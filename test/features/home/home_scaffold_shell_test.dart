@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
+import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/features/home/view/home_scaffold_shell.dart';
 import 'package:hazuki/features/home/support/home_feature_contracts.dart';
 
@@ -56,10 +59,13 @@ void main() {
   testWidgets('home scaffold builds from injected children and services', (
     tester,
   ) async {
+    await tester.runAsync(() => HazukiLiquidGlass.initialize(enabled: false));
+    addTearDown(() => HazukiLiquidGlass.setEnabled(false));
     await tester.binding.setSurfaceSize(const Size(1024, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final downloadStatus = _FakeDownloadStatus();
     addTearDown(downloadStatus.dispose);
+    var searchOpenCount = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -93,7 +99,7 @@ void main() {
           checkedInToday: false,
           onWillPop: () async => false,
           onExitRequested: () async {},
-          onOpenSearch: () {},
+          onOpenSearch: () => searchOpenCount++,
           onFavoriteSortSelected: (_) {},
           onFavoriteCreateFolderPressed: () {},
           onFavoriteModeTogglePressed: () {},
@@ -133,6 +139,46 @@ void main() {
       ),
       isA<RepaintBoundary>(),
     );
+
+    final searchBox = find.byKey(const ValueKey('home-app-bar-search-box'));
+    final glass = find.byKey(
+      const ValueKey('home-search-liquid-glass-surface'),
+    );
+    final originalSize = tester.getSize(searchBox);
+    final homeState = tester.state(find.byType(HomeScaffoldShell));
+    expect(originalSize.height, 40);
+    for (final (index, enabled) in [true, false, true, false].indexed) {
+      await tester.runAsync(() => HazukiLiquidGlass.setEnabled(enabled));
+      await tester.pumpAndSettle();
+      expect(glass, enabled ? findsOneWidget : findsNothing);
+      expect(tester.getSize(searchBox), originalSize);
+      expect(tester.state(find.byType(HomeScaffoldShell)), same(homeState));
+      final material = tester.widget<Material>(
+        find.descendant(of: searchBox, matching: find.byType(Material)).first,
+      );
+      expect(
+        material.color,
+        enabled
+            ? Colors.transparent
+            : hazukiSearchBoxBackgroundColor(tester.element(searchBox)),
+      );
+      if (enabled) {
+        final container = tester.widget<GlassContainer>(glass);
+        expect(container.quality, HazukiLiquidGlass.navigationQuality);
+        expect(
+          container.settings,
+          HazukiLiquidGlass.navigationSettings(tester.element(glass)),
+        );
+        expect(tester.getSize(glass), originalSize);
+      }
+      await tester.tap(
+        find.descendant(of: searchBox, matching: find.byType(InkWell)),
+      );
+      expect(searchOpenCount, index + 1);
+      expect(tester.testTextInput.isVisible, isFalse);
+    }
+    expect(searchOpenCount, 4);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('drawer scale stays fixed until the destination returns', (

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/app/service_locator.dart';
@@ -30,6 +31,116 @@ void main() {
     hazukiNoImageModeNotifier.value = true;
     addTearDown(() => hazukiNoImageModeNotifier.value = previous);
   });
+
+  for (final selectQuality in [false, true]) {
+    for (final systemBack in [false, true]) {
+      testWidgets(
+        'reader exits after quality menu: select=$selectQuality, systemBack=$systemBack',
+        (tester) async {
+          final settings = _SourceSettings();
+          when(() => settings.presentationForSource('picacg')).thenReturn({
+            'imageQualitySetting': 'quality',
+            'imageQualityOptions': {
+              'low': 'Low quality',
+              'high': 'High quality',
+            },
+            'imageQualityDefault': 'low',
+            'buttons': [
+              {'id': 'imageQuality', 'location': 'reader'},
+            ],
+          });
+          when(
+            () => settings.updateSourceSetting('picacg', 'quality', 'high'),
+          ).thenAnswer((_) async {});
+          final titleBar = _TitleBar();
+          addTearDown(titleBar.dispose);
+          await tester.pumpWidget(
+            MaterialApp(
+              locale: const Locale('en'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              builder: (context, child) => withTestSourcePresentation(
+                HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
+              ),
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: TextButton(
+                    onPressed: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => _reader(sourceSettings: settings),
+                      ),
+                    ),
+                    child: const Text('Open reader'),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.tap(find.text('Open reader'));
+          await tester.pumpAndSettle();
+          _host(tester).onOpenSettingsDrawer();
+          await tester.pumpAndSettle();
+          final dropdown = find.byType(DropdownButtonFormField<String>);
+          await tester.scrollUntilVisible(
+            dropdown,
+            300,
+            scrollable: find.descendant(
+              of: find.byType(Drawer),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          await tester.tap(dropdown);
+          await tester.pumpAndSettle();
+          expect(find.text('High quality').hitTestable(), findsOneWidget);
+          if (selectQuality) {
+            await tester.tap(find.text('High quality').hitTestable());
+          } else if (systemBack) {
+            await tester.binding.handlePopRoute();
+          } else {
+            await tester.tapAt(const Offset(10, 10));
+          }
+          await tester.pumpAndSettle();
+          final scaffold = tester.state<ScaffoldState>(
+            find
+                .ancestor(
+                  of: find.byType(Drawer),
+                  matching: find.byType(Scaffold),
+                )
+                .first,
+          );
+          expect(scaffold.isEndDrawerOpen, isTrue);
+          if (systemBack) {
+            await tester.binding.handlePopRoute();
+          } else {
+            await tester.scrollUntilVisible(
+              find.byTooltip('Close'),
+              -300,
+              scrollable: find.descendant(
+                of: find.byType(Drawer),
+                matching: find.byType(Scrollable),
+              ),
+            );
+            await tester.tap(find.byTooltip('Close'));
+          }
+          await tester.pumpAndSettle();
+          expect(scaffold.isEndDrawerOpen, isFalse);
+          expect(find.byType(ReaderPage), findsOneWidget);
+
+          if (systemBack) {
+            await tester.binding.handlePopRoute();
+          } else {
+            _host(tester).onBackPressed();
+          }
+          await tester.pumpAndSettle();
+          expect(find.byType(ReaderPage), findsNothing);
+          expect(find.text('Open reader'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+  }
 
   for (final entry in ['android detail', 'windows detail', 'downloads']) {
     testWidgets('$entry keeps its route and return animation across chapters', (
@@ -208,7 +319,7 @@ void main() {
 ReaderOverlayHost _host(WidgetTester tester) =>
     tester.widget<ReaderOverlayHost>(find.byType(ReaderOverlayHost));
 
-ReaderPage _reader() => ReaderPage(
+ReaderPage _reader({SourceSettingsGateway? sourceSettings}) => ReaderPage(
   title: 'Comic',
   chapterTitle: 'Chapter 1',
   comicId: 'comic',
@@ -239,7 +350,7 @@ ReaderPage _reader() => ReaderPage(
   ],
   dependencies: ReaderDependencies(
     sourceReader: sl<SourceReaderGateway>(),
-    sourceSettings: sl<SourceSettingsGateway>(),
+    sourceSettings: sourceSettings ?? sl<SourceSettingsGateway>(),
     readingProgressService: sl<ReadingProgressService>(),
     downloader: sl<MangaDownloadService>(),
   ),
@@ -254,6 +365,8 @@ ReaderPage _reader() => ReaderPage(
         interactionState,
       }) => const SizedBox.shrink(),
 );
+
+class _SourceSettings extends Mock implements SourceSettingsGateway {}
 
 class _TitleBar extends ChangeNotifier implements WindowTitleBarControl {
   @override

@@ -210,18 +210,18 @@ class HomeScaffoldShell extends StatefulWidget {
 
 class _HomeScaffoldShellState extends State<HomeScaffoldShell>
     with SingleTickerProviderStateMixin {
-  bool _sourceSwitchDialogOpen = false;
+  final _sourceSwitchDialogOpen = ValueNotifier(false);
 
   Future<void> _showSourceSwitchWithMorph(
     FavoriteFoldersMorphOrigin origin,
   ) async {
-    if (_sourceSwitchDialogOpen) return;
-    setState(() => _sourceSwitchDialogOpen = true);
+    if (_sourceSwitchDialogOpen.value) return;
+    _sourceSwitchDialogOpen.value = true;
     var buttonRestored = false;
     void restoreButton() {
       if (buttonRestored) return;
       buttonRestored = true;
-      if (mounted) setState(() => _sourceSwitchDialogOpen = false);
+      if (mounted) _sourceSwitchDialogOpen.value = false;
     }
 
     try {
@@ -285,6 +285,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
 
   @override
   void dispose() {
+    _sourceSwitchDialogOpen.dispose();
     _profileDrawerController.dispose();
     super.dispose();
   }
@@ -345,7 +346,8 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
               onSwitchSourcePressed != null
           ? _showSourceSwitchWithMorph
           : null,
-      sourceSwitchDialogOpen: _sourceSwitchDialogOpen,
+      sourceSwitchDialogOpen: _sourceSwitchDialogOpen.value,
+      sourceSwitchDialogOpenListenable: _sourceSwitchDialogOpen,
       onSelectDiscover: () => onDestinationSelected(0),
       onSelectFavorite: () => onDestinationSelected(1),
       onOpenHistory: onOpenHistory,
@@ -816,9 +818,19 @@ class _HomeAppBarSearchBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: HazukiLiquidGlass.changes,
+      builder: (context, _) => _buildSearchBox(context),
+    );
+  }
+
+  Widget _buildSearchBox(BuildContext context) {
     final theme = Theme.of(context);
-    final searchBox = Material(
-      color: hazukiSearchBoxBackgroundColor(context),
+    final glass = HazukiLiquidGlass.isAvailable;
+    final content = Material(
+      color: glass
+          ? Colors.transparent
+          : hazukiSearchBoxBackgroundColor(context),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(50),
         side: hazukiSearchBoxOutlineSide(context),
@@ -854,6 +866,26 @@ class _HomeAppBarSearchBox extends StatelessWidget {
           ),
         ),
       ),
+    );
+    final searchBox = Stack(
+      key: const ValueKey('home-app-bar-search-box'),
+      fit: StackFit.passthrough,
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: glass
+                ? GlassContainer(
+                    key: const ValueKey('home-search-liquid-glass-surface'),
+                    useOwnLayer: true,
+                    quality: HazukiLiquidGlass.navigationQuality,
+                    shape: const LiquidRoundedRectangle(borderRadius: 50),
+                    settings: HazukiLiquidGlass.navigationSettings(context),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+        content,
+      ],
     );
     if (maxWidth == null) {
       return Padding(

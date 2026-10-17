@@ -2,10 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'source_account_dialogs.dart';
@@ -34,7 +36,6 @@ Future<void> showHomeSourceSwitchDialog(
 
   final dialog = StatefulBuilder(
     builder: (dialogContext, setDialogState) {
-      final morph = FavoriteFoldersMorphScope.maybeOf(dialogContext);
       Future<void> switchTo(SourceCatalogEntry source) async {
         if (switching || source.normalizedKey == registry.activeSourceKey) {
           return;
@@ -104,49 +105,39 @@ Future<void> showHomeSourceSwitchDialog(
 
       return PopScope(
         canPop: !switching,
-        child: Dialog(
-          backgroundColor: morph == null
-              ? homeDialogBackgroundColor(dialogContext)
-              : Colors.transparent,
-          elevation: morph == null ? null : 0,
-          clipBehavior: morph == null ? Clip.antiAlias : Clip.none,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(switching ? 18 : 28),
-          ),
-          child: _HomeSourceSwitchMorphSurface(
-            borderRadius: switching ? 18 : 28,
-            child: AnimatedSize(
-              duration: const Duration(milliseconds: 320),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.center,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                layoutBuilder: (currentChild, previousChildren) {
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: <Widget>[...previousChildren, ?currentChild],
-                  );
-                },
-                transitionBuilder: (child, animation) {
-                  return FadeTransition(opacity: animation, child: child);
-                },
-                child: switching
-                    ? _HomeSourceSwitchBusyPane(
-                        key: const ValueKey('source-switch-busy'),
-                        sourceName: switchingSource?.name ?? '',
-                        phase: busyPhase,
-                      )
-                    : _HomeSourceSwitchPickerPane(
-                        key: const ValueKey('source-switch-picker'),
-                        sources: registry.allowedSources,
-                        activeSourceKey: registry.activeSourceKey ?? '',
-                        errorText: errorText,
-                        onCancel: () => Navigator.of(dialogContext).pop(),
-                        onSelected: switchTo,
-                      ),
-              ),
+        child: _HomeSourceSwitchDialog(
+          borderRadius: switching ? 18 : 28,
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.center,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              layoutBuilder: (currentChild, previousChildren) {
+                return Stack(
+                  alignment: Alignment.center,
+                  children: <Widget>[...previousChildren, ?currentChild],
+                );
+              },
+              transitionBuilder: (child, animation) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              child: switching
+                  ? _HomeSourceSwitchBusyPane(
+                      key: const ValueKey('source-switch-busy'),
+                      sourceName: switchingSource?.name ?? '',
+                      phase: busyPhase,
+                    )
+                  : _HomeSourceSwitchPickerPane(
+                      key: const ValueKey('source-switch-picker'),
+                      sources: registry.allowedSources,
+                      activeSourceKey: registry.activeSourceKey ?? '',
+                      errorText: errorText,
+                      onCancel: () => Navigator.of(dialogContext).pop(),
+                      onSelected: switchTo,
+                    ),
             ),
           ),
         ),
@@ -202,8 +193,8 @@ Future<void> showHomeSourceSwitchDialog(
   }
 }
 
-class _HomeSourceSwitchMorphSurface extends StatelessWidget {
-  const _HomeSourceSwitchMorphSurface({
+class _HomeSourceSwitchDialog extends StatelessWidget {
+  const _HomeSourceSwitchDialog({
     required this.borderRadius,
     required this.child,
   });
@@ -213,8 +204,41 @@ class _HomeSourceSwitchMorphSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: HazukiLiquidGlass.changes,
+      builder: (context, _) {
+        final plain =
+            FavoriteFoldersMorphScope.maybeOf(context) == null &&
+            !HazukiLiquidGlass.isAvailable;
+        return Dialog(
+          backgroundColor: plain
+              ? homeDialogBackgroundColor(context)
+              : Colors.transparent,
+          elevation: plain ? null : 0,
+          clipBehavior: plain ? Clip.antiAlias : Clip.none,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(borderRadius),
+          ),
+          child: _buildSurface(context),
+        );
+      },
+    );
+  }
+
+  Widget _buildSurface(BuildContext context) {
     final morph = FavoriteFoldersMorphScope.maybeOf(context);
-    if (morph == null) return child;
+    final glass = HazukiLiquidGlass.isAvailable;
+    final surface = glass
+        ? GlassContainer(
+            key: const ValueKey('home-source-switch-liquid-glass-surface'),
+            useOwnLayer: true,
+            quality: HazukiLiquidGlass.navigationQuality,
+            shape: LiquidRoundedRectangle(borderRadius: borderRadius),
+            settings: HazukiLiquidGlass.popoverSettings(context),
+            child: morph == null ? child : null,
+          )
+        : null;
+    if (morph == null) return surface ?? child;
     return AnimatedBuilder(
       animation: morph.animation,
       child: child,
@@ -227,6 +251,7 @@ class _HomeSourceSwitchMorphSurface extends StatelessWidget {
           outlineColor: Colors.transparent,
           borderRadius: borderRadius,
           shadowBlurRadius: 22,
+          surface: surface,
           child: child!,
         ),
       ),

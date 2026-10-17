@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
@@ -42,6 +43,7 @@ class HomeSidebarActions {
     this.onSwitchSourcePressed,
     this.onSwitchSourceWithMorph,
     this.sourceSwitchDialogOpen = false,
+    this.sourceSwitchDialogOpenListenable,
     this.onSelectDiscover,
     this.onSelectFavorite,
     this.onOpenHistory,
@@ -59,6 +61,7 @@ class HomeSidebarActions {
   final Future<void> Function(FavoriteFoldersMorphOrigin)?
   onSwitchSourceWithMorph;
   final bool sourceSwitchDialogOpen;
+  final ValueListenable<bool>? sourceSwitchDialogOpenListenable;
   final VoidCallback? onSelectDiscover;
   final VoidCallback? onSelectFavorite;
   final VoidCallback? onOpenHistory;

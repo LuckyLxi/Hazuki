@@ -255,7 +255,7 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
-    testWidgets('navigation glass tint follows ${brightness.name} mode', (
+    testWidgets('navigation glass has a clear ${brightness.name} bevel', (
       tester,
     ) async {
       await tester.runAsync(HazukiLiquidGlass.initialize);
@@ -317,15 +317,17 @@ void main() {
           final backdrop = luminanceAt(10, 90);
           final body = luminanceAt(180, 90);
           if (brightness == Brightness.light) {
-            expect(body, greaterThan(backdrop + 0.10));
+            expect(body, greaterThan(backdrop + 0.03));
           } else {
-            expect(body, lessThan(backdrop - 0.08));
+            expect(body, lessThan(backdrop - 0.025));
           }
-          // The soft highlight must not wash out the backdrop at the rim.
-          final brightestBody = body > backdrop ? body : backdrop;
-          for (var y = 58; y <= 64; y++) {
-            expect(luminanceAt(180, y), lessThan(brightestBody + 0.08));
-          }
+          // Tint should identify the theme without masking the backdrop.
+          expect((body - backdrop).abs(), lessThan(0.09));
+          // A narrow reflection and inset shade give the edge optical depth.
+          final lip = luminanceAt(180, 58);
+          final bevel = luminanceAt(180, 60);
+          expect(lip, greaterThan(bevel + 0.02));
+          expect(bevel, lessThan(body - 0.01));
         } finally {
           snapshot.dispose();
         }
@@ -334,15 +336,20 @@ void main() {
     });
   }
 
-  for (final reader in [false, true]) {
+  for (final (brightness, reader) in [
+    for (final brightness in Brightness.values)
+      for (final reader in [false, true]) (brightness, reader),
+  ]) {
     testWidgets(
-      '${reader ? 'reader' : 'clear'} glass preserves backdrop structure',
+      '${brightness.name} ${reader ? 'reader' : 'clear'} glass preserves '
+      'backdrop structure',
       (tester) async {
         await tester.runAsync(HazukiLiquidGlass.initialize);
         final snapshotKey = GlobalKey();
         await tester.pumpWidget(
           HazukiLiquidGlass.wrap(
             child: MaterialApp(
+              theme: ThemeData(brightness: brightness),
               home: Center(
                 child: RepaintBoundary(
                   key: snapshotKey,
@@ -413,11 +420,11 @@ void main() {
               ).computeLuminance();
             }
 
-            // Broad artwork remains distinct under the reference's 4px blur.
+            // Broad artwork remains distinct under the light 2px blur.
             // Sample well inside adjacent stripes, clear of the glass rim.
             expect(
               luminanceAt(112) - luminanceAt(144),
-              greaterThan(reader ? 0.4 : 0.6),
+              greaterThan(reader ? 0.6 : 0.75),
             );
           } finally {
             snapshot.dispose();
@@ -468,7 +475,9 @@ void main() {
         .glassColor;
     expect(
       lightColor,
-      Theme.of(pageContext).colorScheme.surfaceContainer.withValues(alpha: 0.4),
+      Theme.of(
+        pageContext,
+      ).colorScheme.surfaceContainer.withValues(alpha: 0.16),
     );
 
     mode.value = ThemeMode.dark;
@@ -479,7 +488,9 @@ void main() {
         .glassColor;
     expect(
       darkColor,
-      Theme.of(pageContext).colorScheme.surfaceContainer.withValues(alpha: 0.4),
+      Theme.of(
+        pageContext,
+      ).colorScheme.surfaceContainer.withValues(alpha: 0.16),
     );
     expect(
       lightColor.computeLuminance(),

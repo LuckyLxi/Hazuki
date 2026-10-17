@@ -119,7 +119,16 @@ class _ReaderPageHostState extends State<ReaderPage> {
         onExitReader: () => Navigator.of(context).maybePop(),
         onSettingsDrawerChanged: (open) {
           if (_settingsDrawerOpen != open) {
-            setState(() => _settingsDrawerOpen = open);
+            setState(() {
+              _settingsDrawerOpen = open;
+              if (!open) {
+                // Dismissing a popup while the drawer is open reports that the
+                // chapter can pop. Removing the drawer's local history entry
+                // does not emit another navigation notification.
+                _chapterCanHandlePop =
+                    _chapterNavigatorKey.currentState?.canPop() ?? false;
+              }
+            });
           }
         },
       ),

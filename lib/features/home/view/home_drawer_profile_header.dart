@@ -88,6 +88,8 @@ class HomeDrawerProfileHeader extends StatelessWidget {
                             ? HomeSourceSwitchMorphButton(
                                 onPressed: actions.onSwitchSourceWithMorph!,
                                 dialogOpen: actions.sourceSwitchDialogOpen,
+                                dialogOpenListenable:
+                                    actions.sourceSwitchDialogOpenListenable,
                               )
                             : HomeSourceSwitchPillButton(
                                 onPressed: actions.onSwitchSourcePressed,

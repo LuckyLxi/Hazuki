@@ -90,6 +90,13 @@ void main() {
       final card = find.byKey(const ValueKey('home-profile-liquid-glass-card'));
       _expectNoOpacityLayerAbove(tester.renderObject(card));
       final container = tester.widget<GlassContainer>(card);
+      expect(container.quality, HazukiLiquidGlass.navigationQuality);
+      expect(
+        container.settings,
+        HazukiLiquidGlass.readerSettings(
+          tester.element(card),
+        ).copyWith(visibility: progress),
+      );
       expect(container.settings!.visibility, closeTo(progress, 0.00001));
       final glass = tester.widget<LightweightLiquidGlass>(
         find.descendant(
@@ -134,6 +141,35 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(card, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('open profile follows the glass setting without closing', (
+    tester,
+  ) async {
+    await tester.runAsync(HazukiLiquidGlass.initialize);
+    addTearDown(() => HazukiLiquidGlass.setEnabled(false));
+    await _pumpProfileHost(tester);
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    final glass = find.byKey(const ValueKey('home-profile-liquid-glass-card'));
+    final frosted = find.byKey(
+      const ValueKey('home-profile-frosted-glass-card'),
+    );
+    final originalBounds = tester.getRect(glass);
+    for (final enabled in [false, true]) {
+      await tester.runAsync(() => HazukiLiquidGlass.setEnabled(enabled));
+      await tester.pumpAndSettle();
+      expect(glass, enabled ? findsOneWidget : findsNothing);
+      expect(frosted, enabled ? findsNothing : findsOneWidget);
+      final bounds = tester.getRect(enabled ? glass : frosted);
+      expect(bounds.center, originalBounds.center);
+      expect(bounds.width, originalBounds.width);
+      expect(find.text('Hazuki'), findsOneWidget);
+    }
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+    expect(find.byType(HomeProfileCardContent), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

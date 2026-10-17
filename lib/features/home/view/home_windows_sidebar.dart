@@ -75,6 +75,7 @@ class _HomeWindowsSidebarState extends State<HomeWindowsSidebar> {
   Widget _buildSourceSwitchButton(BuildContext context) => Builder(
     builder: (buttonContext) => HomeSourceSwitchPillButton(
       key: const ValueKey('windows-sidebar-source-switch'),
+      useLiquidGlass: false,
       onPressed: widget.sourceSwitchService == null
           ? actions.onSwitchSourcePressed
           : () => unawaited(_openSourcePicker(buttonContext)),

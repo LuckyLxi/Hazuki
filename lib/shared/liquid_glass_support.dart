@@ -55,7 +55,7 @@ abstract final class HazukiLiquidGlass {
     return LiquidGlassSettings(
       visibility: visibility,
       thickness: premium ? 72 : 10,
-      blur: 4,
+      blur: 2,
       refractiveIndex: 1.18,
       lensModel: premium
           ? GlassLensModel.circularArc
@@ -63,17 +63,17 @@ abstract final class HazukiLiquidGlass {
       refractionAmount: premium ? 24 : 0,
       chromaticAberration: 0,
       lightAngle: 2.356194490192345,
-      lightIntensity: premium ? 0.65 : 0.75,
-      fresnelStrength: 1.05,
+      lightIntensity: premium ? 0.65 : 0.9,
+      fresnelStrength: 1.2,
       // Pair the bright lip with a subtle shaded bevel so the edge has depth.
       // Standard uses thickness/absorption; premium also supports inset rims.
-      edgeAbsorption: isDark ? 0.10 : 0.08,
+      edgeAbsorption: isDark ? 0.14 : 0.12,
       rimShade: premium ? (isDark ? 0.45 : 0.65) : 0,
       rimShadeEnds: isDark ? 0 : 0.2,
       rimLight: premium ? (isDark ? 1.05 : 0.85) : 0,
       ambientStrength: 0,
-      saturation: 1.5,
-      glassColor: isDark ? const Color(0x48141820) : const Color(0x24FFFFFF),
+      saturation: 1.15,
+      glassColor: isDark ? const Color(0x20141820) : const Color(0x14FFFFFF),
       bodyMode: GlassBodyMode.clear,
       glowIntensity: 0,
       shadowElevation: 0.35,
@@ -100,17 +100,12 @@ abstract final class HazukiLiquidGlass {
     shadowElevation: 0,
   );
 
-  static Color _themedTint(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark
-      ? const Color(0x99141820)
-      : const Color(0x99FFFFFF);
-
-  /// The reference uses 40% of the theme's container colour over the lens.
+  /// Keep the theme tint light so artwork remains visible through the lens.
   static LiquidGlassSettings navigationSettings(BuildContext context) {
     return surfaceSettings(context, quality: navigationQuality).copyWith(
       glassColor: Theme.of(
         context,
-      ).colorScheme.surfaceContainer.withValues(alpha: 0.4),
+      ).colorScheme.surfaceContainer.withValues(alpha: 0.16),
     );
   }
 
@@ -119,15 +114,12 @@ abstract final class HazukiLiquidGlass {
     return navigationSettings(context).copyWith(shadowElevation: 0);
   }
 
-  /// Small text in a floating account card needs a calmer backing than chrome.
+  /// Popovers share the navigation lens and tint without a second shadow.
   static LiquidGlassSettings popoverSettings(
     BuildContext context, {
     double visibility = 1,
   }) {
-    return surfaceSettings(
-      context,
-      visibility: visibility,
-    ).copyWith(blur: 3, glassColor: _themedTint(context), shadowElevation: 0);
+    return readerSettings(context).copyWith(visibility: visibility);
   }
 
   static Future<void> initialize({bool enabled = true}) async {

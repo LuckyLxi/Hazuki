@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:hazuki/features/home/support/home_sidebar_models.dart';
@@ -10,14 +11,24 @@ import 'package:hazuki/features/home/view/home_source_switch_pill_button.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 
 class _Gateway extends Mock implements SourceSwitchGateway {}
 
 void main() {
+  for (final glassEnabled in [false, true]) {
+    group('liquid glass enabled=$glassEnabled', () {
+      _sourceSwitchMorphTests(glassEnabled);
+    });
+  }
+}
+
+void _sourceSwitchMorphTests(bool glassEnabled) {
   late _Gateway gateway;
   late StateSetter setHomeState;
   late BuildContext homeContext;
+  late ValueNotifier<bool> dialogOpenState;
   var dialogOpen = false;
   var headerRevision = 0;
   var activeSource = 'a';
@@ -35,6 +46,7 @@ void main() {
   );
 
   setUp(() {
+    dialogOpenState = ValueNotifier(false);
     dialogOpen = false;
     headerRevision = 0;
     activeSource = 'a';
@@ -55,10 +67,17 @@ void main() {
     ).thenAnswer((_) async {});
   });
 
+  tearDown(() => dialogOpenState.dispose());
+
   Future<void> pumpHome(
     WidgetTester tester, {
     bool disableAnimations = false,
+    bool deferHeaderUpdates = false,
   }) async {
+    await tester.runAsync(
+      () => HazukiLiquidGlass.initialize(enabled: glassEnabled),
+    );
+    addTearDown(() => HazukiLiquidGlass.setEnabled(false));
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -83,46 +102,52 @@ void main() {
                 alignment: Alignment.topLeft,
                 child: SizedBox(
                   width: 304,
-                  child: HomeDrawerProfileHeader(
-                    key: ValueKey(headerRevision),
-                    profile: const HomeSidebarProfileState(
-                      isLogged: false,
-                      profileLoading: false,
-                      avatarUrl: '',
-                      username: 'guest',
-                      autoCheckInEnabled: false,
-                      showCheckInActions: false,
-                      checkInBusy: false,
-                      checkedInToday: false,
-                    ),
-                    actions: HomeSidebarActions(
-                      sourceSwitchDialogOpen: dialogOpen,
-                      onSwitchSourceWithMorph: (origin) async {
-                        if (dialogOpen) return;
-                        setState(() => dialogOpen = true);
-                        var buttonRestored = false;
-                        void restoreButton() {
-                          if (buttonRestored) return;
-                          buttonRestored = true;
-                          if (context.mounted) {
-                            setState(() => dialogOpen = false);
+                  child: _DeferredDrawerContent(
+                    deferUpdates: deferHeaderUpdates,
+                    child: HomeDrawerProfileHeader(
+                      key: ValueKey(headerRevision),
+                      profile: const HomeSidebarProfileState(
+                        isLogged: false,
+                        profileLoading: false,
+                        avatarUrl: '',
+                        username: 'guest',
+                        autoCheckInEnabled: false,
+                        showCheckInActions: false,
+                        checkInBusy: false,
+                        checkedInToday: false,
+                      ),
+                      actions: HomeSidebarActions(
+                        sourceSwitchDialogOpen: dialogOpen,
+                        sourceSwitchDialogOpenListenable: dialogOpenState,
+                        onSwitchSourceWithMorph: (origin) async {
+                          if (dialogOpen) return;
+                          dialogOpenState.value = true;
+                          setState(() => dialogOpen = true);
+                          var buttonRestored = false;
+                          void restoreButton() {
+                            if (buttonRestored) return;
+                            buttonRestored = true;
+                            if (context.mounted) {
+                              dialogOpenState.value = false;
+                              setState(() => dialogOpen = false);
+                            }
                           }
-                        }
 
-                        try {
-                          await showHomeSourceSwitchDialog(
-                            context,
-                            sourceService: gateway,
-                            morphOrigin: origin,
-                            onDialogClosed: restoreButton,
-                          );
-                        } finally {
-                          restoreButton();
-                        }
-                      },
+                          try {
+                            await showHomeSourceSwitchDialog(
+                              context,
+                              sourceService: gateway,
+                              morphOrigin: origin,
+                              onDialogClosed: restoreButton,
+                            );
+                          } finally {
+                            restoreButton();
+                          }
+                        },
+                      ),
+                      activeSourceKey: activeSource,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
                     ),
-                    activeSourceKey: activeSource,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
                   ),
                 ),
               ),
@@ -144,6 +169,23 @@ void main() {
       await tester.pump();
       expect(buttonOpacity(tester), 0);
       expect(surfaceRect(tester), origin);
+      final glassSurface = find.byKey(
+        const ValueKey('home-source-switch-liquid-glass-surface'),
+      );
+      expect(glassSurface, glassEnabled ? findsOneWidget : findsNothing);
+      if (glassEnabled) {
+        final container = tester.widget<GlassContainer>(glassSurface);
+        expect(container.quality, HazukiLiquidGlass.navigationQuality);
+        expect(
+          container.settings,
+          HazukiLiquidGlass.readerSettings(tester.element(glassSurface)),
+        );
+        expect(tester.getRect(glassSurface), origin);
+        expect(
+          find.ancestor(of: glassSurface, matching: find.byType(Opacity)),
+          findsNothing,
+        );
+      }
       expect(
         tester.widget<FavoriteFoldersButtonMorph>(morph).origin.iconSize,
         16,
@@ -151,6 +193,9 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 168));
       expect(surfaceRect(tester).width, inExclusiveRange(32, 340));
+      if (glassEnabled) {
+        expect(tester.getRect(glassSurface), surfaceRect(tester));
+      }
       expect(find.text('Cancel').hitTestable(), findsNothing);
       await tester.pumpAndSettle();
       final expanded = surfaceRect(tester);
@@ -170,6 +215,50 @@ void main() {
     },
   );
 
+  testWidgets('open picker and pill follow the glass setting immediately', (
+    tester,
+  ) async {
+    await pumpHome(tester);
+    final glassButton = find.byKey(
+      const ValueKey('home-source-switch-liquid-glass-button'),
+    );
+    final glassSurface = find.byKey(
+      const ValueKey('home-source-switch-liquid-glass-surface'),
+    );
+    expect(glassButton, glassEnabled ? findsOneWidget : findsNothing);
+    if (glassEnabled) {
+      final container = tester.widget<GlassContainer>(glassButton);
+      expect(container.quality, HazukiLiquidGlass.navigationQuality);
+      expect(
+        container.settings,
+        HazukiLiquidGlass.navigationSettings(tester.element(glassButton)),
+      );
+    }
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    final animation = tester
+        .widget<FavoriteFoldersButtonMorph>(morph)
+        .animation;
+    final expanded = surfaceRect(tester);
+    for (final enabled in [!glassEnabled, glassEnabled]) {
+      await tester.runAsync(() => HazukiLiquidGlass.setEnabled(enabled));
+      await tester.pumpAndSettle();
+      expect(glassButton, enabled ? findsOneWidget : findsNothing);
+      expect(glassSurface, enabled ? findsOneWidget : findsNothing);
+      expect(
+        tester.widget<FavoriteFoldersButtonMorph>(morph).animation,
+        animation,
+      );
+      expect(surfaceRect(tester), expanded);
+      expect(find.text('Source b').hitTestable(), findsOneWidget);
+      expect(buttonOpacity(tester), 0);
+    }
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(buttonOpacity(tester), 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('pill is visible in the frame the closing animation finishes', (
     tester,
   ) async {
@@ -187,6 +276,29 @@ void main() {
     expect(animation.status, AnimationStatus.dismissed);
     expect(buttonOpacity(tester), 1);
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('deferred drawer rebuild does not leave a blank closing frame', (
+    tester,
+  ) async {
+    await pumpHome(tester, deferHeaderUpdates: true);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    final animation = tester
+        .widget<FavoriteFoldersButtonMorph>(morph)
+        .animation;
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 559));
+    expect(buttonOpacity(tester), 0);
+    await tester.pump(const Duration(milliseconds: 2));
+    expect(animation.status, AnimationStatus.dismissed);
+    // The header widget still carries the previous frame's dialogOpen value.
+    // The pill must already be visible when the dialog route disappears.
+    expect(buttonOpacity(tester), 1);
+    await tester.pumpAndSettle();
+    expect(buttonOpacity(tester), 1);
     expect(tester.takeException(), isNull);
   });
 
@@ -296,4 +408,37 @@ void main() {
     expect(buttonOpacity(tester), 1);
     expect(tester.takeException(), isNull);
   });
+}
+
+/// Mirrors the profile drawer's post-frame forwarding of new header widgets.
+class _DeferredDrawerContent extends StatefulWidget {
+  const _DeferredDrawerContent({
+    required this.deferUpdates,
+    required this.child,
+  });
+
+  final bool deferUpdates;
+  final Widget child;
+
+  @override
+  State<_DeferredDrawerContent> createState() => _DeferredDrawerContentState();
+}
+
+class _DeferredDrawerContentState extends State<_DeferredDrawerContent> {
+  late Widget _visibleChild = widget.child;
+
+  @override
+  void didUpdateWidget(covariant _DeferredDrawerContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.deferUpdates) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _visibleChild = widget.child);
+      });
+    } else {
+      _visibleChild = widget.child;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _visibleChild;
 }

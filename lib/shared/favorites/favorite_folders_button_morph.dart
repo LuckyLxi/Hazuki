@@ -43,7 +43,7 @@ class FavoriteFoldersMorphScope extends InheritedWidget {
 
 /// Keeps the dialog's contents at their natural layout size while its painted
 /// surface moves and changes shape from the originating button and back.
-class FavoriteFoldersButtonMorph extends SingleChildRenderObjectWidget {
+class FavoriteFoldersButtonMorph extends StatelessWidget {
   const FavoriteFoldersButtonMorph({
     super.key,
     required this.origin,
@@ -52,7 +52,8 @@ class FavoriteFoldersButtonMorph extends SingleChildRenderObjectWidget {
     required this.outlineColor,
     required this.borderRadius,
     required this.shadowBlurRadius,
-    required super.child,
+    this.surface,
+    required this.child,
   });
 
   final FavoriteFoldersMorphOrigin origin;
@@ -62,16 +63,35 @@ class FavoriteFoldersButtonMorph extends SingleChildRenderObjectWidget {
   final double borderRadius;
   final double shadowBlurRadius;
 
+  /// An optional refractive backing, painted independently of content opacity.
+  final Widget? surface;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) => _FavoriteFoldersMorphLayout(this);
+}
+
+class _FavoriteFoldersMorphLayout extends MultiChildRenderObjectWidget {
+  _FavoriteFoldersMorphLayout(this.configuration)
+    : super(children: [?configuration.surface, ?configuration.child]);
+
+  final FavoriteFoldersButtonMorph configuration;
+
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderFavoriteFoldersButtonMorph(this);
+      _RenderFavoriteFoldersButtonMorph(configuration);
 
   @override
   void updateRenderObject(BuildContext context, RenderObject renderObject) =>
-      (renderObject as _RenderFavoriteFoldersButtonMorph).update(this);
+      (renderObject as _RenderFavoriteFoldersButtonMorph).update(configuration);
 }
 
-class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
+class _MorphParentData extends ContainerBoxParentData<RenderBox> {}
+
+class _RenderFavoriteFoldersButtonMorph extends RenderBox
+    with
+        ContainerRenderObjectMixin<RenderBox, _MorphParentData>,
+        RenderBoxContainerDefaultsMixin<RenderBox, _MorphParentData> {
   _RenderFavoriteFoldersButtonMorph(this._configuration);
 
   FavoriteFoldersButtonMorph _configuration;
@@ -79,6 +99,51 @@ class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
   double _reverseStartValue = 1;
   double _reverseStartProgress = 1;
   Rect? _reverseStartRect;
+
+  RenderBox? get child => _configuration.child == null ? null : lastChild;
+  RenderBox? get surface => _configuration.surface == null ? null : firstChild;
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _MorphParentData) {
+      child.parentData = _MorphParentData();
+    }
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) =>
+      child?.getDryLayout(constraints) ?? constraints.smallest;
+
+  @override
+  double computeMinIntrinsicWidth(double height) =>
+      child?.getMinIntrinsicWidth(height) ?? 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) =>
+      child?.getMaxIntrinsicWidth(height) ?? 0;
+
+  @override
+  double computeMinIntrinsicHeight(double width) =>
+      child?.getMinIntrinsicHeight(width) ?? 0;
+
+  @override
+  double computeMaxIntrinsicHeight(double width) =>
+      child?.getMaxIntrinsicHeight(width) ?? 0;
+
+  @override
+  void performLayout() {
+    child?.layout(constraints, parentUsesSize: true);
+    size = child?.size ?? constraints.smallest;
+    // Size the lens to the moving surface rather than stretching its shader.
+    // Only dimensions are needed during layout; ancestor paint transforms may
+    // not have their sizes yet, so defer global coordinate lookup until paint.
+    final surfaceSize = _resolveRect(
+      Offset.zero & _configuration.origin.rect.size,
+      Offset.zero & size,
+      _reverseStartRect,
+    ).size;
+    surface?.layout(BoxConstraints.tight(surfaceSize));
+  }
 
   static const _morphEnd = 0.6;
   // This pulse peaks at 1/3 and returns with zero velocity. Its slope at
@@ -96,6 +161,7 @@ class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
     }
     _configuration = configuration;
     if (attached) _handleStatus(configuration.animation.status);
+    markNeedsLayout();
     markNeedsPaint();
     markNeedsSemanticsUpdate();
   }
@@ -116,6 +182,7 @@ class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
   }
 
   void _handleTick() {
+    if (surface != null) markNeedsLayout();
     markNeedsPaint();
     markNeedsSemanticsUpdate();
   }
@@ -157,13 +224,16 @@ class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
   Rect get _sourceRect =>
       _configuration.origin.rect.shift(-localToGlobal(Offset.zero));
 
-  Rect get _currentRect {
+  Rect get _currentRect => _resolveRect(
+    _sourceRect,
+    Offset.zero & size,
+    _reverseStartRect?.shift(-localToGlobal(Offset.zero)),
+  );
+
+  Rect _resolveRect(Rect source, Rect dialog, Rect? reverseStartRect) {
     final time = _reversing ? _reverseTime : _configuration.animation.value;
-    final source = _sourceRect;
-    final dialog = Offset.zero & size;
     final start = _reversing
-        ? _reverseStartRect?.shift(-localToGlobal(Offset.zero)) ??
-              Rect.lerp(source, dialog, _reverseStartProgress)!
+        ? reverseStartRect ?? Rect.lerp(source, dialog, _reverseStartProgress)!
         : source;
     final end = _reversing ? source : dialog;
     final amplitude = _reversing ? -0.06 * _reverseStartProgress : 0.035;
@@ -211,13 +281,19 @@ class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
 
   @override
   void applyPaintTransform(RenderBox child, Matrix4 transform) {
-    transform.multiply(_childTransform);
+    if (child == surface) {
+      final rect = _currentRect;
+      transform.multiply(Matrix4.translationValues(rect.left, rect.top, 0));
+    } else {
+      transform.multiply(_childTransform);
+    }
   }
 
   @override
   bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
       _configuration.animation.value == 1 &&
-      super.hitTestChildren(result, position: position);
+      child != null &&
+      child!.hitTest(result, position: position);
 
   @override
   void paint(PaintingContext context, Offset offset) {
@@ -242,15 +318,26 @@ class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
       paintedShape.shift(shadow.offset).inflate(shadow.spreadRadius),
       shadow.toPaint(),
     );
-    canvas.drawRRect(
-      paintedShape,
-      Paint()
-        ..color = Color.lerp(
-          origin.backgroundColor,
-          _configuration.surfaceColor,
-          progress,
-        )!,
-    );
+    if (surface != null) {
+      context.pushClipRRect(
+        needsCompositing,
+        offset,
+        rect,
+        shape,
+        (context, offset) =>
+            context.paintChild(surface!, offset + rect.topLeft),
+      );
+    } else {
+      canvas.drawRRect(
+        paintedShape,
+        Paint()
+          ..color = Color.lerp(
+            origin.backgroundColor,
+            _configuration.surfaceColor,
+            progress,
+          )!,
+      );
+    }
     final contentOpacity = const Interval(
       0.18,
       0.8,
@@ -269,7 +356,7 @@ class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
           (context, offset) => context.pushOpacity(
             offset,
             (contentOpacity * 255).round(),
-            (context, offset) => super.paint(context, offset),
+            (context, offset) => context.paintChild(child!, offset),
           ),
         ),
       );

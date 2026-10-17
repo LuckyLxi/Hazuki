@@ -343,18 +343,25 @@ void main() {
   directionalInfluence *= directionalInfluence; // squared for tighter highlight
 
   // Constant base rim (structural edge) + small directional bonus.
-  // iOS 26 uses near-invisible rims in light mode — the glass edge is
-  // defined by subtle refraction and shadow, not by an opaque border.
+  // The regular material uses near-invisible rims in light mode, where
+  // refraction and frost already give the surface definition.
   //
   // smoothstep(0.3, 0.5, luma) creates a sharp binary-like transition:
   //   dark  (luma=0.15) → smoothstep=0.0 → rimFade=1.0  (FULL rim, untouched)
-  //   light (luma=0.85) → smoothstep=1.0 → rimFade=0.08 (near-invisible rim)
+  //   light (luma=0.85) → smoothstep=1.0 → material-specific rim fade
   // Dark mode is completely unaffected.
-  float rimFade = 1.0 - smoothstep(0.3, 0.5, uBackdropLuma) * 0.92;
+  // Clear glass needs a visible reflection even without the adaptive body's
+  // frost. Keep its light-mode lip while retaining the regular material tuning.
+  float lightRimFade = mix(0.08, 0.45, step(0.5, uBodyMode));
+  float rimFade = mix(1.0, lightRimFade, smoothstep(0.3, 0.5, uBackdropLuma));
   float rimAlphaBase = kRimAlphaBase * rimFade + 0.15 * directionalInfluence * uLightIntensity;
   rimAlphaBase *= uRefractiveIndex;
   rimAlphaBase += totalSpecular * kRimAlphaSpecular * rimFade;
   rimAlphaBase *= (1.0 + thicknessOffset * kThicknessRimBoost) * (1.0 + densityFactor * 0.1);
+  // Let clear reflections catch the light in lobes rather than outlining the
+  // entire silhouette at equal strength, especially over dark artwork.
+  float clearReflection = 0.35 + 0.65 * directionalInfluence;
+  rimAlphaBase *= mix(1.0, clearReflection, step(0.5, uBodyMode));
   rimAlphaBase *= borderMask;
   rimAlphaBase = clamp(rimAlphaBase, 0.0, 1.0);
 
@@ -508,12 +515,21 @@ void main() {
     
     pmA = pmA + ambientDarken * (1.0 - pmA);
 
-    // Rim color: full white in dark mode, no dimming needed in light mode
-    // because rimAlphaBase is already near-zero via rimFade.
-    vec3 pathBRimColor = rimColorBase;
+    // A transparent tint cannot darken the backdrop by multiplying its own
+    // premultiplied RGB alone. Composite a narrow shaded bevel underneath the
+    // reflection instead; the flat centre retains the exact clear-body alpha.
+    float clearBevelZone = min(edgeZone, max(1.0, uThickness * 0.35));
+    float clearBevel = (1.0 - meniscusAbsorption(
+        distFromEdge, clearBevelZone, surfaceNormal,
+        uLightDirection, uEdgeAbsorption)) * isClear;
+    pmRgb *= 1.0 - clearBevel;
+    pmA = clearBevel + pmA * (1.0 - clearBevel);
 
-    // Minimum border floor: only active in dark mode (rimFade=1.0).
-    // In light mode rimFade≈0.08, so this floor is effectively zero.
+    // Clear glass reflects a whiter lip, separate from its shaded bevel.
+    // Regular glass retains its softer material rim.
+    vec3 pathBRimColor = mix(rimColorBase, vec3(1.0), isClear * 0.7);
+
+    // Keep a subtle structural edge, attenuated by the material's rim fade.
     float minRimAlpha = borderMask * 0.06 * rimFade;
     float effectiveRimAlpha = max(rimAlphaBase, minRimAlpha);
 
@@ -531,8 +547,8 @@ void main() {
     pmRgb += vec3(uGlowIntensity * 0.3 * glowMask);
     pmA = max(pmA, uGlowIntensity * 0.3 * glowMask);
 
-    // [1] Hemisphere + [2] light-modulated absorption (PATH B — no background texture)
-    pmRgb *= meniscusAbsorption(distFromEdge, edgeZone, surfaceNormal, uLightDirection, uEdgeAbsorption);
+    // Regular material absorption; clear glass already composited its bevel.
+    pmRgb *= mix(meniscusAbsorption(distFromEdge, edgeZone, surfaceNormal, uLightDirection, uEdgeAbsorption), 1.0, isClear);
 
     fragColor = vec4(clamp(pmRgb, 0.0, 1.0) * mask, pmA * mask);
   }

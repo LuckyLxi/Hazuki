@@ -488,6 +488,13 @@ class _HomeProfileGlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: HazukiLiquidGlass.changes,
+      builder: (context, _) => _buildCard(context),
+    );
+  }
+
+  Widget _buildCard(BuildContext context) {
     final progress = _HomeDialogGlassProgress.of(context);
     final content = HomeProfileCardContent(
       avatarUrl: avatarUrl,
@@ -506,7 +513,7 @@ class _HomeProfileGlassCard extends StatelessWidget {
           width: _width,
           padding: _padding,
           useOwnLayer: true,
-          quality: GlassQuality.standard,
+          quality: HazukiLiquidGlass.navigationQuality,
           shape: const LiquidRoundedSuperellipse(borderRadius: _borderRadius),
           settings: HazukiLiquidGlass.popoverSettings(
             context,

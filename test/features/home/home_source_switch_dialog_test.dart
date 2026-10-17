@@ -4,6 +4,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 
 class _MockSourceSwitchGateway extends Mock implements SourceSwitchGateway {}
@@ -53,6 +54,34 @@ Future<_MockSourceSwitchGateway> _openPicker(
 }
 
 void main() {
+  for (final glassEnabled in [false, true]) {
+    group('liquid glass enabled=$glassEnabled', () {
+      _sourceSwitchDialogTests(glassEnabled);
+    });
+  }
+}
+
+void _sourceSwitchDialogTests(bool glassEnabled) {
+  setUp(() => HazukiLiquidGlass.initialize(enabled: glassEnabled));
+  tearDown(() => HazukiLiquidGlass.setEnabled(false));
+
+  testWidgets('picker follows the glass setting while open', (tester) async {
+    await _openPicker(tester, sourceCount: 3);
+    final surface = find.byKey(
+      const ValueKey('home-source-switch-liquid-glass-surface'),
+    );
+    expect(surface, glassEnabled ? findsOneWidget : findsNothing);
+    final listSize = tester.getSize(find.byType(ListView));
+    await tester.runAsync(() => HazukiLiquidGlass.setEnabled(!glassEnabled));
+    await tester.pumpAndSettle();
+    expect(surface, glassEnabled ? findsNothing : findsOneWidget);
+    expect(tester.getSize(find.byType(ListView)), listSize);
+    expect(find.text('Source 1').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   for (final textScale in [1.0, 2.0]) {
     testWidgets(
       'picker reveals and focuses a late current source at ${textScale}x text',
