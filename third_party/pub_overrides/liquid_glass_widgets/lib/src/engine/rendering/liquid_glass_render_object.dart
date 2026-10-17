@@ -17,6 +17,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import '../../renderer/fragment_shader_extensions.dart';
+import '../../renderer/glass_snapshot_render_root.dart';
 import '../../renderer/liquid_glass_renderer.dart'
     show debugPaintLiquidGlassGeometry;
 import '../liquid_glass.dart' show RenderLiquidGlass;
@@ -26,7 +27,8 @@ import '../snap_rect_to_pixels.dart';
 
 /// A render object that can assemble [RenderLiquidGlassGeometry] shapes and
 /// render them to the screen with the liquid glass effect.
-abstract class LiquidGlassRenderObject extends RenderProxyBox {
+abstract class LiquidGlassRenderObject extends RenderProxyBox
+    implements GlassSnapshotAware {
   LiquidGlassRenderObject({
     required GeometryRenderLink link,
     this.renderShader,
@@ -78,6 +80,23 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
 
   Matrix4 get matteTransform;
 
+  /// An active page snapshot is its own render target, independent of the
+  /// page's current screen position. Does not change Hero/hit-test transforms.
+  RenderGlassSnapshotRoot? get snapshotRoot => RenderGlassSnapshotRoot.of(this);
+
+  @override
+  void onSnapshotTargetChanged() => markNeedsPaint();
+
+  /// Converts an input position from the screen to the current render target.
+  Offset positionInRenderTarget(Offset globalPosition) {
+    final root = snapshotRoot;
+    if (root == null) return globalPosition;
+    return MatrixUtils.transformPoint(
+      Matrix4.inverted(root.getTransformTo(null)),
+      globalPosition,
+    );
+  }
+
   /// Local-space rect of the backdrop-reading compositor pass this render
   /// object opened on its last paint (the clip around its
   /// [BackdropFilterLayer]), or null when it painted via the capture path
@@ -101,15 +120,16 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   /// Builds [frostRowsPath] for the glass's current bounds and screen
   /// transform; see [FrostRows].
   Path? _frostRows(Rect passPhysical, double dpr) => _frostRowsCache.rows(
-        transform: getTransformTo(null),
+        transform: getTransformTo(snapshotRoot),
         bounds: _paintBounds,
         passPhysical: passPhysical,
         dpr: dpr,
       );
 
-  /// Screen-space (logical) rect of the nearest enclosing Impeller compositor
+  /// Render-target (logical) rect of the nearest enclosing Impeller compositor
   /// pass that a [BackdropFilterLayer] in this subtree samples from, or null
-  /// when that pass is the root surface.
+  /// when that pass is the root surface. An active page snapshot is a local
+  /// root surface; ancestors outside it cannot supply its backdrop.
   ///
   /// On Impeller, every [BackdropFilterLayer] renders its subtree into an
   /// offscreen pass sized to its clip. [FlutterFragCoord()] inside any shader
@@ -128,9 +148,11 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
   /// Returns null (→ uniforms reduce to current behaviour) when no such
   /// ancestor is found, i.e. the glass composes directly into the root pass.
   Rect? enclosingBackdropPassRect() {
+    final target = snapshotRoot;
     RenderObject? node = parent;
     bool passedThroughGlassShape = false;
     while (node != null) {
+      if (identical(node, target)) return Offset.zero & target!.size;
       Rect? local;
       if (node is RenderBackdropFilter) {
         // Flutter's BackdropFilter opens a pass scoped to its own logical size.
@@ -145,7 +167,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
       }
       if (local != null) {
         final global = MatrixUtils.transformRect(
-          node.getTransformTo(null),
+          node.getTransformTo(target),
           local,
         );
         // Coverage never exceeds the root surface.
@@ -606,7 +628,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
           // touch position must be relative to the enclosing pass, not the screen.
           ..setFloatUniforms(initialIndex: 34, (value) {
             value
-              ..setOffset(_touchPosition * dpr - passPhysical.topLeft)
+              ..setOffset(positionInRenderTarget(_touchPosition) * dpr -
+                  passPhysical.topLeft)
               ..setFloat(_touchIntensity.clamp(0.0, 1.0));
           })
           // Slots 37-39: uRimConfig (rimShade, rimLight, rimShadeEnds);

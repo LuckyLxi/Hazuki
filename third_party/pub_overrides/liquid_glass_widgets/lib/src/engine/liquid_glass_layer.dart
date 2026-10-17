@@ -609,7 +609,9 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
   List<BoxShadow> shadows;
 
   @override
-  Size get desiredMatteSize => switch (owner?.rootNode) {
+  Size get desiredMatteSize =>
+      snapshotRoot?.size ??
+      switch (owner?.rootNode) {
         final RenderView rv => rv.size,
         final RenderBox rb => rb.size,
         _ => Size.zero,
@@ -617,6 +619,13 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   Matrix4? _unscaledTransform;
   Offset? _unscaledCaptureOrigin;
+
+  @override
+  void onSnapshotTargetChanged() {
+    _unscaledTransform = null;
+    _unscaledCaptureOrigin = null;
+    super.onSnapshotTargetChanged();
+  }
 
   bool _hasScale(Matrix4 m) {
     // A surface scaling itself leaves its backdrop where it was, so the live
@@ -670,20 +679,20 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
 
   @override
   Matrix4 get matteTransform {
-    if (_unscaledTransform case final frozen?
-        when _hasScale(getTransformTo(null))) {
+    final current = getTransformTo(snapshotRoot);
+    if (_unscaledTransform case final frozen? when _hasScale(current)) {
       return frozen;
     }
-    return getTransformTo(null);
+    return current;
   }
 
   @override
   Offset get captureOriginInScreenSpace {
     if (_unscaledCaptureOrigin case final frozen?
-        when _hasScale(getTransformTo(null))) {
+        when _hasScale(getTransformTo(snapshotRoot))) {
       return frozen;
     }
-    return super.captureOriginInScreenSpace;
+    return positionInRenderTarget(super.captureOriginInScreenSpace);
   }
 
   @override
@@ -698,7 +707,8 @@ class RenderLiquidGlassLayer extends LiquidGlassRenderObject
     if (!attached) return;
     // Refresh before the base paint reads matteTransform to build geometry.
     // This also records the resting baseline when geometry is not ready yet.
-    _updateScaleState(getTransformTo(null), super.captureOriginInScreenSpace);
+    _updateScaleState(getTransformTo(snapshotRoot),
+        positionInRenderTarget(super.captureOriginInScreenSpace));
     super.paint(context, offset);
   }
 

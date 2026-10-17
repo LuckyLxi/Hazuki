@@ -36,6 +36,7 @@ import 'services/cloud_sync_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
 import 'shared/liquid_glass_support.dart';
+import 'shared/navigation/snapshotting_page_route.dart';
 import 'shared/text/chinese_conversion_scope.dart';
 import 'services/source/source_capabilities.dart';
 import 'widgets/hazuki_prompt.dart';
@@ -464,19 +465,21 @@ class _HazukiAppState extends State<HazukiApp>
                   ),
                 );
               },
-              home: HazukiHomePage(
-                appearanceSettings: appearance,
-                onAppearanceChanged: _updateAppearance,
-                locale: _locale,
-                onLocaleChanged: _updateLocalePreference,
-                featureEntrypoints: _homeFeatureEntrypoints,
-                services: _homeServices,
-                allowDiscoverInitialLoad:
-                    _startupCoordinator.allowDiscoverInitialLoad,
-                hideDiscoverLoadingUntilAllowed:
-                    _startupCoordinator.bootstrapState.showOverlay ||
-                    _startupCoordinator.bootstrapState.showIntro,
-                refreshTick: _startupCoordinator.homeRefreshTick,
+              home: RouteTransitionSnapshot(
+                child: HazukiHomePage(
+                  appearanceSettings: appearance,
+                  onAppearanceChanged: _updateAppearance,
+                  locale: _locale,
+                  onLocaleChanged: _updateLocalePreference,
+                  featureEntrypoints: _homeFeatureEntrypoints,
+                  services: _homeServices,
+                  allowDiscoverInitialLoad:
+                      _startupCoordinator.allowDiscoverInitialLoad,
+                  hideDiscoverLoadingUntilAllowed:
+                      _startupCoordinator.bootstrapState.showOverlay ||
+                      _startupCoordinator.bootstrapState.showIntro,
+                  refreshTick: _startupCoordinator.homeRefreshTick,
+                ),
               ),
             );
           },
