@@ -87,6 +87,98 @@ void resetHomeDrawerScale(AnimationController controller) {
   controller.value = 0;
 }
 
+/// Keeps the glass scaffold stable while only the foreground transform and
+/// navigation layout follow the drawer. Rebuilding the scaffold every tick
+/// also rebuilds its glass scopes and background infrastructure.
+class HomeDrawerTransition extends StatelessWidget {
+  const HomeDrawerTransition({
+    super.key,
+    required this.animation,
+    required this.child,
+    required this.navigationBuilder,
+    this.showNavigation = true,
+  });
+
+  final Animation<double> animation;
+  final Widget child;
+  final Widget Function(BuildContext, double, Size) navigationBuilder;
+  final bool showNavigation;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(18 * animation.value, 0),
+        child: Transform.scale(
+          scale: 1 - 0.035 * animation.value,
+          alignment: Alignment.centerRight,
+          child: child,
+        ),
+      ),
+    );
+    if (!showNavigation) return foreground;
+
+    return ListenableBuilder(
+      listenable: HazukiLiquidGlass.changes,
+      child: foreground,
+      builder: (context, foreground) => LayoutBuilder(
+        builder: (context, constraints) {
+          final glass = HazukiLiquidGlass.isAvailable;
+          final navigation = AnimatedBuilder(
+            animation: animation,
+            builder: (context, _) {
+              final progress = animation.value;
+              final offset = resolveHomeNavigationDrawerOffset(
+                viewportSize: constraints.biggest,
+                progress: progress,
+              );
+              final content = navigationBuilder(
+                context,
+                progress,
+                constraints.biggest,
+              );
+              if (glass) {
+                return Padding(
+                  padding: EdgeInsets.only(bottom: -offset.dy),
+                  child: content,
+                );
+              }
+              return Positioned(
+                left: 0,
+                right: 0,
+                bottom: -offset.dy,
+                child: content,
+              );
+            },
+          );
+          if (glass) {
+            return GlassScaffold(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              enableBackgroundSampling: false,
+              resizeToAvoidBottomInset: false,
+              topEdgeFade: false,
+              bottomEdgeFade: false,
+              contentAwareBrightness: false,
+              bottomBarHeight:
+                  HomeBottomNavigation.floatingBarHeight +
+                  HomeBottomNavigation.floatingVerticalPadding * 2,
+              body: foreground!,
+              bottomBar: navigation,
+            );
+          }
+          return Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.none,
+            children: [foreground!, navigation],
+          );
+        },
+      ),
+    );
+  }
+}
+
 @visibleForTesting
 VoidCallback holdHomeDrawerScaleUntilRouteReturns({
   required Animation<double> routeAnimation,
@@ -423,183 +515,135 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
       },
       child: ColoredBox(
         color: Theme.of(context).colorScheme.surface,
-        child: AnimatedBuilder(
+        child: HomeDrawerTransition(
           animation: _profileDrawerController,
-          child: HomeDrawerSnapshot(
-            animation: _profileDrawerController,
-            enabled: !Platform.isWindows,
-            contentAnimating: _homeContentAnimating,
-            child: WindowsComicDetailHost(
-              child: ListenableBuilder(
-                listenable: downloadStatus,
-                builder: (context, _) {
-                  final hasDownloadTasks = downloadStatus.hasTasks;
-                  return TweenAnimationBuilder<double>(
-                    tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, leadingWidth, _) {
-                      final appBar = hazukiFrostedAppBar(
-                        context: context,
-                        leading: Platform.isWindows
-                            ? null
-                            : _HomeAppBarProfileButton(
-                                downloadStatus: downloadStatus,
-                                activeSourceKey: activeSourceKey,
-                                avatarUrl: avatarUrl,
-                                profileLoading: profileLoading,
-                                username: username,
-                                drawerContent: mobileDrawerContent,
-                                onOpenDownloads: onOpenDownloadTasks,
-                                onDrawerVisibilityChanged:
-                                    _setProfileDrawerOpen,
-                                onDrawerCovered: _resetProfileDrawer,
-                              ),
-                        leadingWidth: Platform.isWindows ? null : leadingWidth,
-                        automaticallyImplyLeading: false,
-                        title: currentIndex == 1
-                            ? null
-                            : _HomeAppBarSearchBox(
-                                onOpenSearch: onOpenSearch,
-                                maxWidth: Platform.isWindows ? 320 : null,
-                              ),
-                        titleSpacing: Platform.isWindows ? null : 4,
-                        centerTitle: Platform.isWindows,
-                        enableBlur: currentIndex != 0 && currentIndex != 1,
-                        actions: [
-                          HomeAppBarActions(
-                            currentIndex: currentIndex,
-                            discoverSearchMorphProgress:
-                                discoverSearchMorphProgress,
-                            forceDiscoverSearchInAppBar:
-                                usePinnedDiscoverSearch,
-                            favoriteAppBarActions: favoriteAppBarActions,
-                            onOpenSearch: onOpenSearch,
-                            onFavoriteSortSelected: onFavoriteSortSelected,
-                            onFavoriteCreateFolderPressed:
-                                onFavoriteCreateFolderPressed,
-                            onFavoriteModeTogglePressed:
-                                onFavoriteModeTogglePressed,
-                          ),
-                        ],
-                      );
-                      return Scaffold(
-                        key: scaffoldKey,
-                        extendBody: true,
-                        appBar: PreferredSize(
-                          preferredSize: appBar.preferredSize,
-                          child: RepaintBoundary(
-                            key: const ValueKey(
-                              'home-app-bar-repaint-boundary',
+          showNavigation: !Platform.isWindows,
+          child: WindowsComicDetailHost(
+            child: ListenableBuilder(
+              listenable: downloadStatus,
+              builder: (context, _) {
+                final hasDownloadTasks = downloadStatus.hasTasks;
+                return TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, leadingWidth, _) {
+                    final appBar = hazukiFrostedAppBar(
+                      context: context,
+                      leading: Platform.isWindows
+                          ? null
+                          : _HomeAppBarProfileButton(
+                              downloadStatus: downloadStatus,
+                              activeSourceKey: activeSourceKey,
+                              avatarUrl: avatarUrl,
+                              profileLoading: profileLoading,
+                              username: username,
+                              drawerContent: mobileDrawerContent,
+                              onOpenDownloads: onOpenDownloadTasks,
+                              onDrawerVisibilityChanged: _setProfileDrawerOpen,
+                              onDrawerCovered: _resetProfileDrawer,
                             ),
-                            child: HomeDrawerSnapshot(
-                              animation: _profileDrawerController,
-                              enabled: !Platform.isWindows,
-                              // The app bar normally composites over Scaffold's
-                              // background. Include it in the isolated raster
-                              // so its translucent glass keeps the same tint.
-                              child: ColoredBox(
-                                color: Theme.of(
-                                  context,
-                                ).scaffoldBackgroundColor,
-                                child: appBar,
-                              ),
+                      leadingWidth: Platform.isWindows ? null : leadingWidth,
+                      automaticallyImplyLeading: false,
+                      title: currentIndex == 1
+                          ? null
+                          : _HomeAppBarSearchBox(
+                              onOpenSearch: onOpenSearch,
+                              maxWidth: Platform.isWindows ? 320 : null,
+                            ),
+                      titleSpacing: Platform.isWindows ? null : 4,
+                      centerTitle: Platform.isWindows,
+                      enableBlur: currentIndex != 0 && currentIndex != 1,
+                      actions: [
+                        HomeAppBarActions(
+                          currentIndex: currentIndex,
+                          discoverSearchMorphProgress:
+                              discoverSearchMorphProgress,
+                          forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
+                          favoriteAppBarActions: favoriteAppBarActions,
+                          onOpenSearch: onOpenSearch,
+                          onFavoriteSortSelected: onFavoriteSortSelected,
+                          onFavoriteCreateFolderPressed:
+                              onFavoriteCreateFolderPressed,
+                          onFavoriteModeTogglePressed:
+                              onFavoriteModeTogglePressed,
+                        ),
+                      ],
+                    );
+                    return Scaffold(
+                      key: scaffoldKey,
+                      extendBody: true,
+                      appBar: PreferredSize(
+                        preferredSize: appBar.preferredSize,
+                        child: RepaintBoundary(
+                          key: const ValueKey('home-app-bar-repaint-boundary'),
+                          child: HomeDrawerSnapshot(
+                            animation: _profileDrawerController,
+                            enabled: !Platform.isWindows,
+                            // The app bar normally composites over Scaffold's
+                            // background. Include it in the isolated raster
+                            // so its translucent glass keeps the same tint.
+                            child: ColoredBox(
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              child: appBar,
                             ),
                           ),
                         ),
-                        drawerEnableOpenDragGesture: false,
-                        drawer: null,
-                        body: body,
-                        bottomNavigationBar: null,
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ),
-          builder: (context, child) {
-            final drawerProgress = _profileDrawerController.value;
-            final transformedContent = Transform.translate(
-              offset: Offset(18 * drawerProgress, 0),
-              child: Transform.scale(
-                scale: 1 - 0.035 * drawerProgress,
-                alignment: Alignment.centerRight,
-                child: child,
-              ),
-            );
-            if (Platform.isWindows) {
-              return transformedContent;
-            }
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final navigationScale = 1 - 0.035 * drawerProgress;
-                final navigationOffset = resolveHomeNavigationDrawerOffset(
-                  viewportSize: constraints.biggest,
-                  progress: drawerProgress,
-                );
-                final navigationContent = RepaintBoundary(
-                  key: const ValueKey(
-                    'home-bottom-navigation-repaint-boundary',
-                  ),
-                  child: HomeBottomNavigation(
-                    currentIndex: currentIndex,
-                    onDestinationSelected: onDestinationSelected,
-                    discoverLabel: l10n(context).homeTabDiscover,
-                    favoriteLabel: l10n(context).homeTabFavorite,
-                    backToTopLabel: l10n(context).favoriteBackToTop,
-                    layoutScale: navigationScale,
-                    showBackToTop: currentIndex == 0
-                        ? _showDiscoverBackToTop
-                        : currentIndex == 1 && widget.showFavoriteBackToTop,
-                    onBackToTopPressed: currentIndex == 0
-                        ? _onDiscoverBackToTopPressed
-                        : widget.onFavoriteBackToTopPressed,
-                  ),
-                );
-                final navigation = HazukiLiquidGlass.isAvailable
-                    ? HomeNavigationDrawerLayout(
-                        viewportWidth: constraints.maxWidth,
-                        progress: drawerProgress,
-                        child: navigationContent,
-                      )
-                    : Padding(
-                        padding: EdgeInsets.only(left: navigationOffset.dx * 2),
-                        child: navigationContent,
-                      );
-                if (HazukiLiquidGlass.isAvailable) {
-                  return GlassScaffold(
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    enableBackgroundSampling: false,
-                    resizeToAvoidBottomInset: false,
-                    topEdgeFade: false,
-                    bottomEdgeFade: false,
-                    contentAwareBrightness: false,
-                    bottomBarHeight:
-                        HomeBottomNavigation.floatingBarHeight +
-                        HomeBottomNavigation.floatingVerticalPadding * 2,
-                    body: transformedContent,
-                    bottomBar: Padding(
-                      padding: EdgeInsets.only(bottom: -navigationOffset.dy),
-                      child: navigation,
-                    ),
-                  );
-                }
-                return Stack(
-                  fit: StackFit.expand,
-                  clipBehavior: Clip.none,
-                  children: [
-                    transformedContent,
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: -navigationOffset.dy,
-                      child: navigation,
-                    ),
-                  ],
+                      ),
+                      drawerEnableOpenDragGesture: false,
+                      drawer: null,
+                      // Cache the body and header separately. A full-page
+                      // snapshot would rasterize the cached header again and
+                      // allocate a second texture containing the same pixels.
+                      body: HomeDrawerSnapshot(
+                        animation: _profileDrawerController,
+                        enabled: !Platform.isWindows,
+                        contentAnimating: _homeContentAnimating,
+                        child: ColoredBox(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          child: body,
+                        ),
+                      ),
+                      bottomNavigationBar: null,
+                    );
+                  },
                 );
               },
+            ),
+          ),
+          navigationBuilder: (context, drawerProgress, viewportSize) {
+            final navigationScale = 1 - 0.035 * drawerProgress;
+            final navigationOffset = resolveHomeNavigationDrawerOffset(
+              viewportSize: viewportSize,
+              progress: drawerProgress,
             );
+            final navigationContent = RepaintBoundary(
+              key: const ValueKey('home-bottom-navigation-repaint-boundary'),
+              child: HomeBottomNavigation(
+                currentIndex: currentIndex,
+                onDestinationSelected: onDestinationSelected,
+                discoverLabel: l10n(context).homeTabDiscover,
+                favoriteLabel: l10n(context).homeTabFavorite,
+                backToTopLabel: l10n(context).favoriteBackToTop,
+                layoutScale: navigationScale,
+                showBackToTop: currentIndex == 0
+                    ? _showDiscoverBackToTop
+                    : currentIndex == 1 && widget.showFavoriteBackToTop,
+                onBackToTopPressed: currentIndex == 0
+                    ? _onDiscoverBackToTopPressed
+                    : widget.onFavoriteBackToTopPressed,
+              ),
+            );
+            return HazukiLiquidGlass.isAvailable
+                ? HomeNavigationDrawerLayout(
+                    viewportWidth: viewportSize.width,
+                    progress: drawerProgress,
+                    child: navigationContent,
+                  )
+                : Padding(
+                    padding: EdgeInsets.only(left: navigationOffset.dx * 2),
+                    child: navigationContent,
+                  );
           },
         ),
       ),

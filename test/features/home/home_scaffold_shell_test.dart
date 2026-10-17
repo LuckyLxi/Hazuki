@@ -8,6 +8,7 @@ import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/features/home/view/home_scaffold_shell.dart';
+import 'package:hazuki/features/home/view/home_drawer_snapshot.dart';
 import 'package:hazuki/features/home/support/home_feature_contracts.dart';
 
 class _FakeDownloadStatus extends ChangeNotifier
@@ -121,6 +122,19 @@ void main() {
 
     expect(find.text('discover child'), findsOneWidget);
     expect(find.text('favorite child'), findsOneWidget);
+    // Body and header use disjoint rasters. Nesting a header snapshot inside
+    // a page snapshot captures the same pixels twice on every drawer motion.
+    final snapshots = find.byType(HomeDrawerSnapshot);
+    expect(snapshots, findsNWidgets(2));
+    for (final snapshot in snapshots.evaluate()) {
+      expect(
+        find.descendant(
+          of: find.byWidget(snapshot.widget),
+          matching: find.byType(HomeDrawerSnapshot),
+        ),
+        findsNothing,
+      );
+    }
     expect(
       find.byKey(const ValueKey('home-app-bar-repaint-boundary')),
       findsOneWidget,
