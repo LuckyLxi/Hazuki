@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
+import 'package:hazuki/features/reader/support/reader_image_actions_service.dart';
+import 'package:hazuki/features/reader/view/reader_image_actions_sheet.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -19,6 +21,8 @@ class ReaderSaveImageController {
     required ReaderLogPayloadBuilder logPayload,
     required String comicId,
     required String epId,
+    required String sourceKey,
+    ReaderImageActionsService imageActions = const ReaderImageActionsService(),
   }) : _context = context,
        _resolveReaderTheme = resolveReaderTheme,
        _sourceReader = sourceReader,
@@ -26,7 +30,9 @@ class ReaderSaveImageController {
        _logEvent = logEvent,
        _logPayload = logPayload,
        _comicId = comicId,
-       _epId = epId;
+       _epId = epId,
+       _sourceKey = sourceKey,
+       _imageActions = imageActions;
 
   final ReaderContextGetter _context;
   final ThemeData Function(BuildContext context) _resolveReaderTheme;
@@ -36,101 +42,118 @@ class ReaderSaveImageController {
   final ReaderLogPayloadBuilder _logPayload;
   final String _comicId;
   final String _epId;
+  final String _sourceKey;
+  final ReaderImageActionsService _imageActions;
+  bool _actionsOpen = false;
 
   Future<void> showSaveImageDialog(String imageUrl) async {
+    if (_actionsOpen || !_isMounted()) return;
+    _actionsOpen = true;
+    try {
+      await _showImageActions(imageUrl);
+    } finally {
+      _actionsOpen = false;
+    }
+  }
+
+  Future<void> _showImageActions(String imageUrl) async {
     unawaited(HapticFeedback.heavyImpact());
     final context = _context();
     final strings = l10n(context);
     final dialogTheme = _resolveReaderTheme(context);
     _logEvent(
-      'Reader save image dialog opened',
+      'Reader image actions opened',
       source: 'reader_media',
       content: _logPayload({'imageUrl': imageUrl}),
     );
-    final shouldSave = await showGeneralDialog<bool>(
+    final action = await showModalBottomSheet<ReaderImageAction>(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: strings.commonClose,
-      transitionDuration: const Duration(milliseconds: 300),
-      transitionBuilder: (context, anim1, anim2, child) {
-        return Transform.scale(
-          scale: CurvedAnimation(
-            parent: anim1,
-            curve: Curves.easeOutBack,
-            reverseCurve: Curves.easeInBack,
-          ).value,
-          child: FadeTransition(opacity: anim1, child: child),
-        );
-      },
-      pageBuilder: (dialogContext, anim1, anim2) {
-        return Theme(
-          data: dialogTheme,
-          child: AlertDialog(
-            backgroundColor: dialogTheme.colorScheme.surfaceContainerHigh,
-            title: Text(strings.readerSaveImageTitle),
-            content: Text(strings.readerSaveImageContent),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: Text(strings.commonCancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: Text(strings.commonSave),
-              ),
-            ],
-          ),
-        );
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      elevation: 0,
+      showDragHandle: false,
+      constraints: const BoxConstraints(maxWidth: 560),
+      sheetAnimationStyle: const AnimationStyle(
+        duration: Duration(milliseconds: 400),
+        // A small overshoot lifts the sheet gently before it settles.
+        curve: Cubic(0.2, 0.9, 0.3, 1.15),
+      ),
+      builder: (dialogContext) {
+        return Theme(data: dialogTheme, child: const ReaderImageActionsSheet());
       },
     );
-    if (shouldSave != true || !_isMounted()) {
+    if (action == null || !_isMounted()) {
       _logEvent(
-        'Reader save image cancelled',
+        'Reader image actions cancelled',
         source: 'reader_media',
         content: _logPayload({'imageUrl': imageUrl}),
       );
       return;
     }
     _logEvent(
-      'Reader save image confirmed',
+      'Reader image action selected',
       source: 'reader_media',
-      content: _logPayload({'imageUrl': imageUrl}),
+      content: _logPayload({'imageUrl': imageUrl, 'action': action.name}),
     );
     try {
       final prepared = await _prepareImageForSave(imageUrl);
-      final directory = await _resolveSaveDirectory();
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
+      if (!_isMounted()) return;
+      String? savedPath;
+      switch (action) {
+        case ReaderImageAction.share:
+          await _imageActions.shareImage(prepared.bytes, prepared.extension);
+        case ReaderImageAction.copy:
+          await _imageActions.copyImage(prepared.bytes, prepared.extension);
+        case ReaderImageAction.save:
+          savedPath = await _imageActions.saveImage(
+            prepared.bytes,
+            prepared.extension,
+            _resolveSaveName(imageUrl, prepared.extension),
+          );
       }
-      final file = File(
-        '${directory.path}/${_resolveSaveName(imageUrl, prepared.extension)}',
-      );
-      await file.writeAsBytes(prepared.bytes, flush: true);
       if (!_isMounted()) {
         return;
       }
       _logEvent(
-        'Reader image saved',
+        'Reader image action completed',
         source: 'reader_media',
-        content: _logPayload({'imageUrl': imageUrl, 'savedPath': file.path}),
+        content: _logPayload({
+          'imageUrl': imageUrl,
+          'action': action.name,
+          'savedPath': ?savedPath,
+        }),
       );
-      unawaited(showHazukiPrompt(_context(), strings.comicDetailSavedToPath));
+      if (action != ReaderImageAction.share) {
+        unawaited(
+          showHazukiPrompt(
+            _context(),
+            action == ReaderImageAction.copy
+                ? strings.readerImageCopied
+                : strings.comicDetailSavedToPath,
+          ),
+        );
+      }
     } catch (error) {
       _logEvent(
-        'Reader image save failed',
+        'Reader image action failed',
         level: 'error',
         source: 'reader_media',
-        content: _logPayload({'imageUrl': imageUrl, 'error': '$error'}),
+        content: _logPayload({
+          'imageUrl': imageUrl,
+          'action': action.name,
+          'error': '$error',
+        }),
       );
       if (!_isMounted()) {
         return;
       }
       unawaited(
-        showHazukiPrompt(
-          _context(),
-          strings.comicDetailSaveFailed('$error'),
-          isError: true,
-        ),
+        showHazukiPrompt(_context(), switch (action) {
+          ReaderImageAction.share => strings.readerShareImageFailed('$error'),
+          ReaderImageAction.copy => strings.readerCopyImageFailed('$error'),
+          ReaderImageAction.save => strings.comicDetailSaveFailed('$error'),
+        }, isError: true),
       );
     }
   }
@@ -154,19 +177,12 @@ class ReaderSaveImageController {
       imageUrl,
       comicId: _comicId,
       epId: _epId,
+      sourceKey: _sourceKey,
     );
     return _ReaderPreparedSaveImage(
       bytes: prepared.bytes,
       extension: prepared.extension,
     );
-  }
-
-  Future<Directory> _resolveSaveDirectory() async {
-    if (Platform.isWindows) {
-      final exeDir = File(Platform.resolvedExecutable).parent.path;
-      return Directory('$exeDir/Saved_Images');
-    }
-    return Directory('/storage/emulated/0/Pictures/Hazuki');
   }
 
   String _resolveSaveName(String imageUrl, String outputExtension) {
@@ -176,7 +192,9 @@ class ReaderSaveImageController {
         : '';
     final defaultName =
         'hazuki_${DateTime.now().millisecondsSinceEpoch}.$outputExtension';
-    final fileName = lastSegment.isEmpty ? defaultName : lastSegment;
+    final fileName = lastSegment.isEmpty
+        ? defaultName
+        : lastSegment.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), '_');
     return fileName.contains('.')
         ? fileName.replaceAll(
             RegExp(r'\.([a-zA-Z0-9]+)$', caseSensitive: false),

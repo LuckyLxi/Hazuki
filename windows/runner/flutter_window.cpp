@@ -1,8 +1,11 @@
 #include "flutter_window.h"
 
+#include <flutter/standard_method_codec.h>
+
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "reader_image_actions.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,6 +28,50 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  media_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "hazuki.comics/media",
+          &flutter::StandardMethodCodec::GetInstance());
+  media_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name() != "copyImage") {
+          result->NotImplemented();
+          return;
+        }
+        const auto* arguments =
+            call.arguments()
+                ? std::get_if<flutter::EncodableMap>(call.arguments())
+                : nullptr;
+        if (!arguments) {
+          result->Error("invalid_image", "Missing image data");
+          return;
+        }
+        const auto bytes_it = arguments->find(flutter::EncodableValue("bytes"));
+        const auto width_it = arguments->find(flutter::EncodableValue("width"));
+        const auto height_it =
+            arguments->find(flutter::EncodableValue("height"));
+        const auto* bytes =
+            bytes_it == arguments->end()
+                ? nullptr
+                : std::get_if<std::vector<uint8_t>>(&bytes_it->second);
+        const auto* width = width_it == arguments->end()
+                                ? nullptr
+                                : std::get_if<int32_t>(&width_it->second);
+        const auto* height = height_it == arguments->end()
+                                 ? nullptr
+                                 : std::get_if<int32_t>(&height_it->second);
+        if (!bytes || !width || !height) {
+          result->Error("invalid_image", "Missing image pixels or dimensions");
+        } else if (!CopyReaderImageToClipboard(GetHandle(), *bytes, *width,
+                                               *height)) {
+          result->Error("image_action_failed",
+                        "Unable to copy image to the clipboard");
+        } else {
+          result->Success();
+        }
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -40,6 +87,10 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  if (media_channel_) {
+    media_channel_->SetMethodCallHandler(nullptr);
+    media_channel_.reset();
+  }
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

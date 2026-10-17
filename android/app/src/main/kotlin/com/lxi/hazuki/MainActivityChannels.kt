@@ -35,6 +35,7 @@ class MainActivityChannels(
         private val privacyManager: PrivacyManager,
         private val displayModeManager: DisplayModeManager,
 ) {
+    private val readerImageActions = ReaderImageActions(activity)
     private var pendingSaveTextResult: MethodChannel.Result? = null
     private var pendingSaveTextContent: String? = null
     private var pendingStorageAccessResult: MethodChannel.Result? = null
@@ -173,6 +174,7 @@ class MainActivityChannels(
                 .setMethodCallHandler { call, result ->
                     when (call.method) {
                         "hasStorageAccess" -> result.success(hasStorageAccess())
+                        "shareImage", "copyImage", "saveImage" -> readerImageActions.handle(call, result)
                         "requestStorageAccess" -> requestStorageAccess(result)
                         "pickDownloadsDirectory" -> pickDownloadsDirectory(result)
                         "startDownloadForegroundService" -> {

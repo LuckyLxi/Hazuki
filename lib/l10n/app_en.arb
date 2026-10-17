@@ -1150,6 +1150,17 @@
   "commentsSend": "Send",
   "commentsEmpty": "No comments yet",
   "readerSaveImageTitle": "Save image",
+  "readerShareImage": "Share",
+  "readerCopyImage": "Copy image",
+  "readerImageCopied": "Image copied",
+  "readerShareImageFailed": "Failed to share image: {error}",
+  "@readerShareImageFailed": {
+    "placeholders": { "error": {} }
+  },
+  "readerCopyImageFailed": "Failed to copy image: {error}",
+  "@readerCopyImageFailed": {
+    "placeholders": { "error": {} }
+  },
   "readerSaveImageContent": "Save this comic image locally?",
   "readerPreviousChapter": "Previous chapter",
   "readerNextChapter": "Next chapter",

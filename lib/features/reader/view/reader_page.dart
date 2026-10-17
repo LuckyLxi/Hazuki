@@ -374,6 +374,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         logPayload: _readerLogPayload,
         comicId: widget.page.comicId,
         epId: widget.page.epId,
+        sourceKey: _pageContext.sourceKey,
       );
 
   WindowTitleBarControl? _windowsTitleBarController;

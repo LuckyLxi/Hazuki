@@ -1150,6 +1150,17 @@
   "commentsSend": "发送",
   "commentsEmpty": "暂无评论",
   "readerSaveImageTitle": "保存图片",
+  "readerShareImage": "分享",
+  "readerCopyImage": "复制图片",
+  "readerImageCopied": "图片已复制",
+  "readerShareImageFailed": "分享图片失败：{error}",
+  "@readerShareImageFailed": {
+    "placeholders": { "error": {} }
+  },
+  "readerCopyImageFailed": "复制图片失败：{error}",
+  "@readerCopyImageFailed": {
+    "placeholders": { "error": {} }
+  },
   "readerSaveImageContent": "是否将该漫画图片保存到本地？",
   "readerPreviousChapter": "上一话",
   "readerNextChapter": "下一话",
