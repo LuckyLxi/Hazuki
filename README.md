@@ -21,7 +21,7 @@
 
 ## 本地开发
 
-环境要求：Flutter `>=3.47.0`、Dart `^3.11.1`，Android 构建需 JDK 21。
+环境要求：Flutter `>=3.47.0`、Dart `^3.11.1`、`JDK 21`
 
 ```sh
 flutter pub get
