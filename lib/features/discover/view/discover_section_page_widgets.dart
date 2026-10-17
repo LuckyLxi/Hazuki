@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -88,7 +89,7 @@ class DiscoverSectionSortBar extends StatelessWidget {
   }
 }
 
-class _DiscoverSectionCapsuleGroup extends StatelessWidget {
+class _DiscoverSectionCapsuleGroup extends StatefulWidget {
   const _DiscoverSectionCapsuleGroup({
     required this.groupIndex,
     required this.options,
@@ -96,37 +97,54 @@ class _DiscoverSectionCapsuleGroup extends StatelessWidget {
     required this.onSelected,
   });
 
-  static const double _minimumItemWidth = 84;
-  static const double _height = 48;
-  static const double _inset = 4;
-
   final int groupIndex;
   final List<CategoryRankingOption> options;
   final String? selectedValue;
   final ValueChanged<String> onSelected;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final selectedIndex = math.max(
-      0,
-      options.indexWhere((option) => option.value == selectedValue),
-    );
+  State<_DiscoverSectionCapsuleGroup> createState() =>
+      _DiscoverSectionCapsuleGroupState();
+}
+
+class _DiscoverSectionCapsuleGroupState
+    extends State<_DiscoverSectionCapsuleGroup> {
+  static const double _minimumItemWidth = 84;
+  static const double _height = 48;
+  static const double _inset = 4;
+
+  List<String>? _measuredLabels;
+  TextStyle? _measuredStyle;
+  TextScaler? _measuredTextScaler;
+  TextDirection? _measuredTextDirection;
+  Locale? _measuredLocale;
+  double _measuredMinimumItemWidth = _minimumItemWidth;
+
+  double _minimumWidthForLabels(BuildContext context, TextStyle style) {
+    final labels = [for (final option in widget.options) option.label];
+    final textScaler = MediaQuery.textScalerOf(context);
+    final textDirection = Directionality.of(context);
+    final locale = Localizations.maybeLocaleOf(context);
+    if (listEquals(labels, _measuredLabels) &&
+        style == _measuredStyle &&
+        textScaler == _measuredTextScaler &&
+        textDirection == _measuredTextDirection &&
+        locale == _measuredLocale) {
+      return _measuredMinimumItemWidth;
+    }
+
     final labelPainter = TextPainter(
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-      locale: Localizations.maybeLocaleOf(context),
+      textDirection: textDirection,
+      textScaler: textScaler,
+      locale: locale,
       maxLines: 1,
     );
     var minimumItemWidth = _minimumItemWidth;
-    for (final option in options) {
+    for (final label in labels) {
       for (final weight in const [FontWeight.w500, FontWeight.w700]) {
         labelPainter.text = TextSpan(
-          text: option.label,
-          style: (theme.textTheme.labelLarge ?? const TextStyle()).copyWith(
-            fontWeight: weight,
-          ),
+          text: label,
+          style: style.copyWith(fontWeight: weight),
         );
         labelPainter.layout();
         minimumItemWidth = math.max(
@@ -136,6 +154,30 @@ class _DiscoverSectionCapsuleGroup extends StatelessWidget {
       }
     }
     labelPainter.dispose();
+    _measuredLabels = labels;
+    _measuredStyle = style;
+    _measuredTextScaler = textScaler;
+    _measuredTextDirection = textDirection;
+    _measuredLocale = locale;
+    _measuredMinimumItemWidth = minimumItemWidth;
+    return minimumItemWidth;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final options = widget.options;
+    final groupIndex = widget.groupIndex;
+    final selectedValue = widget.selectedValue;
+    final selectedIndex = math.max(
+      0,
+      options.indexWhere((option) => option.value == selectedValue),
+    );
+    final minimumItemWidth = _minimumWidthForLabels(
+      context,
+      theme.textTheme.labelLarge ?? const TextStyle(),
+    );
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
@@ -197,7 +239,7 @@ class _DiscoverSectionCapsuleGroup extends StatelessWidget {
                                   ),
                                   label: option.label,
                                   selected: option.value == selectedValue,
-                                  onTap: () => onSelected(option.value),
+                                  onTap: () => widget.onSelected(option.value),
                                 ),
                               ),
                           ],

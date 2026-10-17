@@ -37,7 +37,7 @@ class DiscoverSectionPage extends StatefulWidget {
 class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   late final DiscoverSectionPageController _controller;
   final ScrollController _scrollController = ScrollController();
-  bool _showBackToTop = false;
+  final ValueNotifier<bool> _showBackToTop = ValueNotifier(false);
 
   @override
   void initState() {
@@ -66,6 +66,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _showBackToTop.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -113,11 +114,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
         _controller.comics.isNotEmpty &&
         pos.pixels >= pos.maxScrollExtent - 240;
 
-    if (nextShowBackToTop != _showBackToTop) {
-      setState(() {
-        _showBackToTop = nextShowBackToTop;
-      });
-    }
+    _showBackToTop.value = nextShowBackToTop;
     if (shouldRevealInitialLoadFooter) {
       _controller.revealLoadMoreFooter();
     }
@@ -212,9 +209,13 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                     onRetry: _triggerLoadMore,
                   ),
                 if (!usesWeeklyDateSelector)
-                  DiscoverSectionBackToTopButton(
-                    showBackToTop: _showBackToTop,
-                    onPressed: _scrollToTop,
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _showBackToTop,
+                    builder: (context, showBackToTop, _) =>
+                        DiscoverSectionBackToTopButton(
+                          showBackToTop: showBackToTop,
+                          onPressed: _scrollToTop,
+                        ),
                   ),
                 if (usesWeeklyDateSelector &&
                     _controller.sortOptionGroups.isNotEmpty &&

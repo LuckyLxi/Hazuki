@@ -231,6 +231,51 @@ void main() {
     }
   });
 
+  testWidgets('sort widths update when labels change after being measured', (
+    tester,
+  ) async {
+    final options = [
+      const CategoryRankingOption(value: 'all', label: 'All'),
+      const CategoryRankingOption(value: 'latest', label: 'Latest'),
+    ];
+    const longLabel = 'A much longer filter label after the source changes';
+    late StateSetter update;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return Scaffold(
+              body: SizedBox(
+                width: 320,
+                child: DiscoverSectionSortBar(
+                  sortOptions: options,
+                  selectedSortValue: 'all',
+                  onSelectSortOption: (_) {},
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    update(() {
+      options[1] = const CategoryRankingOption(
+        value: 'latest',
+        label: longLabel,
+      );
+    });
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .renderObject<RenderParagraph>(find.text(longLabel))
+          .didExceedMaxLines,
+      isFalse,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('weekly page morphs the time group and keeps type chips', (
     tester,
   ) async {

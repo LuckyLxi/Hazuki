@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/discover/view/discover_section_page.dart';
+import 'package:hazuki/features/discover/view/discover_section_page_widgets.dart';
 import 'package:hazuki/features/discover/view/tag_category_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -152,6 +153,71 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('fast vertical scrolling does not rebuild large filter groups', (
+    tester,
+  ) async {
+    when(
+      () => discoverSource.loadCategoryOptionGroupsByViewMore(
+        viewMoreUrl: any(named: 'viewMoreUrl'),
+      ),
+    ).thenAnswer(
+      (_) async => [
+        List.generate(
+          500,
+          (index) => CategoryRankingOption(
+            value: 'filter-$index',
+            label: 'Filter option $index',
+          ),
+        ),
+      ],
+    );
+    when(
+      () => discoverSource.loadCategoryComicsByViewMore(
+        viewMoreUrl: any(named: 'viewMoreUrl'),
+        page: any(named: 'page'),
+        order: any(named: 'order'),
+        orders: any(named: 'orders'),
+      ),
+    ).thenAnswer(
+      (_) async => CategoryComicsResult(
+        comics: List.generate(
+          60,
+          (index) => ExploreComic(
+            id: '$index',
+            title: 'Comic $index',
+            subTitle: '',
+            cover: '',
+          ),
+        ),
+        maxPage: 1,
+      ),
+    );
+    await openTag(tester);
+    var sortBarRebuilds = 0;
+    final previousCallback = debugOnRebuildDirtyWidget;
+    debugOnRebuildDirtyWidget = (element, builtOnce) {
+      previousCallback?.call(element, builtOnce);
+      if (element.widget is DiscoverSectionSortBar) {
+        sortBarRebuilds++;
+      }
+    };
+    addTearDown(() => debugOnRebuildDirtyWidget = previousCallback);
+
+    final scrollView = find.byType(CustomScrollView);
+    await tester.fling(scrollView, const Offset(0, -800), 2500);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<CustomScrollView>(scrollView).controller!.offset,
+      greaterThan(520),
+    );
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+
+    expect(sortBarRebuilds, 0);
+    expect(find.text('Filter option 0').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('filters stay usable while loading and after empty results', (
     tester,
