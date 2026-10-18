@@ -10,4 +10,6 @@ Based on flutter_inappwebview_windows 0.6.0 (Apache-2.0); upstream files and att
 
 Hazuki disables browser event debug logging, uses independent environments and InPrivate views, and deletes generated session directories. Re-check these fixes when updating upstream. The host CMake target also opts into the existing experimental-coroutine compatibility mode for MSVC 2026.
 
+Windows build compatibility: remove the unsupported `DEPENDS` argument from the NuGet pre-build command (CMP0175), compile plugin sources as UTF-8, mark WebView2 SDK headers as system includes, and explicitly convert the response status to the SDK's `int` parameter. Plugin source warnings remain enabled.
+
 Verification: host `flutter analyze`, authorization unit/widget tests, Windows debug build and `flutter run -d windows -t test/platform/source_authorization_browser_smoke.dart`. The native smoke test checks Cookie/localStorage/IndexedDB/Cache API isolation, callback interception and directory cleanup with synthetic data.
