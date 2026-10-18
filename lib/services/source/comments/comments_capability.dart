@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../models/hazuki_models.dart';
 import '../account/source_relogin_coordinator.dart';
 import '../common/source_json_coerce.dart';
+import '../plugins/source_sort_options.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
 
@@ -39,8 +40,10 @@ class SourceCommentsCapability {
     int page = 1,
     int pageSize = 16,
     String? replyTo,
+    String order = '',
   }) async {
-    final facade = _facadeFor(sourceKey);
+    final resolvedSourceKey = _resolveSourceKey(sourceKey);
+    final facade = _facadeFor(resolvedSourceKey);
     await facade.ensureInitialized();
 
     final engine = facade.js.engine;
@@ -51,6 +54,9 @@ class SourceCommentsCapability {
     final subIdArg = subId == null ? 'null' : jsonEncode(subId);
     final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
     final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
+    final orderArg = jsonEncode(
+      commentSortOptionsForSource(resolvedSourceKey).normalize(order),
+    );
     final hasChapterComments =
         chapterId?.isNotEmpty == true &&
         facade.js.asBool(
@@ -60,8 +66,8 @@ class SourceCommentsCapability {
         );
     final dynamic result = engine.evaluate(
       hasChapterComments
-          ? 'this.__hazuki_source.comic.loadChapterComments(${jsonEncode(comicId)}, $chapterIdArg, $page, $replyToArg)'
-          : 'this.__hazuki_source.comic.loadComments(${jsonEncode(comicId)}, $subIdArg, $page, $replyToArg)',
+          ? 'this.__hazuki_source.comic.loadChapterComments(${jsonEncode(comicId)}, $chapterIdArg, $page, $replyToArg, $orderArg)'
+          : 'this.__hazuki_source.comic.loadComments(${jsonEncode(comicId)}, $subIdArg, $page, $replyToArg, $orderArg)',
       name: 'source_comments.js',
     );
     final dynamic resolved = await facade.js.resolve(result);
@@ -111,6 +117,7 @@ class SourceCommentsCapability {
     int page = 1,
     int pageSize = 16,
     String? replyTo,
+    String order = '',
   }) async {
     final result = await loadCommentsPage(
       comicId: comicId,
@@ -120,9 +127,17 @@ class SourceCommentsCapability {
       page: page,
       pageSize: pageSize,
       replyTo: replyTo,
+      order: order,
     );
     return result.comments;
   }
+
+  SourceCommentSortOptions commentSortOptionsForSource(String sourceKey) =>
+      SourceCommentSortOptions.fromPresentation(
+        _runtimeHost.runtimeRegistry.presentationFor(
+          _resolveSourceKey(sourceKey),
+        ),
+      );
 
   Future<void> sendComment({
     required String comicId,

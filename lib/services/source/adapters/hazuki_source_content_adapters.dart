@@ -1,4 +1,5 @@
 import '../plugins/source_search_capabilities.dart';
+import '../plugins/source_sort_options.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -194,6 +195,9 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
   bool supportCommentRepliesForSource(String sourceKey) =>
       _comments.supportCommentRepliesForSource(sourceKey);
   @override
+  SourceCommentSortOptions commentSortOptionsForSource(String sourceKey) =>
+      _comments.commentSortOptionsForSource(sourceKey);
+  @override
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
@@ -202,6 +206,7 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
     int page = 1,
     int pageSize = 16,
     String? replyTo,
+    String order = '',
   }) => _comments.loadCommentsPage(
     comicId: comicId,
     subId: subId,
@@ -210,6 +215,7 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
     page: page,
     pageSize: pageSize,
     replyTo: replyTo,
+    order: order,
   );
   @override
   Future<void> sendComment({

@@ -16,6 +16,7 @@ class CommentsInteractionState {
   bool hideFilterLoadMoreQueued = false;
   bool supportCommentLike = false;
   bool supportCommentReplies = false;
+  String order = '';
   int currentPage = 1;
   int? maxPage;
   ComicCommentData? replyToComment;

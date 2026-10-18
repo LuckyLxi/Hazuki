@@ -97,6 +97,26 @@ class SourcePluginManifest {
         presentation['showComments'] is! bool) {
       throw const SourcePluginException('plugin_invalid_manifest');
     }
+    final commentOrders = presentation['commentOrders'];
+    if ((commentOrders != null &&
+            (commentOrders is! Map ||
+                commentOrders.entries.any(
+                  (entry) =>
+                      entry.key is! String ||
+                      (entry.key as String).trim().isEmpty ||
+                      entry.key != (entry.key as String).trim() ||
+                      (entry.value is! String &&
+                          (entry.value is! Map ||
+                              (entry.value as Map).entries.any(
+                                (label) =>
+                                    label.key is! String ||
+                                    label.value is! String,
+                              ))),
+                ))) ||
+        (presentation['commentDefaultOrder'] != null &&
+            presentation['commentDefaultOrder'] is! String)) {
+      throw const SourcePluginException('plugin_invalid_manifest');
+    }
     final groups = presentation['listTagGroups'];
     final enrich = presentation['enrichMissingTags'];
     final aliases = presentation['favoriteOrderAliases'];

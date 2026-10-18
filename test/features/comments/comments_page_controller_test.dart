@@ -88,6 +88,93 @@ void main() {
   });
 
   test(
+    'declared default order is retained for pagination and replies',
+    () async {
+      source.sortOptions = const SourceCommentSortOptions(
+        orders: {'new': 'Newest', 'hot': 'Popular'},
+        defaultOrder: 'hot',
+      );
+      await load([_comment('a')]);
+      expect(controller.state.order, 'hot');
+      expect(source.pages.single.order, 'hot');
+      final more = controller.loadMore();
+      expect(source.pages.last.order, 'hot');
+      source.pages.last.complete([_comment('b')]);
+      await more;
+      final replies = controller.toggleReplies(_comment('a'));
+      expect(source.pages.last.replyTo, 'a');
+      expect(source.pages.last.order, 'hot');
+      source.pages.last.complete([_comment('reply')]);
+      await replies;
+    },
+  );
+
+  test(
+    'changing order clears pages and replies and ignores pending results',
+    () async {
+      source.sortOptions = const SourceCommentSortOptions(
+        orders: {'new': 'Newest', 'hot': 'Popular'},
+        defaultOrder: 'new',
+      );
+      await load([_comment('a')]);
+      final more = controller.loadMore();
+      final oldMore = source.pages.last;
+      final replies = controller.toggleReplies(_comment('a'));
+      final oldReplies = source.pages.last;
+      controller.setReplyTarget(_comment('a'));
+      final changing = controller.setOrder('hot');
+      final sorted = source.pages.last;
+      expect(sorted.page, 1);
+      expect(sorted.order, 'hot');
+      expect(controller.state.comments, isEmpty);
+      expect(controller.state.currentPage, 1);
+      expect(controller.state.maxPage, isNull);
+      expect(controller.state.replyToComment, isNull);
+      expect(controller.state.expandedReplyIds, isEmpty);
+      sorted.complete([_comment('a')]);
+      await changing;
+      final newReplies = controller.toggleReplies(_comment('a'));
+      final sortedReplies = source.pages.last;
+      oldMore.complete([_comment('old')]);
+      oldReplies.complete([_comment('old reply')]);
+      await Future.wait([more, replies]);
+      expect(controller.state.comments.map((c) => c.id), ['a']);
+      expect(controller.state.replyComments, isEmpty);
+      expect(controller.state.loadingReplyIds, contains('a'));
+      sortedReplies.complete([_comment('new reply')]);
+      await newReplies;
+      expect(controller.state.replyComments['a']!.single.id, 'new reply');
+      final count = source.pages.length;
+      await controller.setOrder('hot');
+      await controller.setOrder('missing');
+      expect(source.pages, hasLength(count));
+    },
+  );
+
+  test(
+    'rapid sorting ignores an older initial result and retains shared order',
+    () async {
+      source.sortOptions = const SourceCommentSortOptions(
+        orders: {'new': 'Newest', 'hot': 'Popular'},
+        defaultOrder: 'new',
+      );
+      final initial = controller.loadInitial();
+      final changing = controller.setOrder('hot');
+      source.pages.last.complete([_comment('hot')], maxPage: 1);
+      await changing;
+      source.pages.first.complete([_comment('new')]);
+      await initial;
+      final shared = controller.state;
+      controller.dispose();
+      controller = create(state: shared);
+      controller.initialize();
+      expect(controller.state.order, 'hot');
+      expect(controller.state.comments.single.id, 'hot');
+      expect(source.pages, hasLength(2));
+    },
+  );
+
+  test(
     'pagination deduplicates requests and stops on duplicate-only pages',
     () async {
       await load([_comment('a')]);
@@ -150,6 +237,63 @@ void main() {
     expect(source.pages.length, 2);
     expect(controller.state.hideFilterLoadMoreQueued, isFalse);
   });
+
+  test(
+    'sorting starts fresh filter pagination while the previous request is pending',
+    () async {
+      source.sortOptions = const SourceCommentSortOptions(
+        orders: {'new': 'Newest', 'hot': 'Popular'},
+        defaultOrder: 'new',
+      );
+      await filter.save(
+        userKeywords: ['blocked'],
+        mode: CommentFilterMode.hide,
+      );
+      await load([_comment('blocked-old')]);
+      final oldPage = source.pages.last;
+      final changing = controller.setOrder('hot');
+      source.pages.last.complete([_comment('blocked-hot')]);
+      await changing;
+      final hotPage = source.pages.last;
+      expect(hotPage.order, 'hot');
+      expect(hotPage.page, 2);
+      expect(hotPage, isNot(same(oldPage)));
+      oldPage.complete([_comment('stale')]);
+      await pumpEventQueue();
+      expect(controller.state.hideFilterLoadMoreQueued, isTrue);
+      expect(controller.state.loadingMore, isTrue);
+      hotPage.complete([_comment('clean')], maxPage: 2);
+      await pumpEventQueue();
+      expect(controller.state.comments.map((c) => c.id), [
+        'blocked-hot',
+        'clean',
+      ]);
+      expect(controller.state.hideFilterLoadMoreQueued, isFalse);
+    },
+  );
+
+  test(
+    'a failed sort can retry the selected order without showing old comments',
+    () async {
+      source.sortOptions = const SourceCommentSortOptions(
+        orders: {'new': 'Newest', 'hot': 'Popular'},
+        defaultOrder: 'new',
+      );
+      await load([_comment('old')]);
+      final changing = controller.setOrder('hot');
+      source.pages.last.result.completeError(StateError('offline'));
+      await changing;
+      expect(controller.state.comments, isEmpty);
+      expect(controller.state.loadError, isNotNull);
+      expect(controller.state.initialLoadSucceeded, isFalse);
+      final retry = controller.loadInitial();
+      expect(source.pages.last.order, 'hot');
+      source.pages.last.complete([_comment('hot')], maxPage: 1);
+      await retry;
+      expect(controller.state.comments.single.id, 'hot');
+      expect(controller.state.loadError, isNull);
+    },
+  );
 
   test(
     'hidden-filter pagination stops on failure and retries on filter change',
@@ -392,6 +536,7 @@ class _PageRequest {
     required this.page,
     required this.pageSize,
     this.replyTo,
+    this.order = '',
   });
   final String comicId;
   final String? subId;
@@ -400,6 +545,7 @@ class _PageRequest {
   final int page;
   final int pageSize;
   final String? replyTo;
+  final String order;
   final result = Completer<ComicCommentsPageResult>();
 
   void complete(List<ComicCommentData> comments, {int? maxPage = 3}) {
@@ -410,6 +556,10 @@ class _PageRequest {
 }
 
 class _Source extends Fake implements SourceCommentsGateway {
+  SourceCommentSortOptions sortOptions = const SourceCommentSortOptions();
+  @override
+  SourceCommentSortOptions commentSortOptionsForSource(String sourceKey) =>
+      sortOptions;
   bool loggedIn = true;
   bool canSend = true;
   final pages = <_PageRequest>[];
@@ -449,6 +599,7 @@ class _Source extends Fake implements SourceCommentsGateway {
     int page = 1,
     int pageSize = 16,
     String? replyTo,
+    String order = '',
   }) {
     final request = _PageRequest(
       comicId: comicId,
@@ -458,6 +609,7 @@ class _Source extends Fake implements SourceCommentsGateway {
       page: page,
       pageSize: pageSize,
       replyTo: replyTo,
+      order: order,
     );
     pages.add(request);
     return request.result.future;

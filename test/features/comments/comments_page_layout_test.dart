@@ -53,6 +53,7 @@ void main() {
     double width = 390,
     double textScale = 1,
     bool showAppBar = true,
+    bool isTabView = false,
   }) async {
     tester.view.physicalSize = Size(width, 1000);
     tester.view.devicePixelRatio = 1;
@@ -78,13 +79,33 @@ void main() {
             child: child!,
           ),
           home: Scaffold(
-            body: CommentsPage(
-              sourceService: source,
-              filterService: filter,
-              comicId: 'comic',
-              sourceKey: 'source',
-              showAppBar: showAppBar,
-              interactionState: state,
+            body: Builder(
+              builder: (context) {
+                final page = CommentsPage(
+                  sourceService: source,
+                  filterService: filter,
+                  comicId: 'comic',
+                  sourceKey: 'source',
+                  showAppBar: showAppBar,
+                  interactionState: state,
+                  isTabView: isTabView,
+                );
+                if (!isTabView) return page;
+                return NestedScrollView(
+                  headerSliverBuilder: (context, _) => [
+                    SliverOverlapAbsorber(
+                      handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                        context,
+                      ),
+                      sliver: const SliverAppBar(
+                        title: Text('Details'),
+                        pinned: true,
+                      ),
+                    ),
+                  ],
+                  body: page,
+                );
+              },
             ),
           ),
         ),
@@ -119,6 +140,76 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  testWidgets('declared sort menu reloads comments on a narrow embedded page', (
+    tester,
+  ) async {
+    source.sortOptions = const SourceCommentSortOptions(
+      orders: {
+        'new': {'zh': '最新', 'en': 'Newest'},
+        'hot': {'zh': '热门', 'en': 'Popular'},
+      },
+      defaultOrder: 'new',
+    );
+    await pumpComments(tester, width: 320, textScale: 1.8, showAppBar: false);
+    expect(find.text('Newest'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.swap_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Popular'));
+    await tester.pumpAndSettle();
+    expect(state.order, 'hot');
+    expect(source.lastOrder, 'hot');
+    expect(find.text('Popular'), findsOneWidget);
+    expect(find.text('Newest'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('undeclared sort menu stays hidden', (tester) async {
+    await pumpComments(tester);
+    expect(find.byIcon(Icons.swap_vert), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('sort menu works inside the detail nested scroll view', (
+    tester,
+  ) async {
+    source.sortOptions = const SourceCommentSortOptions(
+      orders: {'new': 'Newest', 'hot': 'Popular'},
+      defaultOrder: 'new',
+    );
+    await pumpComments(tester, isTabView: true);
+    await tester.tap(find.byIcon(Icons.swap_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Popular'));
+    await tester.pumpAndSettle();
+    expect(state.order, 'hot');
+    expect(source.lastOrder, 'hot');
+    expect(find.text('Popular'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('empty comments retain the sort control on a standalone page', (
+    tester,
+  ) async {
+    source.sortOptions = const SourceCommentSortOptions(
+      orders: {'new': 'Newest', 'hot': 'Popular'},
+      defaultOrder: 'new',
+    );
+    state.comments = [];
+    await pumpComments(tester);
+    expect(find.text('Newest'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.swap_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Popular'));
+    await tester.pumpAndSettle();
+    expect(source.lastOrder, 'hot');
+    expect(state.comments.single.id, _parent.id);
+    expect(find.text(_parent.userName), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('card actions retain like locking and reply submission', (
     tester,
@@ -199,6 +290,11 @@ void main() {
 
 class _Source extends Fake
     implements SourceCommentsGateway, SourceImageGateway {
+  SourceCommentSortOptions sortOptions = const SourceCommentSortOptions();
+  String? lastOrder;
+  @override
+  SourceCommentSortOptions commentSortOptionsForSource(String sourceKey) =>
+      sortOptions;
   bool supportActions = true;
   int likeCount = 0;
   final likeResult = Completer<void>();
@@ -226,10 +322,14 @@ class _Source extends Fake
     int page = 1,
     int pageSize = 16,
     String? replyTo,
-  }) async => ComicCommentsPageResult(
-    comments: replyTo == null ? [_parent] : [_reply],
-    maxPage: 1,
-  );
+    String order = '',
+  }) async {
+    lastOrder = order;
+    return ComicCommentsPageResult(
+      comments: replyTo == null ? [_parent] : [_reply],
+      maxPage: 1,
+    );
+  }
 
   @override
   Future<void> likeComment({

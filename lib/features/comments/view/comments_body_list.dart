@@ -2,6 +2,7 @@ part of 'comments_page.dart';
 
 class _CommentsBodyList extends StatelessWidget {
   const _CommentsBodyList({
+    this.sortControl,
     required this.comments,
     required this.visibleComments,
     required this.hiddenCount,
@@ -18,6 +19,7 @@ class _CommentsBodyList extends StatelessWidget {
   });
 
   final List<ComicCommentData> comments;
+  final Widget? sortControl;
   final List<ComicCommentData> visibleComments;
   final int hiddenCount;
   final bool initialLoading;
@@ -56,6 +58,7 @@ class _CommentsBodyList extends StatelessWidget {
           physics: const _CommentsTabClampingScrollPhysics(),
           slivers: [
             SliverOverlapInjector(handle: overlapHandle),
+            if (sortControl != null) SliverToBoxAdapter(child: sortControl),
             if (hiddenCount > 0)
               SliverToBoxAdapter(child: _HiddenCountBanner(count: hiddenCount)),
             if (comments.isNotEmpty)
@@ -111,6 +114,7 @@ class _CommentsBodyList extends StatelessWidget {
               controller: scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
+                if (sortControl != null) SliverToBoxAdapter(child: sortControl),
                 if (hiddenCount > 0)
                   SliverToBoxAdapter(
                     child: _HiddenCountBanner(count: hiddenCount),
@@ -133,6 +137,7 @@ class _CommentsBodyList extends StatelessWidget {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: listBottomPadding,
               children: [
+                ?sortControl,
                 _CommentsContentSwitcher(child: content),
                 loadMoreFooter,
               ],

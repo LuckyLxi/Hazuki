@@ -60,6 +60,9 @@ class CommentsPageController extends ChangeNotifier {
 
   Stream<CommentsEffect> get effects => _effects.stream;
 
+  SourceCommentSortOptions get sortOptions =>
+      _sourceService.commentSortOptionsForSource(sourceKey);
+
   bool get isLogged => sourceKey.trim().isEmpty
       ? _sourceService.isLogged
       : _sourceService.isLoggedForSource(sourceKey);
@@ -75,6 +78,7 @@ class CommentsPageController extends ChangeNotifier {
   }
 
   void _refreshCapabilities() {
+    state.order = sortOptions.normalize(state.order);
     state.supportCommentLike = sourceKey.trim().isEmpty
         ? _sourceService.supportCommentLike
         : _sourceService.supportCommentLikeForSource(sourceKey);
@@ -93,6 +97,7 @@ class CommentsPageController extends ChangeNotifier {
           page: page,
           pageSize: pageSize,
           replyTo: replyTo,
+          order: state.order,
         )
         .timeout(loadTimeout);
   }
@@ -111,11 +116,14 @@ class CommentsPageController extends ChangeNotifier {
 
   Future<void> loadInitial() async {
     if (_disposed) return;
+    _refreshCapabilities();
     final epoch = ++state.loadEpoch;
     _emit(CommentsEffectType.initialLoadStarted);
     _update(() {
       state.initialLoading = true;
       state.loadingMore = false;
+      state.hideFilterLoadMoreQueued = false;
+      state.loadingReplyIds.clear();
     });
     final startedAt = DateTime.now();
     _logEvent('Comments load started', content: {'page': 1});
@@ -213,6 +221,29 @@ class CommentsPageController extends ChangeNotifier {
         },
       );
     }
+  }
+
+  Future<void> setOrder(String order) async {
+    if (_disposed ||
+        !sortOptions.orders.containsKey(order) ||
+        order == state.order) {
+      return;
+    }
+    state.order = order;
+    state.comments = const [];
+    state.loadError = null;
+    state.initialLoadSucceeded = false;
+    state.currentPage = 1;
+    state.maxPage = null;
+    state.hasMore = true;
+    state.replyToComment = null;
+    state.expandedReplyIds.clear();
+    state.loadingReplyIds.clear();
+    state.replyComments.clear();
+    state.replyPages.clear();
+    state.replyMaxPages.clear();
+    state.replyHasMore.clear();
+    await loadInitial();
   }
 
   void setReplyTarget(ComicCommentData comment) {
@@ -313,7 +344,9 @@ class CommentsPageController extends ChangeNotifier {
         );
       });
     } finally {
-      _update(() => state.loadingReplyIds.remove(id));
+      if (_isCurrent(epoch)) {
+        _update(() => state.loadingReplyIds.remove(id));
+      }
     }
   }
 
@@ -381,11 +414,12 @@ class CommentsPageController extends ChangeNotifier {
   }
 
   Future<void> _loadHiddenFilterPages() async {
+    final epoch = state.loadEpoch;
     try {
-      while (!_disposed && state.hasMore && !state.initialLoading) {
+      while (_isCurrent(epoch) && state.hasMore && !state.initialLoading) {
         final previousPage = state.currentPage;
         await loadMore();
-        if (_disposed ||
+        if (!_isCurrent(epoch) ||
             state.currentPage == previousPage ||
             !filterModeIsHide) {
           return;
@@ -393,7 +427,7 @@ class CommentsPageController extends ChangeNotifier {
         if (visibleComments(state.comments).length >= pageSize) return;
       }
     } finally {
-      if (!_disposed) state.hideFilterLoadMoreQueued = false;
+      if (_isCurrent(epoch)) state.hideFilterLoadMoreQueued = false;
     }
   }
 

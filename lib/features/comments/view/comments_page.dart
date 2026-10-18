@@ -13,6 +13,8 @@ import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/plugins/source_sort_options.dart'
+    show sourceOrderLabel;
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 
@@ -481,6 +483,48 @@ class _CommentsPageState extends State<CommentsPage>
     );
   }
 
+  Widget? _buildSortControl() {
+    final options = _controller.sortOptions;
+    if (options.orders.isEmpty) return null;
+    final language = Localizations.localeOf(context).languageCode;
+    final labels = options.orders.map(
+      (key, label) => MapEntry(key, sourceOrderLabel(label, language, key)),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: HazukiFrostedMenuButton<String>(
+          tooltip: l10n(context).searchSortTooltip,
+          selected: _interaction.order,
+          options: [
+            for (final entry in labels.entries)
+              HazukiFrostedMenuOption(value: entry.key, label: entry.value),
+          ],
+          onSelected: (order) => unawaited(_controller.setOrder(order)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    labels[_interaction.order] ?? _interaction.order,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.swap_vert, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCommentsBodyList({
     double extraBottomPadding = 0,
     bool reserveKeyboardInset = false,
@@ -496,6 +540,7 @@ class _CommentsPageState extends State<CommentsPage>
     return ColoredBox(
       color: Theme.of(context).colorScheme.surfaceContainerLow,
       child: _CommentsBodyList(
+        sortControl: _buildSortControl(),
         comments: _comments,
         visibleComments: visibleComments,
         hiddenCount: hiddenCount,

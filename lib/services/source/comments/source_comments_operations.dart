@@ -1,5 +1,6 @@
 import '../../../models/hazuki_models.dart';
 import '../account/source_account_operations.dart';
+import '../plugins/source_sort_options.dart';
 import 'comments_capability.dart';
 
 /// Comment operations consumed by the comments gateway.
@@ -29,6 +30,9 @@ class SourceCommentsOperations {
   bool supportCommentRepliesForSource(String sourceKey) =>
       _comments.supportCommentRepliesForSource(sourceKey);
 
+  SourceCommentSortOptions commentSortOptionsForSource(String sourceKey) =>
+      _comments.commentSortOptionsForSource(sourceKey);
+
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
@@ -37,6 +41,7 @@ class SourceCommentsOperations {
     int page = 1,
     int pageSize = 16,
     String? replyTo,
+    String order = '',
   }) => _comments.loadCommentsPage(
     comicId: comicId,
     subId: subId,
@@ -45,6 +50,7 @@ class SourceCommentsOperations {
     page: page,
     pageSize: pageSize,
     replyTo: replyTo,
+    order: order,
   );
 
   Future<void> sendComment({
