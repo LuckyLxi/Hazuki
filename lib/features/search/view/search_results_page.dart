@@ -101,6 +101,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   late SearchComicLayout _comicLayout;
   bool _keyboardDismissPopInProgress = false;
   bool _initialSearchPending = true;
+  Animation<double>? _initialSearchRouteAnimation;
 
   // Keep the first frame loading until a controller takes over the search.
   bool get _waitingForInitialSearch =>
@@ -229,20 +230,48 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         );
         await _idExtractController.load();
         if (!mounted) return;
-        try {
-          await _submitSearch();
-        } finally {
-          if (mounted) {
-            setState(() {
-              _initialSearchPending = false;
-            });
-          }
-        }
+        _scheduleInitialSearch();
       }());
     });
   }
 
+  void _scheduleInitialSearch() {
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null || animation.isCompleted) {
+      unawaited(_runInitialSearch());
+      return;
+    }
+    // Fast results must not finish their entrance behind the route snapshot.
+    _initialSearchRouteAnimation = animation;
+    animation.addStatusListener(_handleInitialSearchRouteStatus);
+  }
+
+  void _handleInitialSearchRouteStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    _initialSearchRouteAnimation?.removeStatusListener(
+      _handleInitialSearchRouteStatus,
+    );
+    _initialSearchRouteAnimation = null;
+    if (mounted) unawaited(_runInitialSearch());
+  }
+
+  Future<void> _runInitialSearch() async {
+    try {
+      await _submitSearch();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _initialSearchPending = false;
+        });
+      }
+    }
+  }
+
   void _disposeSearchResultsPage() {
+    _initialSearchRouteAnimation?.removeStatusListener(
+      _handleInitialSearchRouteStatus,
+    );
+    _initialSearchRouteAnimation = null;
     _submissionCoordinator.invalidate();
     _focusCoordinator.primaryFocusNode.removeListener(
       _handleSearchFocusChanged,

@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/search/support/search_page_route.dart';
@@ -296,6 +297,100 @@ void main() {
     expect(_isSnapshotting('Home'), isFalse);
     expect(tester.takeException(), isNull);
   });
+
+  for (final glass in [false, true]) {
+    for (final snapshotEntrance in [false, true]) {
+      testWidgets('Hero endpoints do not scroll during push or pop, '
+          'glass=$glass, snapshotEntrance=$snapshotEntrance', (tester) async {
+        if (glass) {
+          await enableGlass(tester);
+        } else {
+          await HazukiLiquidGlass.setEnabled(false);
+        }
+        final homeScroll = ScrollController(initialScrollOffset: 120);
+        final detailScroll = ScrollController(initialScrollOffset: 120);
+        addTearDown(homeScroll.dispose);
+        addTearDown(detailScroll.dispose);
+
+        Widget page(ScrollController controller, double topPadding) => Scaffold(
+          body: SingleChildScrollView(
+            controller: controller,
+            child: Column(
+              children: [
+                SizedBox(height: topPadding, width: double.infinity),
+                Hero(
+                  tag: 'cover',
+                  flightShuttleBuilder: (_, _, _, _, _) =>
+                      const ColoredBox(color: Colors.red),
+                  child: const SizedBox(
+                    width: 80,
+                    height: 120,
+                    child: ColoredBox(color: Colors.red),
+                  ),
+                ),
+                const SizedBox(height: 1800),
+              ],
+            ),
+          ),
+        );
+
+        await tester.pumpWidget(_app(background: page(homeScroll, 200)));
+        final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+        navigator.push(
+          buildSnapshottingPageRoute<void>(
+            allowSnapshotting: snapshotEntrance,
+            builder: (_) => page(detailScroll, 400),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        Future<void> scrollAt(Offset position, double delta) async {
+          await tester.sendEventToBinding(
+            PointerScrollEvent(
+              position: position,
+              scrollDelta: Offset(0, delta),
+            ),
+          );
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+
+        // The entering page is visible along the right edge; the underlying
+        // page is visible along the left edge of the horizontal transition.
+        for (final delta in [80.0, -80.0]) {
+          await scrollAt(const Offset(750, 350), delta);
+          expect(detailScroll.offset, 120);
+          expect(homeScroll.offset, 120);
+          await tester.dragFrom(const Offset(750, 350), Offset(0, delta));
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(detailScroll.offset, 120);
+          expect(homeScroll.offset, 120);
+        }
+        await tester.pumpAndSettle();
+        await scrollAt(const Offset(400, 350), 80);
+        expect(detailScroll.offset, greaterThan(120));
+        detailScroll.jumpTo(120);
+
+        navigator.pop();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        for (final delta in [80.0, -80.0]) {
+          await scrollAt(const Offset(20, 350), delta);
+          expect(homeScroll.offset, 120);
+          expect(detailScroll.offset, 120);
+          await tester.dragFrom(const Offset(20, 350), Offset(0, delta));
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(homeScroll.offset, 120);
+          expect(detailScroll.offset, 120);
+        }
+        await tester.pumpAndSettle();
+        await scrollAt(const Offset(400, 350), 80);
+        expect(homeScroll.offset, greaterThan(120));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
 }
 
 Widget _app({Widget? background}) => MaterialApp(

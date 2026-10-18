@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../liquid_glass_support.dart';
@@ -70,17 +71,33 @@ class RouteTransitionSnapshot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final route = ModalRoute.of(context);
+    final primaryAnimation =
+        animation ?? route?.animation ?? kAlwaysDismissedAnimation;
     final routeAnimation =
-        secondaryAnimation ?? ModalRoute.of(context)?.secondaryAnimation;
-    return ListenableBuilder(
-      listenable: HazukiLiquidGlass.changes,
-      child: child,
-      builder: (context, child) => _TransitionSnapshot(
-        animation: animation ?? kAlwaysDismissedAnimation,
-        secondaryAnimation: HazukiLiquidGlass.isAvailable
-            ? routeAnimation ?? kAlwaysDismissedAnimation
-            : kAlwaysDismissedAnimation,
-        child: child!,
+        secondaryAnimation ??
+        route?.secondaryAnimation ??
+        kAlwaysDismissedAnimation;
+    return AnimatedBuilder(
+      animation: Listenable.merge([primaryAnimation, routeAnimation]),
+      builder: (context, child) => AbsorbPointer(
+        // Keep Hero endpoints and cached pages aligned until both routes settle.
+        // Use the real route animations even when snapshotting is disabled.
+        absorbing:
+            primaryAnimation.status.isAnimating ||
+            routeAnimation.status.isAnimating,
+        child: child,
+      ),
+      child: ListenableBuilder(
+        listenable: HazukiLiquidGlass.changes,
+        child: child,
+        builder: (context, child) => _TransitionSnapshot(
+          animation: animation ?? kAlwaysDismissedAnimation,
+          secondaryAnimation: HazukiLiquidGlass.isAvailable
+              ? routeAnimation
+              : kAlwaysDismissedAnimation,
+          child: child!,
+        ),
       ),
     );
   }
@@ -103,11 +120,62 @@ class _TransitionSnapshot extends StatefulWidget {
 
 class _TransitionSnapshotState extends State<_TransitionSnapshot> {
   final SnapshotController _controller = SnapshotController();
+  final _scrolling = <ScrollPosition>{};
   bool _snapshotScheduled = false;
 
   bool get _isAnimating =>
       widget.animation.status.isAnimating ||
       widget.secondaryAnimation.status.isAnimating;
+
+  bool get _shouldCache => _isAnimating && !_hasVisibleScrollingContent;
+
+  bool get _hasVisibleScrollingContent {
+    _scrolling.removeWhere(
+      (position) =>
+          position.context.notificationContext?.mounted != true ||
+          !position.isScrollingNotifier.value,
+    );
+    return _scrolling.any((position) {
+      RenderObject? node = position.context.notificationContext
+          ?.findRenderObject();
+      while (node != null) {
+        // Hidden home tabs must not prevent caching the visible page.
+        if (node is RenderOffstage && node.offstage ||
+            node is RenderOpacity && node.opacity == 0 ||
+            node is RenderAnimatedOpacity &&
+                node.opacity.value == 0 &&
+                !node.opacity.status.isAnimating) {
+          return false;
+        }
+        node = node.parent;
+      }
+      return true;
+    });
+  }
+
+  bool _handleScroll(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      if (_scrolling.isNotEmpty) _updateSnapshotting();
+      return false;
+    }
+    if (notification is! ScrollStartNotification &&
+        notification is! ScrollEndNotification) {
+      return false;
+    }
+    final notificationContext = notification.context;
+    if (notificationContext == null) return false;
+    final position = Scrollable.maybeOf(notificationContext)?.position;
+    if (position == null) return false;
+    if (notification is ScrollStartNotification) {
+      _scrolling.add(position);
+    } else {
+      _scrolling.remove(position);
+    }
+    // Autoplay can begin after capture. Release before its first moving frame
+    // so the carousel remains visible instead of jumping when the route settles.
+    _updateSnapshotting();
+    return false;
+  }
 
   @override
   void initState() {
@@ -136,7 +204,7 @@ class _TransitionSnapshotState extends State<_TransitionSnapshot> {
   }
 
   void _updateSnapshotting() {
-    if (!_isAnimating) {
+    if (!_shouldCache) {
       _controller.allowSnapshotting = false;
       return;
     }
@@ -148,7 +216,7 @@ class _TransitionSnapshotState extends State<_TransitionSnapshot> {
     _snapshotScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _snapshotScheduled = false;
-      if (mounted) _controller.allowSnapshotting = _isAnimating;
+      if (mounted) _controller.allowSnapshotting = _shouldCache;
     });
   }
 
@@ -162,11 +230,14 @@ class _TransitionSnapshotState extends State<_TransitionSnapshot> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassSnapshot(
-      controller: _controller,
-      mode: SnapshotMode.permissive,
-      autoresize: true,
-      child: widget.child,
+    return NotificationListener<ScrollNotification>(
+      onNotification: _handleScroll,
+      child: GlassSnapshot(
+        controller: _controller,
+        mode: SnapshotMode.permissive,
+        autoresize: true,
+        child: widget.child,
+      ),
     );
   }
 }

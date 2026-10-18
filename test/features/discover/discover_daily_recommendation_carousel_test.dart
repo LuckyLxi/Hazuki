@@ -12,6 +12,7 @@ import 'package:hazuki/features/discover/view/discover_daily_recommendation_caro
 import 'package:hazuki/features/discover/view/discover_daily_recommendation_carousel_widgets.dart';
 import 'package:hazuki/features/home/view/home_drawer_snapshot.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
+import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -124,30 +125,43 @@ Widget _carousel(
 
 void main() {
   setUp(clearHazukiWidgetImageMemoryForTesting);
-  for (final closing in [false, true]) {
-    for (final startDuringDrawer in [false, true]) {
-      testWidgets('carousel paints through drawer closing=$closing, '
-          'startsDuringDrawer=$startDuringDrawer', (tester) async {
+  for (final (routeTransition, closing) in [
+    (false, false),
+    (false, true),
+    (true, false),
+    (true, true),
+  ]) {
+    final motion = routeTransition ? 'route' : 'drawer';
+    for (final startDuringMotion in [false, true]) {
+      testWidgets('carousel paints through $motion closing=$closing, '
+          'startsDuringMotion=$startDuringMotion', (tester) async {
         await tester.runAsync(HazukiLiquidGlass.initialize);
         addTearDown(() => HazukiLiquidGlass.setEnabled(false));
-        final drawer = AnimationController(
+        final transition = AnimationController(
           vsync: tester,
           value: closing ? 1 : 0,
           duration: const Duration(milliseconds: 210),
           reverseDuration: const Duration(milliseconds: 160),
         );
-        addTearDown(drawer.dispose);
+        addTearDown(transition.dispose);
         final rootKey = GlobalKey();
         await tester.pumpWidget(
           RepaintBoundary(
             key: rootKey,
             child: MaterialApp(
-              home: HomeDrawerSnapshot(
-                animation: drawer,
-                child: Scaffold(
-                  body: _carousel(_Images(), _Service(), _items(2)),
-                ),
-              ),
+              home: routeTransition
+                  ? RouteTransitionSnapshot(
+                      secondaryAnimation: transition,
+                      child: Scaffold(
+                        body: _carousel(_Images(), _Service(), _items(2)),
+                      ),
+                    )
+                  : HomeDrawerSnapshot(
+                      animation: transition,
+                      child: Scaffold(
+                        body: _carousel(_Images(), _Service(), _items(2)),
+                      ),
+                    ),
             ),
           ),
         );
@@ -168,19 +182,19 @@ void main() {
           );
         }
 
-        if (!startDuringDrawer) {
+        if (!startDuringMotion) {
           moveCarousel();
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 16));
         }
         if (closing) {
-          drawer.reverse();
+          transition.reverse();
         } else {
-          drawer.forward();
+          transition.forward();
         }
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 16));
-        if (startDuringDrawer) {
+        if (startDuringMotion) {
           expect(snapshot().allowSnapshotting, isTrue);
           moveCarousel();
           await tester.pump();
