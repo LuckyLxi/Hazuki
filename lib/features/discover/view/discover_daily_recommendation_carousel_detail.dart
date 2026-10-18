@@ -76,8 +76,10 @@ extension _DiscoverDailyRecommendationCarouselDetail
   Future<void> _openRecommendation(
     BuildContext context,
     DiscoverDailyRecommendationEntry entry,
-    String heroTag,
-  ) async {
+    String heroTag, {
+    int? imageCacheWidth,
+    HazukiCachedImageController? imageController,
+  }) async {
     if (_detailOpen) {
       return;
     }
@@ -101,12 +103,45 @@ extension _DiscoverDailyRecommendationCarouselDetail
       },
     );
     _cancelAutoPlay(trigger: 'open_recommendation', reason: 'detail_open');
+    ComicCoverHandoff? coverHandoff;
+    final bannerUrl = entry.displayImageUrl.trim();
+    if (bannerUrl.isNotEmpty && bannerUrl != entry.comic.cover.trim()) {
+      final sourceKey = entry.comic.sourceKey;
+      final bytes =
+          imageController?.bytesFor(bannerUrl, sourceKey: sourceKey) ??
+          peekHazukiWidgetImageMemory(bannerUrl, sourceKey: sourceKey) ??
+          _sourceService.peekImageBytesFromMemory(
+            bannerUrl,
+            sourceKey: sourceKey,
+          );
+      if (bytes != null && !useWindowsComicDetailPanel) {
+        coverHandoff = ComicCoverHandoff(
+          heroTag: heroTag,
+          url: bannerUrl,
+          sourceKey: sourceKey,
+          bytes: bytes,
+          cacheWidth: imageCacheWidth,
+          decodedBanner: imageController?.frameFor(
+            bannerUrl,
+            sourceKey: sourceKey,
+          ),
+        );
+      }
+      unawaited(
+        precacheComicCoverHeroImages(
+          context,
+          url: entry.comic.cover,
+          sourceKey: sourceKey,
+        ),
+      );
+    }
     try {
       await openComicDetail(
         context,
         comic: entry.comic,
         heroTag: heroTag,
         pageBuilder: widget.comicDetailPageBuilder,
+        coverHandoff: coverHandoff,
       );
     } finally {
       final keepDetailOpen =

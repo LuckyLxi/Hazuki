@@ -56,6 +56,9 @@ void main() {
             'title': 'Comic $index',
             'cover': 'https://example.com/cover-$index.jpg',
             'imageUrl': 'https://example.com/banner-$index.jpg',
+            'bannerTitle': 'Website pick $index',
+            'caption': 'Editor recommendation $index',
+            'subTitle': 'Comic subtitle $index',
             'sourceKey': 'foreign_source',
           },
         );
@@ -80,13 +83,25 @@ void main() {
           state.recommendations.map((e) => e.comic.id),
           items.map((e) => e['id']),
         );
-        expect(state.recommendations.every((e) => e.author.isEmpty), isTrue);
+        expect(
+          state.recommendations.map((e) => e.author),
+          items.map((e) => e['caption']),
+        );
         expect(
           state.recommendations.every((e) => e.comic.sourceKey == 'website'),
           isTrue,
         );
         if (count > 0) {
           expect(state.recommendations.first.comic.cover, items.first['cover']);
+          expect(state.recommendations.first.comic.title, items.first['title']);
+          expect(
+            state.recommendations.first.comic.subTitle,
+            items.first['subTitle'],
+          );
+          expect(
+            state.recommendations.first.displayTitle,
+            items.first['bannerTitle'],
+          );
           expect(
             state.recommendations.first.displayImageUrl,
             items.first['imageUrl'],
@@ -103,6 +118,10 @@ void main() {
           expect(
             cached.recommendations.first.imageUrl,
             items.first['imageUrl'],
+          );
+          expect(
+            cached.recommendations.first.bannerTitle,
+            items.first['bannerTitle'],
           );
         }
         expect(
@@ -136,6 +155,46 @@ void main() {
     );
   }
 
+  test('legacy recommendations fall back to comic title and cover', () async {
+    await manager.importPackage(
+      utf8.encode(
+        _script('[{id:"a",title:"Comic A",cover:"https://example.com/a.jpg"}]'),
+      ),
+    );
+    await assembly.runtimeRegistry.ensureInitialized(sourceKey: 'website');
+    final service = DiscoverDailyRecommendationService(
+      source: assembly.gateways.dailyRecommendation,
+    );
+    addTearDown(service.dispose);
+    final entry = (await service.ensurePrepared(
+      enabled: true,
+    )).recommendations.single;
+    expect(entry.bannerTitle, isEmpty);
+    expect(entry.displayTitle, 'Comic A');
+    expect(entry.displayImageUrl, 'https://example.com/a.jpg');
+    expect(entry.author, isEmpty);
+  });
+
+  test('banner-only images never become comic covers', () async {
+    await manager.importPackage(
+      utf8.encode(
+        _script(
+          '[{id:"a",title:"Comic A",bannerTitle:"Weekly pick",'
+          'imageUrl:"https://example.com/banner.jpg"}]',
+        ),
+      ),
+    );
+    final entry =
+        (await assembly.gateways.dailyRecommendation.loadDailyRecommendations(
+          sourceKey: 'website',
+        )).single;
+    expect(entry.comic.id, 'a');
+    expect(entry.comic.title, 'Comic A');
+    expect(entry.comic.cover, isEmpty);
+    expect(entry.bannerTitle, 'Weekly pick');
+    expect(entry.imageUrl, 'https://example.com/banner.jpg');
+  });
+
   test('plugin mode requires a callable loader at installation', () async {
     await expectLater(
       manager.importPackage(
@@ -156,6 +215,7 @@ void main() {
     '[null]',
     '[{"id":"a","title":"A"}]',
     '[{"id":"a","title":"A","cover":123}]',
+    '[{"id":"a","title":"A","cover":"a.jpg","bannerTitle":123}]',
   ]) {
     test('rejects malformed site recommendation response: $result', () async {
       await manager.importPackage(utf8.encode(_script(result)));

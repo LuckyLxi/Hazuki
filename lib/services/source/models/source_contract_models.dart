@@ -7,11 +7,15 @@ class SourceDailyRecommendationItem {
     required this.comic,
     this.caption = '',
     this.imageUrl = '',
+    this.bannerTitle = '',
   });
 
   final ExploreComic comic;
   final String caption;
   final String imageUrl;
+
+  /// Promotional title, kept separate from the target comic's title.
+  final String bannerTitle;
 }
 
 class SourceCatalogEntry {

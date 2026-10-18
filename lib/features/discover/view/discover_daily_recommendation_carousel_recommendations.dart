@@ -2,6 +2,24 @@ part of 'discover_daily_recommendation_carousel.dart';
 
 extension _DiscoverDailyRecommendationCarouselRecommendations
     on _DiscoverDailyRecommendationCarouselState {
+  HazukiCachedImageController _imageControllerFor(
+    DiscoverDailyRecommendationEntry entry,
+  ) {
+    final key = hazukiWidgetImageMemoryKey(
+      entry.displayImageUrl,
+      sourceKey: entry.comic.sourceKey,
+    );
+    final controller =
+        _imageControllers.remove(key) ?? HazukiCachedImageController();
+    _imageControllers[key] = controller;
+    // Keep nearby banners decoded across lazy-page recycling and loop jumps.
+    // Bound retained frames even for plugins returning very large lists.
+    while (_imageControllers.length > 16) {
+      _imageControllers.remove(_imageControllers.keys.first)?.dispose();
+    }
+    return controller;
+  }
+
   void _replaceDisplayedRecommendations(
     List<DiscoverDailyRecommendationEntry> recommendations,
   ) {

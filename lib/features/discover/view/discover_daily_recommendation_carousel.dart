@@ -11,6 +11,7 @@ import '../support/discover_daily_recommendation_carousel_support.dart';
 import 'discover_daily_recommendation_carousel_controllers.dart';
 import 'discover_daily_recommendation_carousel_widgets.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/images/comic_cover_handoff.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 part 'discover_daily_recommendation_carousel_detail.dart';
@@ -61,6 +62,7 @@ class _DiscoverDailyRecommendationCarouselState
       const <DiscoverDailyRecommendationEntry>[];
   final Set<int> _protectedVisibleItems = <int>{};
   final Set<int> _prefetchedCoverIndexes = <int>{};
+  final Map<String, HazukiCachedImageController> _imageControllers = {};
   final Map<int, String> _reportedCardSnapshots = <int, String>{};
   final Map<int, String> _reportedImageStates = <int, String>{};
   int _currentPage = 0;
@@ -239,6 +241,9 @@ class _DiscoverDailyRecommendationCarouselState
       },
     );
     _loopController.dispose();
+    for (final controller in _imageControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -352,6 +357,7 @@ class _DiscoverDailyRecommendationCarouselState
                       final entry = _resolvedRecommendationEntry(
                         effectiveIndex,
                       );
+                      final imageController = _imageControllerFor(entry);
                       final heroTag = widget.comicCoverHeroTagBuilder(
                         entry.comic,
                         salt:
@@ -403,9 +409,8 @@ class _DiscoverDailyRecommendationCarouselState
                                   sourceKey: entry.comic.sourceKey,
                                   fit: BoxFit.cover,
                                   cacheWidth: coverCacheWidth.round(),
+                                  controller: imageController,
                                   animateOnLoad: true,
-                                  animateOnCacheHit: _recommendationService
-                                      .usesPluginRecommendations,
                                   waitForFirstFrame: _recommendationService
                                       .usesPluginRecommendations,
                                   filterQuality: FilterQuality.low,
@@ -440,7 +445,13 @@ class _DiscoverDailyRecommendationCarouselState
                             hideOverlay: _activeOverlayHeroTag == heroTag,
                             imageChild: imageChild,
                             onTap: () => unawaited(
-                              _openRecommendation(context, entry, heroTag),
+                              _openRecommendation(
+                                context,
+                                entry,
+                                heroTag,
+                                imageCacheWidth: coverCacheWidth.round(),
+                                imageController: imageController,
+                              ),
                             ),
                           );
                         },

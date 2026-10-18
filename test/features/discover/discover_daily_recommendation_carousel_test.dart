@@ -13,6 +13,7 @@ import 'package:hazuki/features/discover/view/discover_daily_recommendation_caro
 import 'package:hazuki/features/home/view/home_drawer_snapshot.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -110,6 +111,7 @@ Widget _carousel(
   _Service service,
   List<DiscoverDailyRecommendationEntry> items, {
   List<DiscoverDailyRecommendationEntry> pending = const [],
+  Widget Function(ExploreComic, String)? comicDetailPageBuilder,
 }) => SourceImageGatewayScope(
   gateway: images,
   child: DiscoverDailyRecommendationCarousel(
@@ -119,12 +121,106 @@ Widget _carousel(
     sourceService: images,
     recommendationService: service,
     comicCoverHeroTagBuilder: (comic, {salt}) => 'comic-${comic.id}-$salt',
-    comicDetailPageBuilder: (comic, heroTag) => const SizedBox(),
+    comicDetailPageBuilder:
+        comicDetailPageBuilder ?? (comic, heroTag) => const SizedBox(),
   ),
 );
 
 void main() {
   setUp(clearHazukiWidgetImageMemoryForTesting);
+
+  testWidgets('banner content stays separate when opening comic detail', (
+    tester,
+  ) async {
+    final comic = _items(1).single.comic;
+    final entry = DiscoverDailyRecommendationEntry(
+      comic: comic,
+      bannerTitle: 'Website weekly picks',
+      author: 'Editor recommendation',
+      imageUrl: 'https://example.com/promotional.png',
+    );
+    final controller = WindowsComicDetailController();
+    addTearDown(controller.dispose);
+    ExploreComic? openedComic;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WindowsComicDetailControllerScope(
+          controller: controller,
+          child: Scaffold(
+            body: _carousel(
+              _Images(),
+              _Service(),
+              [entry],
+              comicDetailPageBuilder: (comic, _) {
+                openedComic = comic;
+                return const Scaffold(body: Text('Comic detail'));
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Website weekly picks'), findsOneWidget);
+    expect(find.text('Editor recommendation'), findsOneWidget);
+    expect(find.text(comic.title), findsNothing);
+    expect(
+      tester.widget<HazukiCachedImage>(find.byType(HazukiCachedImage)).url,
+      entry.imageUrl,
+    );
+    await tester.tap(find.text('Website weekly picks'));
+    await tester.pumpAndSettle();
+    final target = useWindowsComicDetailPanel
+        ? controller.entry!.comic
+        : openedComic!;
+    expect(target, same(comic));
+    expect(target.title, 'Comic 0');
+    expect(target.cover, 'https://example.com/cover-0.png');
+    expect(target.sourceKey, 'website');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('banner title changes refresh without changing comic data', (
+    tester,
+  ) async {
+    final original = _items(1).single;
+    var entry = original;
+    late StateSetter update;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (_, setState) {
+              update = setState;
+              return _carousel(_Images(), _Service(), [entry]);
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(original.comic.title), findsOneWidget);
+    update(() {
+      entry = DiscoverDailyRecommendationEntry(
+        comic: original.comic,
+        imageUrl: original.imageUrl,
+        bannerTitle: 'Updated promotion',
+      );
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Updated promotion'), findsOneWidget);
+    expect(find.text(original.comic.title), findsNothing);
+    update(() {
+      entry = original;
+    });
+    await tester.pumpAndSettle();
+    expect(find.text(original.comic.title), findsOneWidget);
+    expect(find.text('Updated promotion'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   for (final (routeTransition, closing) in [
     (false, false),
     (false, true),
@@ -297,7 +393,7 @@ void main() {
     },
   );
 
-  testWidgets('website cards animate even when images are cached', (
+  testWidgets('cached website cards are immediately visible without a reveal', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -308,18 +404,11 @@ void main() {
     final imageFinder = find.byType(HazukiCachedImage);
     expect(
       find.descendant(of: imageFinder, matching: find.byType(AnimatedOpacity)),
-      findsWidgets,
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 130));
-    final fades = tester.stateList<ImplicitlyAnimatedWidgetState>(
-      find.descendant(of: imageFinder, matching: find.byType(AnimatedOpacity)),
+      findsNothing,
     );
     expect(
-      fades.every(
-        (state) => state.animation.value > 0 && state.animation.value < 1,
-      ),
-      isTrue,
+      find.descendant(of: imageFinder, matching: find.byType(Image)),
+      findsWidgets,
     );
     await tester.pumpAndSettle();
     expect(
@@ -329,6 +418,71 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets(
+    'cached side cards and loop copies stay visible over three laps',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 320,
+              child: _carousel(_Images(), _Service(), _items(5)),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (var step = 0; step < 15; step++) {
+        final pages = tester
+            .widget<PageView>(find.byType(PageView))
+            .controller!;
+        unawaited(
+          pages.animateToPage(
+            pages.page!.round() + 1,
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.linear,
+          ),
+        );
+        await tester.pump();
+        for (var frame = 0; frame < 12; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          final images = find.byType(HazukiCachedImage);
+          expect(
+            find.descendant(of: images, matching: find.byType(AnimatedOpacity)),
+            findsNothing,
+            reason:
+                'step=$step frame=$frame must not replay cached image fades',
+          );
+          expect(
+            tester
+                .widgetList<RawImage>(
+                  find.descendant(of: images, matching: find.byType(RawImage)),
+                )
+                .every((image) => image.image != null),
+            isTrue,
+          );
+          expect(
+            find.descendant(
+              of: images,
+              matching: find.byKey(const ValueKey('loading-stack')),
+            ),
+            findsNothing,
+          );
+        }
+        expect(
+          tester
+              .widget<DiscoverDailyRecommendationIndicators>(
+                find.byType(DiscoverDailyRecommendationIndicators),
+              )
+              .currentIndex,
+          (step + 1) % 5,
+        );
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   testWidgets(
     'author recommendations keep their existing cached image behavior',

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -15,6 +16,73 @@ enum HazukiCachedImageLoadState { idle, deferred, loading, loaded, error }
 
 typedef HazukiCachedImageStateChanged =
     void Function(String url, HazukiCachedImageLoadState state);
+
+/// Retains the actual bytes and decoded frame used by a visible image. Owners
+/// dispose it when the corresponding presentation session ends.
+class HazukiCachedImageController {
+  ImageStream? _stream;
+  ImageInfo? _frame;
+  Uint8List? _bytes;
+  String _url = '';
+  String _sourceKey = '';
+  int? _cacheWidth;
+  int? _cacheHeight;
+  bool _disposed = false;
+
+  Uint8List? bytesFor(String url, {required String sourceKey}) =>
+      !_disposed && _url == url.trim() && _sourceKey == sourceKey
+      ? _bytes
+      : null;
+
+  ui.Image? frameFor(String url, {required String sourceKey}) =>
+      bytesFor(url, sourceKey: sourceKey) == null ? null : _frame?.image;
+
+  late final ImageStreamListener _listener = ImageStreamListener((frame, _) {
+    _frame?.dispose();
+    _frame = frame;
+  }, onError: (Object _, StackTrace? _) {});
+
+  void _retain(
+    Uint8List bytes, {
+    required String url,
+    required String sourceKey,
+    required int? cacheWidth,
+    required int? cacheHeight,
+  }) {
+    if (_disposed ||
+        (identical(_bytes, bytes) &&
+            _url == url &&
+            _sourceKey == sourceKey &&
+            _cacheWidth == cacheWidth &&
+            _cacheHeight == cacheHeight)) {
+      return;
+    }
+    _release();
+    _bytes = bytes;
+    _url = url;
+    _sourceKey = sourceKey;
+    _cacheWidth = cacheWidth;
+    _cacheHeight = cacheHeight;
+    _stream = ResizeImage.resizeIfNeeded(
+      cacheWidth,
+      cacheHeight,
+      MemoryImage(bytes),
+    ).resolve(ImageConfiguration.empty)..addListener(_listener);
+  }
+
+  void _release() {
+    _stream?.removeListener(_listener);
+    _stream = null;
+    _frame?.dispose();
+    _frame = null;
+  }
+
+  void dispose() {
+    _disposed = true;
+    _release();
+    _bytes = null;
+  }
+}
 
 class HazukiCachedImage extends StatefulWidget {
   const HazukiCachedImage({
@@ -33,6 +101,8 @@ class HazukiCachedImage extends StatefulWidget {
     this.animateOnLoad = false,
     this.animateOnCacheHit = false,
     this.waitForFirstFrame = false,
+    this.revealEnabled = true,
+    this.onRevealComplete,
     this.loadAnimationDuration = const Duration(milliseconds: 260),
     this.loadAnimationBeginScale = 0.985,
     this.filterQuality = FilterQuality.medium,
@@ -41,6 +111,7 @@ class HazukiCachedImage extends StatefulWidget {
     this.sourceKey = '',
     this.onStateChanged,
     this.imageGateway,
+    this.controller,
   });
 
   final String url;
@@ -59,6 +130,14 @@ class HazukiCachedImage extends StatefulWidget {
 
   /// Retains the placeholder until the first decoded image frame can be drawn.
   final bool waitForFirstFrame;
+
+  /// Holds the first-frame reveal while an enclosing transition is running.
+  /// Only applies when [waitForFirstFrame] is enabled.
+  final bool revealEnabled;
+
+  /// Called after the decoded first frame's reveal finishes. Only applies when
+  /// [waitForFirstFrame] is enabled.
+  final VoidCallback? onRevealComplete;
   final Duration loadAnimationDuration;
   final double loadAnimationBeginScale;
   final FilterQuality filterQuality;
@@ -67,6 +146,7 @@ class HazukiCachedImage extends StatefulWidget {
   final String sourceKey;
   final HazukiCachedImageStateChanged? onStateChanged;
   final SourceImageGateway? imageGateway;
+  final HazukiCachedImageController? controller;
 
   @override
   State<HazukiCachedImage> createState() => _HazukiCachedImageState();
@@ -99,6 +179,18 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
   }
 
   String get _resolvedSourceKey => _sourceKeySnapshot;
+
+  void _retainPresentationFrame() {
+    final bytes = _bytes;
+    if (bytes == null) return;
+    widget.controller?._retain(
+      bytes,
+      url: widget.url.trim(),
+      sourceKey: _resolvedSourceKey,
+      cacheWidth: widget.cacheWidth,
+      cacheHeight: widget.cacheHeight,
+    );
+  }
 
   void _reportState(HazukiCachedImageLoadState state) {
     if (_lastReportedState == state) {
@@ -202,6 +294,11 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _error == null) {
       _startLoadOrDefer(widget.url);
     }
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.cacheWidth != widget.cacheWidth ||
+        oldWidget.cacheHeight != widget.cacheHeight) {
+      _retainPresentationFrame();
+    }
   }
 
   @override
@@ -287,6 +384,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     final sourceKey = _resolvedSourceKey;
     final imageGateway = _imageGateway;
     final cached =
+        widget.controller?.bytesFor(normalized, sourceKey: sourceKey) ??
         takeHazukiWidgetImageMemory(normalized, sourceKey: sourceKey) ??
         imageGateway.peekImageBytesFromMemory(normalized, sourceKey: sourceKey);
     if (cached == null) {
@@ -296,6 +394,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       putHazukiWidgetImageMemory(normalized, cached, sourceKey: sourceKey);
     }
     _bytes = cached;
+    _retainPresentationFrame();
     _error = null;
     _loading = false;
     _useLoadedImageReveal = widget.animateOnLoad && widget.animateOnCacheHit;
@@ -364,6 +463,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     if (cached != null) {
       if (!mounted) {
         _bytes = cached;
+        _retainPresentationFrame();
         _error = null;
         _loading = false;
         _showLoadedImage = true;
@@ -372,6 +472,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       }
       setState(() {
         _bytes = cached;
+        _retainPresentationFrame();
         _error = null;
         _loading = false;
         _useLoadedImageReveal =
@@ -413,6 +514,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       request.retain(bytes);
       setState(() {
         _bytes = bytes;
+        _retainPresentationFrame();
         _error = null;
         _loading = false;
         _showLoadedImage = !widget.animateOnLoad;
@@ -464,10 +566,11 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         frameBuilder: widget.waitForFirstFrame
             ? (context, child, frame, wasSynchronouslyLoaded) =>
                   _HazukiImageFrameReveal(
-                    ready: frame != null,
-                    animate: widget.animateOnLoad,
+                    ready: frame != null && widget.revealEnabled,
+                    animate: widget.animateOnLoad && _useLoadedImageReveal,
                     duration: widget.loadAnimationDuration,
                     beginScale: widget.loadAnimationBeginScale,
+                    onRevealComplete: widget.onRevealComplete,
                     placeholder: _buildLoadingPlaceholder(),
                     child: child,
                   )
@@ -582,6 +685,7 @@ class _HazukiImageFrameReveal extends StatefulWidget {
     required this.beginScale,
     required this.placeholder,
     required this.child,
+    this.onRevealComplete,
   });
 
   final bool ready;
@@ -590,6 +694,7 @@ class _HazukiImageFrameReveal extends StatefulWidget {
   final double beginScale;
   final Widget placeholder;
   final Widget child;
+  final VoidCallback? onRevealComplete;
 
   @override
   State<_HazukiImageFrameReveal> createState() =>
@@ -603,6 +708,8 @@ class _HazukiImageFrameRevealState extends State<_HazukiImageFrameReveal> {
   @override
   void initState() {
     super.initState();
+    _visible = widget.ready && !widget.animate;
+    _finished = _visible;
     if (widget.ready) _revealAfterFrame();
   }
 
@@ -613,6 +720,10 @@ class _HazukiImageFrameRevealState extends State<_HazukiImageFrameReveal> {
       _visible = false;
       _finished = false;
     } else if (!oldWidget.ready) {
+      if (!widget.animate) {
+        _visible = true;
+        _finished = true;
+      }
       _revealAfterFrame();
     }
   }
@@ -624,6 +735,7 @@ class _HazukiImageFrameRevealState extends State<_HazukiImageFrameReveal> {
         _visible = true;
         _finished = !widget.animate;
       });
+      if (!widget.animate) widget.onRevealComplete?.call();
     });
   }
 
@@ -641,7 +753,10 @@ class _HazukiImageFrameRevealState extends State<_HazukiImageFrameReveal> {
           duration: widget.duration,
           curve: Curves.easeOutCubic,
           onEnd: () {
-            if (mounted && _visible) setState(() => _finished = true);
+            if (mounted && _visible && !_finished) {
+              setState(() => _finished = true);
+              widget.onRevealComplete?.call();
+            }
           },
           child: AnimatedScale(
             scale: _visible ? 1 : widget.beginScale,

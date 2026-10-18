@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/widgets/cached_image_widgets.dart';
 
 class DiscoverCarouselPagePhysics extends PageScrollPhysics {
   const DiscoverCarouselPagePhysics({super.parent});
@@ -105,11 +106,11 @@ class DiscoverDailyRecommendationCarouselCard extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Hero(
+                        ComicCoverHero(
                           tag: heroTag,
-                          flightShuttleBuilder:
-                              buildComicCoverHeroFlightShuttle,
-                          placeholderBuilder: buildComicCoverHeroPlaceholder,
+                          image: imageChild is HazukiCachedImage
+                              ? imageChild as HazukiCachedImage
+                              : null,
                           child: OverflowBox(
                             alignment: Alignment.center,
                             minWidth: heroCardWidth,
@@ -253,7 +254,7 @@ class _DiscoverDailyRecommendationCardOverlayState
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    convertChineseText(context, widget.entry.comic.title),
+                    convertChineseText(context, widget.entry.displayTitle),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleSmall?.copyWith(

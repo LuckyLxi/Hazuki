@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/images/comic_cover_handoff.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class ComicDetailHeaderCover extends StatelessWidget {
@@ -31,6 +32,17 @@ class ComicDetailHeaderCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final handoff = ComicCoverHandoffScope.find(context, heroTag);
+    final coverImage = displayCoverUrl.isEmpty
+        ? null
+        : HazukiCachedImage(
+            url: displayCoverUrl,
+            sourceKey: handoff?.sourceKey ?? sourceKey,
+            fit: BoxFit.cover,
+            keepInMemory: true,
+            cacheWidth: headerCoverCacheWidth,
+            cacheHeight: headerCoverCacheHeight,
+          );
     return RepaintBoundary(
       child: SizedBox(
         width: width,
@@ -38,25 +50,23 @@ class ComicDetailHeaderCover extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(coverBorderRadius),
           onTap: onTap,
-          child: Hero(
+          child: ComicCoverHero(
             tag: heroTag,
-            flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
-            placeholderBuilder: buildComicCoverHeroPlaceholder,
+            image: coverImage,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(coverBorderRadius),
-              child: displayCoverUrl.isNotEmpty
-                  ? HazukiCachedImage(
-                      url: displayCoverUrl,
-                      sourceKey: sourceKey,
-                      fit: BoxFit.cover,
-                      keepInMemory: true,
+              child: handoff != null
+                  ? ComicCoverHandoffImage(
+                      handoff: handoff,
+                      coverUrl: displayCoverUrl,
                       cacheWidth: headerCoverCacheWidth,
                       cacheHeight: headerCoverCacheHeight,
                     )
-                  : Container(
-                      color: skeletonColor,
-                      child: const Icon(Icons.image_not_supported_outlined),
-                    ),
+                  : coverImage ??
+                        Container(
+                          color: skeletonColor,
+                          child: const Icon(Icons.image_not_supported_outlined),
+                        ),
             ),
           ),
         ),

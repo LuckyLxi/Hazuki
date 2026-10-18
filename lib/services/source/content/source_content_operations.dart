@@ -182,7 +182,13 @@ class SourceContentOperationService
           (item['title'] as String).trim().isEmpty) {
         throw const FormatException('plugin_invalid_daily_recommendation');
       }
-      for (final field in ['cover', 'imageUrl', 'caption', 'subTitle']) {
+      for (final field in [
+        'cover',
+        'imageUrl',
+        'bannerTitle',
+        'caption',
+        'subTitle',
+      ]) {
         if (item[field] != null && item[field] is! String) {
           throw const FormatException('plugin_invalid_daily_recommendation');
         }
@@ -204,6 +210,7 @@ class SourceContentOperationService
           ),
           caption: item['caption'] as String? ?? '',
           imageUrl: imageUrl,
+          bannerTitle: item['bannerTitle'] as String? ?? '',
         ),
       );
     }

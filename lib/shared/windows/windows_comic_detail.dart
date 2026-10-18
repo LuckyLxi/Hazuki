@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/hazuki_models.dart';
 import '../navigation/snapshotting_page_route.dart';
+import '../images/comic_cover_handoff.dart';
 
 bool get useWindowsComicDetailPanel => Platform.isWindows;
 const windowsComicDetailPanelAnimationDuration = Duration(milliseconds: 320);
@@ -207,8 +208,10 @@ Future<void> openComicDetail(
   required String heroTag,
   required Widget Function(ExploreComic comic, String heroTag) pageBuilder,
   bool replaceCurrentRoute = false,
+  ComicCoverHandoff? coverHandoff,
 }) async {
   if (useWindowsComicDetailPanel) {
+    coverHandoff?.dispose();
     WindowsComicDetailControllerScope.of(context).open(comic, heroTag);
     return;
   }
@@ -217,8 +220,18 @@ Future<void> openComicDetail(
   final route = buildSnapshottingPageRoute<void>(
     // Keep the background reveal visible during the route transition.
     allowSnapshotting: false,
-    builder: (_) => pageBuilder(comic, heroTag),
+    builder: (_) {
+      final page = pageBuilder(comic, heroTag);
+      return coverHandoff == null
+          ? page
+          : ComicCoverHandoffScope(handoff: coverHandoff, child: page);
+    },
   );
+  if (coverHandoff != null && route is TransitionRoute<void>) {
+    // The route result completes before the returning Hero lands.
+    // Retain its decoded banner until the overlay has actually been removed.
+    route.completed.then((_) => coverHandoff.dispose());
+  }
 
   if (replaceCurrentRoute) {
     await navigator.pushReplacement(route);

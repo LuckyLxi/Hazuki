@@ -6,18 +6,23 @@ class DiscoverDailyRecommendationEntry {
     this.author = '',
     required this.comic,
     this.imageUrl = '',
+    this.bannerTitle = '',
   });
 
   final String author;
   final ExploreComic comic;
   final String imageUrl;
+  final String bannerTitle;
   String get displayImageUrl =>
       imageUrl.trim().isEmpty ? comic.cover : imageUrl;
+  String get displayTitle =>
+      bannerTitle.trim().isEmpty ? comic.title : bannerTitle;
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'author': author,
       'imageUrl': imageUrl,
+      'bannerTitle': bannerTitle,
       'comic': <String, dynamic>{
         'id': comic.id,
         'sourceKey': comic.sourceKey,
@@ -59,6 +64,7 @@ class DiscoverDailyRecommendationEntry {
       author: author,
       comic: comic,
       imageUrl: (map['imageUrl'] ?? '').toString(),
+      bannerTitle: (map['bannerTitle'] ?? '').toString(),
     );
   }
 }

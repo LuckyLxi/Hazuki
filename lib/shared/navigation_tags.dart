@@ -7,6 +7,7 @@ import '../models/hazuki_models.dart';
 import '../widgets/cached_image_widgets.dart';
 import '../widgets/source_image_gateway_scope.dart';
 import 'ui_flags.dart';
+import 'images/comic_cover_handoff.dart';
 
 typedef ComicHeroTagBuilder =
     String Function(ExploreComic comic, {String? salt});
@@ -102,6 +103,11 @@ Widget buildComicCoverHeroPlaceholder(
 /// 用于在 shuttle builder 中提取 from 端实际使用的 cacheWidth / cacheHeight，
 /// 确保 shuttle 的 ImageProvider 与 from 端完全一致，命中 Flutter ImageCache。
 HazukiCachedImage? _findCachedImageInSubtree(BuildContext context) {
+  final hero = context.widget;
+  if (hero is Hero) {
+    final child = _heroContent(hero.child);
+    if (child is ComicCoverHeroImage) return child.image;
+  }
   HazukiCachedImage? result;
   void visitor(Element element) {
     if (result != null) return;
@@ -120,6 +126,59 @@ HazukiCachedImage? _findCachedImageInSubtree(BuildContext context) {
     return null;
   }
   return result;
+}
+
+Widget _heroContent(Widget child) =>
+    child is KeyedSubtree ? child.child : child;
+
+/// Keeps the image state alive across both Hero placeholders. Flutter's own
+/// placeholder key is absent when a custom placeholder is used, so the content
+/// needs its own key to avoid restarting downloads and image reveals.
+class ComicCoverHero extends StatefulWidget {
+  const ComicCoverHero({
+    super.key,
+    required this.tag,
+    required this.image,
+    required this.child,
+  });
+
+  final Object tag;
+  final HazukiCachedImage? image;
+  final Widget child;
+
+  @override
+  State<ComicCoverHero> createState() => _ComicCoverHeroState();
+}
+
+class _ComicCoverHeroState extends State<ComicCoverHero> {
+  final GlobalKey _contentKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) => Hero(
+    tag: widget.tag,
+    flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
+    placeholderBuilder: buildComicCoverHeroPlaceholder,
+    child: KeyedSubtree(
+      key: _contentKey,
+      child: ComicCoverHeroImage(image: widget.image, child: widget.child),
+    ),
+  );
+}
+
+/// Exposes an image's provider parameters without traversing elements during a
+/// Hero overlay build, when Flutter locks child-element traversal in debug mode.
+class ComicCoverHeroImage extends StatelessWidget {
+  const ComicCoverHeroImage({
+    super.key,
+    required this.image,
+    required this.child,
+  });
+
+  final HazukiCachedImage? image;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => child;
 }
 
 void _precacheHeroDestinationImage(
@@ -157,6 +216,28 @@ Widget buildComicCoverHeroFlightShuttle(
           .toString();
   final borderRadius = comicCoverHeroBorderRadius(heroTag, fallback: 10);
   final scopedImageGateway = SourceImageGatewayScope.of(flightContext);
+  final handoff = ComicCoverHandoffScope.find(fromHeroContext, heroTag);
+  final destinationHandoff = ComicCoverHandoffScope.find(
+    toHeroContext,
+    heroTag,
+  );
+  if (flightDirection == HeroFlightDirection.push &&
+      destinationHandoff?.hasDecodedBanner == true &&
+      !hazukiNoImageModeNotifier.value) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: SizedBox.expand(child: destinationHandoff!.buildBanner()),
+    );
+  }
+  if (flightDirection == HeroFlightDirection.pop &&
+      handoff != null &&
+      !handoff.coverRevealed &&
+      !hazukiNoImageModeNotifier.value) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: SizedBox.expand(child: handoff.buildBanner()),
+    );
+  }
 
   // 从 from 端的 widget tree 中提取 HazukiCachedImage 的实际参数
   final cachedImage = _findCachedImageInSubtree(fromHeroContext);
@@ -180,26 +261,87 @@ Widget buildComicCoverHeroFlightShuttle(
       }
       if (bytes != null) {
         final destinationCachedImage = _findCachedImageInSubtree(toHeroContext);
-        if (destinationCachedImage != null) {
+        if (destinationCachedImage != null &&
+            destinationCachedImage.url.trim() == url) {
           _precacheHeroDestinationImage(
             flightContext,
             bytes,
             destinationCachedImage,
           );
         }
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(borderRadius),
-          child: SizedBox.expand(
-            child: Image.memory(
-              bytes,
+        Widget flightImage = Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
+          // 使用和 from 端完全相同的 resize 参数，确保 ImageProvider 一致
+          cacheWidth: cachedImage.cacheWidth,
+          cacheHeight: cachedImage.cacheHeight,
+        );
+        // Returning from a resolved cover to promotional art needs the inverse
+        // handoff. The banner is already decoded on the underlying carousel.
+        if (flightDirection == HeroFlightDirection.pop &&
+            handoff != null &&
+            destinationCachedImage != null &&
+            destinationCachedImage.url.trim() != url) {
+          final destinationUrl = destinationCachedImage.url.trim();
+          final destinationSourceKey =
+              destinationCachedImage.sourceKey.trim().isEmpty
+              ? handoff.sourceKey
+              : destinationCachedImage.sourceKey;
+          final destinationBytes =
+              destinationUrl == handoff.url &&
+                  destinationSourceKey == handoff.sourceKey
+              ? handoff.bytes
+              : peekHazukiWidgetImageMemory(
+                      destinationUrl,
+                      sourceKey: destinationSourceKey,
+                    ) ??
+                    (destinationCachedImage.imageGateway ?? scopedImageGateway)
+                        .peekImageBytesFromMemory(
+                          destinationUrl,
+                          sourceKey: destinationSourceKey,
+                        );
+          final sourceImage = flightImage;
+          final returnAnimation =
+              ModalRoute.of(fromHeroContext)?.animation ?? animation;
+          Widget blendBanner(Widget banner) => Stack(
+            fit: StackFit.expand,
+            children: [
+              sourceImage,
+              AnimatedBuilder(
+                animation: returnAnimation,
+                child: banner,
+                builder: (_, child) => Opacity(
+                  opacity: Curves.easeOutCubic.transform(
+                    ((0.45 - returnAnimation.value) / 0.45).clamp(0.0, 1.0),
+                  ),
+                  child: child,
+                ),
+              ),
+            ],
+          );
+          if (destinationUrl == handoff.url &&
+              destinationSourceKey == handoff.sourceKey &&
+              handoff.hasDecodedBanner) {
+            flightImage = blendBanner(handoff.buildBanner());
+          } else if (destinationBytes != null) {
+            flightImage = Image.memory(
+              destinationBytes,
               fit: BoxFit.cover,
+              cacheWidth: destinationCachedImage.cacheWidth,
+              cacheHeight: destinationCachedImage.cacheHeight,
               gaplessPlayback: true,
               filterQuality: FilterQuality.medium,
-              // 使用和 from 端完全相同的 resize 参数，确保 ImageProvider 一致
-              cacheWidth: cachedImage.cacheWidth,
-              cacheHeight: cachedImage.cacheHeight,
-            ),
-          ),
+              errorBuilder: (_, _, _) => sourceImage,
+              frameBuilder: (context, banner, frame, _) =>
+                  frame == null ? sourceImage : blendBanner(banner),
+            );
+          }
+        }
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: SizedBox.expand(child: flightImage),
         );
       }
     }
@@ -208,6 +350,13 @@ Widget buildComicCoverHeroFlightShuttle(
   // fallback：bytes 不可用时使用 fromHero.child，但保持和 bytes 路径一致的裁剪。
   return ClipRRect(
     borderRadius: BorderRadius.circular(borderRadius),
-    child: SizedBox.expand(child: fromHero.child),
+    child: SizedBox.expand(
+      child: handoff == null
+          ? _heroContent(fromHero.child)
+          : ComicCoverHandoffScope(
+              handoff: handoff,
+              child: _heroContent(fromHero.child),
+            ),
+    ),
   );
 }

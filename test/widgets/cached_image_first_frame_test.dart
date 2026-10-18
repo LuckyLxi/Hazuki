@@ -22,6 +22,96 @@ class _Images extends Fake implements SourceImageGateway {
 void main() {
   setUp(clearHazukiWidgetImageMemoryForTesting);
 
+  testWidgets('cached first frames respect disabled cache-hit animation', (
+    tester,
+  ) async {
+    final bytes = Uint8List.fromList([7, 8, 9]);
+    final decoded = Completer<ImageInfo>.sync();
+    final cache = PaintingBinding.instance.imageCache;
+    cache.putIfAbsent(
+      MemoryImage(bytes),
+      () => OneFrameImageStreamCompleter(decoded.future),
+    );
+    const placeholder = ValueKey('cache-hit-placeholder');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HazukiCachedImage(
+          url: 'https://example.com/cached.png',
+          imageGateway: _Images(bytes),
+          width: 200,
+          height: 100,
+          waitForFirstFrame: true,
+          animateOnLoad: true,
+          animateOnCacheHit: false,
+          useShimmerLoading: false,
+          loading: const ColoredBox(key: placeholder, color: Colors.grey),
+        ),
+      ),
+    );
+    expect(find.byKey(placeholder), findsOneWidget);
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder).drawColor(Colors.blue, BlendMode.src);
+    final picture = recorder.endRecording();
+    decoded.complete(ImageInfo(image: picture.toImageSync(2, 2)));
+    picture.dispose();
+    await tester.pump();
+    expect(find.byKey(placeholder), findsNothing);
+    expect(find.byType(AnimatedOpacity), findsNothing);
+    expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
+    await tester.pumpWidget(const SizedBox());
+    cache.clear();
+    cache.clearLiveImages();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'presentation controller retains and releases its decoded frame',
+    (tester) async {
+      const url = 'https://example.com/retained.png';
+      final bytes = Uint8List.fromList([10, 11, 12]);
+      final controller = HazukiCachedImageController();
+      addTearDown(controller.dispose);
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(Colors.blue, BlendMode.src);
+      final picture = recorder.endRecording();
+      final decoded = Completer<ImageInfo>.sync();
+      final cache = PaintingBinding.instance.imageCache;
+      cache.putIfAbsent(
+        MemoryImage(bytes),
+        () => OneFrameImageStreamCompleter(decoded.future),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HazukiCachedImage(
+            url: url,
+            sourceKey: 'website',
+            imageGateway: _Images(bytes),
+            controller: controller,
+            waitForFirstFrame: true,
+          ),
+        ),
+      );
+      decoded.complete(ImageInfo(image: picture.toImageSync(2, 2)));
+      picture.dispose();
+      await tester.pumpAndSettle();
+      final frame = controller.frameFor(url, sourceKey: 'website');
+      expect(frame, isNotNull);
+      expect(controller.bytesFor(url, sourceKey: 'website'), same(bytes));
+      expect(controller.bytesFor(url, sourceKey: 'other'), isNull);
+      await tester.pumpWidget(const SizedBox());
+      clearHazukiWidgetImageMemoryForTesting();
+      cache.clear();
+      cache.clearLiveImages();
+      expect(controller.frameFor(url, sourceKey: 'website'), same(frame));
+      final retainedClone = frame!.clone();
+      retainedClone.dispose();
+      controller.dispose();
+      expect(controller.frameFor(url, sourceKey: 'website'), isNull);
+      expect(controller.bytesFor(url, sourceKey: 'website'), isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final failDecoding in [false, true]) {
     testWidgets(
       failDecoding

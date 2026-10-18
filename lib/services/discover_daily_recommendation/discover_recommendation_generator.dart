@@ -65,6 +65,7 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
                 author: item.caption,
                 comic: item.comic,
                 imageUrl: item.imageUrl,
+                bannerTitle: item.bannerTitle,
               ),
             ),
           ),

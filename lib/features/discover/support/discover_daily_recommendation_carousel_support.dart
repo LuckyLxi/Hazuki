@@ -61,7 +61,7 @@ String discoverDailyRecommendationSnapshotKey(
   return recommendations
       .map(
         (entry) =>
-            '${entry.comic.sourceKey}|${entry.author}|${entry.comic.id}|${entry.comic.title}|${entry.comic.cover}|${entry.imageUrl}',
+            '${entry.comic.sourceKey}|${entry.author}|${entry.comic.id}|${entry.comic.title}|${entry.comic.cover}|${entry.imageUrl}|${entry.bannerTitle}',
       )
       .join('||');
 }
