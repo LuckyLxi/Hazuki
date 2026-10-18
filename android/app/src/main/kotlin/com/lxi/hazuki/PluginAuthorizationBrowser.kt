@@ -1,7 +1,9 @@
 package com.lxi.hazuki
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
@@ -9,6 +11,7 @@ import android.os.Message
 import android.view.View
 import android.webkit.*
 import android.widget.FrameLayout
+import org.json.JSONTokener
 import androidx.webkit.ProfileStore
 import androidx.webkit.CookieManagerCompat
 import androidx.webkit.WebViewCompat
@@ -19,8 +22,8 @@ import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
 
-/** Isolated profiles; no JS bridge, external intents, or URL/error logging. */
-class PluginAuthorizationBrowser(private val engine: FlutterEngine) {
+/** Isolated profiles; QQ handoffs stay bound to their live browser session. */
+class PluginAuthorizationBrowser(private val activity: Activity, private val engine: FlutterEngine) {
     private val sessions = mutableMapOf<String, BrowserView>()
     private val prefix = "hazuki_auth_"
 
@@ -86,6 +89,66 @@ class PluginAuthorizationBrowser(private val engine: FlutterEngine) {
         private val channel = MethodChannel(engine.dartExecutor.binaryMessenger, "hazuki/browser_authorization/$id")
         private val callbacks = options["callbacks"] as List<*>
         private var active = true
+        private var qqRequest = 0
+        private var qqLaunchedRequest = -1
+
+        private fun dispatchQq(url: String, request: Int) {
+            if (!active || request != qqRequest || qqLaunchedRequest == request) return
+            qqLaunchedRequest = request
+            try {
+                activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    .addCategory(Intent.CATEGORY_BROWSABLE)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).setPackage("com.tencent.mobileqq"))
+            } catch (_: Exception) {
+                emit("externalFailure")
+            }
+        }
+
+        private fun awaitQqTicket(view: WebView, request: Int, index: Int, attempt: Int = 0) {
+            if (!active || request != qqRequest || qqLaunchedRequest == request || !windows.contains(view)) return
+            view.evaluateJavascript("window.pt?.qrcode?.history?.[$index] ?? null") { result ->
+                if (!active || request != qqRequest || qqLaunchedRequest == request) return@evaluateJavascript
+                val ticket = try { JSONTokener(result).nextValue() as? String } catch (_: Exception) { null }
+                val launch = ticket?.let {
+                    PluginAuthorizationQqHandoff.prepareQr(view.url,
+                        "wtloginmqq://ptlogin/qlogin?qrcode=${Uri.encode(it)}", activity.packageName, id)
+                }
+                if (launch != null) {
+                    dispatchQq(launch, request)
+                } else if (attempt < 30) {
+                    view.postDelayed({ awaitQqTicket(view, request, index, attempt + 1) }, 500)
+                } else {
+                    emit("failure")
+                }
+            }
+        }
+
+        private fun launchQq(view: WebView, url: String): Boolean {
+            if (!active) return false
+            if (PluginAuthorizationQqHandoff.isWebLogin(view.url, url)) {
+                val request = ++qqRequest
+                // Use the provider's QR confirmation mode. Its existing polling stays in
+                // this isolated profile, so QQ never hands an HTTPS result to Chrome.
+                view.evaluateJavascript("""
+                    (function() {
+                        if (typeof window.pt?.qrcode?.get !== 'function') return null;
+                        const index = window.pt.qrcode.history.length;
+                        window.pt.qrcode.get(1);
+                        return index;
+                    })()
+                """.trimIndent()) { result ->
+                    if (!active || request != qqRequest) return@evaluateJavascript
+                    val index = result.toIntOrNull()
+                    if (index == null || index < 0) emit("externalFailure")
+                    else awaitQqTicket(view, request, index)
+                }
+                return true
+            }
+            val launchUrl = PluginAuthorizationQqHandoff.prepareQr(view.url, url, activity.packageName, id)
+                ?: return false
+            dispatchQq(launchUrl, qqRequest)
+            return true
+        }
 
         fun cookies(scopes: List<*>): List<Map<String, String>> {
             val manager = WebViewCompat.getProfile(windows.first()).cookieManager
@@ -156,7 +219,7 @@ class PluginAuthorizationBrowser(private val engine: FlutterEngine) {
             }
             webView.webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
-                    !allow(request.url.toString(), request.isForMainFrame)
+                    launchQq(view, request.url.toString()) || !allow(request.url.toString(), request.isForMainFrame)
 
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                     if (url != "about:blank" && !allow(url, true)) view.stopLoading()

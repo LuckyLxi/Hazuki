@@ -80,6 +80,7 @@ kotlin {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
     implementation("androidx.appcompat:appcompat:1.7.1")

@@ -6,6 +6,8 @@ Hazuki is a Flutter comics application. Application code lives in `lib/`: startu
 
 `third_party/pub_overrides/quickjs_engine` is a separate Flutter package. Run its dependency, format, analysis, and test commands from that directory when modifying it.
 
+Hazuki plugin documentation is located at `D:\Project\HazukiSources\docs`.
+
 ## Build, Test, and Development Commands
 
 - `flutter pub get`: install dependencies.

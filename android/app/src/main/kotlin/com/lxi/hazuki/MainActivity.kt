@@ -28,7 +28,7 @@ class MainActivity : FlutterFragmentActivity() {
             displayModeManager = displayModeManager
         )
         flutterChannels.register(flutterEngine)
-        PluginAuthorizationBrowser(flutterEngine).register()
+        PluginAuthorizationBrowser(this, flutterEngine).register()
         externalAuthorization = PluginExternalAuthorization(this, flutterEngine)
         externalAuthorization.consume(intent)
     }

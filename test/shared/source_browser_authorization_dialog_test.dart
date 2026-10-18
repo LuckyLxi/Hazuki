@@ -234,6 +234,46 @@ void main() {
   );
 
   test(
+    'Android external app launch failure ends the pending browser session',
+    () async {
+      const channel = MethodChannel('hazuki/browser_authorization');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async => true);
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final session = SourceBrowserAuthorizationSession(
+        SourceBrowserAuthorizationOptions.parse(request()),
+        SourceLoginCancellation(),
+      );
+      final backend = AndroidSourceAuthorizationBrowser();
+      await backend.prepare(session);
+      final rejected = expectLater(
+        session.result,
+        throwsA(
+          isA<SourceBrowserAuthorizationException>().having(
+            (e) => e.code,
+            'safe code',
+            'login_external_app_unavailable',
+          ),
+        ),
+      );
+      final done = Completer<void>();
+      await messenger.handlePlatformMessage(
+        'hazuki/browser_authorization/${session.id}',
+        const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('event', {'type': 'externalFailure'}),
+        ),
+        (_) => done.complete(),
+      );
+      await done.future;
+      await rejected;
+      expect(session.isActive, isFalse);
+      await backend.close();
+      session.dispose();
+    },
+  );
+
+  test(
     'owned Android callback is one-shot and close releases its channel',
     () async {
       const channel = MethodChannel('hazuki/browser_authorization');

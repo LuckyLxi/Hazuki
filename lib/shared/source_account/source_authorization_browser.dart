@@ -65,6 +65,8 @@ class AndroidSourceAuthorizationBrowser
             session.cancellation.cancel();
           case 'failure':
             session.fail('login_browser_load_failed');
+          case 'externalFailure':
+            session.fail('login_external_app_unavailable');
         }
       });
   }
