@@ -26,6 +26,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["appLabel"] = "Hazuki"
+        manifestPlaceholders["authorizationScheme"] = "hazuki-auth"
     }
 
     compileOptions {
@@ -49,12 +50,14 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             manifestPlaceholders["appLabel"] = "Hazuki Debug"
+            manifestPlaceholders["authorizationScheme"] = "hazuki-auth-debug"
         }
 
         getByName("profile") {
             applicationIdSuffix = ".profile"
             versionNameSuffix = "-profile"
             manifestPlaceholders["appLabel"] = "Hazuki Profile"
+            manifestPlaceholders["authorizationScheme"] = "hazuki-auth-profile"
         }
 
         release {
@@ -77,6 +80,7 @@ kotlin {
 }
 
 dependencies {
+    implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.core:core-splashscreen:1.2.0")

@@ -167,6 +167,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                   for (final downloadedChapter in comic.chapters)
                     ReaderOfflineChapterData(
                       epId: downloadedChapter.epId,
+                      groupId: downloadedChapter.groupId,
+                      groupTitle: downloadedChapter.groupTitle,
                       title: resolveHazukiChapterTitle(
                         context,
                         downloadedChapter.title,

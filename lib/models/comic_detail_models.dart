@@ -5,6 +5,17 @@ enum ComicInfoAction { none, search, copy }
 
 enum ComicHeaderStatAction { none, like }
 
+class ComicChapterGroup {
+  const ComicChapterGroup({
+    required this.id,
+    required this.title,
+    required this.chapters,
+  });
+  final String id;
+  final String title;
+  final Map<String, String> chapters;
+}
+
 /// A short plugin-defined item above the reader button, never long-form text.
 class ComicHeaderStat {
   const ComicHeaderStat({
@@ -50,6 +61,7 @@ class ComicDetailsData {
     this.infoFields = const [],
     this.viewsCount = '',
     this.headerStats = const [],
+    this.chapterGroups = const [],
   });
 
   final String id;
@@ -60,6 +72,11 @@ class ComicDetailsData {
   final String updateTime;
   final String likesCount;
   final Map<String, String> chapters;
+  final List<ComicChapterGroup> chapterGroups;
+
+  ComicChapterGroup? groupForChapter(String id) => chapterGroups
+      .where((group) => group.chapters.containsKey(id))
+      .firstOrNull;
   final Map<String, List<String>> tags;
   final List<ExploreComic> recommend;
   final bool isFavorite;
@@ -84,6 +101,7 @@ class ComicDetailsData {
     String? updateTime,
     String? likesCount,
     Map<String, String>? chapters,
+    List<ComicChapterGroup>? chapterGroups,
     Map<String, List<String>>? tags,
     List<ExploreComic>? recommend,
     bool? isFavorite,
@@ -105,6 +123,7 @@ class ComicDetailsData {
       updateTime: updateTime ?? this.updateTime,
       likesCount: likesCount ?? this.likesCount,
       chapters: chapters ?? this.chapters,
+      chapterGroups: chapterGroups ?? this.chapterGroups,
       tags: tags ?? this.tags,
       recommend: recommend ?? this.recommend,
       isFavorite: isFavorite ?? this.isFavorite,

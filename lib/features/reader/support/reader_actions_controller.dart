@@ -88,6 +88,26 @@ class ReaderActionsController {
       updateTime: '',
       likesCount: '',
       chapters: {for (final chapter in chapters) chapter.epId: chapter.title},
+      chapterGroups: chapters.any((c) => c.groupId != null)
+          ? [
+              for (final groupId
+                  in chapters.map((c) => c.groupId ?? '').toSet())
+                ComicChapterGroup(
+                  id: groupId,
+                  title:
+                      chapters
+                          .firstWhere((c) => (c.groupId ?? '') == groupId)
+                          .groupTitle ??
+                      l10n(_context()).comicDetailChapters,
+                  chapters: {
+                    for (final c in chapters.where(
+                      (c) => (c.groupId ?? '') == groupId,
+                    ))
+                      c.epId: c.title,
+                  },
+                ),
+            ]
+          : const [],
       tags: const {},
       recommend: const [],
       isFavorite: false,
@@ -223,6 +243,7 @@ class ReaderActionsController {
                 cornerRadius: 20,
                 builder: (sheetContext) => ChaptersPanelSheet(
                   details: details,
+                  initialChapterId: _pageContext.epId,
                   onDownloadConfirm: (selectedEpIds) {
                     Navigator.of(sheetContext).pop();
                     unawaited(
@@ -508,15 +529,23 @@ class ReaderActionsController {
           chapterEntries.length - 1,
         );
       }
-      final targetIndex = currentChapterIndex + offset;
+      final currentChapter = chapterEntries[currentChapterIndex];
+      final currentGroup = details.groupForChapter(currentChapter.key);
+      final navigationEntries =
+          currentGroup?.chapters.entries.toList(growable: false) ??
+          chapterEntries;
+      final currentNavigationIndex = navigationEntries.indexWhere(
+        (entry) => entry.key == currentChapter.key,
+      );
+      final targetNavigationIndex = currentNavigationIndex + offset;
 
-      if (targetIndex < 0) {
+      if (targetNavigationIndex < 0) {
         if (_isMounted()) {
           unawaited(showHazukiPrompt(context, strings.readerNoPreviousChapter));
         }
         return;
       }
-      if (targetIndex >= chapterEntries.length) {
+      if (targetNavigationIndex >= navigationEntries.length) {
         if (_isMounted()) {
           unawaited(
             showHazukiPrompt(context, strings.readerAlreadyLastChapter),
@@ -525,7 +554,10 @@ class ReaderActionsController {
         return;
       }
 
-      final targetChapter = chapterEntries[targetIndex];
+      final targetChapter = navigationEntries[targetNavigationIndex];
+      final targetIndex = chapterEntries.indexWhere(
+        (entry) => entry.key == targetChapter.key,
+      );
       _logEvent(
         'Reader adjacent chapter navigation requested',
         source: 'reader_navigation',

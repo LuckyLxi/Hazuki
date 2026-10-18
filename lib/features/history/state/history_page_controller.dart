@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hazuki/services/source/content/source_cloud_reading.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -27,6 +28,12 @@ class HistoryPageController extends ChangeNotifier {
         .join('|');
     _readHistoryService.addListener(_handleReadHistoryChanged);
     _sourceService.addListener(_handleSourceChanged);
+    final reader = _readerService;
+    if (reader is SourceCloudReadingEvents) {
+      (reader as SourceCloudReadingEvents).addListener(
+        _handleCloudSessionChanged,
+      );
+    }
   }
 
   final ReadHistoryService _readHistoryService;
@@ -36,6 +43,14 @@ class HistoryPageController extends ChangeNotifier {
   final HistoryPageData _state = HistoryPageData();
 
   bool _disposed = false;
+  void _handleCloudSessionChanged() {
+    if (_disposed) return;
+    _requestVersion++;
+    _state.clearHistory();
+    notifyListeners();
+    unawaited(_loadHistory(markLoading: true));
+  }
+
   int _requestVersion = 0;
   int _autoReloadPauseDepth = 0;
   bool _hasDeferredHistoryChange = false;
@@ -183,12 +198,25 @@ class HistoryPageController extends ChangeNotifier {
       notifyListeners();
     }
 
-    final history = await _readHistoryService.loadHistory(
-      sourceKey: sourceKey,
-      availableSourceKeys: _sourceService.allowedSources
-          .map((source) => source.key)
-          .toSet(),
+    final history = List<ExploreComic>.of(
+      await _readHistoryService.loadHistory(
+        sourceKey: sourceKey,
+        availableSourceKeys: _sourceService.allowedSources
+            .map((source) => source.key)
+            .toSet(),
+      ),
     );
+    final reader = _readerService;
+    if (reader is SourceCloudReadingGateway) {
+      try {
+        final cloud = await (reader as SourceCloudReadingGateway)
+            .refreshCloudReadingHistory(sourceKey);
+        final ids = history.map((c) => c.scopedId.storageKey).toSet();
+        history.addAll(cloud.where((c) => ids.add(c.scopedId.storageKey)));
+      } catch (_) {
+        /* Keep browsing history available. */
+      }
+    }
     if (_disposed ||
         requestVersion != _requestVersion ||
         sourceKey != _activeSourceKey) {
@@ -364,6 +392,12 @@ class HistoryPageController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    final reader = _readerService;
+    if (reader is SourceCloudReadingEvents) {
+      (reader as SourceCloudReadingEvents).removeListener(
+        _handleCloudSessionChanged,
+      );
+    }
     _readHistoryService.removeListener(_handleReadHistoryChanged);
     _sourceService.removeListener(_handleSourceChanged);
     super.dispose();

@@ -395,6 +395,29 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.7.0"
+  flutter_inappwebview_internal_annotations:
+    dependency: transitive
+    description:
+      name: flutter_inappwebview_internal_annotations
+      sha256: e30fba942e3debea7b7e6cdd4f0f59ce89dd403a9865193e3221293b6d1544c6
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.3.0"
+  flutter_inappwebview_platform_interface:
+    dependency: "direct main"
+    description:
+      name: flutter_inappwebview_platform_interface
+      sha256: cf5323e194096b6ede7a1ca808c3e0a078e4b33cc3f6338977d75b4024ba2500
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.3.0+1"
+  flutter_inappwebview_windows:
+    dependency: "direct main"
+    description:
+      path: "third_party/pub_overrides/flutter_inappwebview_windows"
+      relative: true
+    source: path
+    version: "0.6.0"
   flutter_lints:
     dependency: "direct dev"
     description:

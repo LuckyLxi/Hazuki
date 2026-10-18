@@ -226,9 +226,16 @@ void main() {
 
       expect(
         store.buildHeader('https://sub.example.com/reader/1'),
-        'sid=host; page=reader',
+        'page=reader; sid=host; sid=domain',
       );
-      expect(store.buildHeader('https://sub.example.com/other'), 'sid=host');
+      expect(
+        store.buildHeader('https://sub.example.com/other'),
+        'sid=host; sid=domain',
+      );
+      expect(
+        store.buildHeader('https://child.sub.example.com/other'),
+        'sid=domain',
+      );
       expect(saveCount, 1);
 
       await store.delete('https://sub.example.com/reader/1');

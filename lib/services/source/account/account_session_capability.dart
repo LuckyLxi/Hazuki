@@ -1,6 +1,7 @@
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
 import 'source_login_operations.dart';
+import 'source_login_interaction.dart';
 
 /// Owns account session state and delegates source-specific login workflows.
 class SourceAccountSessionCapability {
@@ -10,6 +11,7 @@ class SourceAccountSessionCapability {
 
   final SourceRuntimeHost _runtimeHost;
   final SourceLoginOperations _loginOperations;
+  SourceInteractiveAccountGateway? interactive;
 
   HazukiSourceFacade get facade => _runtimeHost.activeHandle.facade;
 
@@ -31,7 +33,9 @@ class SourceAccountSessionCapability {
   }
 
   bool get isLogged =>
-      _runtimeHost.hasActiveSource && facade.loadAccountDataSync() != null;
+      _runtimeHost.hasActiveSource &&
+      (facade.loadAccountDataSync() != null ||
+          facade.loadSourceData(facade.sourceKey, 'login_session') is String);
 
   Future<void> login({required String account, required String password}) =>
       _loginOperations.login(account: account, password: password);
@@ -47,6 +51,7 @@ class SourceAccountSessionCapability {
   );
 
   Future<void> logout() async {
+    interactive?.cancelPendingLogin();
     final facade = this.facade;
     final engine = facade.js.engine;
     final sourceMeta = facade.sourceMeta;
@@ -76,6 +81,10 @@ class SourceAccountSessionCapability {
     await facade.saveCookieStore(const []);
     facade.runtime.transientAvatarUrl = null;
     await facade.deleteSourceData(sourceKey, 'token');
+    await facade.deleteSourceData(sourceKey, 'interactive_login');
+    await facade.deleteSourceData(sourceKey, 'login_method');
+    await facade.deleteSourceData(sourceKey, 'login_session');
+    _runtimeHost.notifyActiveRuntimeChanged(sourceKey);
   }
 
   String? currentAccountForSource(String sourceKey) {
@@ -100,11 +109,13 @@ class SourceAccountSessionCapability {
       return false;
     }
     final handle = _runtimeHost.handleFor(sourceKey);
-    return handle.session.loadAccountDataSync(
-          handle.runtime.sourceMeta,
-          fallbackSourceKey: handle.sourceKey,
-        ) !=
-        null;
+    return handle.session.loadSourceData(sourceKey, 'login_session')
+            is String ||
+        handle.session.loadAccountDataSync(
+              handle.runtime.sourceMeta,
+              fallbackSourceKey: handle.sourceKey,
+            ) !=
+            null;
   }
 
   Future<String?> loadCurrentAvatarUrl() => _runtimeHost.hasActiveSource

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hazuki/shared/source_account/source_login_interaction_dialog.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,12 +32,14 @@ class HomeProfileFlow {
 
   Future<HomeLoginDialogProfile> handleLoginSubmit(
     String account,
-    String password,
-  ) async {
+    String password, {
+    SourceAccountLoginOperation? loginOverride,
+  }) async {
     final profile = await loginSourceAccountForDialog(
       sourceService: sourceService,
       account: account,
       password: password,
+      loginOverride: loginOverride,
       afterLogin: () async {
         if (!isMounted()) {
           throw StateError('Home page disposed');
@@ -59,8 +62,41 @@ class HomeProfileFlow {
   }
 
   Future<void> showLoginDialog() async {
+    final service = sourceService;
+    final selectedSource = service.activeSourceKey;
+    final methods = service is SourceInteractiveAccountGateway
+        ? await (service as SourceInteractiveAccountGateway).loadLoginMethods()
+        : <SourceLoginMethod>[];
+    if (!isMounted() ||
+        !context.mounted ||
+        service.activeSourceKey != selectedSource) {
+      return;
+    }
+    SourceLoginCancellation? attempt;
     await showHomeLoginDialog(
       context,
+      loginMethods: methods,
+      onDismissed: () => attempt?.cancel(),
+      onLoginMethod: (account, password, method) {
+        if (service.activeSourceKey != selectedSource) {
+          throw const SourceLoginCancelled();
+        }
+        attempt?.cancel();
+        final cancellation = attempt = SourceLoginCancellation();
+        return handleLoginSubmit(
+          account,
+          password,
+          loginOverride: ({required account, required password}) =>
+              (service as SourceInteractiveAccountGateway).loginInteractive(
+                account: account,
+                password: password,
+                method: method,
+                cancellation: cancellation,
+                present: (request, token) =>
+                    showSourceLoginInteraction(context, request, token),
+              ),
+        );
+      },
       initialUsername: profileController.username,
       initialAvatarUrl: (profileController.avatarUrl ?? '').trim(),
       firstUseText: profileController.firstUseText,

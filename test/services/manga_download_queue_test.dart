@@ -89,6 +89,56 @@ void main() {
   );
 
   test(
+    'grouped downloads keep unique directories when a new source order reuses an index',
+    () async {
+      state.restoreTasks([_task()]);
+      await queue.processQueue();
+      final oldPath =
+          state.downloadedComics.single.chapters.single.imagePaths.single;
+      final details = _details().copyWith(
+        chapters: const {'ep-2': 'New', 'ep-1': 'Old'},
+        chapterGroups: const [
+          ComicChapterGroup(
+            id: 'other',
+            title: 'Alternative',
+            chapters: {'ep-2': 'New'},
+          ),
+          ComicChapterGroup(
+            id: 'serial',
+            title: 'Serial',
+            chapters: {'ep-1': 'Old'},
+          ),
+        ],
+      );
+      state.enqueue(
+        details: details,
+        coverUrl: 'cover',
+        description: '',
+        chapters: const [
+          MangaChapterDownloadTarget(epId: 'ep-2', title: 'New', index: 0),
+        ],
+      );
+      final target = state.tasks.single.targets.single;
+      expect(target.directoryIndex, 1);
+      expect(target.groupId, 'other');
+      final roundTrip = MangaDownloadTask.fromJson(state.tasks.single.toJson());
+      expect(roundTrip.targets.single.directoryIndex, 1);
+      await queue.processQueue();
+      final downloaded = state.downloadedComics.single;
+      expect(
+        downloaded.chapters.map((c) => c.imagePaths.single).toSet(),
+        hasLength(2),
+      );
+      expect(await File(oldPath).readAsBytes(), [1, 2, 3]);
+      final added = DownloadedMangaChapter.fromJson(
+        downloaded.chapters.firstWhere((c) => c.epId == 'ep-2').toJson(),
+      );
+      expect(added.groupTitle, 'Alternative');
+      expect(added.directoryIndex, 1);
+    },
+  );
+
+  test(
     'same comic ID in two sources stays separate on disk and in state',
     () async {
       state.restoreTasks([_task(), _task(sourceKey: 'copy_manga')]);

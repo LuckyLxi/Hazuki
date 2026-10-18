@@ -63,17 +63,19 @@ class MangaDownloadRecoveryRules {
     for (final chapter in normalizedChapters) {
       final sanitized = _sanitizeRecoveredChapter(
         chapter,
-        fallback: scannedByIndex[chapter.index],
+        fallback: scannedByIndex[chapter.directoryIndex ?? chapter.index],
       );
-      mergedByIndex[sanitized.index] = _preferRecoveredChapter(
-        mergedByIndex[sanitized.index],
+      mergedByIndex[sanitized.directoryIndex ??
+          sanitized.index] = _preferRecoveredChapter(
+        mergedByIndex[sanitized.directoryIndex ?? sanitized.index],
         sanitized,
       );
     }
     for (final chapter in scannedChapters) {
       final sanitized = _sanitizeRecoveredChapter(chapter);
-      mergedByIndex[sanitized.index] = _preferRecoveredChapter(
-        mergedByIndex[sanitized.index],
+      mergedByIndex[sanitized.directoryIndex ??
+          sanitized.index] = _preferRecoveredChapter(
+        mergedByIndex[sanitized.directoryIndex ?? sanitized.index],
         sanitized,
       );
     }
@@ -151,6 +153,9 @@ class MangaDownloadRecoveryRules {
         fallbackTitle: fallback?.title,
       ),
       index: normalizedIndex,
+      directoryIndex: chapter.directoryIndex ?? fallback?.directoryIndex,
+      groupId: chapter.groupId ?? fallback?.groupId,
+      groupTitle: chapter.groupTitle ?? fallback?.groupTitle,
       imagePaths: chapter.imagePaths.isNotEmpty
           ? chapter.imagePaths
           : (fallback?.imagePaths ?? const <String>[]),

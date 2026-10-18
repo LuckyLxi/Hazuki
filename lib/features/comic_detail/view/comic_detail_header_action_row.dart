@@ -116,6 +116,12 @@ class ComicDetailHeaderActionRow extends StatelessWidget {
   ) {
     if (details == null) return l10n(context).comicDetailRead;
     final lastReadProgress = session.lastReadProgress;
+    if (lastReadProgress?['cloud'] == true &&
+        details!.chapters.containsKey(lastReadProgress?['epId'])) {
+      return l10n(context).comicDetailContinueReading(
+        details!.chapters[lastReadProgress!['epId']]!,
+      );
+    }
     if (lastReadProgress != null &&
         details!.chapters.length > 1 &&
         lastReadProgress['index'] is int &&

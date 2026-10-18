@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "win32_window.h"
+#include "external_authorization.h"
 
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
@@ -27,6 +28,7 @@ class FlutterWindow : public Win32Window {
  private:
   // The project to run.
   flutter::DartProject project_;
+  std::unique_ptr<ExternalAuthorization> external_authorization_;
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;

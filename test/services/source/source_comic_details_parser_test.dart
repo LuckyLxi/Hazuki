@@ -4,6 +4,75 @@ import 'package:hazuki/services/source/comic/source_comic_details_parser.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 
 void main() {
+  test(
+    'ordered chapter groups override legacy numeric object keys and retain IDs',
+    () {
+      const parser = SourceComicDetailsParser(_translate);
+      final details = parser.parse(
+        map: {
+          'chapters': {'2': 'old', '10': 'old'},
+          'chapterGroups': [
+            {
+              'id': 'serial',
+              'title': 'Serial',
+              'chapters': [
+                {'id': '10', 'title': 'First'},
+                {'id': '2', 'title': 'Second'},
+              ],
+            },
+            {
+              'id': 'other',
+              'title': 'Other',
+              'chapters': [
+                {'id': '1', 'title': 'Alternative'},
+              ],
+            },
+          ],
+        },
+        fallbackComicId: 'comic',
+        sourceKey: 'sample',
+      );
+      expect(details.chapters.keys, ['10', '2', '1']);
+      expect(details.chapterGroups.map((g) => g.id), ['serial', 'other']);
+      expect(details.groupForChapter('2')?.id, 'serial');
+      expect(
+        details.copyWith(isFavorite: true).chapterGroups,
+        details.chapterGroups,
+      );
+    },
+  );
+
+  test(
+    'duplicate chapter IDs across groups fail instead of replacing chapters',
+    () {
+      const parser = SourceComicDetailsParser(_translate);
+      expect(
+        () => parser.parse(
+          map: {
+            'chapterGroups': [
+              {
+                'id': 'a',
+                'title': 'A',
+                'chapters': [
+                  {'id': '2', 'title': 'One'},
+                ],
+              },
+              {
+                'id': 'b',
+                'title': 'B',
+                'chapters': [
+                  {'id': '2', 'title': 'Two'},
+                ],
+              },
+            ],
+          },
+          fallbackComicId: 'c',
+          sourceKey: 'sample',
+        ),
+        throwsFormatException,
+      );
+    },
+  );
   const parser = SourceComicDetailsParser(_translate);
 
   test(

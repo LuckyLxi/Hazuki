@@ -10,6 +10,7 @@ import '../runtime/source_secure_session_storage.dart';
 import 'source_plugin_models.dart';
 import 'source_plugin_buttons.dart';
 import 'source_search_capabilities.dart';
+import '../account/source_login_interaction.dart';
 
 /// Reads a plugin's own registration without running init or accessing user data.
 class SourcePluginScriptInspector {
@@ -82,11 +83,22 @@ void evaluateSourcePlugin(SourceScriptEngine engine, String script) {
 }
 
 SourcePluginManifest registeredSourcePluginManifest(SourceScriptEngine engine) {
+  if (engine.evaluate(
+        'typeof globalThis.__hazuki_source.comic?.loadReadingHistory === "function" && typeof globalThis.__hazuki_source.comic?.loadReadingProgress !== "function"',
+      ) ==
+      true) {
+    throw const SourcePluginException(
+      'plugin_history_requires_progress_reader',
+    );
+  }
+  SourceLoginMethod.parse(
+    engine.evaluate('globalThis.__hazuki_source.account?.loginMethods'),
+  );
   final manifest = SourcePluginManifest.fromJson({
     ...Map<String, dynamic>.from(
       jsonDecode(
             engine.evaluate(
-                  'JSON.stringify((({key,name,version,apiVersion,presentation,settings,translation})=>({id:key,name,version,apiVersion,presentation,settings,translation}))(globalThis.__hazuki_source))',
+                  'JSON.stringify((({key,name,version,apiVersion,presentation,settings,translation,comic})=>({id:key,name,version,apiVersion,presentation:{...presentation,...(typeof comic?.loadReadingProgress === "function" ? {__hostCloudReading:true} : {})},settings,translation}))(globalThis.__hazuki_source))',
                 )
                 as String,
           )

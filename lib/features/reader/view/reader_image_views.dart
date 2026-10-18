@@ -14,6 +14,7 @@ import 'package:hazuki/l10n/l10n.dart';
 class ReaderImageViews {
   const ReaderImageViews({
     required this.context,
+    this.onFrameDisplayed,
     required this.comicId,
     required this.epId,
     required this.comicTheme,
@@ -32,6 +33,7 @@ class ReaderImageViews {
   });
 
   final BuildContext context;
+  final ValueChanged<int>? onFrameDisplayed;
   final String comicId;
   final String epId;
   final ThemeData? comicTheme;
@@ -137,6 +139,9 @@ class ReaderImageViews {
               gaplessPlayback: false,
               frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
                 if (wasSynchronouslyLoaded || frame != null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (context.mounted) onFrameDisplayed?.call(imageIndex);
+                  });
                   return child;
                 }
                 return ColoredBox(color: readerSurfaceColor);
@@ -313,6 +318,9 @@ class ReaderImageViews {
         gaplessPlayback: false,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
           if (wasSynchronouslyLoaded || frame != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) onFrameDisplayed?.call(imageIndex);
+            });
             return child;
           }
           return ColoredBox(color: readerSurfaceColor);

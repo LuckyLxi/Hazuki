@@ -82,6 +82,14 @@ class SourceReloginCoordinator {
   Future<bool> ensureFavoriteSessionReady(SourceReloginContext context) async {
     await context.ensureInitialized();
     if (context is SourceFacadeReloginContext &&
+        context.facade.loadSourceData(
+              context.facade.sourceKey,
+              'interactive_login',
+            ) ==
+            true) {
+      return true;
+    }
+    if (context is SourceFacadeReloginContext &&
         context.facade.sourceMeta?.presentation['skipPeriodicRelogin'] ==
             true) {
       return true;

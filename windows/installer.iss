@@ -41,3 +41,28 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(AppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\hazuki-auth"; ValueType: string; ValueData: "URL:Hazuki authorization"
+Root: HKCU; Subkey: "Software\Classes\hazuki-auth"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\hazuki-auth\shell\open\command"; ValueType: string; ValueData: """{app}\{#AppExeName}"" ""%1"""
+
+[Code]
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Names: TArrayOfString;
+  I: Integer;
+  Command, OwnedCommand, Key: String;
+begin
+  if CurUninstallStep <> usUninstall then Exit;
+  OwnedCommand := '"' + ExpandConstant('{app}\{#AppExeName}') + '" "%1"';
+  if RegGetSubkeyNames(HKCU, 'Software\Classes', Names) then
+    for I := 0 to GetArrayLength(Names) - 1 do
+      if (Names[I] = 'hazuki-auth') or (Pos('hazuki-auth-portable-', Names[I]) = 1) then
+      begin
+        Key := 'Software\Classes\' + Names[I];
+        if RegQueryStringValue(HKCU, Key + '\shell\open\command', '', Command) and
+           (CompareText(Command, OwnedCommand) = 0) then
+          RegDeleteKeyIncludingSubkeys(HKCU, Key);
+      end;
+end;

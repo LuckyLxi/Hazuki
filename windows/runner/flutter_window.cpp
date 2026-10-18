@@ -28,6 +28,7 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  external_authorization_ = std::make_unique<ExternalAuthorization>(flutter_controller_->engine()->messenger(), GetHandle());
   media_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), "hazuki.comics/media",
@@ -87,6 +88,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  external_authorization_.reset();
   if (media_channel_) {
     media_channel_->SetMethodCallHandler(nullptr);
     media_channel_.reset();
@@ -102,6 +104,11 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == ExternalAuthorization::kCallbackMessage) {
+    if (external_authorization_) external_authorization_->OnCallback(lparam);
+    else delete reinterpret_cast<std::wstring*>(lparam);
+    return 0;
+  }
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

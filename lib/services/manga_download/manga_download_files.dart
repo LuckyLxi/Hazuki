@@ -52,7 +52,9 @@ class MangaDownloadFiles {
     Directory comicDir,
     MangaChapterDownloadTarget target,
   ) {
-    final chapterNumber = (target.index + 1).toString().padLeft(3, '0');
+    final chapterNumber = ((target.directoryIndex ?? target.index) + 1)
+        .toString()
+        .padLeft(3, '0');
     return Directory('${comicDir.path}/MangaChapter$chapterNumber');
   }
 

@@ -259,6 +259,14 @@
   "aboutDisclaimerTitle": "Disclaimer",
   "aboutDisclaimerSubtitle": "Please read before use",
   "aboutDisclaimerContent": "Hazuki is a free, open-source comic reader released under the GPL-3.0 license. Use, modification, and distribution of the software must comply with that license.\n\nHazuki accesses third-party platforms through comic source plugins and does not provide or operate comic content services. Rights to comics, images, and related materials belong to their respective rights holders; the software's open-source license does not grant rights to that content. Hazuki is not affiliated with, partnered with, or authorized by the third-party platforms it accesses.\n\nComply with the laws of your jurisdiction and the relevant platforms' terms of service. Read, download, and use content only as legally permitted, and do not use this software to infringe others' rights. Please support creators and authorized releases.\n\nThird-party content may include adult material or other content unsuitable for minors. Users below the legal age of adulthood in their jurisdiction must not use this software. Adult users must also comply with local restrictions on accessing such content.\n\nSource plugins, content, and services are provided by third parties. Their security, accuracy, and continued availability are outside Hazuki's control. Choose plugin sources carefully, protect your account information, and back up important data.\n\nThis software is provided as is. To the extent permitted by applicable law, the developers make no guarantees regarding its suitability, stability, or error-free operation and accept no liability for losses arising from its use. The GPL-3.0 license governs the specific warranty disclaimers and limitations of liability. This statement does not exclude or limit any liability that cannot legally be excluded or limited.",
+  "sourceLoginImageLoadFailed": "Unable to display the captcha image. Refresh and try again.",
+  "sourceBrowserAuthorization": "Browser authorization",
+  "sourceBrowserInstallWebView2": "Install Microsoft Edge WebView2 Runtime to use browser authorization.",
+  "sourceBrowserUpdateWebView": "Update Android System WebView to use isolated browser authorization.",
+  "sourceBrowserUnavailable": "Browser authorization is unavailable on this device.",
+  "sourceBrowserOpenHelp": "Open installation page",
+  "sourceLoginRefresh": "Refresh captcha",
+  "sourceLoginUndoPoint": "Undo last point",
   "commonConfirm": "OK",
   "commonCancel": "Cancel",
   "commonClose": "Close",
@@ -1545,5 +1553,10 @@
   "pluginsViewDetails": "View details",
   "sourceBackupRestoreTitle": "Restore local backup",
   "sourceBackupRestoreConfirm": "Restore the source from before the last save? This replaces the current source and clears the backup after success. Restart the app to apply it.",
-  "sourceRedownloadTitle": "Download plugin again"
+  "sourceRedownloadTitle": "Download plugin again",
+  "sourceBrowserCompleteLogin": "Complete login",
+  "sourceBrowserCookiesMissing": "Required login cookies are missing. Finish signing in and try again.",
+  "sourceCloudProgressUnavailable": "Sign in or retry progress",
+  "sourceCloudChapterMissing": "Please choose a chapter",
+  "sourceExternalAuthorizationWaiting": "Complete authorization in the external app, then return here."
 }

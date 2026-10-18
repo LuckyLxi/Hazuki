@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'package:hazuki/services/source/gateways/source_content_gateways.dart';
+import 'package:hazuki/services/source/account/source_login_interaction.dart';
 import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -72,6 +75,185 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
     manager.dispose();
     await root.delete(recursive: true);
   });
+
+  test(
+    'declared login methods use local inspection and the real isolated runtime loader',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            (_) async => root.path,
+          );
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('plugins.flutter.io/path_provider'),
+              null,
+            ),
+      );
+      final storage = MemorySourceSecureSessionStorage();
+      final assembly = SourceRuntimeAssembly(
+        pluginManager: manager,
+        secureSessionStorage: storage,
+      );
+      addTearDown(assembly.dispose);
+      await assembly.runtimeRegistry.loadActiveSourcePreference();
+      await manager.importPackage(
+        package(
+          script: '''Hazuki.registerSource({
+      init:async()=>{await Hazuki.storage.set('initRan',true);},
+      search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'Comic'}),loadEp:async()=>({images:[]})},
+      account:{loginMethods:[{id:'sms',title:{en:'SMS',zh:'短信'},input:'account'}],
+        login:async(a,p,ctx)=>{
+          const code=await ctx.requestText({title:'SMS code'});
+          if(a!=='phone'||p!==''||code!=='1234'||ctx.method!=='sms')throw Error('wrong input');
+          await Hazuki.secrets.set('session','private-session');
+          return {token:'session',displayName:'User'};
+        }}});''',
+        ),
+      );
+      final gateway = assembly.gateways.home as SourceInteractiveAccountGateway;
+      expect((await gateway.loadLoginMethods()).single.id, 'sms');
+      final before = assembly.testing.handleFor('independent');
+      expect(before.facade.loadSourceData('independent', 'initRan'), isNull);
+      await gateway.loginInteractive(
+        account: 'phone',
+        password: '',
+        method: 'sms',
+        cancellation: SourceLoginCancellation(),
+        present: (request, _) async {
+          expect(
+            before.facade.loadSourceData('independent', 'initRan'),
+            isNull,
+          );
+          return '1234';
+        },
+      );
+      expect(assembly.gateways.home.isLogged, isTrue);
+      expect(assembly.gateways.home.currentAccount, 'User');
+      expect(assembly.testing.handleFor('independent'), isNot(same(before)));
+      expect(
+        storage.values['hazuki_plugin_secret_v1:independent:session'],
+        'private-session',
+      );
+      await assembly.gateways.home.logout();
+      expect(assembly.gateways.home.isLogged, isFalse);
+    },
+  );
+
+  test(
+    'new callbacks preserve group order and report progress only for logged-in readers',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            (_) async => root.path,
+          );
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('plugins.flutter.io/path_provider'),
+              null,
+            ),
+      );
+      final assembly = SourceRuntimeAssembly(
+        pluginManager: manager,
+        secureSessionStorage: MemorySourceSecureSessionStorage(),
+      );
+      addTearDown(assembly.dispose);
+      await assembly.runtimeRegistry.loadActiveSourcePreference();
+      await manager.importPackage(
+        package(
+          script: '''Hazuki.registerSource({
+      search:{load:async()=>({comics:[]})},
+      comic:{loadInfo:async id=>new ComicDetails({title:'Grouped',chapterGroups:[
+        {id:'a',title:'Serial',chapters:[{id:'10',title:'First'},{id:'2',title:'Second'}]},
+        {id:'b',title:'Other',chapters:[{id:'1',title:'Other'}]}]}),
+      loadEp:async()=>({images:['image']}),
+      onReadingProgress:async p=>{
+        await Hazuki.delay(5);
+        const events=Hazuki.storage.get('events') ?? [];
+        events.push(p);
+        await Hazuki.storage.set('events',events);
+        if(p.page===2) throw Error('sync failure');
+      }}});''',
+        ),
+      );
+      await assembly.runtimeRegistry.ensureInitialized(
+        sourceKey: 'independent',
+      );
+      final details = await assembly.gateways.reader.loadComicDetails('comic');
+      expect(details.chapters.keys, ['10', '2', '1']);
+      final handle = assembly.testing.handleFor('independent');
+      final reporter = assembly.gateways.reader as SourceReadingProgressGateway;
+      Map<String, Object> event(int page, String reason) => {
+        'comicId': 'comic',
+        'chapterId': '10',
+        'page': page,
+        'totalPages': 3,
+        'visiblePages': [page],
+        'reason': reason,
+      };
+      await reporter.reportReadingProgress(
+        event(1, 'initial'),
+        sourceKey: 'independent',
+      );
+      await assembly.gateways.reader.loadChapterImages(
+        comicId: 'comic',
+        epId: '10',
+      );
+      expect(handle.facade.loadSourceData('independent', 'events'), isNull);
+      await handle.facade.saveSourceData('independent', 'account', [
+        'user',
+        'password',
+      ]);
+      await assembly.gateways.reader.loadChapterImages(
+        comicId: 'comic',
+        epId: '10',
+      );
+      expect(handle.facade.loadSourceData('independent', 'events'), isNull);
+      await Future.wait([
+        reporter.reportReadingProgress(
+          event(1, 'initial'),
+          sourceKey: 'independent',
+        ),
+        reporter.reportReadingProgress(
+          event(2, 'chapter'),
+          sourceKey: 'independent',
+        ),
+        reporter.reportReadingProgress(
+          event(3, 'initial'),
+          sourceKey: 'independent',
+        ),
+      ]);
+      final events =
+          handle.facade.loadSourceData('independent', 'events') as List;
+      expect(events.map((e) => e['page']), [1, 2, 3]);
+      await handle.facade.deleteSourceData('independent', 'account');
+      await reporter.reportReadingProgress(
+        event(1, 'exit'),
+        sourceKey: 'independent',
+      );
+      expect(
+        (handle.facade.loadSourceData('independent', 'events') as List),
+        hasLength(3),
+      );
+      await handle.facade.saveSourceData(
+        'independent',
+        'login_session',
+        'browser-session',
+      );
+      await reporter.reportReadingProgress(
+        event(1, 'initial'),
+        sourceKey: 'independent',
+      );
+      expect(
+        (handle.facade.loadSourceData('independent', 'events') as List),
+        hasLength(4),
+      );
+      await handle.facade.deleteSourceData('independent', 'login_session');
+    },
+  );
 
   test(
     'fresh registry stays empty and persists enable/uninstall state',

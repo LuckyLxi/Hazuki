@@ -1,3 +1,4 @@
+import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -6,6 +7,48 @@ import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
 
 void main() {
+  testWidgets(
+    'group switching preserves download selections and global chapter indices',
+    (tester) async {
+      const groups = [
+        ComicChapterGroup(
+          id: 'a',
+          title: 'Serial',
+          chapters: {'10': 'Chapter A', '2': 'Chapter B'},
+        ),
+        ComicChapterGroup(
+          id: 'b',
+          title: 'Other',
+          chapters: {'1': 'Chapter C'},
+        ),
+      ];
+      final taps = <int>[];
+      Set<String>? selected;
+      await _openPanel(
+        tester,
+        chapters: const {'10': 'Chapter A', '2': 'Chapter B', '1': 'Chapter C'},
+        chapterGroups: groups,
+        onChapterTap: (_, _, index) => taps.add(index),
+        onDownloadConfirm: (value) => selected = value,
+      );
+      await tester.tap(find.byType(HazukiFrostedDropdown<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Other').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chapter C'));
+      expect(taps, [2]);
+      await tester.tap(find.byIcon(Icons.download_outlined).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chapter C'));
+      await tester.tap(find.byType(HazukiFrostedDropdown<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Serial').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chapter A'));
+      await tester.tap(find.byType(FilledButton));
+      expect(selected, {'1', '10'});
+    },
+  );
   testWidgets('chapter taps preserve the source id, resolved title and index', (
     tester,
   ) async {
@@ -170,6 +213,7 @@ void main() {
 
 Future<void> _openPanel(
   WidgetTester tester, {
+  List<ComicChapterGroup> chapterGroups = const [],
   Map<String, String> chapters = const {
     'ep-1': 'Chapter 1',
     'ep-2': 'Chapter 2',
@@ -219,6 +263,7 @@ Future<void> _openPanel(
                   updateTime: '',
                   likesCount: '',
                   chapters: chapters,
+                  chapterGroups: chapterGroups,
                   tags: const {},
                   recommend: const [],
                   isFavorite: false,

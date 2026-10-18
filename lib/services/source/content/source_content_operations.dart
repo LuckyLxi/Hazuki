@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'source_cloud_reading.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../category/source_category_capability.dart';
@@ -6,9 +7,11 @@ import '../comic/comic_details_capability.dart';
 import '../common/source_json_coerce.dart';
 import '../explore_capability.dart';
 import '../runtime/source_runtime_host.dart';
+import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_operations.dart';
 import '../plugins/source_sort_options.dart';
 import '../models/source_contract_models.dart';
+import '../gateways/source_content_gateways.dart';
 
 abstract interface class SourceContentOperations {
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
@@ -57,24 +60,101 @@ abstract interface class SourceContentOperations {
   });
 }
 
-class SourceContentOperationService implements SourceContentOperations {
+class SourceContentOperationService
+    implements
+        SourceContentOperations,
+        SourceReadingProgressGateway,
+        SourceCloudReadingGateway,
+        SourceCloudReadingEvents {
   SourceContentOperationService({
     required SourceRuntimeHost runtimeHost,
     required SourceRuntimeOperations runtimeOperations,
     required SourceExploreCapability explore,
     required SourceCategoryCapability category,
     required SourceComicDetailsCapability comicDetails,
+    this.loadCloudReadRuntime,
   }) : _runtimeHost = runtimeHost,
        _runtimeOperations = runtimeOperations,
        _explore = explore,
        _category = category,
-       _comicDetails = comicDetails;
+       _comicDetails = comicDetails {
+    _cloud;
+  }
 
   final SourceRuntimeHost _runtimeHost;
   final SourceRuntimeOperations _runtimeOperations;
   final SourceExploreCapability _explore;
   final SourceCategoryCapability _category;
   final SourceComicDetailsCapability _comicDetails;
+  final Map<String, Future<void>> _progressQueues = {};
+  final Future<void> Function(SourceRuntimeHandle)? loadCloudReadRuntime;
+  late final _cloud = SourceCloudReadingCapability(
+    _runtimeHost,
+    _runtimeOperations,
+    loadReadRuntime: loadCloudReadRuntime,
+  );
+  void dispose() => _cloud.dispose();
+  @override
+  void addListener(void Function() listener) => _cloud.addListener(listener);
+  @override
+  void removeListener(void Function() listener) =>
+      _cloud.removeListener(listener);
+  @override
+  Future<bool> usesCloudReading(String sourceKey) =>
+      _cloud.usesCloudReading(sourceKey);
+  @override
+  Future<Map<String, dynamic>?> loadCloudReadingProgress(
+    String sourceKey,
+    String comicId,
+  ) => _cloud.loadCloudReadingProgress(sourceKey, comicId);
+  @override
+  Future<List<ExploreComic>> refreshCloudReadingHistory(String sourceKey) =>
+      _cloud.refreshCloudReadingHistory(sourceKey);
+
+  @override
+  Future<void> reportReadingProgress(
+    Map<String, Object> progress, {
+    required String sourceKey,
+  }) {
+    if (!_runtimeHost.runtimeRegistry.isAllowedSourceKey(sourceKey)) {
+      return Future.value();
+    }
+    final handle = _runtimeHost.handleFor(sourceKey);
+    final account = handle.session.loginIdentity;
+    if (account == null) return Future.value();
+    final snapshot = Map<String, Object>.from(progress);
+    final previous = _progressQueues[sourceKey] ?? Future<void>.value();
+    final next = previous
+        .then((_) async {
+          if (handle.isDisposed ||
+              !_runtimeHost.isCurrentHandle(handle) ||
+              !_runtimeHost.runtimeRegistry.isAllowedSourceKey(sourceKey) ||
+              handle.session.loginIdentity != account) {
+            return;
+          }
+          final engine = handle.runtime.engine;
+          if (engine == null ||
+              engine.evaluate(
+                    'typeof this.__hazuki_source.comic?.onReadingProgress === "function"',
+                  ) !=
+                  true) {
+            return;
+          }
+          await handle.facade.js.resolve(
+            engine.invoke(
+              '(progress) => this.__hazuki_source.comic.onReadingProgress(progress)',
+              [snapshot],
+            ),
+          );
+        })
+        .catchError((Object _) {});
+    _progressQueues[sourceKey] = next;
+    return next.whenComplete(() {
+      if (identical(_progressQueues[sourceKey], next)) {
+        _progressQueues.remove(sourceKey);
+      }
+    });
+  }
 
   @override
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:hazuki/services/source/content/source_cloud_reading.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -204,7 +205,25 @@ class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
   // ── Persistence ──────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> loadReadingProgress(String comicId) async {
+    final source = _source;
+    if (source is SourceCloudReadingGateway &&
+        await (source as SourceCloudReadingGateway).usesCloudReading(
+          _sourceKey,
+        )) {
+      return (source as SourceCloudReadingGateway).loadCloudReadingProgress(
+        _sourceKey,
+        comicId,
+      );
+    }
     return _readingProgress.load(comicId: comicId, sourceKey: _sourceKey);
+  }
+
+  Future<bool> usesWebsiteReadingProgress() async {
+    final source = _source;
+    return source is SourceCloudReadingGateway &&
+        await (source as SourceCloudReadingGateway).usesCloudReading(
+          _sourceKey,
+        );
   }
 
   Future<bool> loadComicDynamicColorEnabled() async {

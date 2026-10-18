@@ -13,6 +13,7 @@ class MainActivity : FlutterFragmentActivity() {
     private lateinit var displayModeManager: DisplayModeManager
     private lateinit var privacyManager: PrivacyManager
     private lateinit var flutterChannels: MainActivityChannels
+    private lateinit var externalAuthorization: PluginExternalAuthorization
 
     private var isFirstLaunch = true
     private var wasInBackground = false
@@ -27,6 +28,9 @@ class MainActivity : FlutterFragmentActivity() {
             displayModeManager = displayModeManager
         )
         flutterChannels.register(flutterEngine)
+        PluginAuthorizationBrowser(flutterEngine).register()
+        externalAuthorization = PluginExternalAuthorization(this, flutterEngine)
+        externalAuthorization.consume(intent)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,8 +45,10 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
+        val consumedAuthorization = ::externalAuthorization.isInitialized && externalAuthorization.consume(intent)
         super.onNewIntent(intent)
         setIntent(intent)
+        if (consumedAuthorization) return
         val launchAction = resolveLaunchAction(intent) ?: return
         if (::flutterChannels.isInitialized) {
             flutterChannels.emitLaunchAction(launchAction)

@@ -4,6 +4,7 @@ import 'source_js_bridge_cookie_capability.dart';
 import 'source_local_runtime_operations.dart';
 import 'source_runtime_diagnostics_operations.dart';
 import 'source_runtime_host.dart';
+import 'source_runtime_handle.dart';
 import 'source_runtime_initialization_operations.dart';
 import 'source_runtime_loader.dart';
 import 'source_runtime_recovery_operations.dart';
@@ -32,6 +33,14 @@ class SourceRuntimeCapability {
        _sourceIndexUrls = sourceIndexUrls;
 
   final SourceRuntimeHost _runtimeHost;
+
+  Future<void> loadLoginRuntime(SourceRuntimeHandle handle) async {
+    await handle.facade.ensurePrefs();
+    _jsBridgeCookieCapability.configureDioCookieBridge(handle);
+    final file = await _scriptStorage.ensureLocalSourceFile(handle.sourceKey);
+    await _runtimeLoader.loadMetadata(handle, file);
+  }
+
   final SourceScriptStore _scriptStorage;
   final SourceJsBridgeCookieCapability _jsBridgeCookieCapability;
   final SourceRuntimeStateController _runtimeStateController;

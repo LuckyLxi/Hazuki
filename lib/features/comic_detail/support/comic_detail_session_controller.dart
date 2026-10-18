@@ -40,6 +40,7 @@ class ComicDetailSessionController extends ChangeNotifier {
   bool _hasAutomaticallyRetriedDetails = false;
   int _detailsRequestId = 0;
   Map<String, dynamic>? _lastReadProgress;
+  int _readingRequestId = 0;
 
   Future<ComicDetailsData> get future => _future;
   bool get hasDetailsTimedOut => _hasDetailsTimedOut;
@@ -77,9 +78,11 @@ class ComicDetailSessionController extends ChangeNotifier {
   }
 
   Future<void> loadReadingProgress() async {
+    final request = ++_readingRequestId;
+    _lastReadProgress = null;
     try {
       final progress = await _repository.loadReadingProgress(_comic.id);
-      if (progress == null || _disposed) return;
+      if (_disposed || request != _readingRequestId) return;
       _lastReadProgress = progress;
       notifyListeners();
     } catch (_) {}

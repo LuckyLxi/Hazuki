@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:hazuki/services/source/account/source_login_interaction.dart';
+import 'source_login_interaction_text.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -215,6 +217,14 @@ class HomeLoginDialogProfile {
 
 Future<void> showHomeLoginDialog(
   BuildContext context, {
+  List<SourceLoginMethod> loginMethods = const [],
+  Future<HomeLoginDialogProfile> Function(
+    String account,
+    String password,
+    String method,
+  )?
+  onLoginMethod,
+  VoidCallback? onDismissed,
   required String initialUsername,
   required String initialAvatarUrl,
   required String firstUseText,
@@ -228,6 +238,7 @@ Future<void> showHomeLoginDialog(
 }) async {
   final accountController = TextEditingController();
   final passwordController = TextEditingController();
+  var selectedMethod = loginMethods.firstOrNull;
   var loading = false;
   var showProfileCard = false;
   var passwordVisible = false;
@@ -239,211 +250,301 @@ Future<void> showHomeLoginDialog(
 
   await showHomeAnimatedDialog<void>(
     context,
-    child: StatefulBuilder(
-      builder: (dialogContext, setDialogState) {
-        return Dialog(
-          backgroundColor: homeDialogBackgroundColor(dialogContext),
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 360),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 240),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              layoutBuilder: (currentChild, previousChildren) {
-                return Stack(
-                  alignment: Alignment.topCenter,
-                  children: <Widget>[...previousChildren, ?currentChild],
-                );
-              },
-              transitionBuilder: (child, animation) =>
-                  FadeTransition(opacity: animation, child: child),
-              child: showProfileCard
-                  ? Container(
-                      key: const ValueKey('profile-card'),
-                      width: 320,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          HomeProfileCardContent(
-                            avatarUrl: profileAvatarUrl,
-                            username: profileUsername,
-                            firstUseText: firstUseText,
-                            onLogoutTap: () {
-                              Navigator.pop(dialogContext);
-                              onLogoutTap();
-                            },
-                            onRequestSaveAvatar: () {
-                              return onRequestSaveAvatar(profileAvatarUrl);
-                            },
-                          ),
-                        ],
-                      ),
-                    )
-                  : Container(
-                      key: const ValueKey('login-form'),
-                      width: 320,
-                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            strings.homeLoginTitle,
-                            style: Theme.of(
-                              dialogContext,
-                            ).textTheme.headlineSmall,
-                          ),
-                          const SizedBox(height: 20),
-                          AutofillGroup(
-                            child: Column(
-                              children: [
-                                TextField(
-                                  controller: accountController,
-                                  enabled: !loading,
-                                  autofillHints: const [
-                                    AutofillHints.username,
-                                    AutofillHints.email,
-                                  ],
-                                  textInputAction: TextInputAction.next,
-                                  keyboardType: TextInputType.emailAddress,
-                                  decoration: InputDecoration(
-                                    labelText: strings.homeLoginAccountLabel,
-                                    border: const OutlineInputBorder(),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                TextField(
-                                  controller: passwordController,
-                                  enabled: !loading,
-                                  obscureText: !passwordVisible,
-                                  autofillHints: const [AutofillHints.password],
-                                  textInputAction: TextInputAction.done,
-                                  decoration: InputDecoration(
-                                    labelText: strings.homeLoginPasswordLabel,
-                                    border: const OutlineInputBorder(),
-                                    suffixIcon: IconButton(
-                                      tooltip: passwordVisible
-                                          ? strings.homeLoginHidePassword
-                                          : strings.homeLoginShowPassword,
-                                      onPressed: loading
-                                          ? null
-                                          : () {
-                                              setDialogState(() {
-                                                passwordVisible =
-                                                    !passwordVisible;
-                                              });
-                                            },
-                                      icon: Icon(
-                                        passwordVisible
-                                            ? Icons.visibility_off_outlined
-                                            : Icons.visibility_outlined,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (errorText != null) ...[
-                            const SizedBox(height: 10),
-                            Text(
-                              errorText!,
-                              style: TextStyle(
-                                color: Theme.of(
-                                  dialogContext,
-                                ).colorScheme.error,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 24),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+    child: _LoginControllerLifetime(
+      controllers: [accountController, passwordController],
+      onDisposed: onDismissed,
+      child: StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return PopScope(
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) onDismissed?.call();
+            },
+            child: Dialog(
+              backgroundColor: homeDialogBackgroundColor(dialogContext),
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 360),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 240),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  layoutBuilder: (currentChild, previousChildren) {
+                    return Stack(
+                      alignment: Alignment.topCenter,
+                      children: <Widget>[...previousChildren, ?currentChild],
+                    );
+                  },
+                  transitionBuilder: (child, animation) =>
+                      FadeTransition(opacity: animation, child: child),
+                  child: showProfileCard
+                      ? Container(
+                          key: const ValueKey('profile-card'),
+                          width: 320,
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              TextButton(
-                                onPressed: loading
-                                    ? null
-                                    : () => Navigator.pop(dialogContext),
-                                child: Text(strings.commonCancel),
-                              ),
-                              const SizedBox(width: 8),
-                              FilledButton(
-                                onPressed: loading
-                                    ? null
-                                    : () async {
-                                        final account = accountController.text
-                                            .trim();
-                                        final password =
-                                            passwordController.text;
-                                        if (account.isEmpty ||
-                                            password.isEmpty) {
-                                          setDialogState(() {
-                                            errorText =
-                                                strings.homeLoginEmptyError;
-                                          });
-                                          return;
-                                        }
-
-                                        setDialogState(() {
-                                          loading = true;
-                                          errorText = null;
-                                        });
-
-                                        try {
-                                          final profile = await onLogin(
-                                            account,
-                                            password,
-                                          );
-                                          if (!dialogContext.mounted) {
-                                            return;
-                                          }
-                                          setDialogState(() {
-                                            loading = false;
-                                            showProfileCard = true;
-                                            profileUsername = profile.username;
-                                            profileAvatarUrl =
-                                                profile.avatarUrl;
-                                          });
-                                        } catch (error) {
-                                          if (!dialogContext.mounted) {
-                                            return;
-                                          }
-                                          setDialogState(() {
-                                            loading = false;
-                                            errorText = error.toString();
-                                          });
-                                        }
-                                      },
-                                child: loading
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : Text(strings.homeLoginTitle),
+                              HomeProfileCardContent(
+                                avatarUrl: profileAvatarUrl,
+                                username: profileUsername,
+                                firstUseText: firstUseText,
+                                onLogoutTap: () {
+                                  Navigator.pop(dialogContext);
+                                  onLogoutTap();
+                                },
+                                onRequestSaveAvatar: () {
+                                  return onRequestSaveAvatar(profileAvatarUrl);
+                                },
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
+                        )
+                      : Container(
+                          key: const ValueKey('login-form'),
+                          width: 320,
+                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                strings.homeLoginTitle,
+                                style: Theme.of(
+                                  dialogContext,
+                                ).textTheme.headlineSmall,
+                              ),
+                              const SizedBox(height: 20),
+                              if (loginMethods.isNotEmpty)
+                                IgnorePointer(
+                                  ignoring: loading,
+                                  child: HazukiFrostedDropdown<String>(
+                                    selected: selectedMethod!.id,
+                                    options: [
+                                      for (final method in loginMethods)
+                                        HazukiFrostedMenuOption(
+                                          value: method.id,
+                                          label: loginInteractionText(
+                                            dialogContext,
+                                            method.title,
+                                          ),
+                                        ),
+                                    ],
+                                    onSelected: (id) => setDialogState(() {
+                                      selectedMethod = loginMethods.firstWhere(
+                                        (m) => m.id == id,
+                                      );
+                                      errorText = null;
+                                    }),
+                                  ),
+                                ),
+                              AutofillGroup(
+                                child: Column(
+                                  children: [
+                                    if (selectedMethod?.input != 'none')
+                                      TextField(
+                                        controller: accountController,
+                                        enabled: !loading,
+                                        autofillHints: const [
+                                          AutofillHints.username,
+                                          AutofillHints.email,
+                                        ],
+                                        textInputAction: TextInputAction.next,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        decoration: InputDecoration(
+                                          labelText:
+                                              strings.homeLoginAccountLabel,
+                                          border: const OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    if (selectedMethod == null ||
+                                        selectedMethod?.input ==
+                                            'credentials') ...[
+                                      const SizedBox(height: 16),
+                                      TextField(
+                                        controller: passwordController,
+                                        enabled: !loading,
+                                        obscureText: !passwordVisible,
+                                        autofillHints: const [
+                                          AutofillHints.password,
+                                        ],
+                                        textInputAction: TextInputAction.done,
+                                        decoration: InputDecoration(
+                                          labelText:
+                                              strings.homeLoginPasswordLabel,
+                                          border: const OutlineInputBorder(),
+                                          suffixIcon: IconButton(
+                                            tooltip: passwordVisible
+                                                ? strings.homeLoginHidePassword
+                                                : strings.homeLoginShowPassword,
+                                            onPressed: loading
+                                                ? null
+                                                : () {
+                                                    setDialogState(() {
+                                                      passwordVisible =
+                                                          !passwordVisible;
+                                                    });
+                                                  },
+                                            icon: Icon(
+                                              passwordVisible
+                                                  ? Icons
+                                                        .visibility_off_outlined
+                                                  : Icons.visibility_outlined,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (errorText != null) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  errorText!,
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      dialogContext,
+                                    ).colorScheme.error,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 24),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton(
+                                    onPressed: loading && selectedMethod == null
+                                        ? null
+                                        : () {
+                                            onDismissed?.call();
+                                            Navigator.pop(dialogContext);
+                                          },
+                                    child: Text(strings.commonCancel),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  FilledButton(
+                                    onPressed: loading
+                                        ? null
+                                        : () async {
+                                            final account = accountController
+                                                .text
+                                                .trim();
+                                            final password =
+                                                passwordController.text;
+                                            final input =
+                                                selectedMethod?.input ??
+                                                'credentials';
+                                            if (input != 'none' &&
+                                                    account.isEmpty ||
+                                                input == 'credentials' &&
+                                                    password.isEmpty) {
+                                              setDialogState(() {
+                                                errorText =
+                                                    strings.homeLoginEmptyError;
+                                              });
+                                              return;
+                                            }
+
+                                            setDialogState(() {
+                                              loading = true;
+                                              errorText = null;
+                                            });
+
+                                            try {
+                                              final profile =
+                                                  selectedMethod == null
+                                                  ? await onLogin(
+                                                      account,
+                                                      password,
+                                                    )
+                                                  : await onLoginMethod!(
+                                                      selectedMethod!.input ==
+                                                              'none'
+                                                          ? ''
+                                                          : account,
+                                                      selectedMethod!.input ==
+                                                              'credentials'
+                                                          ? password
+                                                          : '',
+                                                      selectedMethod!.id,
+                                                    );
+                                              if (!dialogContext.mounted ||
+                                                  ModalRoute.of(
+                                                        dialogContext,
+                                                      )?.isCurrent !=
+                                                      true) {
+                                                return;
+                                              }
+                                              setDialogState(() {
+                                                loading = false;
+                                                showProfileCard = true;
+                                                profileUsername =
+                                                    profile.username;
+                                                profileAvatarUrl =
+                                                    profile.avatarUrl;
+                                              });
+                                            } catch (error) {
+                                              if (!dialogContext.mounted) {
+                                                return;
+                                              }
+                                              final route = ModalRoute.of(
+                                                dialogContext,
+                                              );
+                                              if (error
+                                                  is SourceLoginCancelled) {
+                                                if (route?.isActive == true) {
+                                                  if (route!.isCurrent) {
+                                                    Navigator.pop(
+                                                      dialogContext,
+                                                    );
+                                                  } else {
+                                                    Navigator.of(
+                                                      dialogContext,
+                                                    ).removeRoute(route);
+                                                  }
+                                                }
+                                                return;
+                                              }
+                                              if (route?.isCurrent != true) {
+                                                return;
+                                              }
+                                              setDialogState(() {
+                                                loading = false;
+                                                errorText = error.toString();
+                                              });
+                                            }
+                                          },
+                                    child: loading
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : Text(strings.homeLoginTitle),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     ),
   );
 
-  accountController.dispose();
-  passwordController.dispose();
+  onDismissed?.call();
 }
 
 Future<void> showHomeAvatarCard(
@@ -547,5 +648,32 @@ class _HomeProfileGlassCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _LoginControllerLifetime extends StatefulWidget {
+  const _LoginControllerLifetime({
+    required this.controllers,
+    required this.child,
+    this.onDisposed,
+  });
+  final List<TextEditingController> controllers;
+  final VoidCallback? onDisposed;
+  final Widget child;
+  @override
+  State<_LoginControllerLifetime> createState() =>
+      _LoginControllerLifetimeState();
+}
+
+class _LoginControllerLifetimeState extends State<_LoginControllerLifetime> {
+  @override
+  Widget build(BuildContext context) => widget.child;
+  @override
+  void dispose() {
+    widget.onDisposed?.call();
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 }

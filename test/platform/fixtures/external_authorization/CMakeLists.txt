@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.14)
+project(hazuki_mock_authorization LANGUAGES CXX)
+add_executable(hazuki_mock_authorization WIN32 main.cpp)
+target_link_libraries(hazuki_mock_authorization PRIVATE shell32 shlwapi)
+target_compile_features(hazuki_mock_authorization PRIVATE cxx_std_17)

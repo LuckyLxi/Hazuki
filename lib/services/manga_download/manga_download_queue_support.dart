@@ -224,6 +224,9 @@ class MangaDownloadQueueExecutor {
             epId: target.epId,
             title: target.title,
             index: target.index,
+            directoryIndex: target.directoryIndex,
+            groupId: target.groupId,
+            groupTitle: target.groupTitle,
             imagePaths: savedPaths,
           ),
         );

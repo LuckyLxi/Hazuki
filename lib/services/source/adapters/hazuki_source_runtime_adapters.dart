@@ -1,3 +1,4 @@
+import '../account/source_login_interaction.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -94,6 +95,7 @@ class HazukiSourceLocalizationAdapter implements SourceLocalizationGateway {
 }
 
 class HazukiSourceHomeAdapter extends HazukiSourceListenableAdapter
+    with _InteractiveAccountAdapter
     implements SourceHomeGateway {
   HazukiSourceHomeAdapter({
     required SourceRuntimeView runtime,
@@ -107,6 +109,8 @@ class HazukiSourceHomeAdapter extends HazukiSourceListenableAdapter
 
   final SourceRuntimeOperations _runtimeOperations;
   final SourceAccountOperations _account;
+  @override
+  SourceAccountOperations get interactiveAccountOperations => _account;
   final SourceFavoritesOperations _favorites;
 
   @override
@@ -179,6 +183,7 @@ class HazukiSourceAdvancedAdapter extends HazukiSourceListenableAdapter
 }
 
 class HazukiSourceAccountAdapter extends HazukiSourceListenableAdapter
+    with _InteractiveAccountAdapter
     implements SourceAccountGateway {
   HazukiSourceAccountAdapter({
     required SourceRuntimeView runtime,
@@ -190,6 +195,8 @@ class HazukiSourceAccountAdapter extends HazukiSourceListenableAdapter
 
   final SourceRuntimeOperations _runtimeOperations;
   final SourceAccountOperations _account;
+  @override
+  SourceAccountOperations get interactiveAccountOperations => _account;
 
   @override
   String? get activeSourceKey => runtime.activeSourceKey;
@@ -279,6 +286,7 @@ class HazukiSourceDebugAdapter implements SourceDebugGateway {
 }
 
 class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
+    with _InteractiveAccountAdapter
     implements
         SourceRuntimeGateway,
         SourceSelectionGateway,
@@ -295,6 +303,8 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
 
   final SourceRuntimeOperations _runtimeOperations;
   final SourceAccountOperations _account;
+  @override
+  SourceAccountOperations get interactiveAccountOperations => _account;
   final SourceFavoritesOperations _favorites;
 
   @override
@@ -456,4 +466,35 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
       _image.setImageCacheAutoCleanMode(mode);
   @override
   Future<void> clearImageCache() => _image.clearImageCache();
+}
+
+mixin _InteractiveAccountAdapter implements SourceInteractiveAccountGateway {
+  SourceAccountOperations get interactiveAccountOperations;
+  @override
+  void cancelPendingLogin() =>
+      (interactiveAccountOperations as SourceInteractiveAccountGateway)
+          .cancelPendingLogin();
+  @override
+  Future<List<SourceLoginMethod>> loadLoginMethods() {
+    final account = interactiveAccountOperations;
+    return account is SourceInteractiveAccountGateway
+        ? (account as SourceInteractiveAccountGateway).loadLoginMethods()
+        : Future.value(const []);
+  }
+
+  @override
+  Future<void> loginInteractive({
+    required String account,
+    required String password,
+    required String method,
+    required SourceLoginPresenter present,
+    required SourceLoginCancellation cancellation,
+  }) => (interactiveAccountOperations as SourceInteractiveAccountGateway)
+      .loginInteractive(
+        account: account,
+        password: password,
+        method: method,
+        present: present,
+        cancellation: cancellation,
+      );
 }

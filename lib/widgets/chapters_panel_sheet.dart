@@ -1,3 +1,4 @@
+import 'package:hazuki/widgets/chapter_group_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/chapter_title_resolver.dart';
@@ -10,11 +11,13 @@ class ChaptersPanelSheet extends StatefulWidget {
     required this.details,
     required this.onChapterTap,
     required this.onDownloadConfirm,
+    this.initialChapterId,
   });
 
   final ComicDetailsData details;
   final void Function(String epId, String chapterTitle, int index) onChapterTap;
   final ValueChanged<Set<String>> onDownloadConfirm;
+  final String? initialChapterId;
 
   @override
   State<ChaptersPanelSheet> createState() => _ChaptersPanelSheetState();
@@ -23,20 +26,31 @@ class ChaptersPanelSheet extends StatefulWidget {
 class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
   bool _showDownloadSelection = false;
   final Set<String> _selectedEpIds = <String>{};
+  String? _groupId;
+
+  Map<String, String> get _visibleChapters {
+    final groups = widget.details.chapterGroups;
+    if (groups.isEmpty) return widget.details.chapters;
+    final initial = widget.details.groupForChapter(
+      widget.initialChapterId ?? '',
+    );
+    return (groups.where((g) => g.id == _groupId).firstOrNull ??
+            initial ??
+            groups.first)
+        .chapters;
+  }
 
   bool _areAllChaptersSelected(Map<String, String> chapters) {
-    return chapters.isNotEmpty && _selectedEpIds.length == chapters.length;
+    return chapters.isNotEmpty && chapters.keys.every(_selectedEpIds.contains);
   }
 
   void _toggleSelectAllChapters(Map<String, String> chapters) {
     setState(() {
       if (_areAllChaptersSelected(chapters)) {
-        _selectedEpIds.clear();
+        _selectedEpIds.removeAll(chapters.keys);
         return;
       }
-      _selectedEpIds
-        ..clear()
-        ..addAll(chapters.keys);
+      _selectedEpIds.addAll(chapters.keys);
     });
   }
 
@@ -44,7 +58,7 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final chapters = widget.details.chapters;
+    final chapters = _visibleChapters;
     final screenH = MediaQuery.of(context).size.height;
 
     return PopScope(
@@ -170,7 +184,7 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
                           },
                           child: Text(
                             _showDownloadSelection
-                                ? '${_selectedEpIds.length}/${chapters.length}'
+                                ? '${_selectedEpIds.length}/${widget.details.chapters.length}'
                                 : l10n(context).comicDetailChapterCount(
                                     '${chapters.length}',
                                   ),
@@ -244,6 +258,17 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
                     ),
                   ),
                 ),
+                if (widget.details.chapterGroups.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: ChapterGroupPicker(
+                      details: widget.details,
+                      selectedGroupId: _groupId,
+                      initialChapterId: widget.initialChapterId,
+
+                      onSelected: (value) => setState(() => _groupId = value),
+                    ),
+                  ),
                 const Divider(height: 1),
                 Flexible(
                   child: AnimatedSwitcher(
@@ -333,7 +358,11 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
         final displayTitle = resolveHazukiChapterTitle(context, entry.value);
         final chip = _ChapterChip(
           label: displayTitle,
-          onTap: () => widget.onChapterTap(entry.key, displayTitle, index),
+          onTap: () => widget.onChapterTap(
+            entry.key,
+            displayTitle,
+            widget.details.chapters.keys.toList().indexOf(entry.key),
+          ),
         );
 
         return TweenAnimationBuilder<double>(

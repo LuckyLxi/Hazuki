@@ -24,6 +24,7 @@ class ReaderNavigationController {
     required ReaderResetZoom resetZoomImmediately,
     required void Function(int index) onPageTargetChanged,
     required void Function() toggleControlsVisibility,
+    void Function(int index)? onVisiblePageChanged,
   }) : _runtimeState = runtimeState,
        _diagnosticsState = diagnosticsState,
        _scrollState = scrollState,
@@ -36,7 +37,8 @@ class ReaderNavigationController {
        _logVisiblePageChange = logVisiblePageChange,
        _resetZoomImmediately = resetZoomImmediately,
        _onPageTargetChanged = onPageTargetChanged,
-       _toggleControlsVisibility = toggleControlsVisibility;
+       _toggleControlsVisibility = toggleControlsVisibility,
+       _onVisiblePageChanged = onVisiblePageChanged;
 
   static const double unexpectedTopOffsetThreshold = 240;
   static const double topEdgeOffsetEpsilon = 8;
@@ -54,6 +56,7 @@ class ReaderNavigationController {
   final ReaderResetZoom _resetZoomImmediately;
   final void Function(int index) _onPageTargetChanged;
   final void Function() _toggleControlsVisibility;
+  final void Function(int index)? _onVisiblePageChanged;
   double _pendingListPixelCorrection = 0;
   bool _listPixelCorrectionScheduled = false;
 
@@ -136,6 +139,7 @@ class ReaderNavigationController {
     }
 
     normalizedIndex = _runtimeState.normalizeSpreadIndex(normalizedIndex);
+    _onVisiblePageChanged?.call(normalizedIndex);
     final activeProgrammaticTarget =
         _scrollState.activeProgrammaticListTargetIndex;
     if (activeProgrammaticTarget != null) {
@@ -214,6 +218,7 @@ class ReaderNavigationController {
       return;
     }
     final pageChanged = _runtimeState.currentPageIndex != index;
+    _onVisiblePageChanged?.call(index);
     final zoomWasActive = _runtimeState.isZoomed;
     _resetZoomImmediately(reason: 'page_swipe');
     if (pageChanged || zoomWasActive) {

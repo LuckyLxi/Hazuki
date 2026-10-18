@@ -9,8 +9,11 @@ import 'package:pointycastle/block/aes.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 
 import '../common/source_json_coerce.dart';
+import '../account/source_browser_authorization.dart';
+import '../account/source_external_authorization.dart';
 import 'source_runtime_facade.dart';
 import 'source_runtime_handle.dart';
+import 'source_cookie_store.dart';
 import 'source_html_bridge.dart';
 import '../plugins/source_plugin_models.dart';
 import '../plugins/source_plugin_localization.dart';
@@ -52,7 +55,87 @@ class SourceJsBridgeCookieCapability {
     final method = map['method']?.toString();
     dynamic result;
     if (handle.isDisposed) throw StateError('plugin_runtime_disposed');
+    handle.loginCancellation?.check();
     switch (method) {
+      case 'login_external_prepare':
+      case 'login_external_close':
+        final cancellation = handle.loginCancellation;
+        if (cancellation == null || handle.loginPresenter == null) {
+          throw StateError('login_interaction_required');
+        }
+        final broker = SourceExternalAuthorizationBroker.instance;
+        result = method == 'login_external_prepare'
+            ? broker.prepare(
+                Map<String, dynamic>.from(map['request'] as Map),
+                cancellation,
+              )
+            : broker.close(map['id']?.toString() ?? '', cancellation);
+        break;
+      case 'login_interaction':
+        final cancellation = handle.loginCancellation;
+        final present = handle.loginPresenter;
+        if (cancellation == null || present == null) {
+          throw StateError('login_interaction_required');
+        }
+        cancellation.check();
+        final request = Map<String, dynamic>.from(map['request'] as Map);
+        if (request['type'] == 'externalAuthorization') {
+          SourceExternalAuthorizationBroker.instance.require(
+            request['id']?.toString() ?? '',
+            cancellation,
+          );
+          request['sourceName'] =
+              handle.runtime.sourceMeta?.name ?? handle.sourceKey;
+        }
+        if (request['type'] == 'browserAuthorization') {
+          SourceBrowserAuthorizationOptions.parse(request);
+          request['sourceName'] =
+              handle.runtime.sourceMeta?.name ?? handle.sourceKey;
+        }
+        final count = request['pointCount'];
+        if (count != null && (count is! int || count < 1 || count > 32)) {
+          throw const FormatException('login_invalid_point_count');
+        }
+        result = present(request, cancellation).then((value) async {
+          cancellation.check();
+          if (request['type'] != 'browserAuthorization' || value is! Map) {
+            return value;
+          }
+          final response = Map<String, dynamic>.from(value);
+          final cookies = response.remove('_cookies');
+          final options = SourceBrowserAuthorizationOptions.parse(request);
+          if (response['status'] == 'completed' &&
+              options.cookieScopes.isNotEmpty) {
+            if (cookies is! List) {
+              throw StateError('login_browser_cookie_missing');
+            }
+            for (final scope in options.cookieScopes) {
+              final selected = cookies
+                  .whereType<Map>()
+                  .where(
+                    (c) =>
+                        c['scopeUrl'] == scope.url &&
+                        scope.names.contains(c['name']),
+                  )
+                  .map(
+                    (c) => SourceCookie.fromMap(Map<String, dynamic>.from(c)),
+                  )
+                  .where(
+                    (c) =>
+                        c.matches(Uri.parse(scope.url)) &&
+                        !c.isExpired(DateTime.now().millisecondsSinceEpoch),
+                  )
+                  .toList();
+              if (scope.names.any((n) => !selected.any((c) => c.name == n))) {
+                throw StateError('login_browser_cookie_missing');
+              }
+              await handle.cookieStore.set(scope.url, selected);
+              cancellation.check();
+            }
+          }
+          return response;
+        });
+        break;
       case 'html':
         result = (htmlBridge ?? handle.htmlBridge).handleOperation(map);
         break;
@@ -115,7 +198,7 @@ class SourceJsBridgeCookieCapability {
         break;
       case 'isLogged':
         _requireScopedSourceKey(handle, map);
-        result = handle.facade.loadAccountDataSync() != null;
+        result = handle.facade.isLogged;
         break;
       case 'delay':
         final ms = map['time'] is num ? (map['time'] as num).toInt() : 0;
@@ -138,6 +221,9 @@ class SourceJsBridgeCookieCapability {
         result = (os == 'android' || os == 'ios') ? os : 'android';
         break;
       case 'log':
+        // Foreground login may hold a complete authorization callback. Never
+        // forward plugin console data from this transient runtime to diagnostics.
+        if (handle.loginCancellation != null) break;
         handle.facade.addApplicationLog(
           level: map['level']?.toString() ?? 'info',
           title: map['title']?.toString() ?? 'Application',

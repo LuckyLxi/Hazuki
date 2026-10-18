@@ -30,6 +30,7 @@ class SourceComicDetailsParser {
       updateTime: _resolveUpdateTime(map['updateTime']?.toString() ?? '', tags),
       likesCount: map['likesCount']?.toString() ?? '',
       chapters: chapters,
+      chapterGroups: parseChapterGroups(map['chapterGroups']),
       tags: _filterDisplayTags(tags),
       recommend: recommendations,
       isFavorite: jsAsBool(map['isFavorite']),
@@ -149,6 +150,10 @@ class SourceComicDetailsParser {
     Map<String, dynamic> map, {
     required String fallbackComicId,
   }) {
+    final groups = parseChapterGroups(map['chapterGroups']);
+    if (groups.isNotEmpty) {
+      return {for (final group in groups) ...group.chapters};
+    }
     final chapters = <String, String>{};
     final chapterEntries = map['__chapterEntries'];
     if (chapterEntries is List) {
@@ -264,4 +269,45 @@ class SourceComicDetailsParser {
         normalized == 'datetime' ||
         normalized == 'datetime_updated';
   }
+}
+
+List<ComicChapterGroup> parseChapterGroups(Object? raw) {
+  if (raw == null) return const [];
+  if (raw is! List) {
+    throw const FormatException('plugin_invalid_chapter_groups');
+  }
+  final groups = <ComicChapterGroup>[];
+  final groupIds = <String>{};
+  final chapterIds = <String>{};
+  for (final item in raw) {
+    if (item is! Map ||
+        item['id'] is! String ||
+        item['title'] is! String ||
+        (item['id'] as String).trim().isEmpty ||
+        (item['title'] as String).trim().isEmpty ||
+        item['chapters'] is! List ||
+        !groupIds.add(item['id'] as String)) {
+      throw const FormatException('plugin_invalid_chapter_group');
+    }
+    final chapters = <String, String>{};
+    for (final chapter in item['chapters'] as List) {
+      if (chapter is! Map ||
+          chapter['id'] is! String ||
+          chapter['title'] is! String ||
+          (chapter['id'] as String).trim().isEmpty ||
+          (chapter['title'] as String).trim().isEmpty ||
+          !chapterIds.add(chapter['id'] as String)) {
+        throw const FormatException('plugin_invalid_or_duplicate_chapter');
+      }
+      chapters[chapter['id'] as String] = chapter['title'] as String;
+    }
+    groups.add(
+      ComicChapterGroup(
+        id: item['id'] as String,
+        title: item['title'] as String,
+        chapters: Map.unmodifiable(chapters),
+      ),
+    );
+  }
+  return List.unmodifiable(groups);
 }

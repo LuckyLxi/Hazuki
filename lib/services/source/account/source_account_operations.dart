@@ -1,6 +1,7 @@
 import '../models/source_contract_models.dart';
 import 'account_session_capability.dart';
 import 'source_daily_check_in_capability.dart';
+import 'source_login_interaction.dart';
 
 /// Account and check-in operations consumed by account-facing gateways.
 abstract interface class SourceAccountOperations {
@@ -16,7 +17,8 @@ abstract interface class SourceAccountOperations {
   Future<DailyCheckInResult> performDailyCheckIn();
 }
 
-class SourceAccountOperationService implements SourceAccountOperations {
+class SourceAccountOperationService
+    implements SourceAccountOperations, SourceInteractiveAccountGateway {
   const SourceAccountOperationService({
     required SourceAccountSessionCapability accountSession,
     required SourceDailyCheckInCapability dailyCheckIn,
@@ -25,6 +27,28 @@ class SourceAccountOperationService implements SourceAccountOperations {
 
   final SourceAccountSessionCapability _accountSession;
   final SourceDailyCheckInCapability _dailyCheckIn;
+
+  @override
+  void cancelPendingLogin() =>
+      _accountSession.interactive?.cancelPendingLogin();
+
+  @override
+  Future<List<SourceLoginMethod>> loadLoginMethods() =>
+      _accountSession.interactive?.loadLoginMethods() ?? Future.value(const []);
+  @override
+  Future<void> loginInteractive({
+    required String account,
+    required String password,
+    required String method,
+    required SourceLoginPresenter present,
+    required SourceLoginCancellation cancellation,
+  }) => _accountSession.interactive!.loginInteractive(
+    account: account,
+    password: password,
+    method: method,
+    present: present,
+    cancellation: cancellation,
+  );
 
   @override
   bool get isLogged => _accountSession.isLogged;

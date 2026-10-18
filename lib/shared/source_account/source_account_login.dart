@@ -11,6 +11,7 @@ Future<HomeLoginDialogProfile> loginSourceAccountForDialog({
   required SourceAccountGateway sourceService,
   required String account,
   required String password,
+  SourceAccountLoginOperation? loginOverride,
   Future<void> Function()? afterLogin,
   String Function()? usernameFallback,
   String? Function()? avatarUrlFallback,
@@ -18,7 +19,7 @@ Future<HomeLoginDialogProfile> loginSourceAccountForDialog({
   return buildSourceAccountDialogProfileAfterLogin(
     account: account,
     password: password,
-    login: sourceService.login,
+    login: loginOverride ?? sourceService.login,
     currentAccount: () => sourceService.currentAccount,
     loadAvatarUrl: sourceService.loadCurrentAvatarUrl,
     afterLogin: afterLogin,

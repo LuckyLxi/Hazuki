@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../../models/hazuki_models.dart';
 import '../account/account_session_capability.dart';
+import '../account/source_interactive_login_operations.dart';
+import '../account/source_login_interaction.dart';
 import '../account/source_account_operations.dart';
 import '../account/source_daily_check_in_capability.dart';
 import '../account/source_relogin_coordinator.dart';
@@ -113,6 +115,18 @@ class SourceRuntimeAssembly {
       reloginCoordinator: _reloginCoordinator,
       bundledInitAssetPath: _bundledInitAssetPath,
       sourceIndexUrls: _sourceIndexUrls,
+    );
+    _accountCapability.interactive = SourceInteractiveLoginOperations(
+      host: _runtimeHost,
+      loadRuntime: _runtimeCapability.loadLoginRuntime,
+      readLoginMethods: (key) => _runtimeCapability.localRuntime.run(
+        key,
+        (handle) async => SourceLoginMethod.parse(
+          handle.runtime.engine!.evaluate(
+            'this.__hazuki_source.account?.loginMethods',
+          ),
+        ),
+      ),
     );
     _commentsCapability = SourceCommentsCapability(
       runtimeHost: _runtimeHost,
@@ -248,6 +262,7 @@ class SourceRuntimeAssembly {
   late final SourceFavoritesCapability _favoritesCapability;
   late final SourceContentOperations _contentOperations =
       SourceContentOperationService(
+        loadCloudReadRuntime: _runtimeCapability.loadLoginRuntime,
         runtimeHost: _runtimeHost,
         runtimeOperations: _runtimeOperations,
         explore: _exploreCapability,
@@ -428,6 +443,8 @@ class SourceRuntimeAssembly {
   }
 
   void dispose() {
+    final content = _contentOperations;
+    if (content is SourceContentOperationService) content.dispose();
     _applicationHandle.requestDispose();
     for (final handle in _retainedImageHandles.values) {
       handle.requestDispose();

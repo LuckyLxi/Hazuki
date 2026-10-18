@@ -66,3 +66,26 @@ return Object.freeze({
     error(code, message) { return new Error(`HAZUKI_${code}: ${message}`); },
 });
 })();
+
+// Only an isolated foreground login runtime installs this host capability.
+function __hazukiCreateLoginContext(method) {
+    return Object.freeze({
+        method,
+        requestText: options => sendMessage({method: 'login_interaction', request: {...options, type: 'text'}}),
+        requestClickCaptcha: options => sendMessage({method: 'login_interaction', request: {...options, type: 'clickCaptcha'}}),
+        requestBrowserAuthorization: options => sendMessage({method: 'login_interaction', request: {...options, type: 'browserAuthorization'}}),
+        async requestExternalAuthorization(options) {
+            if (typeof options?.createUrl !== 'function') throw new Error('login_invalid_external_options');
+            const {createUrl, ...configuration} = options;
+            const session = await sendMessage({method: 'login_external_prepare', request: configuration});
+            try {
+                const url = await createUrl(session.callbackUrl);
+                return await sendMessage({method: 'login_interaction', request: {
+                    title: options.title, id: session.id, url, type: 'externalAuthorization',
+                }});
+            } finally {
+                await sendMessage({method: 'login_external_close', id: session.id});
+            }
+        },
+    });
+}

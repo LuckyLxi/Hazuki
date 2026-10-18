@@ -18,16 +18,25 @@ class MangaChapterDownloadTarget {
     required this.epId,
     required this.title,
     required this.index,
+    this.directoryIndex,
+    this.groupId,
+    this.groupTitle,
   });
 
   final String epId;
   final String title;
   final int index;
+  final int? directoryIndex;
+  final String? groupId;
+  final String? groupTitle;
 
   Map<String, dynamic> toJson() => {
     'epId': epId,
     'title': title,
     'index': index,
+    if (directoryIndex != null) 'directoryIndex': directoryIndex,
+    if (groupId != null) 'groupId': groupId,
+    if (groupTitle != null) 'groupTitle': groupTitle,
   };
 
   factory MangaChapterDownloadTarget.fromJson(Map<String, dynamic> map) {
@@ -35,6 +44,9 @@ class MangaChapterDownloadTarget {
       epId: (map['epId'] ?? '').toString(),
       title: (map['title'] ?? '').toString(),
       index: (map['index'] as num?)?.toInt() ?? 0,
+      directoryIndex: (map['directoryIndex'] as num?)?.toInt(),
+      groupId: map['groupId'] as String?,
+      groupTitle: map['groupTitle'] as String?,
     );
   }
 }
@@ -255,18 +267,27 @@ class DownloadedMangaChapter {
     required this.epId,
     required this.title,
     required this.index,
+    this.directoryIndex,
+    this.groupId,
+    this.groupTitle,
     required this.imagePaths,
   });
 
   final String epId;
   final String title;
   final int index;
+  final int? directoryIndex;
+  final String? groupId;
+  final String? groupTitle;
   final List<String> imagePaths;
 
   Map<String, dynamic> toJson() => {
     'epId': epId,
     'title': title,
     'index': index,
+    if (directoryIndex != null) 'directoryIndex': directoryIndex,
+    if (groupId != null) 'groupId': groupId,
+    if (groupTitle != null) 'groupTitle': groupTitle,
     'imagePaths': imagePaths,
   };
 
@@ -285,6 +306,9 @@ class DownloadedMangaChapter {
       epId: (map['epId'] ?? '').toString(),
       title: (map['title'] ?? '').toString(),
       index: (map['index'] as num?)?.toInt() ?? 0,
+      directoryIndex: (map['directoryIndex'] as num?)?.toInt(),
+      groupId: map['groupId'] as String?,
+      groupTitle: map['groupTitle'] as String?,
       imagePaths: imagePaths,
     );
   }

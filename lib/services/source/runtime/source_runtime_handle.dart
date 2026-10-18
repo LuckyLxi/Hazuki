@@ -16,6 +16,7 @@ import 'source_runtime_facade.dart';
 import 'source_runtime_kernel.dart';
 import 'source_secure_session_storage.dart';
 import 'source_session_store.dart';
+import '../account/source_login_interaction.dart';
 import '../../logging/app_log_store.dart';
 
 Dio _createSourceDio() {
@@ -48,6 +49,8 @@ class SourceRuntimeHandle
   final SourceSecureSessionStorage _secureStorage;
   SourceSecureSessionStorage get secureStorage => _secureStorage;
   String? pluginDirectory;
+  SourceLoginPresenter? loginPresenter;
+  SourceLoginCancellation? loginCancellation;
   final Future<void> Function(String sourceKey) _ensureInitialized;
   final void Function(String sourceKey) _notifyRuntimeStateChanged;
   final Dio dio = _createSourceDio();
@@ -69,7 +72,10 @@ class SourceRuntimeHandle
   @override
   late final SourceCookieStore cookieStore = SourceCookieStore(
     loadCookies: session.loadCookieStore,
-    saveCookies: session.saveCookieStore,
+    saveCookies: (cookies) async {
+      if (_disposed || loginCancellation?.isCancelled == true) return;
+      await session.saveCookieStore(cookies);
+    },
   );
   late final SourceNetworkLogSink networkLogSink = SourceNetworkLogSink(({
     required String method,

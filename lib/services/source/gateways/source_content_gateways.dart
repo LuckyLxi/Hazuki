@@ -243,3 +243,11 @@ abstract interface class SourceReaderGateway {
     String source = 'reader',
   });
 }
+
+/// Optional reader extension; old gateway implementations remain valid.
+abstract interface class SourceReadingProgressGateway {
+  Future<void> reportReadingProgress(
+    Map<String, Object> progress, {
+    required String sourceKey,
+  });
+}

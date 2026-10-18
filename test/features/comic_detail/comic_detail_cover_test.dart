@@ -133,6 +133,19 @@ void main() {
     );
 
     final background = find.byKey(const ValueKey('static-cover-blur-$url'));
+    void expectLiveBackground() {
+      final snapshots = find.ancestor(
+        of: background,
+        matching: find.byType(SnapshotWidget),
+      );
+      // The route keeps a snapshot wrapper for secondary transitions, but
+      // must leave the background live during its own entrance and exit.
+      expect(snapshots, findsWidgets);
+      for (final snapshot in tester.widgetList<SnapshotWidget>(snapshots)) {
+        expect(snapshot.controller.allowSnapshotting, isFalse);
+      }
+    }
+
     for (var visit = 0; visit < 2; visit++) {
       await tester.tap(find.text('Open detail'));
       await tester.pump();
@@ -141,11 +154,9 @@ void main() {
       final route = ModalRoute.of(tester.element(background))!;
       expect(route.transitionDuration, const Duration(milliseconds: 500));
       expect((route as PageRoute<void>).allowSnapshotting, isFalse);
-      expect(
-        find.ancestor(of: background, matching: find.byType(SnapshotWidget)),
-        findsNothing,
-      );
+      expectLiveBackground();
       await tester.pump(const Duration(milliseconds: 160));
+      expectLiveBackground();
       final fade = tester.widget<FadeTransition>(
         find.descendant(of: background, matching: find.byType(FadeTransition)),
       );
@@ -156,6 +167,9 @@ void main() {
       expect(fade.opacity.value, 1);
       expect(gateway.downloadCount, 1);
       Navigator.of(tester.element(background)).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 160));
+      expectLiveBackground();
       await tester.pumpAndSettle();
     }
     expect(tester.takeException(), isNull);

@@ -36,6 +36,7 @@ import 'services/cloud_sync_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
 import 'shared/liquid_glass_support.dart';
+import 'shared/source_account/source_authorization_browser.dart';
 import 'shared/navigation/snapshotting_page_route.dart';
 import 'shared/text/chinese_conversion_scope.dart';
 import 'services/source/source_capabilities.dart';
@@ -45,6 +46,7 @@ import 'features/password_lock/view/password_lock_widgets.dart';
 
 Future<void> main() async {
   final bootstrap = await bootstrapApp();
+  unawaited(cleanAuthorizationBrowserData());
   _installErrorLogging(sl<SourceDebugGateway>());
   runApp(
     HazukiLiquidGlass.wrap(

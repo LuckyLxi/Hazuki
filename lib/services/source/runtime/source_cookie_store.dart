@@ -1,3 +1,5 @@
+import 'dart:io';
+
 class SourceCookieStore {
   SourceCookieStore({
     required List<SourceCookie> Function() loadCookies,
@@ -51,28 +53,22 @@ class SourceCookieStore {
     final all = _loadCookies();
     for (final cookie in cookies) {
       final normalized = cookie.withFallbackDomain(uri.host);
+      final domain = normalized.domain
+          .replaceFirst(RegExp(r'^\.'), '')
+          .toLowerCase();
+      if (normalized.name.isEmpty ||
+          domain.isEmpty ||
+          (uri.host != domain && !uri.host.endsWith('.$domain'))) {
+        continue;
+      }
       all.removeWhere(
         (existing) =>
             existing.name == normalized.name &&
             existing.domain == normalized.domain &&
             existing.path == normalized.path,
       );
-      all.add(normalized);
-      if (normalized.domain.startsWith('.')) {
-        final hostDomain = normalized.domain.substring(1);
-        all.removeWhere(
-          (existing) =>
-              existing.name == normalized.name &&
-              existing.path == normalized.path &&
-              existing.domain == hostDomain,
-        );
-      } else {
-        all.removeWhere(
-          (existing) =>
-              existing.name == normalized.name &&
-              existing.path == normalized.path &&
-              existing.domain == '.${normalized.domain}',
-        );
+      if (!normalized.isExpired(DateTime.now().millisecondsSinceEpoch)) {
+        all.add(normalized);
       }
     }
     await _saveCookies(all);
@@ -88,25 +84,17 @@ class SourceCookieStore {
   String? buildHeader(String url) {
     final cookies = get(url);
     if (cookies.isEmpty) return null;
-    final selected = <String, SourceCookie>{};
-    for (final cookie in cookies) {
-      final current = selected[cookie.name];
-      if (current == null) {
-        selected[cookie.name] = cookie;
-        continue;
-      }
-      final cookieStartsWithDot = cookie.domain.startsWith('.');
-      final currentStartsWithDot = current.domain.startsWith('.');
-      if (!cookieStartsWithDot && currentStartsWithDot) {
-        selected[cookie.name] = cookie;
-      } else if (cookieStartsWithDot == currentStartsWithDot &&
-          cookie.domain.length > current.domain.length) {
-        selected[cookie.name] = cookie;
-      }
-    }
-    return selected.values
-        .map((cookie) => '${cookie.name}=${cookie.value}')
-        .join('; ');
+    cookies.sort((a, b) {
+      final path = b.path.length.compareTo(a.path.length);
+      if (path != 0) return path;
+      final domain = b.domain
+          .replaceFirst(RegExp(r'^\.'), '')
+          .length
+          .compareTo(a.domain.replaceFirst(RegExp(r'^\.'), '').length);
+      if (domain != 0) return domain;
+      return a.hostOnly == b.hostOnly ? 0 : (a.hostOnly ? -1 : 1);
+    });
+    return cookies.map((cookie) => '${cookie.name}=${cookie.value}').join('; ');
   }
 
   Future<void> saveFromHeaders(
@@ -151,28 +139,42 @@ class SourceCookie {
     required this.domain,
     required this.path,
     this.expiresAt,
-  });
+    this.secure = false,
+    this.httpOnly = false,
+    this.sameSite,
+    bool? hostOnly,
+  }) : _hostOnly = hostOnly;
 
   final String name;
   final String value;
   final String domain;
   final String path;
   final int? expiresAt;
+  final bool secure;
+  final bool httpOnly;
+  final String? sameSite;
+  final bool? _hostOnly;
+  bool get hostOnly => _hostOnly ?? !domain.startsWith('.');
 
   bool isExpired(int now) => expiresAt != null && expiresAt! <= now;
 
   bool matches(Uri uri) {
+    if (secure && uri.scheme != 'https') return false;
     final requestHost = uri.host.toLowerCase();
     final normalizedDomain = domain.toLowerCase();
     final cookieDomain = normalizedDomain.startsWith('.')
         ? normalizedDomain.substring(1)
         : normalizedDomain;
     final domainMatch =
-        requestHost == cookieDomain || requestHost.endsWith('.$cookieDomain');
+        requestHost == cookieDomain ||
+        (!hostOnly && requestHost.endsWith('.$cookieDomain'));
     if (!domainMatch) return false;
     final requestPath = uri.path.isEmpty ? '/' : uri.path;
     final cookiePath = path.isEmpty ? '/' : path;
-    return requestPath.startsWith(cookiePath);
+    return requestPath == cookiePath ||
+        (requestPath.startsWith(cookiePath) &&
+            (cookiePath.endsWith('/') ||
+                requestPath.substring(cookiePath.length).startsWith('/')));
   }
 
   SourceCookie withFallbackDomain(String fallbackDomain) {
@@ -183,6 +185,10 @@ class SourceCookie {
       domain: fallbackDomain,
       path: path,
       expiresAt: expiresAt,
+      secure: secure,
+      httpOnly: httpOnly,
+      sameSite: sameSite,
+      hostOnly: true,
     );
   }
 
@@ -192,6 +198,10 @@ class SourceCookie {
     'domain': domain,
     'path': path,
     'expiresAt': expiresAt,
+    'secure': secure,
+    'httpOnly': httpOnly,
+    'sameSite': sameSite,
+    'hostOnly': hostOnly,
   };
 
   static SourceCookie fromMap(Map<String, dynamic> map) {
@@ -200,13 +210,21 @@ class SourceCookie {
       value: map['value']?.toString() ?? '',
       domain: map['domain']?.toString() ?? '',
       path: map['path']?.toString() ?? '/',
+      secure: map['secure'] == true,
+      httpOnly: map['httpOnly'] == true,
+      sameSite: map['sameSite']?.toString(),
+      hostOnly: map['hostOnly'] is bool ? map['hostOnly'] as bool : null,
       expiresAt: map['expiresAt'] is num
           ? (map['expiresAt'] as num).toInt()
           : null,
     );
   }
 
-  static SourceCookie? parseSetCookie(String raw, String fallbackUrl) {
+  static SourceCookie? parseSetCookie(
+    String raw,
+    String fallbackUrl, {
+    bool browserSnapshot = false,
+  }) {
     final uri = Uri.tryParse(fallbackUrl);
     if (uri == null || raw.isEmpty) return null;
     final segments = raw.split(';').map((part) => part.trim()).toList();
@@ -217,25 +235,46 @@ class SourceCookie {
     final name = first.substring(0, equalIndex).trim();
     final value = first.substring(equalIndex + 1).trim();
     String domain = uri.host;
-    String path = '/';
+    String path = uri.path.startsWith('/') && uri.path.lastIndexOf('/') > 0
+        ? uri.path.substring(0, uri.path.lastIndexOf('/'))
+        : '/';
     int? expiresAt;
+    int? maxAge;
+    var secure = false;
+    var httpOnly = false;
+    var hostOnly = true;
+    String? sameSite;
     for (var i = 1; i < segments.length; i++) {
       final segment = segments[i];
+      if (segment.toLowerCase() == 'secure') secure = true;
+      if (segment.toLowerCase() == 'httponly') httpOnly = true;
       final index = segment.indexOf('=');
       if (index <= 0) continue;
       final key = segment.substring(0, index).trim().toLowerCase();
       final val = segment.substring(index + 1).trim();
       if (key == 'domain' && val.isNotEmpty) {
-        domain = val.startsWith('.') ? val : '.$val';
+        // Chromium's canonical export includes domain=host even for host-only
+        // cookies. HTTP Set-Cookie Domain=host has different semantics.
+        domain = browserSnapshot || val.startsWith('.') ? val : '.$val';
+        hostOnly = browserSnapshot && !val.startsWith('.');
       } else if (key == 'path' && val.isNotEmpty) {
-        path = val;
+        if (val.startsWith('/')) path = val;
+      } else if (key == 'samesite') {
+        if (const ['strict', 'lax', 'none'].contains(val.toLowerCase())) {
+          sameSite = val.toLowerCase();
+        }
       } else if (key == 'max-age') {
         final seconds = int.tryParse(val);
         if (seconds != null) {
-          expiresAt = DateTime.now().millisecondsSinceEpoch + seconds * 1000;
+          maxAge = seconds;
         }
       } else if (key == 'expires') {
-        final date = DateTime.tryParse(val);
+        DateTime? date;
+        try {
+          date = HttpDate.parse(val);
+        } on HttpException {
+          /* Ignore invalid dates. */
+        }
         if (date != null) expiresAt = date.millisecondsSinceEpoch;
       }
     }
@@ -244,7 +283,13 @@ class SourceCookie {
       value: value,
       domain: domain,
       path: path,
-      expiresAt: expiresAt,
+      expiresAt: maxAge == null
+          ? expiresAt
+          : DateTime.now().millisecondsSinceEpoch + maxAge * 1000,
+      secure: secure,
+      httpOnly: httpOnly,
+      hostOnly: hostOnly,
+      sameSite: sameSite,
     );
   }
 }

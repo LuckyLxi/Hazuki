@@ -101,9 +101,7 @@ class HazukiSourceFacade {
 
   Future<SharedPreferences> ensurePrefs() => session.ensurePrefs();
 
-  bool get isLogged =>
-      session.loadAccountDataSync(sourceMeta, fallbackSourceKey: sourceKey) !=
-      null;
+  bool get isLogged => session.hasLogin;
 
   SourceMeta? get sourceMeta => runtime.sourceMeta;
 

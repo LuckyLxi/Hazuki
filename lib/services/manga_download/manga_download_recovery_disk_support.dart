@@ -211,7 +211,7 @@ class MangaDownloadRecoveryDiskSupport {
       }
       if (collected.isEmpty) {
         final chapterDir = await findChapterDirectoryByIndex(
-          chapter.index,
+          chapter.directoryIndex ?? chapter.index,
           comicDir,
         );
         if (chapterDir != null) {
@@ -227,6 +227,9 @@ class MangaDownloadRecoveryDiskSupport {
           epId: chapter.epId,
           title: chapter.title,
           index: chapter.index,
+          directoryIndex: chapter.directoryIndex,
+          groupId: chapter.groupId,
+          groupTitle: chapter.groupTitle,
           imagePaths: collected,
         ),
       );

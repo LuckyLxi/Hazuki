@@ -134,7 +134,7 @@ class MangaDownloadRecoveryScanner {
         return dir;
       }
       final legacyDir = await findChapterDirectoryByIndex(
-        target.index,
+        target.directoryIndex ?? target.index,
         comicDir,
       );
       if (legacyDir != null) {

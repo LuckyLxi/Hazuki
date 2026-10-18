@@ -21,6 +21,7 @@ class SourceSessionStore {
   final Map<String, _SecureSourceSessionData> _secureCache =
       <String, _SecureSourceSessionData>{};
   SharedPreferences? prefs;
+  Map<String, dynamic>? stagedStore;
 
   void clearMemory() {
     _secureCache.clear();
@@ -29,12 +30,13 @@ class SourceSessionStore {
 
   Future<SharedPreferences> ensurePrefs() async {
     final current = prefs ??= await _loadPreferences();
-    await _migrateLegacySessionData(current);
+    if (stagedStore == null) await _migrateLegacySessionData(current);
     await _loadSecureSessionData(sourceKey);
     return current;
   }
 
   Map<String, dynamic> loadSourceStore(String sourceKey) {
+    if (stagedStore != null) return Map<String, dynamic>.from(stagedStore!);
     final currentPrefs = prefs;
     if (currentPrefs == null || sourceKey.isEmpty) {
       return {};
@@ -58,11 +60,20 @@ class SourceSessionStore {
     String sourceKey,
     Map<String, dynamic> store,
   ) async {
+    if (stagedStore != null) {
+      stagedStore = Map<String, dynamic>.from(store);
+      return;
+    }
     final currentPrefs = prefs;
     if (currentPrefs == null || sourceKey.isEmpty) {
       return;
     }
-    await currentPrefs.setString('source_data_$sourceKey', jsonEncode(store));
+    if (!await currentPrefs.setString(
+      'source_data_$sourceKey',
+      jsonEncode(store),
+    )) {
+      throw StateError('source_data_not_saved');
+    }
   }
 
   dynamic loadSourceData(String sourceKey, String dataKey) {
@@ -208,6 +219,17 @@ class SourceSessionStore {
     return null;
   }
 
+  bool get hasLogin =>
+      loadSourceData(sourceKey, 'login_session') is String ||
+      loadAccountDataSync(null) != null;
+
+  String? get loginIdentity {
+    final marker = loadSourceData(sourceKey, 'login_session');
+    if (marker is String) return marker;
+    final credentials = loadAccountDataSync(null);
+    return credentials == null ? null : jsonEncode(credentials);
+  }
+
   List<SourceCookie> loadCookieStore() {
     final raw =
         _secureDataFor(sourceKey).cookiesRaw ??
@@ -234,7 +256,7 @@ class SourceSessionStore {
         SourceSecureSessionStorageKeys.cookies(sourceKey),
       );
       _secureDataFor(sourceKey).cookiesRaw = null;
-      await prefs?.remove(_cookieStoreKey);
+      if (stagedStore == null) await prefs?.remove(_cookieStoreKey);
       return;
     }
     final raw = jsonEncode(cookies.map((e) => e.toMap()).toList());
@@ -243,7 +265,7 @@ class SourceSessionStore {
       raw,
     );
     _secureDataFor(sourceKey).cookiesRaw = raw;
-    await prefs?.remove(_cookieStoreKey);
+    if (stagedStore == null) await prefs?.remove(_cookieStoreKey);
   }
 
   String get _cookieStoreKey => 'cookie_store_v2_${sourceKey.trim()}';

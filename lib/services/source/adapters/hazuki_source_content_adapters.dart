@@ -5,6 +5,7 @@ import '../../../models/hazuki_models.dart';
 import '../account/source_account_operations.dart';
 import '../comments/source_comments_operations.dart';
 import '../content/source_content_operations.dart';
+import '../content/source_cloud_reading.dart';
 import '../debug/source_debug_operations.dart';
 import '../favorites/source_favorites_operations.dart';
 import '../gateways/source_content_gateways.dart';
@@ -254,7 +255,11 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
   );
 }
 
-class HazukiSourceComicDetailAdapter implements SourceComicDetailGateway {
+class HazukiSourceComicDetailAdapter
+    with SourceCloudReadingAdapter
+    implements SourceComicDetailGateway {
+  @override
+  Object get cloudReadingDelegate => _content;
   HazukiSourceComicDetailAdapter({
     required SourceRuntimeView runtime,
     required SourceAccountOperations account,
@@ -477,7 +482,11 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
       _favorites.setFavoriteSortOrder(order);
 }
 
-class HazukiSourceReaderAdapter implements SourceReaderGateway {
+class HazukiSourceReaderAdapter
+    with SourceCloudReadingAdapter
+    implements SourceReaderGateway, SourceReadingProgressGateway {
+  @override
+  Object get cloudReadingDelegate => _content;
   HazukiSourceReaderAdapter({
     required SourceContentOperations content,
     required SourceImagePreparationCapability imagePreparation,
@@ -492,6 +501,20 @@ class HazukiSourceReaderAdapter implements SourceReaderGateway {
   final SourceImagePreparationCapability _imagePreparation;
   final SourceImageOperations _image;
   final SourceDebugOperations _debug;
+
+  @override
+  Future<void> reportReadingProgress(
+    Map<String, Object> progress, {
+    required String sourceKey,
+  }) {
+    final content = _content;
+    return content is SourceReadingProgressGateway
+        ? (content as SourceReadingProgressGateway).reportReadingProgress(
+            progress,
+            sourceKey: sourceKey,
+          )
+        : Future<void>.value();
+  }
 
   @override
   Future<ComicDetailsData> loadComicDetails(

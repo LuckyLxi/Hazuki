@@ -30,6 +30,8 @@ class ReaderSessionController {
     required List<String> widgetImages,
     required ReadingProgressService readingProgressService,
     bool offlineMode = false,
+    this.shouldSaveLocalProgress,
+    this.onSettingsReady,
   }) : _runtimeState = runtimeState,
        _displayBridge = displayBridge,
        _displaySession = displaySession,
@@ -71,6 +73,8 @@ class ReaderSessionController {
   final bool _offlineMode;
   final ReaderDisplaySession _displaySession;
   bool _closed = false;
+  final Future<bool> Function()? shouldSaveLocalProgress;
+  final void Function()? onSettingsReady;
 
   void initialize() {
     _displayBridge.attach();
@@ -142,6 +146,7 @@ class ReaderSessionController {
       return;
     }
     await syncVolumeButtonPagingPlatformState();
+    if (!_closed) onSettingsReady?.call();
   }
 
   Future<void> applyReaderDisplaySettings() => _displaySession.apply();
@@ -153,6 +158,10 @@ class ReaderSessionController {
 
   Future<void> _recordReadingProgress({int lastPageIndex = 0}) async {
     try {
+      if (shouldSaveLocalProgress != null &&
+          !await shouldSaveLocalProgress!()) {
+        return;
+      }
       await _readingProgressService.save(
         comicId: _comicId,
         sourceKey: _sourceKey,

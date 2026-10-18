@@ -1057,13 +1057,14 @@ function Comic({id, title, subtitle, subTitle, cover, tags, description, maxPage
  * @param comments {Comment[]?}- `since 1.0.7` App will display comments in the details page.
  * @constructor
  */
-function ComicDetails({title, subtitle, subTitle, cover, description, tags, infoFields, headerStats, viewsCount, chapters, isFavorite, subId, thumbnails, recommend, commentCount, likesCount, isLiked, uploader, updateTime, uploadTime, url, stars, maxPage, comments}) {
+function ComicDetails({title, subtitle, subTitle, cover, description, tags, infoFields, headerStats, viewsCount, chapters, chapterGroups, isFavorite, subId, thumbnails, recommend, commentCount, likesCount, isLiked, uploader, updateTime, uploadTime, url, stars, maxPage, comments}) {
     this.title = title;
     this.subtitle = subtitle ?? subTitle;
     this.cover = cover;
     this.description = description;
     this.tags = tags;
     this.chapters = chapters;
+    this.chapterGroups = chapterGroups;
     this.isFavorite = isFavorite;
     this.subId = subId;
     this.infoFields = infoFields;

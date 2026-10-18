@@ -259,6 +259,14 @@
   "aboutDisclaimerTitle": "免责声明",
   "aboutDisclaimerSubtitle": "使用前请先阅读相关说明",
   "aboutDisclaimerContent": "Hazuki 是以 GPL-3.0 许可证发布的免费开源漫画阅读客户端。软件的使用、修改和分发须遵守该许可证。\n\nHazuki 通过漫画源插件访问第三方平台，不提供或运营漫画内容服务。漫画、图片及相关资料的权利归各自权利人所有；软件的开源许可证不授予这些内容的使用权。Hazuki 与所接入的第三方平台不存在隶属、合作或授权关系。\n\n请遵守所在地法律法规及相关平台的服务条款，在获得合法授权的范围内阅读、下载和使用内容，不得利用本软件侵犯他人权利。请支持作者及正版作品。\n\n第三方内容可能包含成人或其他不适宜未成年人观看的材料。未达到所在地法定成年年龄的用户请勿使用本软件；成年用户也应遵守当地对相关内容的访问限制。\n\n漫画源插件、内容及服务由第三方提供，其安全性、准确性和持续可用性不由 Hazuki 控制。请谨慎选择插件来源，妥善保管账号信息，并备份重要数据。\n\n本软件按现状提供。在适用法律允许的范围内，开发者不对软件的适用性、稳定性或无错误运行作出保证，也不对使用本软件造成的损失承担责任。具体无担保和责任限制条款以 GPL-3.0 许可证为准；依法不得排除或限制的责任不受本声明影响。",
+  "sourceLoginImageLoadFailed": "验证码图片无法显示，请刷新后重试。",
+  "sourceBrowserAuthorization": "浏览器授权",
+  "sourceBrowserInstallWebView2": "请安装 Microsoft Edge WebView2 运行时后使用浏览器授权。",
+  "sourceBrowserUpdateWebView": "请更新 Android System WebView 后使用隔离的浏览器授权。",
+  "sourceBrowserUnavailable": "此设备暂时无法使用浏览器授权。",
+  "sourceBrowserOpenHelp": "打开安装页面",
+  "sourceLoginRefresh": "刷新验证码",
+  "sourceLoginUndoPoint": "撤销上一个点",
   "commonConfirm": "确定",
   "commonCancel": "取消",
   "commonClose": "关闭",
@@ -1545,5 +1553,10 @@
   "pluginsViewDetails": "查看详情",
   "sourceBackupRestoreTitle": "恢复本地备份",
   "sourceBackupRestoreConfirm": "确定恢复到上次保存前的源码吗？当前源码会被覆盖，恢复成功后将清除备份。重启应用后生效。",
-  "sourceRedownloadTitle": "重新下载插件"
+  "sourceRedownloadTitle": "重新下载插件",
+  "sourceBrowserCompleteLogin": "完成登录",
+  "sourceBrowserCookiesMissing": "缺少必要的登录 Cookie，请完成登录后重试。",
+  "sourceCloudProgressUnavailable": "请登录或重试进度读取",
+  "sourceCloudChapterMissing": "网站章节不存在，请选择章节",
+  "sourceExternalAuthorizationWaiting": "请在外部应用中完成授权，然后返回此处。"
 }

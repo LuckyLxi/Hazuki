@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
+import 'package:hazuki/shared/reading/reader_entry_position.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -70,6 +71,7 @@ class ComicDetailActionsController extends ChangeNotifier {
   final MethodChannel _mediaChannel;
 
   bool _disposed = false;
+  int _readerOpenRequest = 0;
 
   Future<void> showCoverPreview(BuildContext context, String imageUrl) async {
     final normalized = imageUrl.trim();
@@ -226,6 +228,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     int? chapterIndex,
     bool fromExpandedChapterSheet = false,
   }) async {
+    final readerRequest = ++_readerOpenRequest;
     FocusManager.instance.primaryFocus?.unfocus();
     final chapters = details.chapters;
     if (chapters.isEmpty) {
@@ -243,11 +246,44 @@ class ComicDetailActionsController extends ChangeNotifier {
     MapEntry<String, String>? initialEntry;
     int finalIndex = 0;
 
-    final lastReadProgress = _lastReadProgressGetter();
+    var lastReadProgress = _lastReadProgressGetter();
+    if (epId == null) {
+      try {
+        if (await _repository.usesWebsiteReadingProgress()) {
+          lastReadProgress = await _repository.loadReadingProgress(_comic.id);
+        }
+      } catch (_) {
+        lastReadProgress = null;
+        if (_disposed || !context.mounted) return;
+        unawaited(
+          showHazukiPrompt(
+            context,
+            l10n(context).sourceCloudProgressUnavailable,
+            isError: true,
+          ),
+        );
+      }
+      if (_disposed ||
+          !context.mounted ||
+          readerRequest != _readerOpenRequest ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+      if (lastReadProgress?['cloud'] == true &&
+          !chapters.containsKey(lastReadProgress?['epId'])) {
+        unawaited(
+          showHazukiPrompt(
+            context,
+            l10n(context).sourceCloudChapterMissing,
+            isError: true,
+          ),
+        );
+        return;
+      }
+    }
     final hasMemory =
         lastReadProgress != null &&
-        chapters.containsKey(lastReadProgress['epId']) &&
-        chapters.length > 1;
+        chapters.containsKey(lastReadProgress['epId']);
 
     if (epId != null && chapters.containsKey(epId)) {
       initialEntry = MapEntry(epId, chapters[epId]!);
@@ -255,7 +291,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     } else if (hasMemory) {
       final memEpId = lastReadProgress['epId'] as String;
       initialEntry = MapEntry(memEpId, chapters[memEpId]!);
-      finalIndex = lastReadProgress['index'] as int;
+      finalIndex = chapters.keys.toList().indexOf(memEpId);
     } else {
       initialEntry = chapters.entries.first;
       finalIndex = 0;
@@ -278,12 +314,15 @@ class ComicDetailActionsController extends ChangeNotifier {
         (fromExpandedChapterSheet
             ? _expandedReaderRouteBuilder
             : _destinationRouteBuilder)(
-          (_) => _readerPageBuilder(
-            details: details,
-            chapterTitle: initialChapterTitle,
-            epId: initialEntry!.key,
-            chapterIndex: finalIndex,
-            comicTheme: _detailThemeApplier(Theme.of(context)),
+          (_) => ReaderEntryPosition(
+            progress: epId == null ? lastReadProgress : null,
+            child: _readerPageBuilder(
+              details: details,
+              chapterTitle: initialChapterTitle,
+              epId: initialEntry!.key,
+              chapterIndex: finalIndex,
+              comicTheme: _detailThemeApplier(Theme.of(context)),
+            ),
           ),
         ),
       );

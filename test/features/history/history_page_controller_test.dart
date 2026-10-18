@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:hazuki/services/source/content/source_cloud_reading.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
@@ -22,6 +24,48 @@ void main() {
   tearDown(() async {
     await sl.reset();
   });
+  test(
+    'merges website history by source and comic and clears old account rows',
+    () async {
+      final service = sl<ReadHistoryService>();
+      await service.importJsonList([
+        _historyJson(_comicA, timestamp: 1),
+      ], replace: true);
+      final reader = _CloudHistoryReader()
+        ..records = [
+          _comicA,
+          const ExploreComic(
+            id: 'website',
+            title: 'Website',
+            subTitle: '',
+            cover: '',
+            sourceKey: 'jm',
+          ),
+        ];
+      final controller = HistoryPageController(
+        readHistoryService: service,
+        sourceService: sl<SourceSelectionGateway>(),
+        readerService: reader,
+      );
+      addTearDown(controller.dispose);
+      addTearDown(reader.dispose);
+      await controller.loadInitial();
+      expect(controller.history.map((c) => c.id), ['a', 'website']);
+      reader.records = [
+        const ExploreComic(
+          id: 'new-account',
+          title: 'New account',
+          subTitle: '',
+          cover: '',
+          sourceKey: 'jm',
+        ),
+      ];
+      reader.notifyListeners();
+      expect(controller.history, isEmpty);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(controller.history.map((c) => c.id), ['a', 'new-account']);
+    },
+  );
 
   test(
     'defers service-triggered reloads while auto reloads are paused',
@@ -329,3 +373,23 @@ const _picacgDetails = ComicDetailsData(
   subId: '',
   sourceKey: 'picacg',
 );
+
+class _CloudHistoryReader extends Fake
+    with ChangeNotifier
+    implements
+        SourceReaderGateway,
+        SourceCloudReadingGateway,
+        SourceCloudReadingEvents {
+  List<ExploreComic> records = [];
+  @override
+  Future<bool> usesCloudReading(String sourceKey) async => true;
+  @override
+  Future<Map<String, dynamic>?> loadCloudReadingProgress(
+    String sourceKey,
+    String comicId,
+  ) async => null;
+  @override
+  Future<List<ExploreComic>> refreshCloudReadingHistory(
+    String sourceKey,
+  ) async => List.of(records);
+}

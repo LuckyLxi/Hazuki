@@ -1,3 +1,4 @@
+import 'package:hazuki/widgets/chapter_group_picker.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -28,6 +29,14 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
   final ScrollController _scrollController = ScrollController();
   final Set<String> _selectedEpIds = <String>{};
   bool _showDownloadSelection = false;
+  String? _groupId;
+
+  Map<String, String> get _visibleChapters {
+    final groups = widget.details.chapterGroups;
+    if (groups.isEmpty) return widget.details.chapters;
+    return (groups.where((g) => g.id == _groupId).firstOrNull ?? groups.first)
+        .chapters;
+  }
 
   @override
   void dispose() {
@@ -40,14 +49,12 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
   }
 
   void _toggleSelectAllChapters() {
-    final chapters = widget.details.chapters;
+    final chapters = _visibleChapters;
     setState(() {
-      if (_selectedEpIds.length == chapters.length) {
-        _selectedEpIds.clear();
+      if (chapters.keys.every(_selectedEpIds.contains)) {
+        _selectedEpIds.removeAll(chapters.keys);
       } else {
-        _selectedEpIds
-          ..clear()
-          ..addAll(chapters.keys);
+        _selectedEpIds.addAll(chapters.keys);
       }
     });
   }
@@ -57,9 +64,10 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final strings = l10n(context);
-    final chapters = widget.details.chapters.entries.toList(growable: false);
+    final chapters = _visibleChapters.entries.toList(growable: false);
     final allSelected =
-        chapters.isNotEmpty && _selectedEpIds.length == chapters.length;
+        chapters.isNotEmpty &&
+        chapters.every((e) => _selectedEpIds.contains(e.key));
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220);
@@ -202,7 +210,7 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
                           Expanded(
                             child: Text(
                               _showDownloadSelection
-                                  ? '${_selectedEpIds.length} / ${chapters.length}'
+                                  ? '${_selectedEpIds.length} / ${widget.details.chapters.length}'
                                   : strings.comicDetailChapterCount(
                                       '${chapters.length}',
                                     ),
@@ -248,6 +256,17 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
                         ],
                       ),
                     ),
+                    if (widget.details.chapterGroups.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: ChapterGroupPicker(
+                          details: widget.details,
+                          selectedGroupId: _groupId,
+
+                          onSelected: (value) =>
+                              setState(() => _groupId = value),
+                        ),
+                      ),
                     Divider(
                       height: 1,
                       color: cs.outlineVariant.withValues(alpha: 0.5),
@@ -301,7 +320,9 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
                                       widget.onChapterTap(
                                         entry.key,
                                         title,
-                                        index,
+                                        widget.details.chapters.keys
+                                            .toList()
+                                            .indexOf(entry.key),
                                       );
                                       return;
                                     }

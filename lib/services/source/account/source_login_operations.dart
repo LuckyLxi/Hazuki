@@ -25,6 +25,9 @@ class SourceLoginOperations {
   }) async {
     await facade.ensureInitialized();
 
+    if (facade.loadSourceData(facade.sourceKey, 'interactive_login') == true) {
+      throw StateError('login_interaction_required');
+    }
     final engine = facade.js.engine;
     final sourceMeta = facade.sourceMeta;
     if (engine == null || sourceMeta == null) {
@@ -69,6 +72,11 @@ class SourceLoginOperations {
         account,
         password,
       ]);
+      await facade.saveSourceData(
+        sourceMeta.key,
+        'login_session',
+        DateTime.now().microsecondsSinceEpoch.toString(),
+      );
     } catch (error) {
       _recordLoginDebugInfo(
         facade,

@@ -91,6 +91,14 @@ class MangaDownloadState {
     final normalizedTargets = <MangaChapterDownloadTarget>[];
     final seen = <String>{};
     var hasQueuedTarget = false;
+    final usedDirectories = <int>{
+      for (final chapter
+          in existingDownloaded?.chapters ?? <DownloadedMangaChapter>[])
+        chapter.directoryIndex ?? chapter.index,
+      for (final chapter
+          in existingTask?.targets ?? <MangaChapterDownloadTarget>[])
+        chapter.directoryIndex ?? chapter.index,
+    };
     for (final target in chapters) {
       if (existingTask?.targets.any((item) => item.epId == target.epId) ??
           false) {
@@ -105,7 +113,22 @@ class MangaDownloadState {
           !seen.add(target.epId)) {
         continue;
       }
-      normalizedTargets.add(target);
+      var directoryIndex = target.directoryIndex ?? target.index;
+      while (usedDirectories.contains(directoryIndex)) {
+        directoryIndex++;
+      }
+      usedDirectories.add(directoryIndex);
+      final group = details.groupForChapter(target.epId);
+      normalizedTargets.add(
+        MangaChapterDownloadTarget(
+          epId: target.epId,
+          title: target.title,
+          index: target.index,
+          directoryIndex: directoryIndex,
+          groupId: group?.id,
+          groupTitle: group?.title,
+        ),
+      );
     }
     if (normalizedTargets.isEmpty) {
       return hasQueuedTarget
