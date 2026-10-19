@@ -47,7 +47,6 @@ class _SourcePluginSettingsContentState
   Map<String, dynamic> _settings = {};
   Map<String, dynamic> _translation = {};
   List<SourcePluginAction> _actions = [];
-  String? _error;
   int _loadRevision = 0;
   @override
   void initState() {
@@ -62,7 +61,6 @@ class _SourcePluginSettingsContentState
       _settings = {};
       _translation = {};
       _actions = [];
-      _error = null;
       unawaited(_load());
     }
   }
@@ -88,7 +86,7 @@ class _SourcePluginSettingsContentState
       }
     } catch (error) {
       if (mounted && revision == _loadRevision) {
-        setState(() => _error = error.toString());
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
       }
     }
   }
@@ -98,7 +96,9 @@ class _SourcePluginSettingsContentState
       await widget.gateway.saveSetting(widget.id, key, value);
       if (mounted) setState(() {});
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+      }
     }
   }
 
@@ -106,7 +106,6 @@ class _SourcePluginSettingsContentState
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(24),
     children: [
-      if (_error != null) SelectableText(_error!),
       for (final entry in _settings.entries)
         if (entry.value is Map && _showsSetting(entry.value as Map))
           _control(entry.key, Map<String, dynamic>.from(entry.value as Map)),

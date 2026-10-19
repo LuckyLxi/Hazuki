@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
+import 'package:hazuki/widgets/hazuki_prompt.dart';
 
 import '../settings_group.dart';
 
@@ -71,67 +74,48 @@ class SourcePluginActionTile extends StatefulWidget {
 
 class _SourcePluginActionTileState extends State<SourcePluginActionTile> {
   bool _busy = false;
-  String? _error;
 
   Future<void> _run() async {
     if (_busy) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    setState(() => _busy = true);
     try {
       final result = await widget.gateway.runAction(
         widget.pluginId,
         widget.action.id,
       );
       if (mounted && result != null) {
-        final translation = widget.translation;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Builder(
-              builder: (context) => Text(
-                localizeSourcePluginText(
-                  result,
-                  Localizations.localeOf(context).toLanguageTag(),
-                  translation: translation,
-                ),
-              ),
+        unawaited(
+          showHazukiPrompt(
+            context,
+            localizeSourcePluginText(
+              result,
+              Localizations.localeOf(context).toLanguageTag(),
+              translation: widget.translation,
             ),
           ),
         );
       }
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      ListTile(
-        title: Text(
-          localizeSourcePluginText(
-            widget.action.title,
-            Localizations.localeOf(context).toLanguageTag(),
-            translation: widget.translation,
-            fallback: widget.action.id,
-          ),
-        ),
-        subtitle: widget.pluginName == null ? null : Text(widget.pluginName!),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: _busy ? null : _run,
+  Widget build(BuildContext context) => ListTile(
+    title: Text(
+      localizeSourcePluginText(
+        widget.action.title,
+        Localizations.localeOf(context).toLanguageTag(),
+        translation: widget.translation,
+        fallback: widget.action.id,
       ),
-      if (_error != null)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SelectableText(
-            _error!,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ),
-    ],
+    ),
+    subtitle: widget.pluginName == null ? null : Text(widget.pluginName!),
+    trailing: const Icon(Icons.chevron_right),
+    onTap: _busy ? null : _run,
   );
 }

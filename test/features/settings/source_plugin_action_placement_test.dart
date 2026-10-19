@@ -82,6 +82,8 @@ class _Plugins extends ChangeNotifier implements SourcePluginGateway {
   final calls = <(String, String)>[];
   final values = <String, dynamic>{};
   Future<dynamic> Function()? action;
+  Object? metadataError;
+  Object? settingError;
   Map<String, dynamic> settings = {
     'default': {'title': 'Default option', 'type': 'switch', 'default': false},
     'lines': {
@@ -108,6 +110,7 @@ class _Plugins extends ChangeNotifier implements SourcePluginGateway {
   @override
   Future<SourceMeta?> loadMetadata(String id) async {
     metadataLoads.add(id);
+    if (metadataError != null) throw metadataError!;
     return SourceMeta(
       name: 'Fixture plugin',
       key: id,
@@ -124,6 +127,7 @@ class _Plugins extends ChangeNotifier implements SourcePluginGateway {
   Object? loadSetting(String id, String key) => values['$id/$key'];
   @override
   Future<void> saveSetting(String id, String key, dynamic value) async {
+    if (settingError != null) throw settingError!;
     values['$id/$key'] = value;
   }
 
@@ -148,6 +152,11 @@ Widget _app(Widget page, {Locale locale = const Locale('en')}) => MaterialApp(
   supportedLocales: AppLocalizations.supportedLocales,
   home: page,
 );
+
+Future<void> _finishPrompt(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 3));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   late _Plugins plugins;
@@ -526,10 +535,13 @@ void main() {
       expect(find.text('完成'), findsOneWidget);
       await tester.pumpWidget(_app(page));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Refresh'));
+      await tester.pumpAndSettle();
       expect(find.text('Done'), findsOneWidget);
       expect(plugins.metadataLoads, isEmpty);
-      expect(plugins.calls, [('fixture', 'run')]);
+      expect(plugins.calls, [('fixture', 'run'), ('fixture', 'run')]);
       expect(tester.takeException(), isNull);
+      await _finishPrompt(tester);
     },
   );
 
@@ -555,6 +567,7 @@ void main() {
     expect(find.text('完成'), findsOneWidget);
     expect(plugins.calls, [('fixture', 'run')]);
     expect(tester.takeException(), isNull);
+    await _finishPrompt(tester);
   });
 
   for (final location in SourcePluginActionLocation.values) {
@@ -632,7 +645,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(plugins.calls, [('fixture', location.name)]);
       expect(find.text('Done'), findsOneWidget);
+      expect(find.byIcon(Icons.tips_and_updates_rounded), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
       expect(tester.takeException(), isNull);
+      await _finishPrompt(tester);
     });
   }
 
@@ -857,6 +873,7 @@ void main() {
     await showLines();
     expect(find.byType(SourcePluginActionTile), findsNothing);
     expect(tester.takeException(), isNull);
+    await _finishPrompt(tester);
   });
 
   testWidgets('disabled and uninstalled plugins remove their action entries', (
@@ -908,6 +925,57 @@ void main() {
     pending.completeError(StateError('Action failed'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Action failed'), findsOneWidget);
+    expect(find.byType(SelectableText), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
     expect(tester.takeException(), isNull);
+    await _finishPrompt(tester);
   });
+
+  for (final failure in ['metadata', 'setting', 'action']) {
+    testWidgets('lines $failure failures use the shared error prompt', (
+      tester,
+    ) async {
+      final settings = _MockSettings();
+      when(() => settings.activeSourceKey).thenReturn('fixture');
+      final error = StateError('$failure failed');
+      if (failure == 'metadata') plugins.metadataError = error;
+      if (failure == 'setting') plugins.settingError = error;
+      if (failure == 'action') plugins.action = () async => throw error;
+      await tester.pumpWidget(
+        _app(LineSettingsPage(sourceService: settings, sourcePlugins: plugins)),
+      );
+      await tester.pumpAndSettle();
+      if (failure == 'setting') {
+        await tester.tap(find.byType(Switch));
+      } else if (failure == 'action') {
+        await tester.tap(find.text('Action lines'));
+      }
+      await tester.pumpAndSettle();
+      final message = find.textContaining('$failure failed');
+      expect(message, findsOneWidget);
+      expect(
+        tester.widget<Text>(message).style?.color,
+        Theme.of(
+          tester.element(find.byType(LineSettingsPage)),
+        ).colorScheme.onErrorContainer,
+      );
+      expect(find.byType(SelectableText), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(tester.takeException(), isNull);
+      await _finishPrompt(tester);
+      expect(message, findsNothing);
+      if (failure == 'setting') {
+        plugins.settingError = null;
+        await tester.tap(find.byType(Switch));
+        await tester.pumpAndSettle();
+        expect(plugins.values['fixture/lines'], isTrue);
+      } else if (failure == 'action') {
+        plugins.action = () async => 'Recovered';
+        await tester.tap(find.text('Action lines'));
+        await tester.pumpAndSettle();
+        expect(find.text('Recovered'), findsOneWidget);
+        await _finishPrompt(tester);
+      }
+    });
+  }
 }
