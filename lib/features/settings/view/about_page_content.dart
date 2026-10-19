@@ -38,95 +38,86 @@ class AboutPageContent extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
             children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: colors.outlineVariant.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
-                  child: Column(
-                    children: [
-                      Semantics(
-                        image: true,
-                        label: 'Hazuki',
-                        child: ExcludeSemantics(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Image.asset(
-                              'assets/branding/app_icon.png',
-                              width: 88,
-                              height: 88,
-                            ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+                child: Column(
+                  children: [
+                    Semantics(
+                      image: true,
+                      label: 'Hazuki',
+                      child: ExcludeSemantics(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Image.asset(
+                            'assets/branding/app_icon.png',
+                            width: 88,
+                            height: 88,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Hazuki',
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.6,
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Hazuki',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      strings.aboutDescription,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _AboutBadge(
+                          label: strings.aboutVersion(currentVersion ?? '…'),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        strings.aboutDescription,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _AboutBadge(
-                            label: strings.aboutVersion(currentVersion ?? '…'),
-                          ),
-                          const _AboutBadge(label: 'GPL-3.0'),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.tonalIcon(
-                          onPressed: checkingUpdate ? null : onCheckUpdate,
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                          ),
-                          icon: checkingUpdate
-                              ? const SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.system_update_alt_rounded),
-                          label: Text(
-                            strings.aboutCheckUpdateTitle,
-                            textAlign: TextAlign.center,
+                        const _AboutBadge(label: 'GPL-3.0'),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonalIcon(
+                        onPressed: checkingUpdate ? null : onCheckUpdate,
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        strings.aboutCheckSoftwareUpdateSubtitle,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
+                        icon: checkingUpdate
+                            ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.system_update_alt_rounded),
+                        label: Text(
+                          strings.aboutCheckUpdateTitle,
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      strings.aboutCheckSoftwareUpdateSubtitle,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               _AboutSectionTitle(strings.aboutCommunityTitle),
