@@ -226,6 +226,11 @@ class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
         );
   }
 
+  Stream<void> watchReadingProgressChanges() async* {
+    if (await usesWebsiteReadingProgress()) return;
+    yield* _readingProgress.changes;
+  }
+
   Future<bool> loadComicDynamicColorEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('appearance_comic_detail_dynamic_color') ?? false;

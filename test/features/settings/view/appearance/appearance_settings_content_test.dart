@@ -109,4 +109,57 @@ void main() {
     expect(settings.discoverSectionLayout, DiscoverSectionLayout.grid2);
     expect(find.text('2-column grid'), findsOneWidget);
   });
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
+    testWidgets('selects all favorite layouts on $platform', (tester) async {
+      var settings = _initialSettings;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: platform),
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => AppearanceSettingsContent(
+                settings: settings,
+                locale: const Locale('en'),
+                onApply: (next, {revealOrigin, revealSyncRegion}) async {
+                  setState(() => settings = next);
+                },
+                onApplyLocale: (_) async {},
+                debugGateway: _MockSourceDebugGateway(),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final setting = find.byKey(const ValueKey('favorite-layout-setting'));
+      await tester.scrollUntilVisible(setting, 200);
+      for (final layout in [
+        FavoriteLayout.grid3,
+        FavoriteLayout.grid2,
+        FavoriteLayout.coverOnly,
+        FavoriteLayout.list,
+      ]) {
+        await tester.tap(setting);
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsOneWidget);
+        for (final option in FavoriteLayout.values) {
+          expect(
+            find.byKey(ValueKey('favorite-layout-option-${option.name}')),
+            findsOneWidget,
+          );
+        }
+        await tester.tap(
+          find.byKey(ValueKey('favorite-layout-option-${layout.name}')),
+        );
+        await tester.pumpAndSettle();
+        expect(settings.favoriteLayout, layout);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
 }

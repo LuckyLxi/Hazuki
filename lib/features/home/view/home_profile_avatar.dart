@@ -16,6 +16,7 @@ class HomeProfileAvatar extends StatefulWidget {
     this.backgroundColor,
     this.heroEnabled = false,
     this.borderRadius,
+    this.animateOnLoad = false,
   });
 
   final String? avatarUrl;
@@ -26,12 +27,14 @@ class HomeProfileAvatar extends StatefulWidget {
   final Color? backgroundColor;
   final bool heroEnabled;
   final BorderRadius? borderRadius;
+  final bool animateOnLoad;
 
   @override
   State<HomeProfileAvatar> createState() => _HomeProfileAvatarState();
 }
 
 class _HomeProfileAvatarState extends State<HomeProfileAvatar> {
+  final _heroContentKey = GlobalKey();
   Timer? _retryTimer;
   int _retryCount = 0;
 
@@ -62,7 +65,35 @@ class _HomeProfileAvatarState extends State<HomeProfileAvatar> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => HeroMode(
+    enabled: widget.heroEnabled,
+    child: Hero(
+      tag: homeProfileAvatarHeroTag,
+      // The default destination placeholder unmounts the image, restarting its
+      // reveal after landing. Keep it alive while the shuttle shows the image
+      // without another load animation.
+      placeholderBuilder: (context, size, child) => Visibility(
+        visible: false,
+        maintainSize: true,
+        maintainAnimation: true,
+        maintainState: true,
+        child: child,
+      ),
+      flightShuttleBuilder:
+          (context, animation, direction, fromContext, toContext) =>
+              _buildAvatar(toContext, inFlight: true),
+      child: KeyedSubtree(key: _heroContentKey, child: _buildAvatar(context)),
+    ),
+  );
+
+  Widget _buildAvatar(BuildContext context, {bool inFlight = false}) {
+    final animateOnLoad = widget.animateOnLoad && !inFlight;
+    // A warm avatar is already visible in the source Hero. Its route motion is
+    // the entrance animation; fading the destination again dims the handoff.
+    final route = widget.heroEnabled ? ModalRoute.of(context) : null;
+    final arrivingWithHero =
+        route != null &&
+        (route.offstage || route.animation?.isCompleted == false);
     final resolvedAvatarUrl = (widget.avatarUrl ?? '').trim();
     final size = widget.size;
     final borderWidth = widget.borderWidth;
@@ -99,9 +130,9 @@ class _HomeProfileAvatarState extends State<HomeProfileAvatar> {
             ? HazukiShimmerLoading(width: contentSize, height: contentSize)
             : resolvedAvatarUrl.isEmpty
             ? Center(child: fallbackIcon)
-            : borderRadius != null
+            : borderRadius != null || widget.animateOnLoad || inFlight
             ? HazukiCachedImage(
-                key: ValueKey(_retryCount),
+                key: ValueKey((resolvedAvatarUrl, _retryCount)),
                 url: resolvedAvatarUrl,
                 width: contentSize,
                 height: contentSize,
@@ -115,6 +146,10 @@ class _HomeProfileAvatarState extends State<HomeProfileAvatar> {
                   height: contentSize,
                 ),
                 ignoreNoImageMode: true,
+                animateOnLoad: animateOnLoad,
+                animateOnCacheHit: animateOnLoad && !arrivingWithHero,
+                waitForFirstFrame: widget.animateOnLoad || inFlight,
+                loadAnimationDuration: const Duration(milliseconds: 300),
                 onStateChanged: (_, state) {
                   if (state == HazukiCachedImageLoadState.error) {
                     _scheduleRetry();
@@ -132,22 +167,16 @@ class _HomeProfileAvatarState extends State<HomeProfileAvatar> {
       ),
     );
 
-    return HeroMode(
-      enabled: widget.heroEnabled,
-      child: Hero(
-        tag: homeProfileAvatarHeroTag,
-        child: Material(
-          type: MaterialType.transparency,
-          shape: borderRadius == null
-              ? CircleBorder(side: _heroBorderSide(context))
-              : RoundedRectangleBorder(
-                  borderRadius: borderRadius,
-                  side: _heroBorderSide(context),
-                ),
-          clipBehavior: Clip.antiAlias,
-          child: SizedBox(width: radius * 2, height: radius * 2, child: avatar),
-        ),
-      ),
+    return Material(
+      type: MaterialType.transparency,
+      shape: borderRadius == null
+          ? CircleBorder(side: _heroBorderSide(context))
+          : RoundedRectangleBorder(
+              borderRadius: borderRadius,
+              side: _heroBorderSide(context),
+            ),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(width: radius * 2, height: radius * 2, child: avatar),
     );
   }
 

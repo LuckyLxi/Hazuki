@@ -64,6 +64,7 @@ void main() {
         sourceKey: 'sample',
       );
       expect(await repository.loadReadingProgress('comic'), isNull);
+      expect(await repository.watchReadingProgressChanges().toList(), isEmpty);
       source.fail = true;
       await expectLater(
         repository.loadReadingProgress('comic'),

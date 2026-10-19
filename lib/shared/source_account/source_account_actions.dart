@@ -76,6 +76,11 @@ Future<void> showHomeSourceSwitchDialog(
             sourceKey: source.normalizedKey,
           );
           await onSourceSwitched?.call();
+          if (morphOrigin?.resolveReturnRect != null) {
+            // Flush the profile rebuild and its post-frame drawer forwarding.
+            // The first closing paint then reads the newly laid out button.
+            await WidgetsBinding.instance.endOfFrame;
+          }
           if (!dialogContext.mounted) {
             return;
           }

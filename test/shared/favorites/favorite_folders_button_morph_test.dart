@@ -129,6 +129,58 @@ void main() {
     },
   );
 
+  for (final removedDuringClose in [false, true]) {
+    testWidgets(
+      'missing return button falls back safely, removed during close=$removedDuringClose',
+      (tester) async {
+        final animation = AnimationController(
+          vsync: tester,
+          duration: const Duration(seconds: 1),
+          value: 1,
+        );
+        addTearDown(animation.dispose);
+        const originRect = Rect.fromLTWH(320, 400, 32, 22);
+        const returnRect = Rect.fromLTWH(80, 400, 32, 22);
+        Rect? target = removedDuringClose ? returnRect : null;
+        const surfaceKey = ValueKey('surface');
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Center(
+              child: FavoriteFoldersButtonMorph(
+                origin: FavoriteFoldersMorphOrigin(
+                  rect: originRect,
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  icon: Icons.swap_horiz_rounded,
+                  resolveReturnRect: () => target,
+                ),
+                animation: animation,
+                surfaceColor: Colors.white,
+                outlineColor: Colors.grey,
+                borderRadius: 28,
+                shadowBlurRadius: 22,
+                child: const SizedBox(key: surfaceKey, width: 300, height: 260),
+              ),
+            ),
+          ),
+        );
+        animation.reverse();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        target = null;
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byKey(surfaceKey)),
+          rectMoreOrLessEquals(
+            removedDuringClose ? returnRect : originRect,
+            epsilon: 0.001,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final openingValue in [0.5, 0.6 + 0.4 / 3]) {
     testWidgets(
       'closing morph at $openingValue preserves the painted geometry',

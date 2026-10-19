@@ -85,6 +85,10 @@ class ReadingProgressService {
     return _rowToJson(row);
   }
 
+  Stream<void> get changes => _database
+      .tableUpdates(TableUpdateQuery.onTable(_database.readingProgressEntries))
+      .map((_) {});
+
   Future<void> save({
     required String comicId,
     required String sourceKey,

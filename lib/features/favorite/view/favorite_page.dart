@@ -13,6 +13,8 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
 import 'package:hazuki/shared/comic_cover_prefetcher.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
+import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
@@ -21,6 +23,7 @@ import 'favorite_view_support.dart';
 import '../support/favorite_dialogs.dart';
 import 'favorite_folder_header.dart';
 import 'favorite_login_required_view.dart';
+import '../support/favorite_entry_animation_queue.dart';
 
 typedef FavoriteComicTapHandler =
     Future<void> Function(ExploreComic comic, String heroTag);
@@ -67,12 +70,14 @@ class FavoritePageState extends State<FavoritePage>
   late final FavoritePageController _controller;
   late final ComicCoverPrefetcher _coverPrefetcher;
   final ScrollController _scrollController = ScrollController();
+  final FavoriteEntryAnimationQueue _entryAnimationQueue =
+      FavoriteEntryAnimationQueue();
   bool _showBackToTop = false;
   FavoriteAppBarActionsState? _lastReportedAppBarActionsState;
   Map<String, FavoriteEntryAnimationStyle> _comicAnimationStyles =
       <String, FavoriteEntryAnimationStyle>{};
   bool _pendingFreshListEntryAnimation = true;
-  int _entryAnimationBatchId = 0;
+  FavoriteLayout _favoriteLayout = FavoriteLayout.list;
 
   @override
   bool get backToTopVisible => _showBackToTop;
@@ -104,6 +109,18 @@ class FavoritePageState extends State<FavoritePage>
         ),
       );
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final layout =
+        HazukiThemeControllerScope.maybeOf(context)?.settings.favoriteLayout ??
+        FavoriteLayout.list;
+    if (_favoriteLayout != layout) {
+      _favoriteLayout = layout;
+      _scheduleCoverPrefetch();
+    }
   }
 
   @override
@@ -151,6 +168,7 @@ class FavoritePageState extends State<FavoritePage>
     _controller.removeListener(_handleControllerChanged);
     _controller.dispose();
     _coverPrefetcher.dispose();
+    _entryAnimationQueue.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -360,27 +378,6 @@ class FavoritePageState extends State<FavoritePage>
     });
   }
 
-  void _scheduleEntryAnimation(
-    List<String> comicIds,
-    FavoriteEntryAnimationStyle style,
-  ) {
-    if (!mounted || comicIds.isEmpty) {
-      return;
-    }
-    final batchId = ++_entryAnimationBatchId;
-    _comicAnimationStyles = {for (final id in comicIds) id: style};
-    Future<void>.delayed(const Duration(milliseconds: 620), () {
-      if (!mounted ||
-          _comicAnimationStyles.isEmpty ||
-          batchId != _entryAnimationBatchId) {
-        return;
-      }
-      setState(() {
-        _comicAnimationStyles = <String, FavoriteEntryAnimationStyle>{};
-      });
-    });
-  }
-
   void _syncEntryAnimationTargets() {
     if (_controller.initialLoading ||
         _controller.refreshing ||
@@ -395,12 +392,13 @@ class FavoritePageState extends State<FavoritePage>
       return;
     }
     if (_pendingFreshListEntryAnimation) {
+      _comicAnimationStyles = <String, FavoriteEntryAnimationStyle>{};
       _pendingFreshListEntryAnimation = false;
-      _scheduleEntryAnimation(
-        currentIds.take(8).toList(),
-        FavoriteEntryAnimationStyle.staggered,
-      );
     }
+    _comicAnimationStyles = {
+      for (final id in currentIds)
+        id: _comicAnimationStyles[id] ?? FavoriteEntryAnimationStyle.staggered,
+    };
   }
 
   void _showFolderLoadError(String rawError) {
@@ -429,10 +427,26 @@ class FavoritePageState extends State<FavoritePage>
     if (_controller.mode != FavoritePageMode.local) {
       return;
     }
+    var estimatedItemExtent = 122.0;
+    if (_favoriteLayout != FavoriteLayout.list) {
+      final columns = _favoriteLayout.columns;
+      final width = context.size?.width ?? MediaQuery.sizeOf(context).width;
+      final coverWidth = (width - 32 - (columns - 1) * 10) / columns;
+      final titleHeight = _favoriteLayout == FavoriteLayout.coverOnly
+          ? 0.0
+          : 6 +
+                MediaQuery.textScalerOf(
+                      context,
+                    ).scale(Theme.of(context).textTheme.bodyMedium!.fontSize!) *
+                    1.3 *
+                    2;
+      estimatedItemExtent =
+          (coverWidth * 102 / 72 + titleHeight + 10) / columns;
+    }
     _coverPrefetcher.prefetchAroundScroll(
       comics: _controller.comics,
       scrollController: _scrollController,
-      estimatedItemExtent: 122,
+      estimatedItemExtent: estimatedItemExtent,
       extraBefore: 6,
       extraAfter: 30,
       maxRequests: 30,
@@ -510,6 +524,9 @@ class FavoritePageState extends State<FavoritePage>
                           : null,
                     ),
                   FavoritePageContentSection(
+                    layout: _favoriteLayout,
+                    entryScrollController: _scrollController,
+                    entryAnimationQueue: _entryAnimationQueue,
                     comics: _controller.comics,
                     comicAnimationStyles: _comicAnimationStyles,
                     errorMessage: _controller.errorMessage,

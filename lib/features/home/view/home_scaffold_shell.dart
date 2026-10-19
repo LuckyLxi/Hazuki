@@ -304,6 +304,7 @@ class HomeScaffoldShell extends StatefulWidget {
 class _HomeScaffoldShellState extends State<HomeScaffoldShell>
     with SingleTickerProviderStateMixin {
   final _sourceSwitchDialogOpen = ValueNotifier(false);
+  final _sourceSwitchButtonKey = GlobalKey();
   final _homeContentAnimating = ValueNotifier(false);
 
   Future<void> _showSourceSwitchWithMorph(
@@ -445,6 +446,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
           : null,
       sourceSwitchDialogOpen: _sourceSwitchDialogOpen.value,
       sourceSwitchDialogOpenListenable: _sourceSwitchDialogOpen,
+      sourceSwitchButtonKey: _sourceSwitchButtonKey,
       onSelectDiscover: () => onDestinationSelected(0),
       onSelectFavorite: () => onDestinationSelected(1),
       onOpenHistory: onOpenHistory,
@@ -456,7 +458,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
       onOpenLines: onOpenLines,
     );
     final mobileDrawerContent = HomeDrawerContent(
-      key: ValueKey('home-mobile-drawer-$drawerVisualKey'),
+      key: const ValueKey('home-mobile-drawer'),
       profile: sidebarProfile,
       actions: sidebarActions,
       activeSourceKey: activeSourceKey,

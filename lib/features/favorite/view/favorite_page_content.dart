@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/widgets/source_runtime_status_card.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -7,6 +8,7 @@ import 'package:hazuki/widgets/widgets.dart';
 
 import 'favorite_comic_tile.dart';
 import 'favorite_view_support.dart';
+import '../support/favorite_entry_animation_queue.dart';
 
 class FavoriteBackToTopButton extends StatelessWidget {
   const FavoriteBackToTopButton({
@@ -63,6 +65,9 @@ class FavoritePageContentSection extends StatelessWidget {
     required this.onComicTap,
     required this.mode,
     this.onCreateLocalFolder,
+    this.layout = FavoriteLayout.list,
+    this.entryScrollController,
+    this.entryAnimationQueue,
   });
 
   final List<ExploreComic> comics;
@@ -78,6 +83,9 @@ class FavoritePageContentSection extends StatelessWidget {
   final ValueChanged<ExploreComic> onComicTap;
   final FavoritePageMode mode;
   final VoidCallback? onCreateLocalFolder;
+  final FavoriteLayout layout;
+  final ScrollController? entryScrollController;
+  final FavoriteEntryAnimationQueue? entryAnimationQueue;
 
   @override
   Widget build(BuildContext context) {
@@ -226,28 +234,66 @@ class FavoritePageContentSection extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
+    // Keep one switcher child across layouts so cover Heroes are never duplicated.
+    return LayoutBuilder(
       key: const ValueKey('favorite-list'),
+      builder: (context, constraints) {
+        if (layout == FavoriteLayout.list) {
+          return _buildList();
+        }
+        final columns = layout.columns;
+        final coverWidth =
+            (constraints.maxWidth - 32 - (columns - 1) * 10) / columns;
+        final titleStyle = Theme.of(context).textTheme.bodyMedium!;
+        final titleHeight = layout == FavoriteLayout.coverOnly
+            ? 0.0
+            : 6 +
+                  MediaQuery.textScalerOf(context).scale(titleStyle.fontSize!) *
+                      1.3 *
+                      2;
+        return GridView.builder(
+          key: const ValueKey('favorite-grid'),
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            mainAxisExtent: coverWidth * 102 / 72 + titleHeight,
+          ),
+          itemCount: comics.length,
+          itemBuilder: _buildComicTile,
+        );
+      },
+    );
+  }
+
+  Widget _buildList() {
+    return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       itemCount: comics.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final comic = comics[index];
-        final heroTag = favoriteComicHeroTag(comic, salt: 'favorite');
-        return FavoriteComicTile(
-          key: ValueKey('${comic.id}-${mode.name}'),
-          comic: comic,
-          heroTag: heroTag,
-          animationStyle: comic.id.isEmpty
-              ? FavoriteEntryAnimationStyle.none
-              : (comicAnimationStyles[comic.id] ??
-                    FavoriteEntryAnimationStyle.none),
-          entryIndex: index,
-          onTap: () => onComicTap(comic),
-        );
-      },
+      itemBuilder: _buildComicTile,
+    );
+  }
+
+  Widget _buildComicTile(BuildContext context, int index) {
+    final comic = comics[index];
+    return FavoriteComicTile(
+      key: ValueKey('${comic.id}-${mode.name}'),
+      comic: comic,
+      heroTag: favoriteComicHeroTag(comic, salt: 'favorite'),
+      layout: layout,
+      entryScrollController: entryScrollController,
+      entryAnimationQueue: entryAnimationQueue,
+      animationStyle: comic.id.isEmpty
+          ? FavoriteEntryAnimationStyle.none
+          : (comicAnimationStyles[comic.id] ??
+                FavoriteEntryAnimationStyle.none),
+      onTap: () => onComicTap(comic),
     );
   }
 

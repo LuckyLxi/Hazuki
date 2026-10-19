@@ -28,6 +28,10 @@ class ComicDetailHeaderActionRow extends StatelessWidget {
     final scope = ComicDetailScope.of(context);
     final actions = scope.actions;
     final session = scope.session;
+    final readerButtonLabel = _buildReaderButtonLabel(context, session);
+    final labelTransitionDuration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
     final detailsReady = details != null;
     final animateSlide = !useMobileStyle && shouldAnimateInitialDetailReveal;
     final colors = Theme.of(context).colorScheme;
@@ -51,6 +55,44 @@ class ComicDetailHeaderActionRow extends StatelessWidget {
         icon: const Icon(Icons.format_list_bulleted_rounded),
       ),
     );
+    final readerLabel = AnimatedSwitcher(
+      duration: labelTransitionDuration,
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (currentChild, previousChildren) => LayoutBuilder(
+        builder: (context, constraints) => Stack(
+          alignment: Alignment.center,
+          children: [
+            // Only the current label determines the target size.
+            for (final child in previousChildren)
+              Positioned.fill(
+                child: OverflowBox(
+                  minWidth: 0,
+                  maxWidth: constraints.maxWidth,
+                  child: child,
+                ),
+              ),
+            ?currentChild,
+          ],
+        ),
+      ),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.16),
+            end: Offset.zero,
+          ).animate(animation),
+          child: child,
+        ),
+      ),
+      child: Text(
+        readerButtonLabel,
+        key: ValueKey(readerButtonLabel),
+        maxLines: useMobileStyle ? 1 : null,
+        overflow: useMobileStyle ? TextOverflow.ellipsis : null,
+      ),
+    );
     final readerButton = Expanded(
       child: AbsorbPointer(
         absorbing: !detailsReady,
@@ -71,10 +113,14 @@ class ComicDetailHeaderActionRow extends StatelessWidget {
             Icons.menu_book_outlined,
             size: useMobileStyle ? 20 : null,
           ),
-          label: Text(
-            _buildReaderButtonLabel(context, session),
-            maxLines: useMobileStyle ? 1 : null,
-            overflow: useMobileStyle ? TextOverflow.ellipsis : null,
+          label: ClipRect(
+            child: labelTransitionDuration == Duration.zero
+                ? readerLabel
+                : AnimatedSize(
+                    duration: labelTransitionDuration,
+                    curve: Curves.easeOutCubic,
+                    child: readerLabel,
+                  ),
           ),
         ),
       ),

@@ -415,6 +415,33 @@ void main() {
     },
   );
 
+  test(
+    'sending a reply discards stale threads before the next expansion',
+    () async {
+      final parent = _comment('parent');
+      final oldReply = _comment('old-reply');
+      final newReply = _comment('new-reply');
+      await load([parent]);
+      final expanding = controller.toggleReplies(parent);
+      source.pages.last.complete([oldReply], maxPage: 1);
+      await expanding;
+      controller.setReplyTarget(oldReply);
+      final sending = controller.submitComment('reply to a reply');
+      expect(source.sends.single.replyTo, 'old-reply');
+      source.sends.single.result.complete();
+      await pumpEventQueue();
+      source.pages.last.complete([parent]);
+      await sending;
+      final reloading = controller.toggleReplies(parent);
+      expect(source.pages.last.replyTo, 'parent');
+      expect(source.pages.last.page, 1);
+      expect(controller.state.replyComments['parent'], isNull);
+      source.pages.last.complete([oldReply, newReply], maxPage: 1);
+      await reloading;
+      expect(controller.state.replyComments['parent'], [oldReply, newReply]);
+    },
+  );
+
   test('send failure preserves reply target and permits retry', () async {
     final parent = _comment('parent');
     controller.setReplyTarget(parent);

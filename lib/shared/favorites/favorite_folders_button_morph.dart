@@ -11,6 +11,7 @@ class FavoriteFoldersMorphOrigin {
     this.borderRadius = 15,
     this.iconSize = 22,
     this.borderColor,
+    this.resolveReturnRect,
   });
 
   final Rect rect;
@@ -20,6 +21,10 @@ class FavoriteFoldersMorphOrigin {
   final double borderRadius;
   final double iconSize;
   final Color? borderColor;
+
+  /// Reads the current button bounds after layout when closing. The opening
+  /// bounds remain fixed even if the button moves or its widget is replaced.
+  final Rect? Function()? resolveReturnRect;
 }
 
 class FavoriteFoldersMorphScope extends InheritedWidget {
@@ -99,6 +104,9 @@ class _RenderFavoriteFoldersButtonMorph extends RenderBox
   double _reverseStartValue = 1;
   double _reverseStartProgress = 1;
   Rect? _reverseStartRect;
+  Rect? _returnTargetRect;
+  Rect? _returnStartRect;
+  double _returnRetargetTime = 0;
 
   RenderBox? get child => _configuration.child == null ? null : lastChild;
   RenderBox? get surface => _configuration.surface == null ? null : firstChild;
@@ -158,6 +166,8 @@ class _RenderFavoriteFoldersButtonMorph extends RenderBox
       configuration.animation.addStatusListener(_handleStatus);
       _reversing = false;
       _reverseStartRect = null;
+      _returnTargetRect = null;
+      _returnStartRect = null;
     }
     _configuration = configuration;
     if (attached) _handleStatus(configuration.animation.status);
@@ -195,6 +205,8 @@ class _RenderFavoriteFoldersButtonMorph extends RenderBox
           : null;
       _reverseStartProgress = _progress;
       _reverseStartValue = _configuration.animation.value;
+      _returnTargetRect = null;
+      _returnStartRect = null;
       _reversing = true;
     } else if (status == AnimationStatus.forward) {
       _reversing = false;
@@ -222,7 +234,36 @@ class _RenderFavoriteFoldersButtonMorph extends RenderBox
       Rect.lerp(_sourceRect, Offset.zero & size, _progress)!.width;
 
   Rect get _sourceRect =>
-      _configuration.origin.rect.shift(-localToGlobal(Offset.zero));
+      (_reversing ? _returnRect : _configuration.origin.rect).shift(
+        -localToGlobal(Offset.zero),
+      );
+
+  Rect get _returnRect {
+    final next =
+        _configuration.origin.resolveReturnRect?.call() ??
+        _returnTargetRect ??
+        _configuration.origin.rect;
+    if (_returnTargetRect == null) {
+      _returnTargetRect = next;
+    } else if (_returnTargetRect != next) {
+      // Retarget from the current position rather than jumping when a late
+      // profile update lays out a new username during the closing animation.
+      _returnStartRect = _interpolatedReturnRect;
+      _returnRetargetTime = _reverseTime;
+      _returnTargetRect = next;
+    }
+    return _interpolatedReturnRect;
+  }
+
+  Rect get _interpolatedReturnRect {
+    final start = _returnStartRect;
+    final target = _returnTargetRect!;
+    if (start == null || _returnRetargetTime >= 1) return target;
+    final progress =
+        ((_reverseTime - _returnRetargetTime) / (1 - _returnRetargetTime))
+            .clamp(0.0, 1.0);
+    return Rect.lerp(start, target, Curves.easeOutCubic.transform(progress))!;
+  }
 
   Rect get _currentRect => _resolveRect(
     _sourceRect,
