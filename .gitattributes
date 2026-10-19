@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Flutter 自动生成的跨平台插件注册文件，固定 LF 避免 Windows 下反复变脏
+**/generated_plugin_registrant.* text eol=lf
+**/generated_plugins.cmake text eol=lf
+**/GeneratedPluginRegistrant.* text eol=lf
