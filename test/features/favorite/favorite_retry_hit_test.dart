@@ -82,13 +82,13 @@ void main() {
         expect(find.text('Three'), findsOneWidget);
         expect(tester.state(outgoingTile), same(outgoingState));
         if (animationStyle == FavoriteEntryAnimationStyle.staggered) {
-          final entryOpacity = tester.widget<AnimatedOpacity>(
+          final entryOpacity = tester.widget<FadeTransition>(
             find.descendant(
               of: outgoingTile,
-              matching: find.byType(AnimatedOpacity),
+              matching: find.byType(FadeTransition),
             ),
           );
-          expect(entryOpacity.opacity, 1);
+          expect(entryOpacity.opacity.value, 1);
         }
         await tester.tap(find.text('Network error'), warnIfMissed: false);
         await tester.tapAt(oldComicPosition);

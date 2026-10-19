@@ -8,6 +8,8 @@ import 'package:hazuki/widgets/sun_moon_icon.dart';
 import 'display_mode_settings_page.dart';
 import '../settings_group.dart';
 import 'appearance_settings_locale_dialog.dart';
+import 'appearance_favorite_layout_picker.dart';
+import 'appearance_layout_option.dart';
 
 class AppearanceSettingsContent extends StatefulWidget {
   const AppearanceSettingsContent({
@@ -124,8 +126,16 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
                   childAspectRatio: 2.15,
                   children: [
                     for (final layout in DiscoverSectionLayout.values)
-                      _DiscoverLayoutOption(
-                        layout: layout,
+                      AppearanceLayoutOption(
+                        icon: switch (layout) {
+                          DiscoverSectionLayout.horizontal =>
+                            Icons.view_carousel_outlined,
+                          DiscoverSectionLayout.list =>
+                            Icons.view_agenda_outlined,
+                          DiscoverSectionLayout.grid2 =>
+                            Icons.grid_view_rounded,
+                          DiscoverSectionLayout.grid3 => Icons.apps_rounded,
+                        },
                         label: _discoverSectionLayoutLabel(strings, layout),
                         selected:
                             widget.settings.discoverSectionLayout == layout,
@@ -162,6 +172,19 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
       return;
     }
     await widget.onApplyLocale(nextLocale);
+  }
+
+  Future<void> _handleFavoriteLayoutTap() async {
+    final selected = await showFavoriteLayoutPicker(
+      context,
+      selected: widget.settings.favoriteLayout,
+    );
+    if (!mounted ||
+        selected == null ||
+        selected == widget.settings.favoriteLayout) {
+      return;
+    }
+    await widget.onApply(widget.settings.copyWith(favoriteLayout: selected));
   }
 
   Offset? _themeToggleOrigin() {
@@ -480,6 +503,17 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
             ),
             const Divider(height: 1, indent: 56),
             ListTile(
+              key: const ValueKey('favorite-layout-setting'),
+              leading: const Icon(Icons.collections_bookmark_outlined),
+              title: Text(strings.displayFavoriteLayoutTitle),
+              subtitle: Text(
+                favoriteLayoutLabel(strings, widget.settings.favoriteLayout),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => unawaited(_handleFavoriteLayoutTap()),
+            ),
+            const Divider(height: 1, indent: 56),
+            ListTile(
               leading: const Icon(Icons.language_rounded),
               title: Text(strings.displayLanguageTitle),
               subtitle: Text(_localeLabel(strings)),
@@ -649,84 +683,6 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
         ),
         const SizedBox(height: 24),
       ],
-    );
-  }
-}
-
-class _DiscoverLayoutOption extends StatelessWidget {
-  const _DiscoverLayoutOption({
-    required this.layout,
-    required this.label,
-    required this.selected,
-    required this.colorScheme,
-    required this.onTap,
-  });
-
-  final DiscoverSectionLayout layout;
-  final String label;
-  final bool selected;
-  final ColorScheme colorScheme;
-  final VoidCallback onTap;
-
-  IconData get _icon => switch (layout) {
-    DiscoverSectionLayout.horizontal => Icons.view_carousel_outlined,
-    DiscoverSectionLayout.list => Icons.view_agenda_outlined,
-    DiscoverSectionLayout.grid2 => Icons.grid_view_rounded,
-    DiscoverSectionLayout.grid3 => Icons.apps_rounded,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected
-          ? colorScheme.primaryContainer
-          : colorScheme.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: selected ? colorScheme.primary : colorScheme.outlineVariant,
-          width: selected ? 1.5 : 1,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Icon(
-                _icon,
-                color: selected
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: selected
-                        ? colorScheme.onPrimaryContainer
-                        : colorScheme.onSurface,
-                  ),
-                ),
-              ),
-              if (selected) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.check_circle_rounded,
-                  size: 20,
-                  color: colorScheme.primary,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

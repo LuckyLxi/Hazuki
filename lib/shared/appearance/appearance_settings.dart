@@ -19,6 +19,27 @@ enum DiscoverSectionLayout {
   }
 }
 
+enum FavoriteLayout {
+  list,
+  grid3,
+  grid2,
+  coverOnly;
+
+  int get columns => switch (this) {
+    FavoriteLayout.list => 1,
+    FavoriteLayout.grid3 => 3,
+    FavoriteLayout.grid2 => 2,
+    FavoriteLayout.coverOnly => 4,
+  };
+
+  static FavoriteLayout decode(String? raw) {
+    return FavoriteLayout.values.firstWhere(
+      (layout) => layout.name == raw,
+      orElse: () => FavoriteLayout.list,
+    );
+  }
+}
+
 typedef AppearanceSettingsApplyCallback =
     Future<void> Function(
       AppearanceSettingsData next, {
@@ -37,6 +58,7 @@ class AppearanceSettingsData {
     required this.useSystemFont,
     this.liquidGlassEnabled = true,
     this.discoverSectionLayout = DiscoverSectionLayout.horizontal,
+    this.favoriteLayout = FavoriteLayout.list,
   });
 
   final ThemeMode themeMode;
@@ -48,6 +70,7 @@ class AppearanceSettingsData {
   final bool useSystemFont;
   final bool liquidGlassEnabled;
   final DiscoverSectionLayout discoverSectionLayout;
+  final FavoriteLayout favoriteLayout;
 
   static ThemeMode decodeThemeMode(String? raw) {
     return switch (raw) {
@@ -75,6 +98,7 @@ class AppearanceSettingsData {
     bool? useSystemFont,
     bool? liquidGlassEnabled,
     DiscoverSectionLayout? discoverSectionLayout,
+    FavoriteLayout? favoriteLayout,
   }) {
     return AppearanceSettingsData(
       themeMode: themeMode ?? this.themeMode,
@@ -88,6 +112,7 @@ class AppearanceSettingsData {
       liquidGlassEnabled: liquidGlassEnabled ?? this.liquidGlassEnabled,
       discoverSectionLayout:
           discoverSectionLayout ?? this.discoverSectionLayout,
+      favoriteLayout: favoriteLayout ?? this.favoriteLayout,
     );
   }
 
@@ -105,7 +130,8 @@ class AppearanceSettingsData {
         other.comicDetailDynamicColor == comicDetailDynamicColor &&
         other.useSystemFont == useSystemFont &&
         other.liquidGlassEnabled == liquidGlassEnabled &&
-        other.discoverSectionLayout == discoverSectionLayout;
+        other.discoverSectionLayout == discoverSectionLayout &&
+        other.favoriteLayout == favoriteLayout;
   }
 
   @override
@@ -119,6 +145,7 @@ class AppearanceSettingsData {
     useSystemFont,
     liquidGlassEnabled,
     discoverSectionLayout,
+    favoriteLayout,
   );
 }
 

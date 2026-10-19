@@ -52,4 +52,38 @@ void main() {
     final persisted = await store.loadAppearance();
     expect(persisted.discoverSectionLayout, DiscoverSectionLayout.grid3);
   });
+
+  test(
+    'favorite layout defaults to list and persists all four layouts',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      const store = HazukiAppSettingsStore();
+      final initial = await store.loadAppearance();
+      expect(initial.favoriteLayout, FavoriteLayout.list);
+
+      for (final layout in FavoriteLayout.values) {
+        final settings = initial.copyWith(favoriteLayout: layout);
+        await store.saveAppearance(settings);
+        final restored = await store.loadAppearance();
+        expect(restored, settings);
+        expect(
+          restored.copyWith(themeMode: ThemeMode.dark).favoriteLayout,
+          layout,
+        );
+        if (layout != FavoriteLayout.list) {
+          expect(settings, isNot(initial));
+        }
+      }
+    },
+  );
+
+  test('unknown favorite layout falls back to the existing list', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'appearance_favorite_layout': 'unknown',
+    });
+    expect(
+      (await const HazukiAppSettingsStore().loadAppearance()).favoriteLayout,
+      FavoriteLayout.list,
+    );
+  });
 }

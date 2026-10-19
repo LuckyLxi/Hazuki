@@ -19,6 +19,7 @@ class HazukiAppSettingsStore {
   static const String _liquidGlassEnabledKey = 'appearance_liquid_glass';
   static const String _discoverSectionLayoutKey =
       'appearance_discover_section_layout';
+  static const String _favoriteLayoutKey = 'appearance_favorite_layout';
 
   Future<AppearanceSettingsData> loadAppearance() async {
     final prefs = await SharedPreferences.getInstance();
@@ -47,6 +48,9 @@ class HazukiAppSettingsStore {
       discoverSectionLayout: DiscoverSectionLayout.decode(
         prefs.getString(_discoverSectionLayoutKey),
       ),
+      favoriteLayout: FavoriteLayout.decode(
+        prefs.getString(_favoriteLayoutKey),
+      ),
     );
   }
 
@@ -68,6 +72,7 @@ class HazukiAppSettingsStore {
       _discoverSectionLayoutKey,
       next.discoverSectionLayout.name,
     );
+    await prefs.setString(_favoriteLayoutKey, next.favoriteLayout.name);
   }
 
   Future<Locale?> loadLocalePreference() async {
