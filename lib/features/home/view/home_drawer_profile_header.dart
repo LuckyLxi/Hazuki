@@ -32,9 +32,6 @@ class HomeDrawerProfileHeader extends StatelessWidget {
         ? l10n(context).commonLoading
         : profile.username;
     final resolvedAvatarUrl = (profile.avatarUrl ?? '').trim();
-    final visualStateKey =
-        '$activeSourceKey|$resolvedAvatarUrl|'
-        '${profile.profileLoading}|$displayUsername';
     final usernameStyle = textTheme.titleLarge?.copyWith(
       fontWeight: FontWeight.bold,
       color: colorScheme.onSurface,
@@ -45,10 +42,9 @@ class HomeDrawerProfileHeader extends StatelessWidget {
           children: [
             Positioned.fill(
               child: _HomeDrawerProfileBackground(
-                key: ValueKey('drawer-background-$visualStateKey-$isDark'),
+                key: ValueKey('drawer-background-$activeSourceKey'),
                 profileLoading: profile.profileLoading,
                 avatarUrl: resolvedAvatarUrl,
-                visualStateKey: visualStateKey,
                 backgroundColor: backgroundColor,
                 isDark: isDark,
               ),
@@ -62,11 +58,12 @@ class HomeDrawerProfileHeader extends StatelessWidget {
                     onTap: actions.onProfileTap,
                     borderRadius: BorderRadius.circular(40),
                     child: HomeProfileAvatar(
-                      key: ValueKey('drawer-avatar-$visualStateKey'),
+                      key: ValueKey('drawer-avatar-$activeSourceKey'),
                       avatarUrl: profile.avatarUrl,
                       loading: profile.profileLoading,
                       size: 72,
                       heroEnabled: true,
+                      animateOnLoad: true,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -74,11 +71,45 @@ class HomeDrawerProfileHeader extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Flexible(
-                        child: Text(
-                          displayUsername,
-                          style: usernameStyle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: AnimatedSize(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.centerLeft,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 260),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            layoutBuilder: (currentChild, previousChildren) =>
+                                Stack(
+                                  alignment: Alignment.centerLeft,
+                                  children: [
+                                    ...previousChildren,
+                                    ?currentChild,
+                                  ],
+                                ),
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0, 0.08),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                ),
+                            child: Text(
+                              displayUsername,
+                              key: ValueKey((
+                                activeSourceKey,
+                                profile.profileLoading,
+                                displayUsername,
+                              )),
+                              style: usernameStyle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 3),
@@ -123,14 +154,12 @@ class _HomeDrawerProfileBackground extends StatefulWidget {
     super.key,
     required this.profileLoading,
     required this.avatarUrl,
-    required this.visualStateKey,
     required this.backgroundColor,
     required this.isDark,
   });
 
   final bool profileLoading;
   final String avatarUrl;
-  final String visualStateKey;
   final Color backgroundColor;
   final bool isDark;
 
@@ -141,11 +170,17 @@ class _HomeDrawerProfileBackground extends StatefulWidget {
 
 class _HomeDrawerProfileBackgroundState
     extends State<_HomeDrawerProfileBackground> {
-  final SnapshotController _snapshotController = SnapshotController(
-    allowSnapshotting: true,
-  );
+  final SnapshotController _snapshotController = SnapshotController();
   bool _snapshotRefreshScheduled = false;
   Color? _surfaceContainerHigh;
+
+  bool get _hasImage => !widget.profileLoading && widget.avatarUrl.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _snapshotController.allowSnapshotting = !_hasImage;
+  }
 
   @override
   void didChangeDependencies() {
@@ -163,7 +198,14 @@ class _HomeDrawerProfileBackgroundState
   @override
   void didUpdateWidget(covariant _HomeDrawerProfileBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.backgroundColor != widget.backgroundColor) {
+    if (oldWidget.profileLoading != widget.profileLoading ||
+        oldWidget.avatarUrl != widget.avatarUrl) {
+      // Keep decoded frames and their reveal live before caching the result.
+      _snapshotController.allowSnapshotting = !_hasImage;
+      _scheduleSnapshotRefresh();
+    }
+    if (oldWidget.backgroundColor != widget.backgroundColor ||
+        oldWidget.isDark != widget.isDark) {
       _scheduleSnapshotRefresh();
     }
   }
@@ -189,10 +231,25 @@ class _HomeDrawerProfileBackgroundState
   }
 
   void _handleImageStateChanged(String _, HazukiCachedImageLoadState state) {
-    if (state == HazukiCachedImageLoadState.loaded ||
-        state == HazukiCachedImageLoadState.error) {
-      _scheduleSnapshotRefresh();
+    if (state == HazukiCachedImageLoadState.error) _handleRevealComplete();
+    if (state == HazukiCachedImageLoadState.loading ||
+        state == HazukiCachedImageLoadState.loaded) {
+      _snapshotController.allowSnapshotting = false;
     }
+  }
+
+  void _handleRevealComplete() {
+    final avatarUrl = widget.avatarUrl;
+    final profileLoading = widget.profileLoading;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          widget.avatarUrl != avatarUrl ||
+          widget.profileLoading != profileLoading) {
+        return;
+      }
+      _snapshotController.clear();
+      _snapshotController.allowSnapshotting = true;
+    });
   }
 
   @override
@@ -231,10 +288,14 @@ class _HomeDrawerProfileBackgroundState
                   child: widget.profileLoading || widget.avatarUrl.isEmpty
                       ? ColoredBox(color: colorScheme.surfaceContainerHigh)
                       : HazukiCachedImage(
-                          key: ValueKey('drawer-bg-${widget.visualStateKey}'),
+                          key: ValueKey('drawer-bg-${widget.avatarUrl}'),
                           url: widget.avatarUrl,
                           fit: BoxFit.cover,
                           ignoreNoImageMode: true,
+                          animateOnLoad: true,
+                          animateOnCacheHit: true,
+                          waitForFirstFrame: true,
+                          onRevealComplete: _handleRevealComplete,
                           onStateChanged: _handleImageStateChanged,
                         ),
                 ),

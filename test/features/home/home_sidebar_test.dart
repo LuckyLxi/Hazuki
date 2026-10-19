@@ -142,7 +142,10 @@ void main() {
     );
 
     final switcher = tester.widget<AnimatedSwitcher>(
-      find.byType(AnimatedSwitcher),
+      find.ancestor(
+        of: find.byType(FilledButton),
+        matching: find.byType(AnimatedSwitcher),
+      ),
     );
 
     expect(switcher.duration, const Duration(milliseconds: 260));

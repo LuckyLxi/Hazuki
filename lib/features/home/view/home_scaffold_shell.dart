@@ -458,7 +458,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
       onOpenLines: onOpenLines,
     );
     final mobileDrawerContent = HomeDrawerContent(
-      key: ValueKey('home-mobile-drawer-$drawerVisualKey'),
+      key: const ValueKey('home-mobile-drawer'),
       profile: sidebarProfile,
       actions: sidebarActions,
       activeSourceKey: activeSourceKey,
