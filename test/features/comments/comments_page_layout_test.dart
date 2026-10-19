@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comments/view/comments_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -29,6 +31,8 @@ const _reply = ComicCommentData(
   score: 3,
 );
 
+const _backgroundBoundaryKey = ValueKey('comments-background-boundary');
+
 void main() {
   late _Source source;
   late CommentFilterService filter;
@@ -54,6 +58,7 @@ void main() {
     double textScale = 1,
     bool showAppBar = true,
     bool isTabView = false,
+    ThemeData? theme,
   }) async {
     tester.view.physicalSize = Size(width, 1000);
     tester.view.devicePixelRatio = 1;
@@ -66,46 +71,51 @@ void main() {
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.deepPurple,
-              brightness: brightness,
-            ),
-          ),
+          theme:
+              theme ??
+              ThemeData(
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: Colors.deepPurple,
+                  brightness: brightness,
+                ),
+              ),
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(
               context,
             ).copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
-          home: Scaffold(
-            body: Builder(
-              builder: (context) {
-                final page = CommentsPage(
-                  sourceService: source,
-                  filterService: filter,
-                  comicId: 'comic',
-                  sourceKey: 'source',
-                  showAppBar: showAppBar,
-                  interactionState: state,
-                  isTabView: isTabView,
-                );
-                if (!isTabView) return page;
-                return NestedScrollView(
-                  headerSliverBuilder: (context, _) => [
-                    SliverOverlapAbsorber(
-                      handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                        context,
+          home: RepaintBoundary(
+            key: _backgroundBoundaryKey,
+            child: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  final page = CommentsPage(
+                    sourceService: source,
+                    filterService: filter,
+                    comicId: 'comic',
+                    sourceKey: 'source',
+                    showAppBar: showAppBar,
+                    interactionState: state,
+                    isTabView: isTabView,
+                  );
+                  if (!isTabView) return page;
+                  return NestedScrollView(
+                    headerSliverBuilder: (context, _) => [
+                      SliverOverlapAbsorber(
+                        handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                          context,
+                        ),
+                        sliver: const SliverAppBar(
+                          title: Text('Details'),
+                          pinned: true,
+                        ),
                       ),
-                      sliver: const SliverAppBar(
-                        title: Text('Details'),
-                        pinned: true,
-                      ),
-                    ),
-                  ],
-                  body: page,
-                );
-              },
+                    ],
+                    body: page,
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -115,6 +125,52 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
+    for (final mode in ['page', 'embedded', 'tab']) {
+      testWidgets('comments use the theme surface in $brightness $mode', (
+        tester,
+      ) async {
+        final scheme = ColorScheme.fromSeed(
+          seedColor: Colors.brown,
+          brightness: brightness,
+        );
+        // Use a contrasting host background to detect transparent list areas.
+        final theme = ThemeData(brightness: brightness).copyWith(
+          colorScheme: scheme,
+          scaffoldBackgroundColor: const Color(0xffff00ff),
+        );
+        await pumpComments(
+          tester,
+          theme: theme,
+          showAppBar: mode == 'page',
+          isTabView: mode == 'tab',
+        );
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(_backgroundBoundaryKey),
+        );
+        final background = await tester.runAsync(() async {
+          final image = await boundary.toImage();
+          try {
+            final data = (await image.toByteData(
+              format: ui.ImageByteFormat.rawRgba,
+            ))!;
+            // Sample the list margin, clear of cards and the composer.
+            final offset = (300 * image.width + 4) * 4;
+            return Color.fromARGB(
+              data.getUint8(offset + 3),
+              data.getUint8(offset),
+              data.getUint8(offset + 1),
+              data.getUint8(offset + 2),
+            );
+          } finally {
+            image.dispose();
+          }
+        });
+        expect(background, scheme.surface);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+
     testWidgets('cards and expanded replies fit narrow $brightness screens', (
       tester,
     ) async {

@@ -538,7 +538,7 @@ class _CommentsPageState extends State<CommentsPage>
         : 0;
 
     return ColoredBox(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      color: Theme.of(context).colorScheme.surface,
       child: _CommentsBodyList(
         sortControl: _buildSortControl(),
         comments: _comments,
