@@ -11,7 +11,7 @@ void main() {
     return engine;
   }
 
-  test('preserves native values and synchronous host calls', () {
+  test('preserves native values and synchronous host calls', () async {
     final engine = createEngine();
     engine.setMessageHandler(
       (message) => {
@@ -20,16 +20,16 @@ void main() {
         'enabled': true,
       },
     );
-    expect(engine.evaluate('null'), isNull);
-    expect(engine.evaluate('undefined'), isNull);
-    expect(engine.evaluate('sendMessage({text: "漫画"})'), {
+    expect(await engine.evaluate('null'), isNull);
+    expect(await engine.evaluate('undefined'), isNull);
+    expect(await engine.evaluate('sendMessage({text: "漫画"})'), {
       'text': '漫画',
       'bytes': [0, 128, 255],
       'enabled': true,
     });
-    expect(engine.evaluate('sendMessage({}).bytes.byteLength'), 3);
+    expect(await engine.evaluate('sendMessage({}).bytes.byteLength'), 3);
     expect(
-      engine.invoke('(bytes) => new Uint8Array(bytes).buffer', [
+      await engine.invoke('(bytes) => new Uint8Array(bytes).buffer', [
         Uint8List.fromList([0, 128, 255]),
       ]),
       [0, 128, 255],
@@ -39,14 +39,14 @@ void main() {
   for (final text in ['a', '漫画']) {
     test('preserves concatenated long strings containing $text', () async {
       final engine = createEngine();
-      engine.setGlobal('text', text);
+      await engine.setGlobal('text', text);
       final expected = '${text * 9000}${'b' * 9000}';
       const expression = 'text.repeat(9000) + "b".repeat(9000)';
 
-      final evaluated = engine.evaluate(expression);
+      final evaluated = await engine.evaluate(expression);
       expect(evaluated, isA<String>());
       expect(evaluated, expected);
-      expect(engine.invoke('() => $expression', []), expected);
+      expect(await engine.invoke('() => $expression', []), expected);
       expect(await engine.evaluate('Promise.resolve($expression)'), expected);
 
       dynamic body;
@@ -54,7 +54,10 @@ void main() {
         body = message['body'];
         return body;
       });
-      expect(engine.evaluate('sendMessage({body: $expression})'), expected);
+      expect(
+        await engine.evaluate('sendMessage({body: $expression})'),
+        expected,
+      );
       expect(body, expected);
 
       engine.setMessageHandler((message) async => message['body']);
@@ -65,16 +68,20 @@ void main() {
     });
   }
 
-  test('propagates script and host errors with the script name', () {
+  test('propagates script and host errors with the script name', () async {
     final engine = createEngine();
     expect(
-      () =>
-          engine.evaluate('throw new Error("script failed")', name: 'main.js'),
+      () async => await engine.evaluate(
+        'throw new Error("script failed")',
+        name: 'main.js',
+      ),
       throwsA(predicate((error) => error.toString().contains('main.js'))),
     );
     engine.setMessageHandler((_) => throw StateError('host failed'));
     expect(
-      engine.evaluate('try { sendMessage({}); } catch (e) { e.message; }'),
+      await engine.evaluate(
+        'try { sendMessage({}); } catch (e) { e.message; }',
+      ),
       contains('host failed'),
     );
   });
@@ -111,14 +118,17 @@ void main() {
     test('can close while a host Future is pending (failure: $fail)', () async {
       final engine = createEngine();
       final response = Completer<int>();
-      engine.setMessageHandler((_) => response.future);
+      final called = Completer<void>();
+      engine.setMessageHandler((_) {
+        called.complete();
+        return response.future;
+      });
       final pending = engine.evaluate('sendMessage({})');
-      final assertion = fail
-          ? expectLater(pending, throwsA(anything))
-          : expectLater(pending, completion(42));
-      engine.close();
-      engine.close();
-      expect(() => engine.evaluate('1'), throwsStateError);
+      final assertion = expectLater(pending, throwsStateError);
+      await called.future;
+      await engine.close();
+      await engine.close();
+      expect(() async => await engine.evaluate('1'), throwsStateError);
       if (fail) {
         response.completeError(StateError('cancelled'));
       } else {
@@ -136,9 +146,9 @@ void main() {
     () async {
       final first = createEngine();
       final second = createEngine();
-      first.setGlobal('value', 'first');
-      second.setGlobal('value', 'second');
-      first.close();
+      await first.setGlobal('value', 'first');
+      await second.setGlobal('value', 'second');
+      await first.close();
       expect(await second.evaluate('Promise.resolve(value)'), 'second');
     },
   );
@@ -150,10 +160,13 @@ void main() {
       final interrupted = predicate(
         (error) => error.toString().contains('interrupted'),
       );
-      expect(() => engine.evaluate('while (true) {}'), throwsA(interrupted));
-      expect(engine.evaluate('1 + 1'), 2);
       expect(
-        () => engine.invoke('() => { while (true) {} }', []),
+        () async => await engine.evaluate('while (true) {}'),
+        throwsA(interrupted),
+      );
+      expect(await engine.evaluate('1 + 1'), 2);
+      expect(
+        () async => await engine.invoke('() => { while (true) {} }', []),
         throwsA(interrupted),
       );
       await expectLater(

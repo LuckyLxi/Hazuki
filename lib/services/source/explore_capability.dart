@@ -21,44 +21,46 @@ class SourceExploreCapability {
     if (!_runtimeHost.hasActiveSource) return const [];
     final handle = _runtimeHost.activeHandle;
     final facade = handle.facade;
-    await facade.ensureInitialized();
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    final exploreCache = handle.exploreCache;
-    if (!forceRefresh) {
-      final memoryCached = exploreCache.getCachedSections();
-      if (memoryCached != null) {
-        return memoryCached;
+      final exploreCache = handle.exploreCache;
+      if (!forceRefresh) {
+        final memoryCached = exploreCache.getCachedSections();
+        if (memoryCached != null) {
+          return memoryCached;
+        }
+      } else {
+        exploreCache.clearMemory();
       }
-    } else {
-      exploreCache.clearMemory();
-    }
 
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final hasExplore = facade.js.asBool(
-      facade.js.evaluate('Array.isArray(this.__hazuki_source.explore)'),
-    );
-    if (!hasExplore) {
-      return const [];
-    }
+      final hasExplore = facade.js.asBool(
+        await engine.evaluate('Array.isArray(this.__hazuki_source.explore)'),
+      );
+      if (!hasExplore) {
+        return const [];
+      }
 
-    final exploreType =
-        (engine.evaluate('this.__hazuki_source.explore?.[0]?.type') ?? '')
-            .toString();
-    if (exploreType != 'multiPartPage' &&
-        exploreType != 'singlePageWithMultiPart' &&
-        exploreType != 'multiPageComicList') {
-      throw Exception('explore_type_not_supported:$exploreType');
-    }
+      final exploreType =
+          (await engine.evaluate('this.__hazuki_source.explore?.[0]?.type') ??
+                  '')
+              .toString();
+      if (exploreType != 'multiPartPage' &&
+          exploreType != 'singlePageWithMultiPart' &&
+          exploreType != 'multiPageComicList') {
+        throw Exception('explore_type_not_supported:$exploreType');
+      }
 
-    final dynamic result = engine.evaluate(switch (exploreType) {
-      'multiPartPage' => 'this.__hazuki_source.explore[0].load(null)',
-      'singlePageWithMultiPart' => 'this.__hazuki_source.explore[0].load()',
-      _ =>
-        '''
+      final dynamic result = await engine.evaluate(switch (exploreType) {
+        'multiPartPage' => 'this.__hazuki_source.explore[0].load(null)',
+        'singlePageWithMultiPart' => 'this.__hazuki_source.explore[0].load()',
+        _ =>
+          '''
 Promise.all(
   this.__hazuki_source.explore
     .filter((section) => section?.type === "multiPageComicList")
@@ -74,19 +76,21 @@ Promise.all(
     })
 ).then((sections) => sections.filter((section) => section != null))
 ''',
-    }, name: 'source_explore_load.js');
+      }, name: 'source_explore_load.js');
 
-    final dynamic resolved = await facade.js.resolve(result);
-    final sections = switch (exploreType) {
-      'multiPartPage' => _parseMultiPartExploreSections(resolved),
-      'singlePageWithMultiPart' => _parseSinglePageWithMultiPartExploreSections(
-        resolved,
-      ),
-      _ => _parseMultiPageComicListExploreSections(resolved),
-    };
+      final dynamic resolved = await facade.js.resolve(result);
+      final sections = switch (exploreType) {
+        'multiPartPage' => _parseMultiPartExploreSections(resolved),
+        'singlePageWithMultiPart' =>
+          _parseSinglePageWithMultiPartExploreSections(resolved),
+        _ => _parseMultiPageComicListExploreSections(resolved),
+      };
 
-    exploreCache.putSections(sections);
-    return List<ExploreSection>.unmodifiable(sections);
+      if (identical(facade.js.engine, engine)) {
+        exploreCache.putSections(sections);
+      }
+      return List<ExploreSection>.unmodifiable(sections);
+    });
   }
 
   List<ExploreSection> _parseMultiPartExploreSections(dynamic resolved) {

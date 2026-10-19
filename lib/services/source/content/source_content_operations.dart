@@ -11,6 +11,12 @@ import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_operations.dart';
 import '../plugins/source_sort_options.dart';
 import '../models/source_contract_models.dart';
+import '../runtime/source_script_engine.dart';
+import '../models/source_script_execution.dart';
+import '../debug/debug_log_internals.dart';
+import '../debug/source_task_log_recorder.dart';
+import '../models/source_task.dart';
+import '../runtime/source_task_registry.dart';
 import '../gateways/source_content_gateways.dart';
 
 abstract interface class SourceContentOperations {
@@ -57,6 +63,7 @@ abstract interface class SourceContentOperations {
     required int page,
     String order = '',
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
 }
 
@@ -87,6 +94,8 @@ class SourceContentOperationService
   final SourceCategoryCapability _category;
   final SourceComicDetailsCapability _comicDetails;
   final Map<String, Future<void>> _progressQueues = {};
+  final SourceTaskRegistry _searchTasks = SourceTaskRegistry();
+  List<SourceTaskSnapshot> get activeSearchTasks => _searchTasks.activeTasks;
   final Future<void> Function(SourceRuntimeHandle)? loadCloudReadRuntime;
   late final _cloud = SourceCloudReadingCapability(
     _runtimeHost,
@@ -134,7 +143,7 @@ class SourceContentOperationService
           }
           final engine = handle.runtime.engine;
           if (engine == null ||
-              engine.evaluate(
+              await engine.evaluate(
                     'typeof this.__hazuki_source.comic?.onReadingProgress === "function"',
                   ) !=
                   true) {
@@ -165,56 +174,60 @@ class SourceContentOperationService
         : _runtimeHost.normalize(sourceKey);
     await _runtimeOperations.ensureSourceInitialized(key);
     final facade = _runtimeHost.handleFor(key).facade;
-    final engine = facade.js.engine;
-    if (engine == null) throw StateError('source_not_initialized');
-    final raw = await facade.js.resolve(
-      engine.evaluate('globalThis.__hazuki_source.dailyRecommendation.load()'),
-    );
-    if (raw is! List) {
-      throw const FormatException('plugin_invalid_daily_recommendations');
-    }
-    final items = <SourceDailyRecommendationItem>[];
-    for (final item in raw) {
-      if (item is! Map ||
-          item['id'] is! String ||
-          (item['id'] as String).trim().isEmpty ||
-          item['title'] is! String ||
-          (item['title'] as String).trim().isEmpty) {
-        throw const FormatException('plugin_invalid_daily_recommendation');
-      }
-      for (final field in [
-        'cover',
-        'imageUrl',
-        'bannerTitle',
-        'caption',
-        'subTitle',
-      ]) {
-        if (item[field] != null && item[field] is! String) {
-          throw const FormatException('plugin_invalid_daily_recommendation');
-        }
-      }
-      final cover = (item['cover'] as String? ?? '').trim();
-      final imageUrl = (item['imageUrl'] as String? ?? '').trim();
-      if (cover.isEmpty && imageUrl.isEmpty) {
-        throw const FormatException('plugin_recommendation_image_missing');
-      }
-      items.add(
-        SourceDailyRecommendationItem(
-          comic: ExploreComic(
-            id: (item['id'] as String).trim(),
-            title: (item['title'] as String).trim(),
-            sourceKey: key,
-            cover: cover,
-            subTitle: item['subTitle'] as String? ?? '',
-            tags: jsAsStringList(item['tags']),
-          ),
-          caption: item['caption'] as String? ?? '',
-          imageUrl: imageUrl,
-          bannerTitle: item['bannerTitle'] as String? ?? '',
+    return facade.handle.runOperation(() async {
+      final engine = facade.js.engine;
+      if (engine == null) throw StateError('source_not_initialized');
+      final raw = await facade.js.resolve(
+        engine.evaluate(
+          'globalThis.__hazuki_source.dailyRecommendation.load()',
         ),
       );
-    }
-    return List.unmodifiable(items);
+      if (raw is! List) {
+        throw const FormatException('plugin_invalid_daily_recommendations');
+      }
+      final items = <SourceDailyRecommendationItem>[];
+      for (final item in raw) {
+        if (item is! Map ||
+            item['id'] is! String ||
+            (item['id'] as String).trim().isEmpty ||
+            item['title'] is! String ||
+            (item['title'] as String).trim().isEmpty) {
+          throw const FormatException('plugin_invalid_daily_recommendation');
+        }
+        for (final field in [
+          'cover',
+          'imageUrl',
+          'bannerTitle',
+          'caption',
+          'subTitle',
+        ]) {
+          if (item[field] != null && item[field] is! String) {
+            throw const FormatException('plugin_invalid_daily_recommendation');
+          }
+        }
+        final cover = (item['cover'] as String? ?? '').trim();
+        final imageUrl = (item['imageUrl'] as String? ?? '').trim();
+        if (cover.isEmpty && imageUrl.isEmpty) {
+          throw const FormatException('plugin_recommendation_image_missing');
+        }
+        items.add(
+          SourceDailyRecommendationItem(
+            comic: ExploreComic(
+              id: (item['id'] as String).trim(),
+              title: (item['title'] as String).trim(),
+              sourceKey: key,
+              cover: cover,
+              subTitle: item['subTitle'] as String? ?? '',
+              tags: jsAsStringList(item['tags']),
+            ),
+            caption: item['caption'] as String? ?? '',
+            imageUrl: imageUrl,
+            bannerTitle: item['bannerTitle'] as String? ?? '',
+          ),
+        );
+      }
+      return List.unmodifiable(items);
+    });
   }
 
   @override
@@ -291,30 +304,84 @@ class SourceContentOperationService
     required int page,
     String order = '',
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     final resolvedSourceKey = sourceKey.trim().isEmpty
         ? _runtimeHost.activeSourceKey
         : _runtimeHost.normalize(sourceKey);
-    await _runtimeOperations.ensureSourceInitialized(resolvedSourceKey);
-    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
-    final engine = facade.js.engine;
-    if (engine == null) throw Exception('source_not_initialized');
     final normalizedKeyword = keyword.trim();
+    final recorder = SourceTaskLogRecorder(_runtimeHost.logStore);
+    return _searchTasks.run(
+      pluginId: resolvedSourceKey,
+      pluginVersion: _runtimeHost.catalog
+          .where((source) => source.normalizedKey == resolvedSourceKey)
+          .firstOrNull
+          ?.pluginVersion,
+      method: 'search.load',
+      origin: taskOrigin,
+      observe: (task, event, disposition, error, stack) => recorder.record(
+        task,
+        event,
+        disposition,
+        error,
+        stack,
+        sensitiveValues: [keyword, normalizedKeyword],
+      ),
+      operation: (task) async {
+        await _runtimeOperations.ensureSourceInitialized(resolvedSourceKey);
+        final handle = _runtimeHost.handleFor(resolvedSourceKey);
+        // Acquire before any script execution, including synchronous checks.
+        return handle.runOperation(() async {
+          final facade = handle.facade;
+          final engine = facade.js.engine;
+          if (engine == null) throw Exception('source_not_initialized');
+          task.bindRuntime(
+            runtimeId: engine.runtimeId,
+            pluginVersion: facade.sourceMeta?.version,
+          );
+          return _searchWithEngine(
+            engine,
+            normalizedKeyword,
+            page,
+            order,
+            resolvedSourceKey,
+            SourceScriptExecution.fromTask(task.snapshot),
+          );
+        });
+      },
+    );
+  }
+
+  Future<SearchComicsResult> _searchWithEngine(
+    SourceScriptEngine engine,
+    String normalizedKeyword,
+    int page,
+    String order,
+    String resolvedSourceKey,
+    SourceScriptExecution execution,
+  ) async {
     if (normalizedKeyword.isEmpty) {
       return const SearchComicsResult(comics: [], maxPage: 0);
     }
-    final hasSearch = facade.js.asBool(
-      engine.evaluate('!!this.__hazuki_source.search'),
+    final hasSearch = jsAsBool(
+      await engine.evaluate(
+        '!!this.__hazuki_source.search',
+        execution: execution,
+      ),
     );
-    final hasSearchLoad = facade.js.asBool(
-      engine.evaluate('!!this.__hazuki_source.search?.load'),
+    final hasSearchLoad = jsAsBool(
+      await engine.evaluate(
+        '!!this.__hazuki_source.search?.load',
+        execution: execution,
+      ),
     );
     if (!hasSearch || !hasSearchLoad) throw Exception('search_not_supported');
-    final result = engine.evaluate(
+    final result = await engine.evaluate(
       'this.__hazuki_source.search.load(${jsonEncode(normalizedKeyword)}, ${jsonEncode([_normalizeSearchOption(order, resolvedSourceKey)])}, ${page < 1 ? 1 : page})',
       name: 'source_search.js',
+      execution: execution,
     );
-    final resolved = await facade.js.resolve(result);
+    final resolved = await awaitJsResult(result);
     if (resolved is! Map) {
       return const SearchComicsResult(comics: [], maxPage: null);
     }

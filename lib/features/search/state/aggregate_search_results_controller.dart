@@ -29,6 +29,7 @@ class AggregateSearchSectionState {
   int page = 0;
   int? maxPage;
   int requestToken = 0;
+  String taskGroupId = createSourceTaskId();
 }
 
 class AggregateSearchResultsController extends ChangeNotifier {
@@ -55,6 +56,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
   final SourceSearchGateway _sourceService;
   final AggregateSearchPageLoader? _loader;
   final List<AggregateSearchSectionState> sections;
+  final String _taskOwnerId = createSourceTaskId();
 
   String _keyword = '';
   SearchMessages? _lastMessages;
@@ -86,8 +88,10 @@ class AggregateSearchResultsController extends ChangeNotifier {
 
     _keyword = normalized;
     _lastMessages = messages;
+    final groupId = createSourceTaskId();
     for (final section in sections) {
       section
+        ..taskGroupId = groupId
         ..requestToken = section.requestToken + 1
         ..comics = const []
         ..errorMessage = null
@@ -134,6 +138,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
     section
       ..requestToken = section.requestToken + 1
       ..order = normalized
+      ..taskGroupId = createSourceTaskId()
       ..comics = const []
       ..errorMessage = null
       ..loading = true
@@ -174,6 +179,19 @@ class AggregateSearchResultsController extends ChangeNotifier {
     required bool append,
   }) async {
     final token = section.requestToken;
+    var timedOut = false;
+    final taskOrigin = SourceTaskOrigin(
+      ownerId: _taskOwnerId,
+      groupId: section.taskGroupId,
+      requestSequence: token,
+      resultDisposition: () {
+        if (_disposed) return SourceTaskResultDisposition.disposed;
+        if (timedOut) return SourceTaskResultDisposition.timedOut;
+        return _isCurrent(section, token)
+            ? SourceTaskResultDisposition.current
+            : SourceTaskResultDisposition.superseded;
+      },
+    );
     try {
       final sourceKey = section.source.normalizedKey;
       final order = section.order;
@@ -190,10 +208,14 @@ class AggregateSearchResultsController extends ChangeNotifier {
               page: page,
               order: order,
               sourceKey: sourceKey,
+              taskOrigin: taskOrigin,
             );
       final result = await request.timeout(
         searchLoadTimeout,
-        onTimeout: () => throw Exception(messages.timeout),
+        onTimeout: () {
+          timedOut = true;
+          throw Exception(messages.timeout);
+        },
       );
       if (!_isCurrent(section, token)) return;
 
@@ -257,6 +279,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
           previous
             ..requestToken = previous.requestToken + 1
             ..order = order
+            ..taskGroupId = createSourceTaskId()
             ..comics = const []
             ..errorMessage = null
             ..page = 0

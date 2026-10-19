@@ -22,6 +22,8 @@ set(BRIDGE_SOURCES
 set(BRIDGE_NAME quickjs_c_bridge_plugin)
 
 add_library(${BRIDGE_NAME} SHARED ${BRIDGE_SOURCES} ${QJS_SOURCES})
+find_package(Threads REQUIRED)
+target_link_libraries(${BRIDGE_NAME} PRIVATE Threads::Threads)
 
 target_include_directories(${BRIDGE_NAME} PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/cxx

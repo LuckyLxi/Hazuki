@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../models/source_contract_models.dart';
+import '../models/source_task.dart';
 
 abstract interface class SourceSearchGateway implements Listenable {
   String? get activeSourceKey;
@@ -18,6 +19,7 @@ abstract interface class SourceSearchGateway implements Listenable {
     required int page,
     String order = '',
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {

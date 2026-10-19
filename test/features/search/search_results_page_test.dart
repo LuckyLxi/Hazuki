@@ -43,6 +43,7 @@ void main() {
           when(() => history.add('Action')).thenAnswer((_) async {});
           when(
             () => source.searchComics(
+              taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
               keyword: any(named: 'keyword'),
               page: any(named: 'page'),
               order: any(named: 'order'),
@@ -166,6 +167,7 @@ void main() {
     verifyNever(() => history.add(any()));
     verifyNever(
       () => source.searchComics(
+        taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
         keyword: any(named: 'keyword'),
         page: any(named: 'page'),
         order: any(named: 'order'),
@@ -201,6 +203,7 @@ void main() {
         ).thenAnswer((_) => historyRecorded.future);
         when(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: any(named: 'keyword'),
             page: any(named: 'page'),
             order: any(named: 'order'),
@@ -231,6 +234,7 @@ void main() {
         expect(find.byKey(const ValueKey('search-loading')), findsOneWidget);
         verifyNever(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: any(named: 'keyword'),
             page: any(named: 'page'),
             order: any(named: 'order'),
@@ -243,6 +247,7 @@ void main() {
 
         verify(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: 'Action',
             page: 1,
             order: 'mr',

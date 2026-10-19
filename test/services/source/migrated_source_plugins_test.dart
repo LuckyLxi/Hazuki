@@ -35,19 +35,21 @@ Future<SourceRuntimeHandle> _loadPlugin(
   engine.setMessageHandler(
     (dynamic request) => bridge.handleJsMessageForHandle(handle, request),
   );
-  engine.evaluate(await File('assets/init.js').readAsString());
-  engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
-  engine.evaluate(
+  await engine.evaluate(await File('assets/init.js').readAsString());
+  await engine.evaluate(
+    await File('assets/hazuki_plugin_sdk.js').readAsString(),
+  );
+  await engine.evaluate(
     await File('test/fixtures/source_plugins/$id/main.js').readAsString(),
   );
-  final manifest = registeredSourcePluginManifest(engine).toJson();
+  final manifest = (await registeredSourcePluginManifest(engine)).toJson();
   handle.runtime.sourceMeta = SourceMeta(
     name: manifest['name'] as String,
     key: id,
     version: '1.0.1',
     supportsAccount: true,
     settingsDefaults: parseSourceSettingsDefaults(
-      engine.evaluate('source.settings'),
+      await engine.evaluate('source.settings'),
     ),
     presentation: Map<String, dynamic>.from(manifest['presentation'] as Map),
   );
@@ -99,7 +101,7 @@ void main() {
   test('JM login, profile, check-in and image segments live in the plugin', () async {
     final handle = await _loadPlugin('jm', _SiteFixtures());
     final engine = handle.runtime.engine!;
-    engine.evaluate(
+    await engine.evaluate(
       "jmRequest=async(method,path)=>path==='/login'?{uid:123}:path==='/daily_chk'?{msg:'签到成功'}:{daily_id:'today'};",
     );
     await handle.facade.js.resolve(
@@ -119,19 +121,19 @@ void main() {
       contains('/media/users/123.jpg'),
     );
     expect(
-      engine.evaluate(
+      await engine.evaluate(
         "source.comic.onImageLoad('https://img.example/a.jpg','1','250000').segments",
       ),
       10,
     );
     expect(
-      engine.evaluate(
+      await engine.evaluate(
         "source.comic.onImageLoad('https://img.example/a.jpg','1','100000').segments",
       ),
       0,
     );
     expect(
-      engine.evaluate(
+      await engine.evaluate(
         "source.comic.onImageLoad('https://img.example/a.gif?key=1','1','250000').segments",
       ),
       0,
@@ -178,17 +180,23 @@ void main() {
       final fixtures = _SiteFixtures();
       final handle = await _loadPlugin('copy_manga', fixtures);
       final engine = handle.runtime.engine!;
-      expect(engine.evaluate('copyBaseUrl()'), 'https://api.copy2000.online');
+      expect(
+        await engine.evaluate('copyBaseUrl()'),
+        'https://api.copy2000.online',
+      );
 
       await handle.facade.js.resolve(engine.evaluate('copyRefreshAppApi()'));
       expect(
-        engine.evaluate('copyBaseUrl()'),
+        await engine.evaluate('copyBaseUrl()'),
         'https://${fixtures.copyApiHost}',
       );
 
       fixtures.copyApiHost = 'next.fixture.example';
       await handle.facade.js.resolve(engine.evaluate('copyRefreshAppApi()'));
-      expect(engine.evaluate('copyBaseUrl()'), 'https://next.fixture.example');
+      expect(
+        await engine.evaluate('copyBaseUrl()'),
+        'https://next.fixture.example',
+      );
 
       await handle.facade.saveSourceSetting(
         'copy_manga',
@@ -198,7 +206,7 @@ void main() {
       fixtures.copyApiHost = 'another.fixture.example';
       await handle.facade.js.resolve(engine.evaluate('copyRefreshAppApi()'));
       expect(
-        engine.evaluate('copyBaseUrl()'),
+        await engine.evaluate('copyBaseUrl()'),
         'https://custom.fixture.example',
       );
     },

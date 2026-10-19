@@ -9,6 +9,7 @@ import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
 import '../runtime/source_runtime_operations.dart';
 import '../runtime/source_runtime_view.dart';
+import '../models/source_task.dart';
 import 'hazuki_source_adapter_base.dart';
 
 class HazukiSourceImageAdapter implements SourceImageGateway {
@@ -176,11 +177,13 @@ class HazukiSourceDailyRecommendationAdapter
     required int page,
     String order = '',
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _content.searchComics(
     keyword: keyword,
     page: page,
     order: order,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<ComicDetailsData> loadComicDetails(

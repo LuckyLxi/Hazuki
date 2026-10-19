@@ -42,16 +42,18 @@ class SourceDailyCheckInCapability {
   Future<bool> isCompletedToday() async {
     if (!_supports) return false;
     final facade = _facade;
-    await facade.ensureInitialized();
-    if (!facade.isLogged) return false;
-    final result = await facade.js.resolve(
-      facade.js.engine!.evaluate(
-        'this.__hazuki_source.account?.checkInStatus?.()',
-      ),
-    );
-    if (result is bool) return result;
-    return facade.loadSourceData(facade.sourceKey, 'lastCheckInDate') ==
-        dailyCheckInDateTag(DateTime.now());
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      if (!facade.isLogged) return false;
+      final result = await facade.js.resolve(
+        facade.js.engine!.evaluate(
+          'this.__hazuki_source.account?.checkInStatus?.()',
+        ),
+      );
+      if (result is bool) return result;
+      return facade.loadSourceData(facade.sourceKey, 'lastCheckInDate') ==
+          dailyCheckInDateTag(DateTime.now());
+    });
   }
 
   Future<DailyCheckInResult> perform() async {
@@ -59,29 +61,31 @@ class SourceDailyCheckInCapability {
       return const DailyCheckInResult.skipped();
     }
     final facade = _facade;
-    await facade.ensureInitialized();
-    final result = await _reloginCoordinator.runWithReloginRetry(
-      () => facade.js.resolve(
-        facade.js.engine!.evaluate('this.__hazuki_source.account.checkIn()'),
-      ),
-      context: SourceFacadeReloginContext(facade),
-    );
-    if (result is! Map) throw StateError('plugin_invalid_check_in_result');
-    final message = result['message']?.toString();
-    if (result['status'] == 'skipped') {
-      return const DailyCheckInResult.skipped();
-    }
-    if (result['status'] != 'success' &&
-        result['status'] != 'alreadyCheckedIn') {
-      throw StateError('plugin_invalid_check_in_result');
-    }
-    await facade.saveSourceData(
-      facade.sourceKey,
-      'lastCheckInDate',
-      dailyCheckInDateTag(DateTime.now()),
-    );
-    return result['status'] == 'alreadyCheckedIn'
-        ? DailyCheckInResult.alreadyCheckedIn(message)
-        : DailyCheckInResult.success(message);
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      final result = await _reloginCoordinator.runWithReloginRetry(
+        () async => facade.js.resolve(
+          facade.js.engine!.evaluate('this.__hazuki_source.account.checkIn()'),
+        ),
+        context: SourceFacadeReloginContext(facade),
+      );
+      if (result is! Map) throw StateError('plugin_invalid_check_in_result');
+      final message = result['message']?.toString();
+      if (result['status'] == 'skipped') {
+        return const DailyCheckInResult.skipped();
+      }
+      if (result['status'] != 'success' &&
+          result['status'] != 'alreadyCheckedIn') {
+        throw StateError('plugin_invalid_check_in_result');
+      }
+      await facade.saveSourceData(
+        facade.sourceKey,
+        'lastCheckInDate',
+        dailyCheckInDateTag(DateTime.now()),
+      );
+      return result['status'] == 'alreadyCheckedIn'
+          ? DailyCheckInResult.alreadyCheckedIn(message)
+          : DailyCheckInResult.success(message);
+    });
   }
 }

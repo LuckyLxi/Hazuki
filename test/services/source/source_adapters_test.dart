@@ -94,15 +94,18 @@ void main() {
       adapter.addListener(onChanged);
 
       runtime.runtimeRegistry.notifyChanged();
+      final origin = SourceTaskOrigin.standalone();
       await adapter.searchComics(
         keyword: 'hazuki',
         page: 2,
         order: 'vd',
         sourceKey: 'picacg',
+        taskOrigin: origin,
       );
 
       expect(notifications, 1);
       expect(content.searchCalls, [('hazuki', 2, 'vd', 'picacg')]);
+      expect(content.searchOrigins.single, same(origin));
 
       adapter.removeListener(onChanged);
       runtime.runtimeRegistry.notifyChanged();
@@ -192,6 +195,7 @@ class _FakeRuntimeRegistry extends ChangeNotifier
 
 class _FakeContentOperations implements SourceContentOperations {
   final searchCalls = <(String, int, String, String)>[];
+  final searchOrigins = <SourceTaskOrigin?>[];
 
   @override
   Future<SearchComicsResult> searchComics({
@@ -199,8 +203,10 @@ class _FakeContentOperations implements SourceContentOperations {
     required int page,
     String order = 'mr',
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     searchCalls.add((keyword, page, order, sourceKey));
+    searchOrigins.add(taskOrigin);
     return const SearchComicsResult(comics: [], maxPage: 0);
   }
 

@@ -345,6 +345,7 @@ class _SearchCountingContent implements SourceContentOperations {
     required int page,
     String order = 'mr',
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _source.searchComics(
     keyword: keyword,
     page: page,

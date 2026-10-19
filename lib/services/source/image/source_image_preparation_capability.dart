@@ -6,6 +6,7 @@ import '../common/source_json_coerce.dart';
 
 import '../models/source_contract_models.dart';
 import '../runtime/source_runtime_host.dart';
+import '../runtime/source_runtime_handle.dart';
 
 typedef SourceImageBytesDownloader =
     Future<Uint8List> Function(
@@ -55,69 +56,72 @@ class SourceImagePreparationCapability {
     bool priority = false,
     String sourceKey = '',
   }) async {
-    var rawBytes = await _downloadImageBytes(
-      imageUrl,
-      comicId: comicId,
-      epId: epId,
-      keepInMemory: false,
-      useDiskCache: useDiskCache,
-      priority: priority,
-      sourceKey: sourceKey,
-    );
-    final declaredSegments = await _resolveSourceDeclaredImageSegments(
-      imageUrl,
-      comicId: comicId,
-      epId: epId,
-      sourceKey: sourceKey,
-    );
-    var sourceExtension = imageExtensionFromUrl(imageUrl);
-    var transformed = false;
-    final handle = _runtimeHost.handleFor(_resolveSourceKey(sourceKey));
-    final engine = handle.runtime.engine;
-    if (engine?.evaluate(
-          'typeof this.__hazuki_source.comic?.transformImageBytes === "function"',
-        ) ==
-        true) {
-      final pending = engine!.invoke(
-        '(bytes,url,id,ep)=>Promise.resolve(this.__hazuki_source.comic.transformImageBytes(new Uint8Array(bytes),url,id,ep)).then(result=>{const v=result?.bytes;return ArrayBuffer.isView(v)?{...result,bytes:v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)}:result})',
-        [rawBytes, imageUrl, comicId, epId],
+    final resolvedKey = _resolveSourceKey(sourceKey);
+    final handle = _runtimeHost.handleFor(resolvedKey);
+    return handle.runOperation(() async {
+      var rawBytes = await _downloadImageBytes(
+        imageUrl,
+        comicId: comicId,
+        epId: epId,
+        keepInMemory: false,
+        useDiskCache: useDiskCache,
+        priority: priority,
+        sourceKey: resolvedKey,
       );
-      final result = await handle.facade.js.resolve(pending);
-      if (result is! Map || result['bytes'] == null) {
-        throw StateError('plugin_invalid_image_transform');
-      }
-      rawBytes = jsToBytes(result['bytes']);
-      if (rawBytes.isEmpty) throw StateError('plugin_empty_image_transform');
-      final extension = result['extension']?.toString();
-      if (extension != null) {
-        if (!RegExp(r'^[a-zA-Z0-9]{1,8}$').hasMatch(extension)) {
-          throw StateError('plugin_invalid_image_extension');
+      final declaredSegments = await _resolveSourceDeclaredImageSegments(
+        imageUrl,
+        comicId: comicId,
+        epId: epId,
+        handle: handle,
+      );
+      var sourceExtension = imageExtensionFromUrl(imageUrl);
+      var transformed = false;
+      final engine = handle.runtime.engine;
+      if (await engine?.evaluate(
+            'typeof this.__hazuki_source.comic?.transformImageBytes === "function"',
+          ) ==
+          true) {
+        final pending = await engine!.invoke(
+          '(bytes,url,id,ep)=>Promise.resolve(this.__hazuki_source.comic.transformImageBytes(new Uint8Array(bytes),url,id,ep)).then(result=>{const v=result?.bytes;return ArrayBuffer.isView(v)?{...result,bytes:v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)}:result})',
+          [rawBytes, imageUrl, comicId, epId],
+        );
+        final result = await handle.facade.js.resolve(pending);
+        if (result is! Map || result['bytes'] == null) {
+          throw StateError('plugin_invalid_image_transform');
         }
-        sourceExtension = extension.toLowerCase();
+        rawBytes = jsToBytes(result['bytes']);
+        if (rawBytes.isEmpty) throw StateError('plugin_empty_image_transform');
+        final extension = result['extension']?.toString();
+        if (extension != null) {
+          if (!RegExp(r'^[a-zA-Z0-9]{1,8}$').hasMatch(extension)) {
+            throw StateError('plugin_invalid_image_extension');
+          }
+          sourceExtension = extension.toLowerCase();
+        }
+        transformed = true;
       }
-      transformed = true;
-    }
-    final segments = declaredSegments != null && declaredSegments > 1
-        ? declaredSegments
-        : 0;
-    if (segments > 1 && sourceExtension != 'gif') {
-      final fixed = await _reverseVerticalImageTiles(
-        rawBytes,
-        segments,
-        fallbackExtension: sourceExtension,
-      );
+      final segments = declaredSegments != null && declaredSegments > 1
+          ? declaredSegments
+          : 0;
+      if (segments > 1 && sourceExtension != 'gif') {
+        final fixed = await _reverseVerticalImageTiles(
+          rawBytes,
+          segments,
+          fallbackExtension: sourceExtension,
+        );
+        return PreparedChapterImageData(
+          bytes: fixed.bytes,
+          extension: fixed.extension,
+          wasProcessed: true,
+          aspectRatio: fixed.aspectRatio,
+        );
+      }
       return PreparedChapterImageData(
-        bytes: fixed.bytes,
-        extension: fixed.extension,
-        wasProcessed: true,
-        aspectRatio: fixed.aspectRatio,
+        bytes: rawBytes,
+        extension: sourceExtension,
+        wasProcessed: transformed,
       );
-    }
-    return PreparedChapterImageData(
-      bytes: rawBytes,
-      extension: sourceExtension,
-      wasProcessed: transformed,
-    );
+    });
   }
 
   String _resolveSourceKey(String sourceKey) => sourceKey.trim().isEmpty
@@ -128,15 +132,13 @@ class SourceImagePreparationCapability {
     String imageUrl, {
     required String comicId,
     required String epId,
-    required String sourceKey,
+    required SourceRuntimeHandle handle,
   }) async {
     try {
-      final facade = _runtimeHost
-          .handleFor(_resolveSourceKey(sourceKey))
-          .facade;
+      final facade = handle.facade;
       final engine = facade.js.engine;
       if (engine == null) return null;
-      final dynamic configRaw = engine.evaluate(
+      final dynamic configRaw = await engine.evaluate(
         'this.__hazuki_source.comic?.onImageLoad?.(${jsonEncode(imageUrl)}, ${jsonEncode(comicId)}, ${jsonEncode(epId)}) ?? {}',
         name: 'source_on_image_prepare.js',
       );

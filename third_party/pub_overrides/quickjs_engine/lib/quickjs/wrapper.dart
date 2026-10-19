@@ -70,6 +70,19 @@ Pointer<JSValue> _dartToJs(
   }
   if (val is _JSObject) return jsDupValue(ctx, val._val!);
   if (val is Future) {
+    final futureRuntime = jsGetRuntime(ctx);
+    final futureTask = jsGetTaskContext(futureRuntime);
+    jsRetainTaskContext(futureRuntime, futureTask);
+    void settle(_JSFunction callback, dynamic value) {
+      final previous = jsGetTaskContext(futureRuntime);
+      jsSetTaskContext(futureRuntime, futureTask);
+      try {
+        callback.invoke([value]);
+      } finally {
+        jsSetTaskContext(futureRuntime, previous);
+      }
+    }
+
     final resolvingFunc = malloc<Uint8>(sizeOfJSValue * 2).cast<JSValue>();
     final resolvingFunc2 = Pointer<JSValue>.fromAddress(
       resolvingFunc.address + sizeOfJSValue,
@@ -87,15 +100,16 @@ Pointer<JSValue> _dartToJs(
     val
         .then(
           (value) {
-            res.invoke([value]);
+            settle(res, value);
           },
           onError: (e) {
-            rej.invoke([e]);
+            settle(rej, e);
           },
         )
         .whenComplete(() {
           refRes.free();
           refRej.free();
+          jsReleaseTaskContext(futureRuntime, futureTask);
         });
     return ret;
   }

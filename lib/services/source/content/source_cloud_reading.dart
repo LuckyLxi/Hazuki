@@ -141,6 +141,10 @@ class SourceCloudReadingCapability extends ChangeNotifier
     handle?.loginCancellation?.cancel();
     handle?.dio.close(force: true);
     handle?.requestDispose();
+    // Only the private reading runtime is retired; the owner's shared runtime
+    // keeps serving its admitted reading, search and download operations.
+    final closing = handle?.runtime.engine?.close();
+    closing?.ignore();
   }
 
   Future<SourceRuntimeHandle> _reader(SourceRuntimeHandle owner) {
@@ -234,7 +238,7 @@ class SourceCloudReadingCapability extends ChangeNotifier
   }
 
   bool _declares(SourceRuntimeHandle h, String method) =>
-      h.runtime.engine?.evaluate(
+      h.runtime.engine?.cachedValue(
         'typeof globalThis.__hazuki_source.comic?.$method === "function"',
       ) ==
       true;

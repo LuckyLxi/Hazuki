@@ -11,6 +11,7 @@ typedef SourceNetworkLogAppender =
       Object? requestData,
       Map<String, dynamic>? responseHeaders,
       Object? responseBody,
+      Map<String, Object?>? taskContext,
     });
 
 class SourceNetworkLogSink {
@@ -30,6 +31,7 @@ class SourceNetworkLogSink {
     Object? requestData,
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
+    Map<String, Object?>? taskContext,
   }) => _append(
     method: method,
     url: url,
@@ -42,5 +44,6 @@ class SourceNetworkLogSink {
     requestData: requestData,
     responseHeaders: responseHeaders,
     responseBody: responseBody,
+    taskContext: taskContext,
   );
 }

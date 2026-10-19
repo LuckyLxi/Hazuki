@@ -125,7 +125,7 @@ void main() {
           );
         }
         expect(
-          assembly.testing
+          await assembly.testing
               .handleFor('website')
               .runtime
               .engine!
@@ -144,7 +144,7 @@ void main() {
           hasLength(count),
         );
         expect(
-          assembly.testing
+          await assembly.testing
               .handleFor('website')
               .runtime
               .engine!

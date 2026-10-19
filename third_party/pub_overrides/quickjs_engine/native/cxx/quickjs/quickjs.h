@@ -1211,6 +1211,13 @@ JS_EXTERN int JS_EnqueueJob(JSContext *ctx, JSJobFunc *job_func,
                             int argc, JSValueConst *argv);
 
 JS_EXTERN bool JS_IsJobPending(JSRuntime *rt);
+/* Hazuki: async task ownership; accessed only by the runtime's owner thread. */
+typedef void JSHostTaskReference(JSRuntime *rt, uint64_t token, int delta, void *opaque);
+JS_EXTERN void JS_SetHostTaskReference(JSRuntime *rt, JSHostTaskReference *callback, void *opaque);
+JS_EXTERN uint64_t JS_GetHostTaskContext(JSRuntime *rt);
+JS_EXTERN void JS_SetHostTaskContext(JSRuntime *rt, uint64_t token);
+JS_EXTERN void JS_RetainHostTaskContext(JSRuntime *rt, uint64_t token);
+JS_EXTERN void JS_ReleaseHostTaskContext(JSRuntime *rt, uint64_t token);
 JS_EXTERN JSContext *JS_GetPendingJobContext(JSRuntime *rt);
 JS_EXTERN int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx);
 

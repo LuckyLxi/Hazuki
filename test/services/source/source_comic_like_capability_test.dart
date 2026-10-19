@@ -56,30 +56,33 @@ void main() {
 
   test(
     'detects callable likeComic after initialization without a display flag or source ID',
-    () {
+    () async {
       expect(capability.supportComicLikeForSource('arbitrary'), isFalse);
       final engine = engineFor('arbitrary');
-      engine.evaluate(
+      await engine.evaluate(
         'globalThis.__hazuki_source = {comic:{likeComic:async()=>{}}}',
       );
       expect(capability.supportComicLikeForSource('arbitrary'), isTrue);
       expect(capability.supportComicLike, isTrue);
       expect(capability.supportComicLikeForSource('other'), isFalse);
       expect(capability.supportComicLikeForSource('missing'), isFalse);
-      engine.evaluate('delete this.__hazuki_source.comic.likeComic');
+      await engine.evaluate('delete this.__hazuki_source.comic.likeComic');
       expect(capability.supportComicLikeForSource('arbitrary'), isFalse);
     },
   );
 
-  test('truthy values and legacy display flags cannot enable a like button', () {
-    final engine = engineFor('other');
-    for (final value in ['true', '"enabled"', '{}', '1', 'null']) {
-      engine.evaluate(
-        'globalThis.__hazuki_source = {comic:{likeComic:$value},presentation:{showComicLike:true}}',
-      );
-      expect(capability.supportComicLikeForSource('other'), isFalse);
-    }
-  });
+  test(
+    'truthy values and legacy display flags cannot enable a like button',
+    () async {
+      final engine = engineFor('other');
+      for (final value in ['true', '"enabled"', '{}', '1', 'null']) {
+        await engine.evaluate(
+          'globalThis.__hazuki_source = {comic:{likeComic:$value},presentation:{showComicLike:true}}',
+        );
+        expect(capability.supportComicLikeForSource('other'), isFalse);
+      }
+    },
+  );
 
   test(
     'like and unlike call the target plugin even when another source is active',
@@ -89,7 +92,7 @@ void main() {
         'globalThis.__hazuki_source={comic:{likeComic:()=>{throw "wrong_source"}}}',
       );
       final target = engineFor('other');
-      target.evaluate(
+      await target.evaluate(
         'globalThis.likeCalls=[]; globalThis.__hazuki_source={comic:{likeComic:async(id,liked)=>{likeCalls.push([id,liked]);}}}',
       );
       await capability.toggleComicLike(
@@ -103,7 +106,7 @@ void main() {
         sourceKey: 'other',
       );
       expect(
-        target.evaluate('JSON.stringify(likeCalls)'),
+        await target.evaluate('JSON.stringify(likeCalls)'),
         '[["comic\\"id",true],["comic\\"id",false]]',
       );
       expect(host.activeSourceKey, 'arbitrary');

@@ -49,45 +49,49 @@ class SourceFavoriteComicsLoader {
     required int page,
     required String folderId,
   }) async {
-    final engine = facade.js.engine;
-    if (engine == null) throw Exception('source_not_initialized');
-    final hasFavorites = facade.js.asBool(
-      engine.evaluate('!!this.__hazuki_source.favorites'),
-    );
-    if (!hasFavorites) throw Exception('favorites_not_supported');
-    final hasLoadComics = facade.js.asBool(
-      engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
-    );
-    final hasLoadNext = facade.js.asBool(
-      engine.evaluate('!!this.__hazuki_source.favorites?.loadNext'),
-    );
-    if (!hasLoadComics && !hasLoadNext) {
-      throw Exception('favorite_comics_loading_not_supported');
-    }
-    final normalizedFolderId = SourceFavoritesResponseParser.normalizeFolderId(
-      folderId,
-    );
-    if (!hasLoadComics) {
-      final comics = await _loadNext(facade, normalizedFolderId);
-      return (SourceFavoritesResponseParser.mergeComics(comics), null);
-    }
-    if (normalizedFolderId != '0') {
-      final loaded = await _loadComics(
-        facade: facade,
-        page: page,
-        folderId: normalizedFolderId,
-        scriptName: 'source_favorite_comics.js',
+    return facade.handle.runOperation(() async {
+      final engine = facade.js.engine;
+      if (engine == null) throw Exception('source_not_initialized');
+      final hasFavorites = facade.js.asBool(
+        await engine.evaluate('!!this.__hazuki_source.favorites'),
       );
-      return (SourceFavoritesResponseParser.mergeComics(loaded.$1), loaded.$2);
-    }
-    return _loadAllComics(facade: facade, page: page);
+      if (!hasFavorites) throw Exception('favorites_not_supported');
+      final hasLoadComics = facade.js.asBool(
+        await engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
+      );
+      final hasLoadNext = facade.js.asBool(
+        await engine.evaluate('!!this.__hazuki_source.favorites?.loadNext'),
+      );
+      if (!hasLoadComics && !hasLoadNext) {
+        throw Exception('favorite_comics_loading_not_supported');
+      }
+      final normalizedFolderId =
+          SourceFavoritesResponseParser.normalizeFolderId(folderId);
+      if (!hasLoadComics) {
+        final comics = await _loadNext(facade, normalizedFolderId);
+        return (SourceFavoritesResponseParser.mergeComics(comics), null);
+      }
+      if (normalizedFolderId != '0') {
+        final loaded = await _loadComics(
+          facade: facade,
+          page: page,
+          folderId: normalizedFolderId,
+          scriptName: 'source_favorite_comics.js',
+        );
+        return (
+          SourceFavoritesResponseParser.mergeComics(loaded.$1),
+          loaded.$2,
+        );
+      }
+      return _loadAllComics(facade: facade, page: page);
+    });
   }
 
   Future<List<ExploreComic>> _loadNext(
     HazukiSourceFacade facade,
     String folderId,
   ) async {
-    final raw = facade.js.engine!.evaluate(
+    final raw = await facade.js.engine!.evaluate(
       _scriptFactory.loadNext(cursor: null, folderId: folderId),
       name: 'source_favorite_next.js',
     );
@@ -142,10 +146,10 @@ class SourceFavoriteComicsLoader {
   Future<List<String>> _loadFallbackFolderIds(HazukiSourceFacade facade) async {
     final engine = facade.js.engine!;
     final hasLoadFolders = facade.js.asBool(
-      engine.evaluate('!!this.__hazuki_source.favorites?.loadFolders'),
+      await engine.evaluate('!!this.__hazuki_source.favorites?.loadFolders'),
     );
     if (!hasLoadFolders) return const [];
-    final raw = engine.evaluate(
+    final raw = await engine.evaluate(
       _scriptFactory.loadFolders(null),
       name: 'source_favorite_folders_for_all.js',
     );
@@ -177,7 +181,7 @@ class SourceFavoriteComicsLoader {
     required String? folderId,
     required String scriptName,
   }) async {
-    final raw = facade.js.engine!.evaluate(
+    final raw = await facade.js.engine!.evaluate(
       _scriptFactory.loadComics(page: page, folderId: folderId),
       name: scriptName,
     );

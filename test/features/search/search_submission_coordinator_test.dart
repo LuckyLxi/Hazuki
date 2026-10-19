@@ -223,6 +223,7 @@ void main() {
         );
         when(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: '12345',
             page: 1,
             order: '',
@@ -243,6 +244,7 @@ void main() {
       for (final key in ['jm', 'books']) {
         verify(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: '12345',
             page: 1,
             order: '',

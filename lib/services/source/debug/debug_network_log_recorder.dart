@@ -19,6 +19,7 @@ class DebugNetworkLogRecorder {
     Object? requestData,
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
+    Map<String, Object?>? taskContext,
   }) {
     final endedAt = DateTime.now();
     final durationMs = endedAt.difference(startedAt).inMilliseconds;
@@ -35,6 +36,7 @@ class DebugNetworkLogRecorder {
       durationMs: durationMs,
     );
     final data = <String, dynamic>{
+      'task': ?taskContext,
       'method': method,
       'url': url,
       'statusCode': statusCode,

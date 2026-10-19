@@ -46,9 +46,11 @@ Future<SourceScriptEngine> _installRuntime(SourceRuntimeHandle handle) async {
   engine.setMessageHandler(
     (dynamic message) => bridge.handleJsMessageForHandle(handle, message),
   );
-  engine.evaluate(await File('assets/init.js').readAsString());
-  engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
-  engine.evaluate('''
+  await engine.evaluate(await File('assets/init.js').readAsString());
+  await engine.evaluate(
+    await File('assets/hazuki_plugin_sdk.js').readAsString(),
+  );
+  await engine.evaluate('''
 Hazuki.registerSource({
   id: ${jsonEncode(handle.sourceKey)}, translation: ${jsonEncode(_translation)},
   search: {load: async () => ({comics: []})},
@@ -87,7 +89,7 @@ void main() {
         expected,
       );
       expect(
-        engine.evaluate(
+        await engine.evaluate(
           '__hazukiLocalizeText(${jsonEncode(text)}, ${jsonEncode(_translation)}, ${jsonEncode(locale)})',
         ),
         expected,
@@ -122,13 +124,16 @@ void main() {
         ('zh', 'zh_CN', '你好', '语言翻译'),
       ]) {
         await prefs.setString(hazukiLocalePreferenceKey, language);
-        expect(engine.evaluate('Hazuki.locale'), tag);
-        expect(engine.evaluate('APP.locale'), tag);
-        expect(engine.evaluate("Hazuki.translate('Greeting')"), greeting);
-        expect(engine.evaluate("legacy.translate('Greeting')"), greeting);
-        expect(engine.evaluate("Hazuki.translate('Language only')"), fallback);
+        expect(await engine.evaluate('Hazuki.locale'), tag);
+        expect(await engine.evaluate('APP.locale'), tag);
+        expect(await engine.evaluate("Hazuki.translate('Greeting')"), greeting);
+        expect(await engine.evaluate("legacy.translate('Greeting')"), greeting);
         expect(
-          engine.evaluate("Hazuki.translate({zh:'中文',en:'English'})"),
+          await engine.evaluate("Hazuki.translate('Language only')"),
+          fallback,
+        );
+        expect(
+          await engine.evaluate("Hazuki.translate({zh:'中文',en:'English'})"),
           language == 'zh' ? '中文' : 'English',
         );
       }

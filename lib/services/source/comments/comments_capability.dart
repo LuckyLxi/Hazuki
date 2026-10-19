@@ -44,69 +44,71 @@ class SourceCommentsCapability {
   }) async {
     final resolvedSourceKey = _resolveSourceKey(sourceKey);
     final facade = _facadeFor(resolvedSourceKey);
-    await facade.ensureInitialized();
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final subIdArg = subId == null ? 'null' : jsonEncode(subId);
-    final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
-    final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
-    final orderArg = jsonEncode(
-      commentSortOptionsForSource(resolvedSourceKey).normalize(order),
-    );
-    final hasChapterComments =
-        chapterId?.isNotEmpty == true &&
-        facade.js.asBool(
-          facade.js.evaluate(
-            '!!this.__hazuki_source.comic?.loadChapterComments',
-          ),
+      final subIdArg = subId == null ? 'null' : jsonEncode(subId);
+      final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
+      final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
+      final orderArg = jsonEncode(
+        commentSortOptionsForSource(resolvedSourceKey).normalize(order),
+      );
+      final hasChapterComments =
+          chapterId?.isNotEmpty == true &&
+          facade.js.asBool(
+            await engine.evaluate(
+              '!!this.__hazuki_source.comic?.loadChapterComments',
+            ),
+          );
+      final dynamic result = await engine.evaluate(
+        hasChapterComments
+            ? 'this.__hazuki_source.comic.loadChapterComments(${jsonEncode(comicId)}, $chapterIdArg, $page, $replyToArg, $orderArg)'
+            : 'this.__hazuki_source.comic.loadComments(${jsonEncode(comicId)}, $subIdArg, $page, $replyToArg, $orderArg)',
+        name: 'source_comments.js',
+      );
+      final dynamic resolved = await facade.js.resolve(result);
+      if (resolved is! Map) {
+        return const ComicCommentsPageResult(comments: [], maxPage: null);
+      }
+
+      final resultMap = Map<String, dynamic>.from(resolved);
+      final commentsRaw = resultMap['comments'];
+      if (commentsRaw is! List) {
+        return ComicCommentsPageResult(
+          comments: const [],
+          maxPage: jsAsInt(resultMap['maxPage']),
         );
-    final dynamic result = engine.evaluate(
-      hasChapterComments
-          ? 'this.__hazuki_source.comic.loadChapterComments(${jsonEncode(comicId)}, $chapterIdArg, $page, $replyToArg, $orderArg)'
-          : 'this.__hazuki_source.comic.loadComments(${jsonEncode(comicId)}, $subIdArg, $page, $replyToArg, $orderArg)',
-      name: 'source_comments.js',
-    );
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! Map) {
-      return const ComicCommentsPageResult(comments: [], maxPage: null);
-    }
+      }
 
-    final resultMap = Map<String, dynamic>.from(resolved);
-    final commentsRaw = resultMap['comments'];
-    if (commentsRaw is! List) {
+      final all = commentsRaw.whereType<Map>().map((e) {
+        final map = Map<String, dynamic>.from(e);
+        return ComicCommentData(
+          avatar: map['avatar']?.toString() ?? '',
+          userName: map['userName']?.toString() ?? '',
+          time: map['time']?.toString() ?? '',
+          content: map['content']?.toString() ?? '',
+          id: map['id']?.toString() ?? map['commentId']?.toString(),
+          replyCount: jsAsInt(map['replyCount']),
+          isLiked: map['isLiked'] is bool ? map['isLiked'] as bool : null,
+          score: jsAsInt(map['score']),
+          voteStatus: jsAsInt(map['voteStatus']),
+        );
+      }).toList();
+
+      final comments = (pageSize <= 0 || all.length <= pageSize)
+          ? all
+          : all.sublist(0, pageSize);
+
       return ComicCommentsPageResult(
-        comments: const [],
+        comments: comments,
         maxPage: jsAsInt(resultMap['maxPage']),
       );
-    }
-
-    final all = commentsRaw.whereType<Map>().map((e) {
-      final map = Map<String, dynamic>.from(e);
-      return ComicCommentData(
-        avatar: map['avatar']?.toString() ?? '',
-        userName: map['userName']?.toString() ?? '',
-        time: map['time']?.toString() ?? '',
-        content: map['content']?.toString() ?? '',
-        id: map['id']?.toString() ?? map['commentId']?.toString(),
-        replyCount: jsAsInt(map['replyCount']),
-        isLiked: map['isLiked'] is bool ? map['isLiked'] as bool : null,
-        score: jsAsInt(map['score']),
-        voteStatus: jsAsInt(map['voteStatus']),
-      );
-    }).toList();
-
-    final comments = (pageSize <= 0 || all.length <= pageSize)
-        ? all
-        : all.sublist(0, pageSize);
-
-    return ComicCommentsPageResult(
-      comments: comments,
-      maxPage: jsAsInt(resultMap['maxPage']),
-    );
+    });
   }
 
   Future<List<ComicCommentData>> loadComments({
@@ -148,40 +150,42 @@ class SourceCommentsCapability {
     String? replyTo,
   }) async {
     final facade = _facadeFor(sourceKey);
-    await facade.ensureInitialized();
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final text = content.trim();
-    if (text.isEmpty) {
-      throw Exception('comment_content_empty');
-    }
+      final text = content.trim();
+      if (text.isEmpty) {
+        throw Exception('comment_content_empty');
+      }
 
-    final subIdArg = subId == null ? 'null' : jsonEncode(subId);
-    final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
-    final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
+      final subIdArg = subId == null ? 'null' : jsonEncode(subId);
+      final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
+      final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
 
-    Future<void> runSend() async {
-      final hasChapterComments =
-          chapterId?.isNotEmpty == true &&
-          facade.js.asBool(
-            facade.js.evaluate(
-              '!!this.__hazuki_source.comic?.sendChapterComment',
-            ),
-          );
-      final dynamic result = engine.evaluate(
-        hasChapterComments
-            ? 'this.__hazuki_source.comic.sendChapterComment(${jsonEncode(comicId)}, $chapterIdArg, ${jsonEncode(text)}, $replyToArg)'
-            : 'this.__hazuki_source.comic.sendComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(text)}, $replyToArg)',
-        name: 'source_send_comment.js',
-      );
-      await facade.js.resolve(result);
-    }
+      Future<void> runSend() async {
+        final hasChapterComments =
+            chapterId?.isNotEmpty == true &&
+            facade.js.asBool(
+              await engine.evaluate(
+                '!!this.__hazuki_source.comic?.sendChapterComment',
+              ),
+            );
+        final dynamic result = await engine.evaluate(
+          hasChapterComments
+              ? 'this.__hazuki_source.comic.sendChapterComment(${jsonEncode(comicId)}, $chapterIdArg, ${jsonEncode(text)}, $replyToArg)'
+              : 'this.__hazuki_source.comic.sendComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(text)}, $replyToArg)',
+          name: 'source_send_comment.js',
+        );
+        await facade.js.resolve(result);
+      }
 
-    await _runWithReloginRetry(runSend, facade: facade);
+      await _runWithReloginRetry(runSend, facade: facade);
+    });
   }
 
   Future<void> likeComment({
@@ -192,24 +196,26 @@ class SourceCommentsCapability {
     required bool isLike,
   }) async {
     final facade = _facadeFor(sourceKey);
-    await facade.ensureInitialized();
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final subIdArg = subId == null ? 'null' : jsonEncode(subId);
+      final subIdArg = subId == null ? 'null' : jsonEncode(subId);
 
-    Future<void> runLike() async {
-      final dynamic result = engine.evaluate(
-        'this.__hazuki_source.comic.likeComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(commentId)}, $isLike)',
-        name: 'source_like_comment.js',
-      );
-      await facade.js.resolve(result);
-    }
+      Future<void> runLike() async {
+        final dynamic result = await engine.evaluate(
+          'this.__hazuki_source.comic.likeComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(commentId)}, $isLike)',
+          name: 'source_like_comment.js',
+        );
+        await facade.js.resolve(result);
+      }
 
-    await _runWithReloginRetry(runLike, facade: facade);
+      await _runWithReloginRetry(runLike, facade: facade);
+    });
   }
 
   bool supportCommentSendForSource(String sourceKey) {
@@ -219,7 +225,7 @@ class SourceCommentsCapability {
       return false;
     }
     return facade.js.asBool(
-      facade.js.evaluate('!!this.__hazuki_source.comic?.sendComment'),
+      facade.js.cachedValue('!!this.__hazuki_source.comic?.sendComment'),
     );
   }
 
@@ -230,7 +236,7 @@ class SourceCommentsCapability {
       return false;
     }
     return facade.js.asBool(
-      facade.js.evaluate('!!this.__hazuki_source.comic?.likeComment'),
+      facade.js.cachedValue('!!this.__hazuki_source.comic?.likeComment'),
     );
   }
 
@@ -242,7 +248,7 @@ class SourceCommentsCapability {
       return false;
     }
     return facade.js.asBool(
-      facade.js.evaluate(
+      facade.js.cachedValue(
         '!!this.__hazuki_source.comic?.loadComments && this.__hazuki_source.presentation?.commentReplies == true',
       ),
     );

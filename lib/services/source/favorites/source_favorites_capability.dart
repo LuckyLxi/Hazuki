@@ -160,72 +160,77 @@ class SourceFavoritesCapability {
     try {
       final resolvedSourceKey = _resolveSourceKey(sourceKey);
       final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
-      await facade.ensureInitialized();
-      final context = _reloginContext(facade);
-      final sessionReady = await _reloginCoordinator.ensureFavoriteSessionReady(
-        context,
-      );
-      if (!sessionReady) throw Exception('login_expired');
-      Future<(List<FavoriteFolder>, Set<String>)> runLoad() async {
-        final engine = facade.js.engine;
-        if (engine == null) throw Exception('source_not_initialized');
-        final hasFavorites = facade.js.asBool(
-          engine.evaluate('!!this.__hazuki_source.favorites'),
-        );
-        if (!hasFavorites) throw Exception('favorites_not_supported');
-        final hasLoadFolders = facade.js.asBool(
-          engine.evaluate('!!this.__hazuki_source.favorites?.loadFolders'),
-        );
-        if (!hasLoadFolders) {
-          final hasLoadComics = facade.js.asBool(
-            engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
+      return await facade.handle.runOperation(() async {
+        await facade.ensureInitialized();
+        final context = _reloginContext(facade);
+        final sessionReady = await _reloginCoordinator
+            .ensureFavoriteSessionReady(context);
+        if (!sessionReady) throw Exception('login_expired');
+        Future<(List<FavoriteFolder>, Set<String>)> runLoad() async {
+          final engine = facade.js.engine;
+          if (engine == null) throw Exception('source_not_initialized');
+          final hasFavorites = facade.js.asBool(
+            await engine.evaluate('!!this.__hazuki_source.favorites'),
           );
-          if (hasLoadComics) {
-            return (
-              const <FavoriteFolder>[
-                FavoriteFolder(id: '0', name: '__favorite_all__'),
-              ],
-              const <String>{},
-            );
-          }
-          throw Exception('favorite_folders_not_supported');
-        }
-        final dynamic raw = engine.evaluate(
-          _scriptFactory.loadFolders(comicId),
-          name: 'source_favorite_folders.js',
-        );
-        final dynamic resolved = await facade.js.resolve(raw);
-        if (resolved is! Map) {
-          throw Exception('favorite_folders_invalid_response');
-        }
-        final parsed = _responseParser.parseFolders(resolved);
-        final folders = parsed.folders;
-        final favorited = parsed.favoritedFolderIds;
-        final normalizedComicId = comicId?.trim() ?? '';
-        if (normalizedComicId.isNotEmpty &&
-            favorited.isEmpty &&
-            folders.any((folder) => folder.id != '0')) {
-          favorited.addAll(
-            await _inferFavoritedFolderIds(
-              engine: engine,
-              comicId: normalizedComicId,
-              folders: folders,
-              facade: facade,
-              sourceKey: resolvedSourceKey,
+          if (!hasFavorites) throw Exception('favorites_not_supported');
+          final hasLoadFolders = facade.js.asBool(
+            await engine.evaluate(
+              '!!this.__hazuki_source.favorites?.loadFolders',
             ),
           );
+          if (!hasLoadFolders) {
+            final hasLoadComics = facade.js.asBool(
+              await engine.evaluate(
+                '!!this.__hazuki_source.favorites?.loadComics',
+              ),
+            );
+            if (hasLoadComics) {
+              return (
+                const <FavoriteFolder>[
+                  FavoriteFolder(id: '0', name: '__favorite_all__'),
+                ],
+                const <String>{},
+              );
+            }
+            throw Exception('favorite_folders_not_supported');
+          }
+          final dynamic raw = await engine.evaluate(
+            _scriptFactory.loadFolders(comicId),
+            name: 'source_favorite_folders.js',
+          );
+          final dynamic resolved = await facade.js.resolve(raw);
+          if (resolved is! Map) {
+            throw Exception('favorite_folders_invalid_response');
+          }
+          final parsed = _responseParser.parseFolders(resolved);
+          final folders = parsed.folders;
+          final favorited = parsed.favoritedFolderIds;
+          final normalizedComicId = comicId?.trim() ?? '';
+          if (normalizedComicId.isNotEmpty &&
+              favorited.isEmpty &&
+              folders.any((folder) => folder.id != '0')) {
+            favorited.addAll(
+              await _inferFavoritedFolderIds(
+                engine: engine,
+                comicId: normalizedComicId,
+                folders: folders,
+                facade: facade,
+                sourceKey: resolvedSourceKey,
+              ),
+            );
+          }
+          return (folders, favorited);
         }
-        return (folders, favorited);
-      }
 
-      final result = await _reloginCoordinator.runWithReloginRetry(
-        runLoad,
-        context: context,
-      );
-      return FavoriteFoldersResult.success(
-        folders: result.$1,
-        favoritedFolderIds: result.$2,
-      );
+        final result = await _reloginCoordinator.runWithReloginRetry(
+          runLoad,
+          context: context,
+        );
+        return FavoriteFoldersResult.success(
+          folders: result.$1,
+          favoritedFolderIds: result.$2,
+        );
+      });
     } catch (error) {
       return FavoriteFoldersResult.error(error.toString());
     }
@@ -241,7 +246,7 @@ class SourceFavoritesCapability {
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty ||
         !facade.js.asBool(
-          engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
+          await engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
         )) {
       return const <String>{};
     }
@@ -254,7 +259,7 @@ class SourceFavoritesCapability {
           RegExp(r'[^A-Za-z0-9_-]'),
           '_',
         );
-        final dynamic raw = engine.evaluate(
+        final dynamic raw = await engine.evaluate(
           _scriptFactory.loadComics(page: page, folderId: folderId),
           name: 'source_favorite_folder_probe_${safeFolderId}_$page.js',
         );
@@ -266,21 +271,23 @@ class SourceFavoritesCapability {
 
   Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) async {
     final facade = _facadeForSource(sourceKey);
-    await facade.ensureInitialized();
-    await _reloginCoordinator.runWithReloginRetry(() async {
-      final engine = facade.js.engine;
-      if (engine == null) throw Exception('source_not_initialized');
-      if (!facade.js.asBool(
-        engine.evaluate('!!this.__hazuki_source.favorites?.addFolder'),
-      )) {
-        throw Exception('favorite_folder_creation_not_supported');
-      }
-      final dynamic result = engine.evaluate(
-        _scriptFactory.addFolder(name),
-        name: 'source_favorite_add_folder.js',
-      );
-      await facade.js.resolve(result);
-    }, context: _reloginContext(facade));
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      await _reloginCoordinator.runWithReloginRetry(() async {
+        final engine = facade.js.engine;
+        if (engine == null) throw Exception('source_not_initialized');
+        if (!facade.js.asBool(
+          await engine.evaluate('!!this.__hazuki_source.favorites?.addFolder'),
+        )) {
+          throw Exception('favorite_folder_creation_not_supported');
+        }
+        final dynamic result = await engine.evaluate(
+          _scriptFactory.addFolder(name),
+          name: 'source_favorite_add_folder.js',
+        );
+        await facade.js.resolve(result);
+      }, context: _reloginContext(facade));
+    });
   }
 
   Future<void> deleteFavoriteFolder(
@@ -288,21 +295,25 @@ class SourceFavoritesCapability {
     String sourceKey = '',
   }) async {
     final facade = _facadeForSource(sourceKey);
-    await facade.ensureInitialized();
-    await _reloginCoordinator.runWithReloginRetry(() async {
-      final engine = facade.js.engine;
-      if (engine == null) throw Exception('source_not_initialized');
-      if (!facade.js.asBool(
-        engine.evaluate('!!this.__hazuki_source.favorites?.deleteFolder'),
-      )) {
-        throw Exception('favorite_folder_deletion_not_supported');
-      }
-      final dynamic result = engine.evaluate(
-        _scriptFactory.deleteFolder(folderId),
-        name: 'source_favorite_delete_folder.js',
-      );
-      await facade.js.resolve(result);
-    }, context: _reloginContext(facade));
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      await _reloginCoordinator.runWithReloginRetry(() async {
+        final engine = facade.js.engine;
+        if (engine == null) throw Exception('source_not_initialized');
+        if (!facade.js.asBool(
+          await engine.evaluate(
+            '!!this.__hazuki_source.favorites?.deleteFolder',
+          ),
+        )) {
+          throw Exception('favorite_folder_deletion_not_supported');
+        }
+        final dynamic result = await engine.evaluate(
+          _scriptFactory.deleteFolder(folderId),
+          name: 'source_favorite_delete_folder.js',
+        );
+        await facade.js.resolve(result);
+      }, context: _reloginContext(facade));
+    });
   }
 
   Future<void> toggleFavorite({
@@ -315,39 +326,46 @@ class SourceFavoritesCapability {
     final normalizedComicId = comicId.trim();
     final resolvedSourceKey = _resolveSourceKey(sourceKey);
     final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
-    await facade.ensureInitialized();
-    await _reloginCoordinator.runWithReloginRetry(() async {
-      final engine = facade.js.engine;
-      if (engine == null) throw Exception('source_not_initialized');
-      if (!facade.js.asBool(
-        engine.evaluate('!!this.__hazuki_source.favorites'),
-      )) {
-        throw Exception('favorites_not_supported');
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      final originalEngine = facade.js.engine;
+      await _reloginCoordinator.runWithReloginRetry(() async {
+        final engine = facade.js.engine;
+        if (engine == null) throw Exception('source_not_initialized');
+        if (!facade.js.asBool(
+          await engine.evaluate('!!this.__hazuki_source.favorites'),
+        )) {
+          throw Exception('favorites_not_supported');
+        }
+        if (!facade.js.asBool(
+          await engine.evaluate(
+            '!!this.__hazuki_source.favorites?.addOrDelFavorite',
+          ),
+        )) {
+          throw Exception('favorite_toggle_not_supported');
+        }
+        final normalizedFolderId = normalizeFolderId(folderId);
+        final dynamic result = await engine.evaluate(
+          _scriptFactory.toggleFavorite(
+            comicId: comicId,
+            folderId: normalizedFolderId,
+            isAdding: isAdding,
+            favoriteId: favoriteId,
+          ),
+          name: 'source_toggle_favorite.js',
+        );
+        await facade.js.resolve(result);
+      }, context: _reloginContext(facade));
+      if (normalizedComicId.isNotEmpty &&
+          identical(facade.js.engine, originalEngine) &&
+          identical(_runtimeHost.handleFor(resolvedSourceKey).facade, facade)) {
+        _updateComicDetailsFavoriteState(
+          sourceKey: resolvedSourceKey,
+          comicId: normalizedComicId,
+          isFavorite: isAdding,
+        );
       }
-      if (!facade.js.asBool(
-        engine.evaluate('!!this.__hazuki_source.favorites?.addOrDelFavorite'),
-      )) {
-        throw Exception('favorite_toggle_not_supported');
-      }
-      final normalizedFolderId = normalizeFolderId(folderId);
-      final dynamic result = engine.evaluate(
-        _scriptFactory.toggleFavorite(
-          comicId: comicId,
-          folderId: normalizedFolderId,
-          isAdding: isAdding,
-          favoriteId: favoriteId,
-        ),
-        name: 'source_toggle_favorite.js',
-      );
-      await facade.js.resolve(result);
-    }, context: _reloginContext(facade));
-    if (normalizedComicId.isNotEmpty) {
-      _updateComicDetailsFavoriteState(
-        sourceKey: resolvedSourceKey,
-        comicId: normalizedComicId,
-        isFavorite: isAdding,
-      );
-    }
-    _notifyCloudFavoritesChanged();
+      _notifyCloudFavoritesChanged();
+    });
   }
 }

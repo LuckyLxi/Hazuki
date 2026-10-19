@@ -8,6 +8,7 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 extension ListFirstWhere<T> on Iterable<T> {
@@ -75,6 +76,7 @@ class JSChannelType {
   static const MODULE = 1;
   static const PROMISE_TRACK = 2;
   static const FREE_OBJECT = 3;
+  static const TASK_REFERENCE = 4;
 }
 
 class JSProp {
@@ -238,7 +240,8 @@ Pointer<JSValue> channelDispacher(
   int type,
   Pointer<JSValue> argv,
 ) {
-  final rt = type == JSChannelType.FREE_OBJECT
+  final rt =
+      type == JSChannelType.FREE_OBJECT || type == JSChannelType.TASK_REFERENCE
       ? ctx.cast<JSRuntime>()
       : jsGetRuntime(ctx);
   return runtimeOpaques[rt]!._channel(ctx, type, argv);
@@ -367,8 +370,9 @@ Pointer<JSValue> jsEval(
   Pointer<JSContext> ctx,
   String input,
   String filename,
-  int evalFlags,
-) {
+  int evalFlags, {
+  bool notifyJobs = true,
+}) {
   final utf8input = input.toNativeUtf8();
   final utf8filename = filename.toNativeUtf8();
   final val = _jsEval(
@@ -380,7 +384,7 @@ Pointer<JSValue> jsEval(
   );
   malloc.free(utf8input);
   malloc.free(utf8filename);
-  runtimeOpaques[jsGetRuntime(ctx)]?._port.sendPort.send(#eval);
+  if (notifyJobs) runtimeOpaques[jsGetRuntime(ctx)]?._port.sendPort.send(#eval);
   return val;
 }
 
@@ -851,3 +855,92 @@ jsFree = _qjsLib
       NativeFunction<Void Function(Pointer<JSContext>, Pointer<JSPropertyEnum>)>
     >('jsFree')
     .asFunction();
+
+final jsGetTaskContext = _qjsLib
+    .lookupFunction<
+      Uint64 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsGetTaskContext');
+final jsSetTaskContext = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Uint64),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsSetTaskContext');
+final jsRetainTaskContext = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Uint64),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsRetainTaskContext');
+final jsReleaseTaskContext = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Uint64),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsReleaseTaskContext');
+final jsRemainingExecutionMilliseconds = _qjsLib
+    .lookupFunction<
+      Int64 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsRemainingExecutionMilliseconds');
+
+/// A thread-safe byte mailbox. It never accesses a QuickJS runtime.
+class QuickJsHostReply {
+  static final _create = _qjsLib
+      .lookupFunction<Uint64 Function(), int Function()>('jsHostReplyCreate');
+  static final _complete = _qjsLib
+      .lookupFunction<
+        Int32 Function(Uint64, Pointer<Uint8>, IntPtr),
+        int Function(int, Pointer<Uint8>, int)
+      >('jsHostReplyComplete');
+  static final _close = _qjsLib
+      .lookupFunction<Void Function(Uint64), void Function(int)>(
+        'jsHostReplyClose',
+      );
+  static final _active = _qjsLib
+      .lookupFunction<Int32 Function(Uint64), int Function(int)>(
+        'jsHostReplyActive',
+      );
+  static final _count = _qjsLib
+      .lookupFunction<IntPtr Function(), int Function()>('jsHostReplyCount');
+  static final _wait = _qjsLib
+      .lookupFunction<
+        IntPtr Function(Uint64, Int64, Pointer<Pointer<Uint8>>),
+        int Function(int, int, Pointer<Pointer<Uint8>>)
+      >('jsHostReplyWait');
+  static final _free = _qjsLib
+      .lookupFunction<
+        Void Function(Pointer<Void>),
+        void Function(Pointer<Void>)
+      >('jsHostReplyFree');
+
+  static int create() => _create();
+  static bool active(int id) => _active(id) != 0;
+  static int get count => _count();
+  static void close(int id) => _close(id);
+
+  static bool complete(int id, Uint8List bytes) {
+    final buffer = malloc<Uint8>(bytes.length);
+    try {
+      buffer.asTypedList(bytes.length).setAll(0, bytes);
+      return _complete(id, buffer, bytes.length) != 0;
+    } finally {
+      malloc.free(buffer);
+    }
+  }
+
+  /// Only call on a worker isolate; the FFI call must remain non-leaf.
+  static Uint8List wait(int id, int milliseconds) {
+    final output = calloc<Pointer<Uint8>>();
+    try {
+      final size = _wait(id, milliseconds, output);
+      if (size < 0) {
+        throw StateError(
+          size == -2 ? 'host_bridge_timeout' : 'host_bridge_closed',
+        );
+      }
+      return Uint8List.fromList(output.value.asTypedList(size));
+    } finally {
+      if (output.value != nullptr) _free(output.value.cast());
+      calloc.free(output);
+    }
+  }
+}

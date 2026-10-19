@@ -7,7 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/l10n.dart';
 import '../../services/source/account/source_browser_authorization.dart';
 import '../../services/source/account/source_login_interaction.dart';
-import 'source_account_dialogs.dart';
+import 'source_account_dialog_support.dart';
 import 'source_authorization_browser.dart';
 import 'source_login_interaction_text.dart';
 import 'source_login_dialog_controller.dart';

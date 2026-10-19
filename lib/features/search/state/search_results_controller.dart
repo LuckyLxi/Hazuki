@@ -27,6 +27,8 @@ class SearchResultsController extends ChangeNotifier {
   final SearchPageLoader? _searchPageLoader;
   final SearchComicDetailsLoader? _comicDetailsLoader;
   final SourceSearchGateway _sourceService;
+  final String _taskOwnerId = createSourceTaskId();
+  String? _taskGroupId;
 
   String _searchKeyword = '';
   SearchMessages? _lastSearchMessages;
@@ -167,17 +169,38 @@ class SearchResultsController extends ChangeNotifier {
     required String keyword,
     required int page,
     required String order,
+    required String groupId,
+    required int requestToken,
   }) {
     final overrideLoader = _searchPageLoader;
     if (overrideLoader != null) {
       return overrideLoader(keyword: keyword, page: page, order: order);
     }
     final timeoutMessage = messages.timeout;
+    var timedOut = false;
+    final taskOrigin = SourceTaskOrigin(
+      ownerId: _taskOwnerId,
+      groupId: groupId,
+      requestSequence: requestToken,
+      resultDisposition: () {
+        if (_disposed) return SourceTaskResultDisposition.disposed;
+        if (timedOut) return SourceTaskResultDisposition.timedOut;
+        return isCurrentRequest(requestToken)
+            ? SourceTaskResultDisposition.current
+            : SourceTaskResultDisposition.superseded;
+      },
+    );
     return _sourceService
-        .searchComics(keyword: keyword, page: page, order: order)
+        .searchComics(
+          keyword: keyword,
+          page: page,
+          order: order,
+          taskOrigin: taskOrigin,
+        )
         .timeout(
           searchLoadTimeout,
           onTimeout: () {
+            timedOut = true;
             throw Exception(timeoutMessage);
           },
         );
@@ -205,6 +228,8 @@ class SearchResultsController extends ChangeNotifier {
 
     final requestToken = ++_searchRequestToken;
     final isLoadMore = append;
+    if (!append || _taskGroupId == null) _taskGroupId = createSourceTaskId();
+    final groupId = _taskGroupId!;
 
     _searchKeyword = normalized;
     _lastSearchMessages = messages;
@@ -243,6 +268,8 @@ class SearchResultsController extends ChangeNotifier {
             keyword: normalized,
             page: page,
             order: _searchOrder,
+            groupId: groupId,
+            requestToken: requestToken,
           );
           final hasRemainingAttempt = attempt + 1 < maxAttempts;
           if (result.comics.isNotEmpty || !hasRemainingAttempt) {

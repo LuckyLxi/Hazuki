@@ -36,7 +36,9 @@ class SourceLocalizationOperations {
       return localizeSourcePluginText(
         text,
         sourcePluginLocaleTag(handle.session.prefs),
-        translation: engine.evaluate('this.__hazuki_source.translation ?? {}'),
+        translation: engine.cachedValue(
+          'this.__hazuki_source.translation ?? {}',
+        ),
       );
     } catch (_) {
       return text;

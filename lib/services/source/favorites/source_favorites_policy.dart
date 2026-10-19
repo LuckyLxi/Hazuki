@@ -49,7 +49,7 @@ class SourceFavoritesPolicy {
   bool _evaluateForSource(String sourceKey, String expression) {
     final facade = _facadeForSource(sourceKey);
     final engine = facade.js.engine;
-    return engine != null && facade.js.asBool(engine.evaluate(expression));
+    return engine != null && facade.js.asBool(engine.cachedValue(expression));
   }
 
   bool get favoriteSingleFolderForSingleComic => _evaluateActive(
@@ -79,7 +79,8 @@ class SourceFavoritesPolicy {
     if (!_runtimeHost.hasActiveSource) return false;
     final facade = _activeFacade;
     final engine = facade.js.engine;
-    return engine != null && facade.js.asBool(facade.js.evaluate(expression));
+    return engine != null &&
+        facade.js.asBool(facade.js.cachedValue(expression));
   }
 
   Map<String, dynamic> get _options => _runtimeHost.runtimeRegistry

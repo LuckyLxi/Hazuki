@@ -75,39 +75,41 @@ class SourceLoginSideDataOperations {
     String? identity,
   ) async {
     final facade = handle.facade;
-    try {
-      final result = await (() async {
-        await facade.ensureInitialized();
-        final engine = handle.runtime.engine;
-        if (engine == null ||
-            engine.evaluate(
-                  'typeof this.__hazuki_source.account?.loadProfile === "function"',
-                ) !=
-                true) {
+    return facade.handle.runOperation(() async {
+      try {
+        final result = await (() async {
+          await facade.ensureInitialized();
+          final engine = handle.runtime.engine;
+          if (engine == null ||
+              await engine.evaluate(
+                    'typeof this.__hazuki_source.account?.loadProfile === "function"',
+                  ) !=
+                  true) {
+            return null;
+          }
+          return facade.js.resolve(
+            engine.evaluate('this.__hazuki_source.account.loadProfile()'),
+          );
+        })().timeout(_profileLoadTimeout);
+        // A completed request must not restore a profile after logout or runtime
+        // replacement. Timed-out requests never reach this persistence step.
+        if (!_runtimeHost.isCurrentHandle(handle) ||
+            handle.session.loginIdentity != identity) {
           return null;
         }
-        return facade.js.resolve(
-          engine.evaluate('this.__hazuki_source.account.loadProfile()'),
+        await persistLoginSideData(
+          facade,
+          sourceKey: handle.sourceKey,
+          result: result,
         );
-      })().timeout(_profileLoadTimeout);
-      // A completed request must not restore a profile after logout or runtime
-      // replacement. Timed-out requests never reach this persistence step.
+      } catch (_) {
+        // Profile refresh is optional; keep the last successfully saved profile.
+      }
       if (!_runtimeHost.isCurrentHandle(handle) ||
           handle.session.loginIdentity != identity) {
         return null;
       }
-      await persistLoginSideData(
-        facade,
-        sourceKey: handle.sourceKey,
-        result: result,
-      );
-    } catch (_) {
-      // Profile refresh is optional; keep the last successfully saved profile.
-    }
-    if (!_runtimeHost.isCurrentHandle(handle) ||
-        handle.session.loginIdentity != identity) {
-      return null;
-    }
-    return _cachedAvatarUrl(facade);
+      return _cachedAvatarUrl(facade);
+    });
   }
 }

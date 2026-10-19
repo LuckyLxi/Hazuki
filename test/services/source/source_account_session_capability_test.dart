@@ -131,21 +131,25 @@ void main() {
     engine.setMessageHandler(
       (message) => bridge.handleJsMessageForHandle(handle, message),
     );
-    engine.evaluate(File('assets/init.js').readAsStringSync());
-    engine.evaluate(File('assets/hazuki_plugin_sdk.js').readAsStringSync());
-    engine.evaluate("const source = new HazukiSource(); source.key = 'jm';");
+    await engine.evaluate(File('assets/init.js').readAsStringSync());
+    await engine.evaluate(
+      File('assets/hazuki_plugin_sdk.js').readAsStringSync(),
+    );
+    await engine.evaluate(
+      "const source = new HazukiSource(); source.key = 'jm';",
+    );
 
-    expect(engine.evaluate('source.isLogged'), isFalse);
+    expect(await engine.evaluate('source.isLogged'), isFalse);
     await handle.facade.saveSourceData('jm', 'login_session', 'session-id');
     expect(handle.facade.loadAccountDataSync(), isNull);
-    expect(engine.evaluate('source.isLogged'), isTrue);
+    expect(await engine.evaluate('source.isLogged'), isTrue);
 
     await accountSession.logout();
-    expect(engine.evaluate('source.isLogged'), isFalse);
+    expect(await engine.evaluate('source.isLogged'), isFalse);
 
     await handle.facade.saveSourceData('jm', 'login_session', true);
-    expect(engine.evaluate('source.isLogged'), isFalse);
+    expect(await engine.evaluate('source.isLogged'), isFalse);
     await handle.facade.saveSourceData('jm', 'account', ['user', 'password']);
-    expect(engine.evaluate('source.isLogged'), isTrue);
+    expect(await engine.evaluate('source.isLogged'), isTrue);
   });
 }

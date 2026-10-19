@@ -64,9 +64,11 @@ void main() {
         engine.setMessageHandler(
           (message) => bridge.handleJsMessageForHandle(handle, message),
         );
-        engine.evaluate(File('assets/init.js').readAsStringSync());
-        engine.evaluate(File('assets/hazuki_plugin_sdk.js').readAsStringSync());
-        engine.evaluate(
+        await engine.evaluate(File('assets/init.js').readAsStringSync());
+        await engine.evaluate(
+          File('assets/hazuki_plugin_sdk.js').readAsStringSync(),
+        );
+        await engine.evaluate(
           '''Hazuki.registerSource({id:'sample', search:{load:async()=>({comics:[]})},
         comic:{loadInfo:async()=>({}),loadEp:async()=>({images:[]})},
         account:{loginMethods:[{id:'sms',title:'SMS',input:'$input'}],

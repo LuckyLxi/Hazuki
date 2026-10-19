@@ -3,6 +3,29 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
+
+namespace {
+struct HostReply {
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool ready = false;
+    bool closed = false;
+    std::vector<uint8_t> bytes;
+};
+std::mutex host_replies_mutex;
+std::unordered_map<uint64_t, std::shared_ptr<HostReply>> host_replies;
+uint64_t next_host_reply = 1;
+std::shared_ptr<HostReply> find_host_reply(uint64_t id) {
+    std::lock_guard<std::mutex> lock(host_replies_mutex);
+    auto it = host_replies.find(id);
+    return it == host_replies.end() ? nullptr : it->second;
+}
+}
 #ifdef __ANDROID__
 #include <android/log.h>
 #else
@@ -323,6 +346,69 @@ extern "C"
 
     typedef void *JSChannel(JSContext *ctx, size_t type, void *argv);
 
+    DLLEXPORT uint64_t jsHostReplyCreate() {
+        std::lock_guard<std::mutex> lock(host_replies_mutex);
+        const auto id = next_host_reply++;
+        host_replies.emplace(id, std::make_shared<HostReply>());
+        return id;
+    }
+    DLLEXPORT int jsHostReplyComplete(uint64_t id, const uint8_t *bytes, intptr_t length) {
+        const auto reply = find_host_reply(id);
+        if (!reply) return 0;
+        std::lock_guard<std::mutex> lock(reply->mutex);
+        if (reply->closed || reply->ready) return 0;
+        reply->bytes.assign(bytes, bytes + length);
+        reply->ready = true;
+        reply->changed.notify_all();
+        return 1;
+    }
+    DLLEXPORT void jsHostReplyClose(uint64_t id) {
+        std::shared_ptr<HostReply> reply;
+        {
+            std::lock_guard<std::mutex> lock(host_replies_mutex);
+            auto it = host_replies.find(id);
+            if (it == host_replies.end()) return;
+            reply = it->second;
+            host_replies.erase(it);
+        }
+        std::lock_guard<std::mutex> lock(reply->mutex);
+        reply->closed = true;
+        reply->changed.notify_all();
+    }
+    DLLEXPORT int jsHostReplyActive(uint64_t id) {
+        return find_host_reply(id) ? 1 : 0;
+    }
+    DLLEXPORT intptr_t jsHostReplyCount() {
+        std::lock_guard<std::mutex> lock(host_replies_mutex);
+        return static_cast<intptr_t>(host_replies.size());
+    }
+    // Copies into caller-owned memory; no pointer to a mailbox escapes its lock.
+    DLLEXPORT intptr_t jsHostReplyWait(uint64_t id, int64_t milliseconds, uint8_t **output) {
+        const auto reply = find_host_reply(id);
+        if (!reply) return -1;
+        std::unique_lock<std::mutex> lock(reply->mutex);
+        if (!reply->changed.wait_for(lock, std::chrono::milliseconds(milliseconds),
+                                    [&] { return reply->ready || reply->closed; })) return -2;
+        if (reply->closed) return -1;
+        const auto size = reply->bytes.size();
+        *output = static_cast<uint8_t *>(malloc(size == 0 ? 1 : size));
+        if (!*output) return -3;
+        memcpy(*output, reply->bytes.data(), size);
+        return static_cast<intptr_t>(size);
+    }
+    DLLEXPORT void jsHostReplyFree(void *bytes) { free(bytes); }
+
+    static void task_reference(JSRuntime *rt, uint64_t token, int delta, void *data) {
+        int64_t message[2] = {static_cast<int64_t>(token), delta};
+        auto *channel = reinterpret_cast<JSChannel *>(data);
+        channel(reinterpret_cast<JSContext *>(rt), 4, message);
+    }
+
+    DLLEXPORT uint64_t jsGetTaskContext(JSRuntime *rt) { return JS_GetHostTaskContext(rt); }
+    DLLEXPORT void jsSetTaskContext(JSRuntime *rt, uint64_t token) { JS_SetHostTaskContext(rt, token); }
+    DLLEXPORT void jsRetainTaskContext(JSRuntime *rt, uint64_t token) { JS_RetainHostTaskContext(rt, token); }
+    DLLEXPORT void jsReleaseTaskContext(JSRuntime *rt, uint64_t token) { JS_ReleaseHostTaskContext(rt, token); }
+
     struct RuntimeOpaque
     {
         JSChannel *channel;
@@ -355,6 +441,14 @@ extern "C"
         auto *opaque = static_cast<RuntimeOpaque *>(JS_GetRuntimeOpaque(rt));
         if (opaque != nullptr)
             opaque->deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(opaque->timeout);
+    }
+
+    DLLEXPORT int64_t jsRemainingExecutionMilliseconds(JSRuntime *rt) {
+        auto *opaque = static_cast<RuntimeOpaque *>(JS_GetRuntimeOpaque(rt));
+        if (!opaque || opaque->timeout <= 0) return 5000;
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+            opaque->deadline - std::chrono::steady_clock::now()).count();
+        return remaining < 0 ? 0 : (remaining > opaque->timeout ? opaque->timeout : remaining);
     }
 
     DLLEXPORT JSValue *jsThrow(JSContext *ctx, JSValue *obj)
@@ -423,6 +517,7 @@ extern "C"
         JSRuntime *rt = JS_NewRuntime();
         auto *opaque = new RuntimeOpaque{channel, timeout, {}};
         JS_SetRuntimeOpaque(rt, opaque);
+        JS_SetHostTaskReference(rt, task_reference, reinterpret_cast<void *>(channel));
         JS_SetInterruptHandler(rt, interrupt_handler, opaque);
         JS_SetHostPromiseRejectionTracker(rt, js_promise_rejection_tracker, nullptr);
         JS_SetModuleLoaderFunc(rt, nullptr, js_module_loader, nullptr);

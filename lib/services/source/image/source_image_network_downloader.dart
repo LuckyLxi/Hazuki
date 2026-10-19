@@ -34,16 +34,17 @@ class SourceImageNetworkDownloader {
 
   factory SourceImageNetworkDownloader.forFacade(HazukiSourceFacade facade) {
     return SourceImageNetworkDownloader(
-      resolveLoadConfig: (url, comicId, epId) async {
-        await facade.ensureInitialized();
-        final engine = facade.js.engine;
-        if (engine == null) return null;
-        final raw = engine.evaluate(
-          buildImageLoadScript(url, comicId: comicId, epId: epId),
-          name: 'source_on_image_load.js',
-        );
-        return facade.js.resolve(raw);
-      },
+      resolveLoadConfig: (url, comicId, epId) =>
+          facade.handle.runOperation(() async {
+            await facade.ensureInitialized();
+            final engine = facade.js.engine;
+            if (engine == null) return null;
+            final raw = await engine.evaluate(
+              buildImageLoadScript(url, comicId: comicId, epId: epId),
+              name: 'source_on_image_load.js',
+            );
+            return facade.js.resolve(raw);
+          }),
       resolveCookie: facade.httpGateway.buildCookieHeader,
       requestBytes: (url, headers) async {
         await facade.ensureInitialized();

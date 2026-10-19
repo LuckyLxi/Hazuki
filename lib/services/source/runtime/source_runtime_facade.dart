@@ -38,9 +38,10 @@ class SourceJsBridge {
   final SourceRuntimeHandleView _handle;
 
   SourceScriptEngine? get engine => _runtime.engine;
+  dynamic cachedValue(String code) => engine?.cachedValue(code);
 
-  dynamic evaluate(String code, {String? name}) {
-    return engine?.evaluate(code, name: name);
+  Future<dynamic> evaluate(String code, {String? name}) async {
+    return await engine?.evaluate(code, name: name);
   }
 
   Future<dynamic> resolve(dynamic value) =>
@@ -50,8 +51,8 @@ class SourceJsBridge {
 
   int? asInt(dynamic value) => jsAsInt(value);
 
-  String evaluateString(String code) {
-    return (evaluate(code) ?? '').toString().trim();
+  Future<String> evaluateString(String code) async {
+    return (await evaluate(code) ?? '').toString().trim();
   }
 }
 

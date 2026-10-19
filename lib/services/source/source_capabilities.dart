@@ -9,3 +9,4 @@ export 'gateways/source_sync_gateway.dart';
 export 'plugins/source_search_capabilities.dart';
 export 'plugins/source_sort_options.dart' show SourceCommentSortOptions;
 export 'account/source_login_interaction.dart';
+export 'models/source_task.dart';

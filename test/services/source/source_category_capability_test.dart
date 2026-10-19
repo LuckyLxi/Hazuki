@@ -74,7 +74,7 @@ void main() {
         hostPromiseRejectionHandler: (_) {},
       );
       host.activeHandle.runtime.engine = engine;
-      engine.evaluate('''
+      await engine.evaluate('''
 globalThis.__hazuki_source = {categoryComics: {
   optionList: [{options: ['-All', 'japan-Japan']}, {options: ['score-Score']}],
   load: (category, param, options, page) => {
@@ -99,7 +99,7 @@ globalThis.__hazuki_source = {categoryComics: {
       );
       expect(
         jsonDecode(
-          engine.evaluate('JSON.stringify(lastRequest)') as String,
+          await engine.evaluate('JSON.stringify(lastRequest)') as String,
         )['options'],
         [],
       );
@@ -109,7 +109,9 @@ globalThis.__hazuki_source = {categoryComics: {
         orders: ['', ' score '],
       );
       final request =
-          jsonDecode(engine.evaluate('JSON.stringify(lastRequest)') as String)
+          jsonDecode(
+                await engine.evaluate('JSON.stringify(lastRequest)') as String,
+              )
               as Map;
       expect(request['options'], ['', 'score']);
       expect(request['page'], 2);

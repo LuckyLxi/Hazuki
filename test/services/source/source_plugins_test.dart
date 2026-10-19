@@ -546,21 +546,24 @@ Hazuki.registerSource({
       await assembly.ensureSourceInitialized('independent');
       final handle = assembly.testing.handleFor('independent');
       final engine = handle.runtime.engine!;
-      engine.evaluate(
+      await engine.evaluate(
         "globalThis.__hazuki_source.settings.option = {default:'initial'}",
       );
-      expect(engine.evaluate("Hazuki.settings.get('option')"), 'initial');
-      engine.evaluate(
+      expect(await engine.evaluate("Hazuki.settings.get('option')"), 'initial');
+      await engine.evaluate(
         "globalThis.__hazuki_source.settings.option.default = 'refreshed'",
       );
-      expect(engine.evaluate("Hazuki.settings.get('option')"), 'refreshed');
+      expect(
+        await engine.evaluate("Hazuki.settings.get('option')"),
+        'refreshed',
+      );
       for (final value in [false, 0, '', null]) {
         await handle.facade.js.resolve(
           engine.evaluate(
             "Hazuki.settings.set('option', ${jsonEncode(value)})",
           ),
         );
-        expect(engine.evaluate("Hazuki.settings.get('option')"), value);
+        expect(await engine.evaluate("Hazuki.settings.get('option')"), value);
       }
     },
   );
@@ -658,7 +661,7 @@ Hazuki.registerSource({
     final handle = assembly.testing.handleFor('independent');
     final engine = handle.runtime.engine!;
     expect(
-      () => engine.evaluate(
+      () async => await engine.evaluate(
         "'use strict'; globalThis.__hazuki_source.key = 'other';",
       ),
       throwsA(anything),
@@ -666,7 +669,7 @@ Hazuki.registerSource({
     await handle.facade.js.resolve(
       engine.evaluate("Hazuki.storage.set('marker', 'private')"),
     );
-    expect(engine.evaluate("Hazuki.storage.get('marker')"), 'private');
+    expect(await engine.evaluate("Hazuki.storage.get('marker')"), 'private');
     expect(handle.facade.loadSourceData('independent', 'marker'), 'private');
   });
 
@@ -975,8 +978,7 @@ Hazuki.registerSource({
         'embedded',
       );
       await expectLater(
-        engine.evaluate("Hazuki.resources.readText('toString')")
-            as Future<dynamic>,
+        engine.evaluate("Hazuki.resources.readText('toString')"),
         throwsA(anything),
       );
       expect(

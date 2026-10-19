@@ -14,6 +14,8 @@ import 'source_js_bridge_cookie_capability.dart';
 import 'source_html_bridge.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_state_controller.dart';
+import 'source_runtime_metadata.dart';
+export 'source_runtime_metadata.dart' show parseSourceSettingsDefaults;
 import 'source_script_storage.dart';
 import 'source_text_downloader.dart';
 
@@ -126,49 +128,76 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
   }) async {
     final facade = handle.facade;
     if (handle.isDisposed) throw Exception('source_runtime_disposed');
+    final cancellation = handle.loginCancellation;
+    cancellation?.check();
 
     final initScript = await _loadAssetText(_bundledInitAssetPath);
     final sourceScript = await sourceFile.readAsString();
     final sdk = await _loadAssetText('assets/hazuki_plugin_sdk.js');
+    if (handle.isDisposed) throw Exception('source_runtime_disposed');
+    cancellation?.check();
     final engine = SourceScriptEngine(
+      pluginId: handle.sourceKey,
       timeout: 5000,
       memoryLimit: 64 * 1024 * 1024,
       hostPromiseRejectionHandler: (_) {},
     );
     final oldEngine = facade.runtime.engine;
-    final oldMeta = facade.sourceMeta;
     final oldHtmlBridge = handle.htmlBridge;
     final htmlBridge = SourceHtmlBridge();
+    SourceMeta? candidateMeta;
+    engine.operationGuard = (operation) => handle.runOperation(operation);
+    // Private login/cloud runtimes can be cancelled before this candidate is
+    // published. Track its close so disposal also waits for worker cleanup.
+    void cancelCandidate() => handle.closeEngine(engine).ignore();
+    cancellation?.addListener(cancelCandidate);
     try {
-      engine.setMessageHandler(
-        (dynamic message) => _jsBridge.handleJsMessageForHandle(
+      engine.setContextMessageHandler(
+        (dynamic message, execution) => _jsBridge.handleJsMessageForHandle(
           handle,
           message,
           htmlBridge: htmlBridge,
+          execution: execution,
+          runtimeId: engine.runtimeId,
+          sourceMeta: () => identical(handle.runtime.engine, engine)
+              ? handle.runtime.sourceMeta
+              : candidateMeta,
         ),
       );
-      engine.setGlobal('appVersion', '1.0.0');
+      await engine.setGlobal('appVersion', '1.0.0');
 
-      engine.evaluate(initScript, name: 'init.js');
-      engine.evaluate(sdk, name: 'hazuki_plugin_sdk.js');
-      evaluateSourcePlugin(engine, sourceScript);
-      final manifest = registeredSourcePluginManifest(engine);
+      await engine.execute(initScript, name: 'init.js');
+      await engine.execute(sdk, name: 'hazuki_plugin_sdk.js');
+      await evaluateSourcePlugin(engine, sourceScript);
+      final manifest = await registeredSourcePluginManifest(engine);
       if (manifest.id != handle.sourceKey) {
         throw const SourcePluginException('plugin_identity_mismatch');
       }
 
-      final name = (engine.evaluate('this.__hazuki_source.name') ?? '')
+      final name = (await engine.evaluate('this.__hazuki_source.name') ?? '')
           .toString();
-      final key = (engine.evaluate('this.__hazuki_source.key') ?? '')
+      final key = (await engine.evaluate('this.__hazuki_source.key') ?? '')
           .toString();
-      final version = (engine.evaluate('this.__hazuki_source.version') ?? '')
-          .toString();
+      final version =
+          (await engine.evaluate('this.__hazuki_source.version') ?? '')
+              .toString();
       final supportsAccount = jsAsBool(
-        engine.evaluate('!!this.__hazuki_source.account?.login'),
+        await engine.evaluate('!!this.__hazuki_source.account?.login'),
       );
       if (name.isEmpty || key.isEmpty || version.isEmpty) {
         throw Exception('source_metadata_incomplete');
       }
+      Future<Map<String, dynamic>> readSettings() async =>
+          Map<String, dynamic>.from(
+            jsonDecode(
+                  await engine.evaluate(
+                        'JSON.stringify(this.__hazuki_source.settings ?? {})',
+                      )
+                      as String,
+                )
+                as Map,
+          );
+      final settings = await readSettings();
 
       final meta = SourceMeta(
         translation: manifest.translation,
@@ -176,21 +205,11 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
         key: key,
         version: version,
         supportsAccount: supportsAccount,
-        settingsDefaults: parseSourceSettingsDefaults(
-          engine.evaluate('this.__hazuki_source.settings ?? {}'),
-        ),
+        settingsDefaults: parseSourceSettingsDefaults(settings),
         presentation: jsAsMap(
-          engine.evaluate('this.__hazuki_source.presentation ?? {}'),
+          await engine.evaluate('this.__hazuki_source.presentation ?? {}'),
         ),
-        settings: Map<String, dynamic>.from(
-          jsonDecode(
-                engine.evaluate(
-                      'JSON.stringify(this.__hazuki_source.settings ?? {})',
-                    )
-                    as String,
-              )
-              as Map,
-        ),
+        settings: settings,
       );
       if (runSourceInit) {
         _runtimeStateController.setBusy(
@@ -200,60 +219,42 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
           debugDetail: 'running_source_init',
         );
       }
-      facade.runtime.sourceMeta = meta;
+      candidateMeta = meta;
+      if (runSourceInit) {
+        await engine
+            .evaluate('this.__hazuki_source.init?.()', name: 'source_init.js')
+            .timeout(const Duration(seconds: 90));
+      }
+      if (handle.isDisposed) throw Exception('source_runtime_disposed');
+      final finalSettings = await readSettings();
+      final finalSnapshot =
+          jsonDecode(engine.cachedValue('__metadata') as String) as Map;
+      final finalMeta = SourceMeta(
+        translation: jsAsMap(finalSnapshot['translation']),
+        name: finalSnapshot['name']?.toString() ?? name,
+        key: key,
+        version: finalSnapshot['version']?.toString() ?? version,
+        supportsAccount: finalSnapshot['supportsAccount'] == true,
+        presentation: jsAsMap(finalSnapshot['presentation']),
+        settingsDefaults: parseSourceSettingsDefaults(finalSettings),
+        settings: finalSettings,
+      );
+      if (handle.isDisposed) throw Exception('source_runtime_disposed');
+      facade.runtime.sourceMeta = finalMeta;
       facade.runtime.engine = engine;
       handle.htmlBridge = htmlBridge;
-      try {
-        if (runSourceInit) {
-          final initResult = engine.evaluate(
-            'this.__hazuki_source.init?.()',
-            name: 'source_init.js',
-          );
-          if (initResult is Future) {
-            await initResult.timeout(const Duration(seconds: 90));
-          }
-        }
-        if (handle.isDisposed) throw Exception('source_runtime_disposed');
-      } catch (_) {
-        facade.runtime.sourceMeta = oldMeta;
-        facade.runtime.engine = oldEngine;
-        rethrow;
-      }
-      facade.runtime.engine = engine;
-      final finalMeta = SourceMeta(
-        translation: jsAsMap(
-          engine.evaluate('this.__hazuki_source.translation ?? {}'),
-        ),
-        name: name,
-        key: key,
-        version: version,
-        supportsAccount: supportsAccount,
-        presentation: meta.presentation,
-        settingsDefaults: parseSourceSettingsDefaults(
-          engine.evaluate('this.__hazuki_source.settings ?? {}'),
-        ),
-        settings: Map<String, dynamic>.from(
-          jsonDecode(
-                engine.evaluate(
-                      'JSON.stringify(this.__hazuki_source.settings ?? {})',
-                    )
-                    as String,
-              )
-              as Map,
-        ),
-      );
-      facade.runtime.sourceMeta = finalMeta;
-      oldEngine?.close();
+      if (oldEngine != null) handle.retireEngine(oldEngine);
       oldHtmlBridge.clear();
       return finalMeta;
     } catch (_) {
-      facade.runtime.engine = oldEngine;
-      facade.runtime.sourceMeta = oldMeta;
+      // The candidate has not been published. The current runtime may have
+      // received live metadata updates or been disposed while init awaited.
+      // Restoring a captured state would overwrite either of those outcomes.
       htmlBridge.clear();
-      handle.htmlBridge = oldHtmlBridge;
-      if (handle.isDisposed) oldHtmlBridge.clear();
-      engine.close();
+      await engine.close();
       rethrow;
+    } finally {
+      cancellation?.removeListener(cancelCandidate);
     }
   }
 }
@@ -274,16 +275,4 @@ String extractSourceClassName(String script) {
   ).firstMatch(script);
   if (match == null) throw Exception('source_class_not_found');
   return match.group(1)!;
-}
-
-Map<String, dynamic> parseSourceSettingsDefaults(dynamic raw) {
-  if (raw is! Map) return {};
-  final defaults = <String, dynamic>{};
-  for (final entry in Map<String, dynamic>.from(raw).entries) {
-    final value = entry.value;
-    if (value is Map && value.containsKey('default')) {
-      defaults[entry.key] = value['default'];
-    }
-  }
-  return defaults;
 }

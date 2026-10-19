@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../network/hazuki_network.dart';
 import '../debug/source_network_log_sink.dart';
 import '../runtime/source_cookie_store.dart';
+import '../models/source_script_execution.dart';
 
 class SourceHttpGateway {
   SourceHttpGateway({
@@ -71,8 +72,10 @@ class SourceHttpGateway {
   }
 
   Future<Map<String, dynamic>> sendJsHttpRequest(
-    Map<String, dynamic> request,
-  ) async {
+    Map<String, dynamic> request, {
+    SourceScriptExecution? execution,
+    String? runtimeId,
+  }) async {
     Response<dynamic>? response;
     String? error;
     final startedAt = DateTime.now();
@@ -120,6 +123,9 @@ class SourceHttpGateway {
         requestData: data,
         responseHeaders: _flattenHeaders(response?.headers),
         responseBody: response?.data,
+        taskContext: execution == null
+            ? null
+            : {...execution.toMap(), 'runtimeId': runtimeId},
       );
     }
 

@@ -30,7 +30,7 @@ class SourceInteractiveLoginOperations
     if (readLoginMethods != null) return readLoginMethods!(handle.sourceKey);
     await handle.facade.ensureInitialized();
     return SourceLoginMethod.parse(
-      handle.runtime.engine!.evaluate(
+      await handle.runtime.engine!.evaluate(
         'this.__hazuki_source.account?.loginMethods',
       ),
     );
@@ -89,7 +89,7 @@ class SourceInteractiveLoginOperations
         cancellation.check();
         final engine = local.runtime.engine!;
         final methods = SourceLoginMethod.parse(
-          engine.evaluate('this.__hazuki_source.account?.loginMethods'),
+          await engine.evaluate('this.__hazuki_source.account?.loginMethods'),
         );
         if (!methods.any((m) => m.id == method)) {
           throw StateError('login_method_unavailable');
@@ -170,6 +170,10 @@ class SourceInteractiveLoginOperations
       host.removeListener(checkSource);
       host.runtimeRegistry.removeListener(checkSource);
       attempt?.requestDispose();
+      // This private runtime has no other accepted work to preserve on cancel.
+      // A plugin may still be awaiting a host interaction that never settles.
+      await attempt?.runtime.engine?.close();
+      await attempt?.whenDisposed;
       cancellation.removeListener(abortNetwork);
       _running.remove(key);
       _cancellations.remove(key);

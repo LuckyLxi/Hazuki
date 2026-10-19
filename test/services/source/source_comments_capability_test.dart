@@ -16,7 +16,7 @@ void main() {
   late SourceCommentsCapability comments;
   late SourceScriptEngine target;
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
     host = SourceRuntimeHost(
       catalog: const [
@@ -53,7 +53,7 @@ void main() {
     );
     target = SourceScriptEngine(hostPromiseRejectionHandler: (_) {});
     host.handleFor('target').runtime.engine = target;
-    target.evaluate('''
+    await target.evaluate('''
       globalThis.calls = [];
       globalThis.__hazuki_source = {comic: {
         loadComments: async (...args) => {
@@ -90,10 +90,13 @@ void main() {
         replyTo: 'reply',
         order: 'missing',
       );
-      expect(jsonDecode(target.evaluate('JSON.stringify(calls)') as String), [
-        ['comic', 'comic"id', 'sub', 2, 'parent', 'new'],
-        ['chapter', 'comic', 'chapter', 3, 'reply', 'hot'],
-      ]);
+      expect(
+        jsonDecode(await target.evaluate('JSON.stringify(calls)') as String),
+        [
+          ['comic', 'comic"id', 'sub', 2, 'parent', 'new'],
+          ['chapter', 'comic', 'chapter', 3, 'reply', 'hot'],
+        ],
+      );
       expect(host.activeSourceKey, 'active');
       expect(comments.commentSortOptionsForSource('').orders, isEmpty);
     },
@@ -140,10 +143,13 @@ void main() {
         sourceKey: 'target',
         order: 'new',
       );
-      expect(jsonDecode(target.evaluate('JSON.stringify(calls)') as String), [
-        ['comic', 'comic', null, 1, null, ''],
-      ]);
-      target.evaluate('''
+      expect(
+        jsonDecode(await target.evaluate('JSON.stringify(calls)') as String),
+        [
+          ['comic', 'comic', null, 1, null, ''],
+        ],
+      );
+      await target.evaluate('''
       this.__hazuki_source.comic.loadComments = async (id, subId, page, replyTo) =>
         ({comments: [{content: [id, subId, page, replyTo].join('|')}], maxPage: 1});
     ''');

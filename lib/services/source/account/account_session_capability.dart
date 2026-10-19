@@ -55,38 +55,40 @@ class SourceAccountSessionCapability {
   Future<void> logout() async {
     interactive?.cancelPendingLogin();
     final facade = this.facade;
-    final engine = facade.js.engine;
-    final sourceMeta = facade.sourceMeta;
-    final sourceKey = (sourceMeta?.key ?? facade.sourceKey).trim();
+    return facade.handle.runOperation(() async {
+      final engine = facade.js.engine;
+      final sourceMeta = facade.sourceMeta;
+      final sourceKey = (sourceMeta?.key ?? facade.sourceKey).trim();
 
-    if (engine != null && sourceMeta != null) {
-      final hasLogout = facade.js.asBool(
-        facade.js.evaluate('!!this.__hazuki_source.account?.logout'),
-      );
+      if (engine != null && sourceMeta != null) {
+        final hasLogout = facade.js.asBool(
+          await engine.evaluate('!!this.__hazuki_source.account?.logout'),
+        );
 
-      if (hasLogout) {
-        try {
-          final result = engine.evaluate(
-            'this.__hazuki_source.account.logout()',
-            name: 'source_logout.js',
-          );
-          await facade.js.resolve(result);
-        } catch (_) {}
+        if (hasLogout) {
+          try {
+            final result = await engine.evaluate(
+              'this.__hazuki_source.account.logout()',
+              name: 'source_logout.js',
+            );
+            await facade.js.resolve(result);
+          } catch (_) {}
+        }
       }
-    }
 
-    if (sourceKey.isEmpty) return;
+      if (sourceKey.isEmpty) return;
 
-    await facade.deleteSourceData(sourceKey, 'account');
-    await facade.deleteSourceData(sourceKey, 'avatar_url');
-    await facade.deleteSourceData(sourceKey, 'display_name');
-    await facade.saveCookieStore(const []);
-    facade.runtime.transientAvatarUrl = null;
-    await facade.deleteSourceData(sourceKey, 'token');
-    await facade.deleteSourceData(sourceKey, 'interactive_login');
-    await facade.deleteSourceData(sourceKey, 'login_method');
-    await facade.deleteSourceData(sourceKey, 'login_session');
-    _runtimeHost.notifyActiveRuntimeChanged(sourceKey);
+      await facade.deleteSourceData(sourceKey, 'account');
+      await facade.deleteSourceData(sourceKey, 'avatar_url');
+      await facade.deleteSourceData(sourceKey, 'display_name');
+      await facade.saveCookieStore(const []);
+      facade.runtime.transientAvatarUrl = null;
+      await facade.deleteSourceData(sourceKey, 'token');
+      await facade.deleteSourceData(sourceKey, 'interactive_login');
+      await facade.deleteSourceData(sourceKey, 'login_method');
+      await facade.deleteSourceData(sourceKey, 'login_session');
+      _runtimeHost.notifyActiveRuntimeChanged(sourceKey);
+    });
   }
 
   String? currentAccountForSource(String sourceKey) {

@@ -140,14 +140,15 @@ class SourceComicDetailsCapability {
     required String sourceKey,
     required bool Function() shouldCacheResult,
   }) async {
-    await facade.ensureInitialized();
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final dynamic result = engine.evaluate('''(async () => {
+      final dynamic result = await engine.evaluate('''(async () => {
         const data = await this.__hazuki_source.comic.loadInfo(${jsonEncode(normalizedComicId)});
         const chapterEntries = [];
         const chapters = data?.chapters;
@@ -178,33 +179,39 @@ class SourceComicDetailsCapability {
           __chapterEntries: chapterEntries,
         };
       })()''', name: 'source_comic_detail.js');
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! Map) {
-      throw Exception('comic_details_invalid_response');
-    }
+      final dynamic resolved = await facade.js.resolve(result);
+      if (resolved is! Map) {
+        throw Exception('comic_details_invalid_response');
+      }
 
-    final details = _parser.parse(
-      map: Map<String, dynamic>.from(resolved),
-      fallbackComicId: normalizedComicId,
-      sourceKey: sourceKey,
-    );
-
-    if (shouldCacheResult() &&
-        !facade.handle.isDisposed &&
-        identical(_runtimeHost.handleFor(sourceKey).facade, facade)) {
-      _cache.put(
-        SourceScopedComicId(
-          sourceKey: details.sourceKey,
-          comicId: normalizedComicId,
-        ).storageKey,
-        details,
+      final details = _parser.parse(
+        map: Map<String, dynamic>.from(resolved),
+        fallbackComicId: normalizedComicId,
         sourceKey: sourceKey,
       );
-      if (details.id != normalizedComicId) {
-        _cache.put(details.scopedId.storageKey, details, sourceKey: sourceKey);
+
+      if (shouldCacheResult() &&
+          identical(facade.js.engine, engine) &&
+          !facade.handle.isDisposed &&
+          identical(_runtimeHost.handleFor(sourceKey).facade, facade)) {
+        _cache.put(
+          SourceScopedComicId(
+            sourceKey: details.sourceKey,
+            comicId: normalizedComicId,
+          ).storageKey,
+          details,
+          sourceKey: sourceKey,
+        );
+        if (details.id != normalizedComicId) {
+          _cache.put(
+            details.scopedId.storageKey,
+            details,
+            sourceKey: sourceKey,
+          );
+        }
       }
-    }
-    return details;
+      return details;
+    });
   }
 
   Future<List<String>> loadChapterImages({
@@ -258,30 +265,32 @@ class SourceComicDetailsCapability {
     required String epId,
     required HazukiSourceFacade facade,
   }) async {
-    await facade.ensureInitialized();
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final dynamic result = engine.evaluate(
-      'this.__hazuki_source.comic.loadEp(${jsonEncode(comicId)}, ${jsonEncode(epId)})',
-      name: 'source_chapter_images.js',
-    );
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! Map) {
-      return const [];
-    }
+      final dynamic result = await engine.evaluate(
+        'this.__hazuki_source.comic.loadEp(${jsonEncode(comicId)}, ${jsonEncode(epId)})',
+        name: 'source_chapter_images.js',
+      );
+      final dynamic resolved = await facade.js.resolve(result);
+      if (resolved is! Map) {
+        return const [];
+      }
 
-    final imagesRaw = Map<String, dynamic>.from(resolved)['images'];
-    if (imagesRaw is! List) {
-      return const [];
-    }
+      final imagesRaw = Map<String, dynamic>.from(resolved)['images'];
+      if (imagesRaw is! List) {
+        return const [];
+      }
 
-    return imagesRaw
-        .map((e) => e.toString())
-        .where((e) => e.isNotEmpty)
-        .toList();
+      return imagesRaw
+          .map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    });
   }
 
   bool get supportComicLike {
@@ -289,7 +298,7 @@ class SourceComicDetailsCapability {
     if (engine == null) return false;
     try {
       return jsAsBool(
-        engine.evaluate(
+        engine.cachedValue(
           'typeof this.__hazuki_source.comic?.likeComic === "function"',
         ),
       );
@@ -310,7 +319,7 @@ class SourceComicDetailsCapability {
     if (engine == null) return false;
     try {
       return targetFacade.js.asBool(
-        engine.evaluate(
+        engine.cachedValue(
           'typeof this.__hazuki_source.comic?.likeComic === "function"',
         ),
       );
@@ -330,44 +339,55 @@ class SourceComicDetailsCapability {
     }
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
     final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
-    await facade.ensureInitialized();
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    Future<void> runToggle() async {
-      final engine = facade.js.engine;
-      if (engine == null) {
-        throw Exception('source_not_initialized');
+      final originalEngine = facade.js.engine;
+      Future<void> runToggle() async {
+        final engine = facade.js.engine;
+        if (engine == null) {
+          throw Exception('source_not_initialized');
+        }
+        if (!jsAsBool(
+          await engine.evaluate(
+            'typeof this.__hazuki_source.comic?.likeComic === "function"',
+          ),
+        )) {
+          throw Exception('comic_like_not_supported');
+        }
+
+        final dynamic result = await engine.evaluate(
+          'this.__hazuki_source.comic.likeComic(${jsonEncode(normalizedComicId)}, $isLike)',
+          name: 'source_comic_like.js',
+        );
+        await facade.js.resolve(result);
       }
-      if (!jsAsBool(
-        engine.evaluate(
-          'typeof this.__hazuki_source.comic?.likeComic === "function"',
-        ),
-      )) {
-        throw Exception('comic_like_not_supported');
+
+      await _reloginCoordinator.runWithReloginRetry(
+        runToggle,
+        context: SourceFacadeReloginContext(facade),
+      );
+
+      if (!identical(facade.js.engine, originalEngine) ||
+          !identical(
+            _runtimeHost.handleFor(resolvedSourceKey).facade,
+            facade,
+          )) {
+        return;
       }
 
-      final dynamic result = engine.evaluate(
-        'this.__hazuki_source.comic.likeComic(${jsonEncode(normalizedComicId)}, $isLike)',
-        name: 'source_comic_like.js',
-      );
-      await facade.js.resolve(result);
-    }
-
-    await _reloginCoordinator.runWithReloginRetry(
-      runToggle,
-      context: SourceFacadeReloginContext(facade),
-    );
-
-    final scopedKey = SourceScopedComicId(
-      sourceKey: resolvedSourceKey,
-      comicId: normalizedComicId,
-    ).storageKey;
-    final cached = _cache.get(scopedKey, sourceKey: resolvedSourceKey);
-    if (cached != null) {
-      _updateComicDetailsLikeStateInMemoryCache(
-        cached.scopedId,
-        isLike: isLike,
-      );
-    }
+      final scopedKey = SourceScopedComicId(
+        sourceKey: resolvedSourceKey,
+        comicId: normalizedComicId,
+      ).storageKey;
+      final cached = _cache.get(scopedKey, sourceKey: resolvedSourceKey);
+      if (cached != null) {
+        _updateComicDetailsLikeStateInMemoryCache(
+          cached.scopedId,
+          isLike: isLike,
+        );
+      }
+    });
   }
 
   void _updateComicDetailsLikeStateInMemoryCache(

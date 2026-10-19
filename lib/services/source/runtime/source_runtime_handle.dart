@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 
 import '../../network/hazuki_network.dart';
@@ -15,6 +17,7 @@ import 'source_runtime_coordinator.dart';
 import 'source_runtime_facade.dart';
 import 'source_runtime_kernel.dart';
 import 'source_secure_session_storage.dart';
+import 'source_script_engine.dart';
 import 'source_session_store.dart';
 import '../account/source_login_interaction.dart';
 import '../../logging/app_log_store.dart';
@@ -55,12 +58,20 @@ class SourceRuntimeHandle
   final void Function(String sourceKey) _notifyRuntimeStateChanged;
   final Dio dio = _createSourceDio();
   final AppLogStore appLogStore;
-  final SourceRuntimeKernel runtime = SourceRuntimeKernel();
+  late final SourceRuntimeKernel runtime = SourceRuntimeKernel(
+    operationGuard: (operation) => runOperation(operation),
+    onMetadataChanged: () => _notifyRuntimeStateChanged(sourceKey),
+  );
+  final Completer<void> _whenDisposed = Completer<void>();
+  Future<void> get whenDisposed => _whenDisposed.future;
   SourceHtmlBridge htmlBridge = SourceHtmlBridge();
   bool _disposed = false;
   bool _disposeRequested = false;
   bool _recreationRequested = false;
   int _activeOperationCount = 0;
+  final Object _operationZoneKey = Object();
+  final Set<SourceScriptEngine> _retiredEngines = {};
+  final List<Future<void>> _engineClosures = [];
   late final SourceSessionStore session = SourceSessionStore(
     sourceKey: sourceKey,
     secureStorage: _secureStorage,
@@ -89,6 +100,7 @@ class SourceRuntimeHandle
     Object? requestData,
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
+    Map<String, Object?>? taskContext,
   }) {
     debugLog.appendNetworkLogEntry(
       method: method,
@@ -102,6 +114,7 @@ class SourceRuntimeHandle
       requestData: requestData,
       responseHeaders: responseHeaders,
       responseBody: responseBody,
+      taskContext: taskContext,
     );
   });
   late final SourceHttpGateway httpGateway = SourceHttpGateway(
@@ -163,18 +176,48 @@ class SourceRuntimeHandle
 
   @override
   Future<T> runOperation<T>(Future<T> Function() operation) async {
-    if (_disposed || _disposeRequested) {
+    // An admitted operation can continue across awaits after switching source.
+    // The proxy's nested lease must not reject the remainder of that operation.
+    final inherited = Zone.current[_operationZoneKey] as _OperationLease?;
+    final admitted = inherited?.active == true;
+    if (_disposed || (_disposeRequested && !admitted)) {
       throw StateError('source_runtime_disposed:$sourceKey');
     }
     _activeOperationCount += 1;
+    final lease = admitted ? inherited! : _OperationLease();
     try {
-      return await operation();
+      return await runZoned(operation, zoneValues: {_operationZoneKey: lease});
     } finally {
       _activeOperationCount -= 1;
+      if (!admitted) lease.active = false;
       if (_disposeRequested && _activeOperationCount == 0) {
         _disposeNow();
+      } else if (_activeOperationCount == 0) {
+        _closeRetiredEngines();
       }
     }
+  }
+
+  /// Existing operations retain the old instance until their leases finish.
+  void retireEngine(SourceScriptEngine engine) {
+    _retiredEngines.add(engine);
+    if (_activeOperationCount == 0) _closeRetiredEngines();
+  }
+
+  void _closeRetiredEngines() {
+    for (final engine in _retiredEngines) {
+      closeEngine(engine);
+    }
+    _retiredEngines.clear();
+  }
+
+  /// Closes a private or cancelled candidate engine without waiting for leases.
+  /// Disposal still waits for its worker to finish releasing native resources.
+  Future<void> closeEngine(SourceScriptEngine engine) {
+    final closing = engine.close();
+    closing.ignore();
+    _engineClosures.add(closing);
+    return closing;
   }
 
   @override
@@ -204,11 +247,26 @@ class SourceRuntimeHandle
     try {
       dio.close(force: true);
     } catch (_) {}
-    try {
-      engine?.close();
-    } catch (_) {}
+    if (engine != null) _retiredEngines.add(engine);
+    _closeRetiredEngines();
+    final closing = Future.wait(_engineClosures);
+    closing.then<void>(
+      (_) {
+        if (!_whenDisposed.isCompleted) _whenDisposed.complete();
+      },
+      onError: (Object error, StackTrace stack) {
+        if (!_whenDisposed.isCompleted) {
+          _whenDisposed.completeError(error, stack);
+        }
+      },
+    );
+    _whenDisposed.future.ignore();
     session.clearMemory();
     cache.clearMemory();
     htmlBridge.clear();
   }
+}
+
+class _OperationLease {
+  bool active = true;
 }

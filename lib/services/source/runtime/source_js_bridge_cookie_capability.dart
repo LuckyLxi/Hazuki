@@ -1,14 +1,7 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:math' as math;
-import 'dart:typed_data';
+import 'source_local_script_bridge.dart';
+import '../../../models/source_meta.dart';
+import '../models/source_script_execution.dart';
 
-import 'package:crypto/crypto.dart';
-import 'package:pointycastle/api.dart' show KeyParameter;
-import 'package:pointycastle/block/aes.dart';
-import 'package:pointycastle/block/modes/ecb.dart';
-
-import '../common/source_json_coerce.dart';
 import '../account/source_browser_authorization.dart';
 import '../account/source_external_authorization.dart';
 import 'source_runtime_facade.dart';
@@ -25,6 +18,7 @@ class SourceJsBridgeCookieCapability {
   }) : _activeHandle = activeHandle;
 
   final SourceRuntimeHandle Function() _activeHandle;
+  final _local = SourceLocalScriptBridge();
 
   Future<dynamic> handleCookieOperationForHandle(
     SourceRuntimeHandleView handle,
@@ -49,6 +43,9 @@ class SourceJsBridgeCookieCapability {
     SourceRuntimeHandle handle,
     dynamic message, {
     SourceHtmlBridge? htmlBridge,
+    SourceScriptExecution? execution,
+    String? runtimeId,
+    SourceMeta? Function()? sourceMeta,
   }) {
     if (message is! Map) return null;
     final map = Map<String, dynamic>.from(message);
@@ -161,7 +158,11 @@ class SourceJsBridgeCookieCapability {
         );
         break;
       case 'http':
-        result = handle.facade.httpGateway.sendJsHttpRequest(map);
+        result = handle.facade.httpGateway.sendJsHttpRequest(
+          map,
+          execution: execution,
+          runtimeId: runtimeId,
+        );
         break;
       case 'cookie':
         result = handleCookieOperationForHandle(handle, map);
@@ -190,7 +191,9 @@ class SourceJsBridgeCookieCapability {
         result = handle.session.loadSourceSetting(
           sourceKey: _requireScopedSourceKey(handle, map),
           settingKey: settingKey,
-          sourceMeta: handle.runtime.sourceMeta,
+          sourceMeta: sourceMeta != null
+              ? sourceMeta()
+              : handle.runtime.sourceMeta,
           settingsDefaults: map.containsKey('default_value')
               ? {settingKey: map['default_value']}
               : null,
@@ -205,20 +208,19 @@ class SourceJsBridgeCookieCapability {
         result = Future<void>.delayed(Duration(milliseconds: ms));
         break;
       case 'random':
-        result = _random(map);
+        result = _local.random(map);
         break;
       case 'uuid':
-        result = _uuid();
+        result = _local.uuid();
         break;
       case 'convert':
-        result = _convert(map);
+        result = _local.convert(map);
         break;
       case 'getLocale':
         result = sourcePluginLocaleTag(handle.session.prefs);
         break;
       case 'getPlatform':
-        final os = Platform.operatingSystem;
-        result = (os == 'android' || os == 'ios') ? os : 'android';
+        result = _local.handle(map);
         break;
       case 'log':
         // Foreground login may hold a complete authorization callback. Never
@@ -251,84 +253,5 @@ class SourceJsBridgeCookieCapability {
       );
     }
     return handle.sourceKey;
-  }
-
-  dynamic _random(Map<String, dynamic> request) {
-    final min = request['min'] is num ? request['min'] as num : 0;
-    final max = request['max'] is num ? request['max'] as num : 1;
-    if (request['type']?.toString() == 'double') {
-      return min + (max - min) * DateTime.now().microsecond / 1000000;
-    }
-    final range = (max - min).toInt();
-    return range <= 0
-        ? min.toInt()
-        : min.toInt() + DateTime.now().microsecond % range;
-  }
-
-  String _uuid() {
-    final bytes = List<int>.generate(
-      16,
-      (_) => math.Random.secure().nextInt(256),
-    );
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    final hex = bytes
-        .map((value) => value.toRadixString(16).padLeft(2, '0'))
-        .join();
-    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
-  }
-
-  dynamic _convert(Map<String, dynamic> request) {
-    final value = request['value'];
-    final encode = request['isEncode'] == true;
-    switch (request['type']?.toString()) {
-      case 'utf8':
-        return encode
-            ? utf8.encode((value ?? '').toString())
-            : utf8.decode(jsToBytes(value));
-      case 'base64':
-        return encode
-            ? base64Encode(jsToBytes(value))
-            : base64Decode((value ?? '').toString());
-      case 'md5':
-        return Uint8List.fromList(md5.convert(jsToBytes(value)).bytes);
-      case 'sha1':
-        return Uint8List.fromList(sha1.convert(jsToBytes(value)).bytes);
-      case 'sha256':
-        return Uint8List.fromList(sha256.convert(jsToBytes(value)).bytes);
-      case 'sha512':
-        return Uint8List.fromList(sha512.convert(jsToBytes(value)).bytes);
-      case 'hmac':
-        final algorithm = switch (request['hash']?.toString()) {
-          'sha1' => sha1,
-          'sha256' => sha256,
-          'sha512' => sha512,
-          _ => md5,
-        };
-        final digest = Hmac(
-          algorithm,
-          jsToBytes(request['key']),
-        ).convert(jsToBytes(value));
-        return request['isString'] == true
-            ? digest.toString()
-            : Uint8List.fromList(digest.bytes);
-      case 'aes-ecb':
-        final bytes = jsToBytes(value);
-        final cipher = ECBBlockCipher(AESEngine())
-          ..init(encode, KeyParameter(jsToBytes(request['key'])));
-        final result = Uint8List(bytes.length);
-        for (var offset = 0; offset < bytes.length;) {
-          offset += cipher.processBlock(bytes, offset, result, offset);
-        }
-        return result;
-      case 'gbk':
-      case 'aes-cbc':
-      case 'aes-cfb':
-      case 'aes-ofb':
-      case 'rsa':
-        throw UnsupportedError('Unsupported conversion: ${request['type']}');
-      default:
-        return value;
-    }
   }
 }

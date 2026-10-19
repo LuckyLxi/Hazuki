@@ -94,8 +94,8 @@ void main() {
 
   test('profile refresh failure falls back to persisted avatar', () async {
     final facade = host.activeHandle.facade;
-    facade.runtime.engine = SourceScriptEngine()
-      ..evaluate('''
+    facade.runtime.engine = SourceScriptEngine();
+    await facade.runtime.engine!.evaluate('''
         this.__hazuki_source = {account: {loadProfile() {
           throw new Error('offline');
         }}};
@@ -115,8 +115,8 @@ void main() {
       ..setMessageHandler((_) {
         calls++;
         return refresh.future;
-      })
-      ..evaluate('''
+      });
+    await facade.runtime.engine!.evaluate('''
         this.__hazuki_source = {account: {loadProfile: () => sendMessage({})}};
       ''');
     final sideData = SourceLoginSideDataOperations(runtimeHost: host);
@@ -133,8 +133,8 @@ void main() {
     final refresh = Completer<dynamic>();
     final facade = host.activeHandle.facade;
     facade.runtime.engine = SourceScriptEngine()
-      ..setMessageHandler((_) => refresh.future)
-      ..evaluate('''
+      ..setMessageHandler((_) => refresh.future);
+    await facade.runtime.engine!.evaluate('''
         this.__hazuki_source = {account: {loadProfile: () => sendMessage({})}};
       ''');
     await facade.saveSourceData('jm', 'avatar_url', 'https://example/cached');
@@ -160,8 +160,8 @@ void main() {
         ..setMessageHandler((_) {
           requested.complete();
           return refresh.future;
-        })
-        ..evaluate('''
+        });
+      await facade.runtime.engine!.evaluate('''
         this.__hazuki_source = {account: {loadProfile: () => sendMessage({})}};
       ''');
       final sideData = SourceLoginSideDataOperations(runtimeHost: host);

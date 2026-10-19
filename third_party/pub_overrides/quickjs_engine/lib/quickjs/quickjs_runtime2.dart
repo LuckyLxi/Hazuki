@@ -11,7 +11,7 @@ import 'package:quickjs_engine/quickjs_engine.dart';
 
 import 'ffi.dart';
 
-export 'ffi.dart' show JSEvalFlag, JSRef;
+export 'ffi.dart' show JSEvalFlag, JSRef, QuickJsHostReply;
 
 part './isolate.dart';
 part './object.dart';
@@ -45,6 +45,7 @@ class QuickJsRuntime2 extends JavascriptRuntime {
 
   /// Handler function to manage js module.
   final _JsHostPromiseRejectionHandler? hostPromiseRejectionHandler;
+  final void Function(int token, int delta)? taskReferenceHandler;
 
   QuickJsRuntime2({
     this.moduleHandler,
@@ -52,6 +53,7 @@ class QuickJsRuntime2 extends JavascriptRuntime {
     this.timeout,
     this.memoryLimit,
     this.hostPromiseRejectionHandler,
+    this.taskReferenceHandler,
   }) {
     this.init();
   }
@@ -62,6 +64,10 @@ class QuickJsRuntime2 extends JavascriptRuntime {
       (ctx, type, ptr) {
         try {
           switch (type) {
+            case JSChannelType.TASK_REFERENCE:
+              final data = ptr.cast<Int64>();
+              taskReferenceHandler?.call(data[0], data[1]);
+              return nullptr;
             case JSChannelType.METHON:
               final pdata = ptr.cast<Pointer<JSValue>>();
               final argc = pdata[1].cast<Int32>().value;
@@ -164,6 +170,37 @@ class QuickJsRuntime2 extends JavascriptRuntime {
     }
   }
 
+  /// One job, allowing an owner to yield for control messages at checkpoints.
+  int executePendingJobOnce() {
+    if (_rt == null) return 0;
+    final result = jsExecutePendingJob(_rt!);
+    if (result < 0) throw _parseJSException(_ctx!);
+    return result;
+  }
+
+  int get taskContext => _rt == null ? 0 : jsGetTaskContext(_rt!);
+  static int get registeredRuntimeCount => runtimeOpaques.length;
+  int get remainingExecutionMilliseconds =>
+      _rt == null ? (timeout ?? 5000) : jsRemainingExecutionMilliseconds(_rt!);
+  void retainTaskContext(int token) {
+    if (_rt != null) jsRetainTaskContext(_rt!, token);
+  }
+
+  void releaseTaskContext(int token) {
+    if (_rt != null) jsReleaseTaskContext(_rt!, token);
+  }
+
+  T withTaskContext<T>(int token, T Function() action) {
+    _ensureEngine();
+    final previous = jsGetTaskContext(_rt!);
+    jsSetTaskContext(_rt!, token);
+    try {
+      return action();
+    } finally {
+      jsSetTaskContext(_rt!, previous);
+    }
+  }
+
   /// Dispatch JavaScript Event loop.
   Future<void> dispatch() async {
     //await for (final _ in port) {
@@ -182,6 +219,7 @@ class QuickJsRuntime2 extends JavascriptRuntime {
     String? name,
     int? evalFlags,
     String? sourceUrl,
+    bool notifyJobs = true,
   }) {
     _ensureEngine();
     final ctx = _ctx!;
@@ -190,6 +228,7 @@ class QuickJsRuntime2 extends JavascriptRuntime {
       command,
       name ?? '<eval>',
       evalFlags ?? JSEvalFlag.GLOBAL,
+      notifyJobs: notifyJobs,
     );
 
     if (jsIsException(jsval) != 0) {

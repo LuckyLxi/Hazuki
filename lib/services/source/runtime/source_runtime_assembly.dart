@@ -122,7 +122,7 @@ class SourceRuntimeAssembly {
       readLoginMethods: (key) => _runtimeCapability.localRuntime.run(
         key,
         (handle) async => SourceLoginMethod.parse(
-          handle.runtime.engine!.evaluate(
+          await handle.runtime.engine!.evaluate(
             'this.__hazuki_source.account?.loginMethods',
           ),
         ),

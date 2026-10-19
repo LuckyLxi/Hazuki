@@ -37,9 +37,11 @@ Future<SourceRuntimeHandle> _createRuntime(String id) async {
   engine.setMessageHandler(
     (dynamic request) => bridge.handleJsMessageForHandle(handle, request),
   );
-  engine.setGlobal('fixtureHtml', _html);
-  engine.evaluate(await File('assets/init.js').readAsString());
-  engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
+  await engine.setGlobal('fixtureHtml', _html);
+  await engine.evaluate(await File('assets/init.js').readAsString());
+  await engine.evaluate(
+    await File('assets/hazuki_plugin_sdk.js').readAsString(),
+  );
   return handle;
 }
 
@@ -93,7 +95,7 @@ void main() {
     () async {
       final handle = await _createRuntime('html_source');
       final engine = handle.runtime.engine!;
-      final result = engine.evaluate('''
+      final result = await engine.evaluate('''
 (() => {
   const doc = new HtmlDocument(fixtureHtml);
   try {
@@ -145,20 +147,26 @@ void main() {
   test('parses incomplete HTML and keeps documents independent', () async {
     final handle = await _createRuntime('html_source');
     final engine = handle.runtime.engine!;
-    engine.evaluate('''
+    await engine.evaluate('''
 const firstDoc = Hazuki.html.parse('<p>First &amp; One');
 const secondDoc = Hazuki.html.parse('<p>Second');
 const savedElement = firstDoc.querySelector('p');
 ''');
-    expect(engine.evaluate('savedElement.text'), 'First & One');
-    engine.evaluate('firstDoc.dispose(); firstDoc.dispose();');
+    expect(await engine.evaluate('savedElement.text'), 'First & One');
+    await engine.evaluate('firstDoc.dispose(); firstDoc.dispose();');
     expect(
-      () => engine.evaluate("firstDoc.querySelector('p')"),
+      () async => await engine.evaluate("firstDoc.querySelector('p')"),
       throwsA(anything),
     );
-    expect(() => engine.evaluate('savedElement.text'), throwsA(anything));
-    expect(engine.evaluate("secondDoc.querySelector('p').text"), 'Second');
-    engine.evaluate('secondDoc.dispose();');
+    expect(
+      () async => await engine.evaluate('savedElement.text'),
+      throwsA(anything),
+    );
+    expect(
+      await engine.evaluate("secondDoc.querySelector('p').text"),
+      'Second',
+    );
+    await engine.evaluate('secondDoc.dispose();');
   });
 
   test(
@@ -166,17 +174,17 @@ const savedElement = firstDoc.querySelector('p');
     () async {
       final first = await _createRuntime('first');
       final second = await _createRuntime('second');
-      first.runtime.engine!.evaluate(
+      await first.runtime.engine!.evaluate(
         "const doc = Hazuki.html.parse('<p>First');",
       );
-      second.runtime.engine!.evaluate(
+      await second.runtime.engine!.evaluate(
         "const doc = Hazuki.html.parse('<p>Second');",
       );
-      expect(first.runtime.engine!.evaluate('doc.key'), 0);
-      expect(second.runtime.engine!.evaluate('doc.key'), 0);
-      first.runtime.engine!.evaluate('doc.dispose();');
+      expect(await first.runtime.engine!.evaluate('doc.key'), 0);
+      expect(await second.runtime.engine!.evaluate('doc.key'), 0);
+      await first.runtime.engine!.evaluate('doc.dispose();');
       expect(
-        second.runtime.engine!.evaluate("doc.querySelector('p').text"),
+        await second.runtime.engine!.evaluate("doc.querySelector('p').text"),
         'Second',
       );
       final documents = second.htmlBridge;
@@ -241,11 +249,11 @@ Hazuki.registerSource({
       await expectLater(loader.loadMetadata(handle, file), throwsA(anything));
       expect(handle.runtime.engine, same(oldEngine));
       expect(handle.htmlBridge, same(oldDocuments));
-      expect(oldEngine.evaluate("doc.querySelector('h1').text"), 'First');
+      expect(await oldEngine.evaluate("doc.querySelector('h1').text"), 'First');
       await manager.write('html_source', script('Second'));
       await loader.loadMetadata(handle, file);
       expect(
-        handle.runtime.engine!.evaluate("doc.querySelector('h1').text"),
+        await handle.runtime.engine!.evaluate("doc.querySelector('h1').text"),
         'Second',
       );
       expect(
