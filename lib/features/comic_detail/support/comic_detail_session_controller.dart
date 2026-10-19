@@ -41,6 +41,7 @@ class ComicDetailSessionController extends ChangeNotifier {
   int _detailsRequestId = 0;
   Map<String, dynamic>? _lastReadProgress;
   int _readingRequestId = 0;
+  StreamSubscription<void>? _readingProgressSubscription;
 
   Future<ComicDetailsData> get future => _future;
   bool get hasDetailsTimedOut => _hasDetailsTimedOut;
@@ -50,6 +51,13 @@ class ComicDetailSessionController extends ChangeNotifier {
   void initialize() {
     _future = _createComicDetailsFuture();
     unawaited(_warmupReaderImages());
+    // Route return can precede the reader's asynchronous exit save.
+    _readingProgressSubscription = _repository
+        .watchReadingProgressChanges()
+        .listen(
+          (_) => unawaited(loadReadingProgress()),
+          onError: (Object _) {},
+        );
     unawaited(loadReadingProgress());
     unawaited(_loadFavoriteOverrideState());
     unawaited(_recordHistory());
@@ -72,6 +80,7 @@ class ComicDetailSessionController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    unawaited(_readingProgressSubscription?.cancel());
     _detailsTimeoutTimer?.cancel();
     _detailsTimeoutTimer = null;
     super.dispose();

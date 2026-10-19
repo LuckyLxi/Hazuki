@@ -22,6 +22,7 @@ import 'package:hazuki/features/comic_detail/view/comic_detail_view_primitives.d
 import 'package:hazuki/features/comic_detail/repository/comic_detail_repository.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_dependencies.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_reveal_registry.dart';
+import 'package:hazuki/features/comic_detail/support/comic_detail_scope.dart';
 import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -30,10 +31,12 @@ import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/window/window_title_bar_control.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/widgets/cached_image_widgets.dart';
 import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
@@ -86,6 +89,204 @@ void main() {
     await ensureTestServiceLocator();
   });
   for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
+    testWidgets('reader icon moves smoothly as the label shrinks ($platform)', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final facade = _MutableReadingProgressDetailFacade();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: platform),
+          locale: const Locale('en'),
+          builder: (context, child) => withTestSourcePresentation(child!),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: _buildDesktopTestDetail(
+            comic: const ExploreComic(
+              id: 'shrinking-progress',
+              sourceKey: 'copy_manga',
+              title: 'Comic',
+              subTitle: '',
+              cover: '',
+            ),
+            facade: facade,
+            shouldAnimateInitialRevealOverride: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final icon = find.byIcon(Icons.menu_book_outlined);
+      final initialX = tester.getCenter(icon).dx;
+      final session = ComicDetailScope.of(
+        tester.element(find.byType(ComicDetailHeaderActionRow)),
+      ).session;
+      facade.progress = null;
+      await session.loadReadingProgress();
+      await tester.pump();
+      expect(tester.getCenter(icon).dx, closeTo(initialX, 0.1));
+      await tester.pump(const Duration(milliseconds: 80));
+      final middleX = tester.getCenter(icon).dx;
+      await tester.pump(const Duration(milliseconds: 120));
+      final nearEndX = tester.getCenter(icon).dx;
+      await tester.pumpAndSettle();
+      final finalX = tester.getCenter(icon).dx;
+      expect(middleX, greaterThan(initialX));
+      expect(middleX, lessThan(finalX));
+      expect(nearEndX, greaterThan(middleX));
+      expect(finalX - nearEndX, lessThan((finalX - initialX) * 0.05));
+      expect(find.text('Read'), findsOneWidget);
+      expect(find.text('Continue reading Chapter 3'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    });
+    testWidgets(
+      'reading button updates after a delayed reader exit save ($platform)',
+      (tester) async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(
+          ReaderSettingsStore.windowsShortcutsGuideSeenKey,
+          true,
+        );
+        tester.view.physicalSize = const Size(1200, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final titleBar = _NavigationTitleBarControl();
+        addTearDown(titleBar.dispose);
+        final progress = _DelayedReadingProgressService(
+          database: sl<HazukiDatabase>(),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(platform: platform),
+            locale: const Locale('en'),
+            builder: (context, child) => withTestSourcePresentation(
+              HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
+            ),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: ComicDetailPage(
+              comic: const ExploreComic(
+                id: 'delayed-progress',
+                sourceKey: 'copy_manga',
+                title: 'Comic',
+                subTitle: '',
+                cover: '',
+              ),
+              dependencies: _comicDetailDependencies(),
+              repository: _ReadingProgressDetailFacade(),
+              heroTag: 'delayed-progress',
+              shouldAnimateInitialRevealOverride: false,
+              readerWidgetBuilder:
+                  ({
+                    required title,
+                    required chapterTitle,
+                    required comicId,
+                    required epId,
+                    required chapterIndex,
+                    required images,
+                    required sourceKey,
+                    coverUrl = '',
+                    comicTheme,
+                    onFavoriteRequested,
+                  }) => ReaderPage(
+                    title: title,
+                    chapterTitle: chapterTitle,
+                    comicId: comicId,
+                    epId: epId,
+                    chapterIndex: chapterIndex,
+                    images: const [],
+                    sourceKey: sourceKey,
+                    offlineMode: true,
+                    dependencies: ReaderDependencies(
+                      sourceReader: sl<SourceReaderGateway>(),
+                      sourceSettings: sl<SourceSettingsGateway>(),
+                      readingProgressService: progress,
+                      downloader: sl<MangaDownloadService>(),
+                    ),
+                    commentsWidgetBuilder: _buildReaderComments,
+                  ),
+              searchPageBuilder: (_) => const SizedBox.shrink(),
+              commentsWidgetBuilder: _buildComments,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Read'), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Chapter 3'));
+        await tester.pumpAndSettle();
+        final reader = find.byType(ReaderPage);
+        expect(reader, findsOneWidget);
+        Navigator.of(tester.element(reader)).pop();
+        await tester.pumpAndSettle();
+        expect(reader, findsNothing);
+        expect(find.text('Read'), findsOneWidget);
+        final button = find.ancestor(
+          of: find.text('Read'),
+          matching: find.byType(FilledButton),
+        );
+        final buttonRect = tester.getRect(button);
+        // The route-return refresh has already finished with no saved progress.
+        // Commit only now, after the reader has been disposed.
+        await tester.runAsync(() async {
+          progress.allowSave.complete();
+          await progress.saved.future;
+        });
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 80));
+        expect(find.text('Read'), findsOneWidget);
+        final updatedLabel = find.text('Continue reading Chapter 3');
+        expect(updatedLabel, findsOneWidget);
+        final fade = tester.widget<FadeTransition>(
+          find
+              .ancestor(of: updatedLabel, matching: find.byType(FadeTransition))
+              .first,
+        );
+        expect(fade.opacity.value, greaterThan(0));
+        expect(fade.opacity.value, lessThan(1));
+        final slide = tester.widget<SlideTransition>(
+          find
+              .ancestor(
+                of: updatedLabel,
+                matching: find.byType(SlideTransition),
+              )
+              .first,
+        );
+        expect(slide.position.value.dy, greaterThan(0));
+        expect(slide.position.value.dy, lessThan(0.16));
+        final animatingButtonRect = tester.getRect(button);
+        expect(animatingButtonRect.left, buttonRect.left);
+        expect(animatingButtonRect.right, buttonRect.right);
+        expect(animatingButtonRect.center, buttonRect.center);
+        await tester.pumpAndSettle();
+        expect(find.text('Continue reading Chapter 3'), findsOneWidget);
+        expect(find.text('Read'), findsNothing);
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await tester.pumpAndSettle();
+        final switcher = tester.widget<AnimatedSwitcher>(
+          find
+              .ancestor(
+                of: updatedLabel,
+                matching: find.byType(AnimatedSwitcher),
+              )
+              .first,
+        );
+        expect(switcher.duration, Duration.zero);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+    );
     for (final canLike in [false, true]) {
       testWidgets(
         'custom header stats keep order, localization and like behavior ($platform, like=$canLike)',
@@ -1753,6 +1954,57 @@ class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
 class _NavigationDetailFacade extends _DesktopDetailFacade {
   @override
   Future<List<CategoryTagGroup>> loadCategoryTagGroups() async => [];
+}
+
+class _ReadingProgressDetailFacade extends _NavigationDetailFacade {
+  @override
+  Future<ComicDetailsData> loadComicDetails(
+    String id, {
+    String sourceKey = '',
+    bool forceRefresh = false,
+  }) async => (await super.loadComicDetails(id)).copyWith(
+    chapters: const {'1': 'Chapter 1', '2': 'Chapter 2', '3': 'Chapter 3'},
+  );
+}
+
+class _MutableReadingProgressDetailFacade extends _ReadingProgressDetailFacade {
+  Map<String, dynamic>? progress = {
+    'epId': '3',
+    'title': 'Chapter 3',
+    'index': 2,
+  };
+
+  @override
+  Future<Map<String, dynamic>?> loadReadingProgress(String comicId) async =>
+      progress;
+}
+
+class _DelayedReadingProgressService extends ReadingProgressService {
+  _DelayedReadingProgressService({required super.database});
+
+  final allowSave = Completer<void>();
+  final saved = Completer<void>();
+
+  @override
+  Future<void> save({
+    required String comicId,
+    required String sourceKey,
+    required String epId,
+    required String title,
+    required int chapterIndex,
+    required int pageIndex,
+  }) async {
+    await allowSave.future;
+    await super.save(
+      comicId: comicId,
+      sourceKey: sourceKey,
+      epId: epId,
+      title: title,
+      chapterIndex: chapterIndex,
+      pageIndex: pageIndex,
+    );
+    saved.complete();
+  }
 }
 
 class _NavigationTitleBarControl extends ChangeNotifier
