@@ -18,11 +18,13 @@ class HomeSourceSwitchMorphButton extends StatelessWidget {
     required this.onPressed,
     required this.dialogOpen,
     this.dialogOpenListenable,
+    this.buttonKey,
   });
 
   final Future<void> Function(FavoriteFoldersMorphOrigin) onPressed;
   final bool dialogOpen;
   final ValueListenable<bool>? dialogOpenListenable;
+  final GlobalKey? buttonKey;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +47,7 @@ class HomeSourceSwitchMorphButton extends StatelessWidget {
         opacity: dialogOpen ? 0 : 1,
         child: Builder(
           builder: (buttonContext) => HomeSourceSwitchPillButton(
+            key: buttonKey,
             onPressed: () {
               if (dialogOpen) return;
               final box = buttonContext.findRenderObject()! as RenderBox;
@@ -61,6 +64,21 @@ class HomeSourceSwitchMorphButton extends StatelessWidget {
                     borderColor: HazukiLiquidGlass.isAvailable
                         ? Colors.transparent
                         : _pillBorderColor(isDark),
+                    resolveReturnRect: () {
+                      // The source/profile key can replace the entire header.
+                      // Use the shell-owned key to find its current button.
+                      final currentContext =
+                          buttonKey?.currentContext ??
+                          (buttonContext.mounted ? buttonContext : null);
+                      final currentBox = currentContext?.findRenderObject();
+                      if (currentBox is! RenderBox ||
+                          !currentBox.attached ||
+                          !currentBox.hasSize) {
+                        return null;
+                      }
+                      return currentBox.localToGlobal(Offset.zero) &
+                          currentBox.size;
+                    },
                   ),
                 ),
               );

@@ -29,9 +29,13 @@ void _sourceSwitchMorphTests(bool glassEnabled) {
   late StateSetter setHomeState;
   late BuildContext homeContext;
   late ValueNotifier<bool> dialogOpenState;
+  late GlobalKey sourceSwitchButtonKey;
   var dialogOpen = false;
   var headerRevision = 0;
   var activeSource = 'a';
+  var username = 'guest';
+  var profileLoading = false;
+  Future<void> Function()? onSourceSwitched;
   final button = find.byType(HomeSourceSwitchPillButton);
   final morph = find.byType(FavoriteFoldersButtonMorph);
 
@@ -47,9 +51,13 @@ void _sourceSwitchMorphTests(bool glassEnabled) {
 
   setUp(() {
     dialogOpenState = ValueNotifier(false);
+    sourceSwitchButtonKey = GlobalKey();
     dialogOpen = false;
     headerRevision = 0;
     activeSource = 'a';
+    username = 'guest';
+    profileLoading = false;
+    onSourceSwitched = null;
     gateway = _Gateway();
     when(gateway.loadActiveSourcePreference).thenAnswer((_) async {});
     when(() => gateway.activeSourceKey).thenAnswer((_) => activeSource);
@@ -106,17 +114,18 @@ void _sourceSwitchMorphTests(bool glassEnabled) {
                     deferUpdates: deferHeaderUpdates,
                     child: HomeDrawerProfileHeader(
                       key: ValueKey(headerRevision),
-                      profile: const HomeSidebarProfileState(
+                      profile: HomeSidebarProfileState(
                         isLogged: false,
-                        profileLoading: false,
+                        profileLoading: profileLoading,
                         avatarUrl: '',
-                        username: 'guest',
+                        username: username,
                         autoCheckInEnabled: false,
                         showCheckInActions: false,
                         checkInBusy: false,
                         checkedInToday: false,
                       ),
                       actions: HomeSidebarActions(
+                        sourceSwitchButtonKey: sourceSwitchButtonKey,
                         sourceSwitchDialogOpen: dialogOpen,
                         sourceSwitchDialogOpenListenable: dialogOpenState,
                         onSwitchSourceWithMorph: (origin) async {
@@ -138,6 +147,9 @@ void _sourceSwitchMorphTests(bool glassEnabled) {
                               context,
                               sourceService: gateway,
                               morphOrigin: origin,
+                              onSourceSwitched: () async {
+                                await onSourceSwitched?.call();
+                              },
                               onDialogClosed: restoreButton,
                             );
                           } finally {
@@ -374,6 +386,105 @@ void _sourceSwitchMorphTests(bool glassEnabled) {
     expect(buttonOpacity(tester), 1);
     expect(tester.takeException(), isNull);
   });
+
+  for (final deferHeaderUpdates in [false, true]) {
+    testWidgets(
+      'switch returns to the new username with deferred header=$deferHeaderUpdates',
+      (tester) async {
+        await pumpHome(tester, deferHeaderUpdates: deferHeaderUpdates);
+        final oldOrigin = tester.getRect(button);
+        final initialized = Completer<void>();
+        when(() => gateway.activateSource('b')).thenAnswer((_) async {
+          activeSource = 'b';
+          setHomeState(() {
+            profileLoading = true;
+            headerRevision++;
+          });
+        });
+        when(
+          () => gateway.ensureInitialized(sourceKey: 'b'),
+        ).thenAnswer((_) => initialized.future);
+        onSourceSwitched = () async {
+          setHomeState(() {
+            profileLoading = false;
+            username = deferHeaderUpdates ? 'A much longer account name' : 'x';
+            headerRevision++;
+          });
+        };
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        final animation = tester
+            .widget<FavoriteFoldersButtonMorph>(morph)
+            .animation;
+        await tester.tap(find.text('Source b'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(profileLoading, isTrue);
+        initialized.complete();
+        for (var frame = 0; frame < 8; frame++) {
+          await tester.pump();
+          if (animation.status == AnimationStatus.reverse) break;
+        }
+        expect(animation.status, AnimationStatus.reverse);
+        await tester.pump();
+        final target = tester.getRect(button);
+        expect((target.left - oldOrigin.left).abs(), greaterThan(20));
+        expect(buttonOpacity(tester), 0);
+        // Keep the success prompt's staged entrance on separate frames.
+        await tester.pump(const Duration(milliseconds: 70));
+        await tester.pump(const Duration(milliseconds: 90));
+        await tester.pump(const Duration(milliseconds: 40));
+        await tester.pump(const Duration(milliseconds: 359));
+        expect(
+          surfaceRect(tester),
+          rectMoreOrLessEquals(target, epsilon: 0.01),
+        );
+        expect(buttonOpacity(tester), 0);
+        await tester.pump(const Duration(milliseconds: 2));
+        expect(buttonOpacity(tester), 1);
+        expect(tester.getRect(button), target);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final elapsed in [200, 450]) {
+    testWidgets(
+      'username changes at ${elapsed}ms of closing keep the morph continuous',
+      (tester) async {
+        await pumpHome(tester);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancel'));
+        await tester.pump();
+        await tester.pump(Duration(milliseconds: elapsed));
+        final beforeUpdate = surfaceRect(tester);
+        setHomeState(() {
+          username = 'A much longer account name';
+          headerRevision++;
+        });
+        await tester.pump();
+        expect(
+          surfaceRect(tester),
+          rectMoreOrLessEquals(beforeUpdate, epsilon: 0.001),
+        );
+        final target = tester.getRect(button);
+        await tester.pump(Duration(milliseconds: 559 - elapsed));
+        expect(
+          surfaceRect(tester),
+          rectMoreOrLessEquals(target, epsilon: 0.01),
+        );
+        await tester.pump(const Duration(milliseconds: 2));
+        expect(buttonOpacity(tester), 1);
+        expect(tester.getRect(button), target);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('failed switch restores the picker and its closing animation', (
     tester,

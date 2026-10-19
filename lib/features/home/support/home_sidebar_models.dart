@@ -44,6 +44,7 @@ class HomeSidebarActions {
     this.onSwitchSourceWithMorph,
     this.sourceSwitchDialogOpen = false,
     this.sourceSwitchDialogOpenListenable,
+    this.sourceSwitchButtonKey,
     this.onSelectDiscover,
     this.onSelectFavorite,
     this.onOpenHistory,
@@ -62,6 +63,7 @@ class HomeSidebarActions {
   onSwitchSourceWithMorph;
   final bool sourceSwitchDialogOpen;
   final ValueListenable<bool>? sourceSwitchDialogOpenListenable;
+  final GlobalKey? sourceSwitchButtonKey;
   final VoidCallback? onSelectDiscover;
   final VoidCallback? onSelectFavorite;
   final VoidCallback? onOpenHistory;

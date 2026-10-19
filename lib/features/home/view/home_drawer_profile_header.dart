@@ -86,6 +86,7 @@ class HomeDrawerProfileHeader extends StatelessWidget {
                         offset: const Offset(0, 2),
                         child: actions.onSwitchSourceWithMorph != null
                             ? HomeSourceSwitchMorphButton(
+                                buttonKey: actions.sourceSwitchButtonKey,
                                 onPressed: actions.onSwitchSourceWithMorph!,
                                 dialogOpen: actions.sourceSwitchDialogOpen,
                                 dialogOpenListenable:
