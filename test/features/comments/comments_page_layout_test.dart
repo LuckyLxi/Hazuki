@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comments/view/comments_page.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_panels.dart';
+import 'package:hazuki/features/reader/view/reader_comments_sheet.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
+import 'package:hazuki/shared/comments/comments_sort_scope.dart';
 import 'package:hazuki/widgets/source_image_gateway_scope.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -50,6 +53,195 @@ void main() {
   });
 
   tearDown(() => filter.dispose());
+
+  testWidgets('tab header sort fades in and out and updates comment ordering', (
+    tester,
+  ) async {
+    source.sortOptions = const SourceCommentSortOptions(
+      orders: {'new': 'Newest', 'old': 'Oldest'},
+      defaultOrder: 'new',
+    );
+    final binding = CommentsSortBinding();
+    final tabs = TabController(length: 3, vsync: tester);
+    addTearDown(binding.dispose);
+    addTearDown(tabs.dispose);
+    await tester.pumpWidget(
+      SourceImageGatewayScope(
+        gateway: source,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: CommentsSortScope(
+            binding: binding,
+            child: Scaffold(
+              body: NestedScrollView(
+                headerSliverBuilder: (context, _) => [
+                  SliverOverlapAbsorber(
+                    handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                      context,
+                    ),
+                    sliver: SliverPersistentHeader(
+                      pinned: true,
+                      delegate: HazukiTabBarDelegate(
+                        TabBar(
+                          controller: tabs,
+                          isScrollable: true,
+                          tabs: const [
+                            Tab(text: 'Info'),
+                            Tab(text: 'Comments'),
+                            Tab(text: 'Related'),
+                          ],
+                        ),
+                        Colors.white,
+                        detailsReady: true,
+                        shouldAnimateInitialDetailReveal: false,
+                        trailing: ComicDetailCommentsSortAction(
+                          tabController: tabs,
+                          tabIndex: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                body: CommentsPage(
+                  sourceService: source,
+                  filterService: filter,
+                  comicId: 'comic',
+                  sourceKey: 'source',
+                  interactionState: state,
+                  isTabView: true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.swap_vert), findsNothing);
+
+    await tester.tap(find.text('Comments'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 50));
+    final fade = find
+        .ancestor(
+          of: find.byType(CommentsSortButton),
+          matching: find.byType(FadeTransition),
+        )
+        .first;
+    expect(
+      tester.widget<FadeTransition>(fade).opacity.value,
+      inExclusiveRange(0, 1),
+    );
+    await tester.pumpAndSettle();
+    final sort = find.byIcon(Icons.swap_vert);
+    expect(sort, findsOneWidget);
+    final header = tester.getRect(find.byType(TabBar));
+    final sortRect = tester.getRect(sort);
+    expect(sortRect.left, greaterThanOrEqualTo(header.right));
+    expect(sortRect.center.dy, closeTo(header.center.dy, 1));
+    await tester.tap(sort);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Oldest'));
+    await tester.pumpAndSettle();
+    expect(source.lastOrder, 'old');
+    expect(find.text('Oldest'), findsOneWidget);
+
+    await tester.tap(find.text('Related'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(
+      tester.widget<FadeTransition>(fade).opacity.value,
+      inExclusiveRange(0, 1),
+    );
+    expect(sort.hitTestable(), findsNothing);
+    await tester.pumpAndSettle();
+    expect(sort, findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  testWidgets('reader sheet sort sits left of close with a safe gap', (
+    tester,
+  ) async {
+    source.sortOptions = const SourceCommentSortOptions(
+      orders: {'new': 'Newest', 'old': 'Oldest'},
+      defaultOrder: 'new',
+    );
+    await tester.pumpWidget(
+      SourceImageGatewayScope(
+        gateway: source,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => ReaderCommentsSheet(
+                    comicId: 'comic',
+                    subId: null,
+                    chapterId: 'chapter',
+                    sourceKey: 'source',
+                    interactionState: state,
+                    commentsWidgetBuilder:
+                        ({
+                          required comicId,
+                          required sourceKey,
+                          subId,
+                          chapterId,
+                          scrollController,
+                          onRequestTabFullscreen,
+                          interactionState,
+                        }) => CommentsPage(
+                          sourceService: source,
+                          filterService: filter,
+                          comicId: comicId,
+                          sourceKey: sourceKey,
+                          showAppBar: false,
+                          scrollController: scrollController,
+                          onRequestTabFullscreen: onRequestTabFullscreen,
+                          interactionState: interactionState,
+                        ),
+                  ),
+                ),
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    final sort = find.byIcon(Icons.swap_vert);
+    expect(sort, findsOneWidget);
+    final sortButton = find
+        .ancestor(of: sort, matching: find.byType(InkWell))
+        .first;
+    final closeButton = find.widgetWithIcon(IconButton, Icons.close_rounded);
+    final sortRect = tester.getRect(sortButton);
+    final closeRect = tester.getRect(closeButton);
+    expect(closeRect.left - sortRect.right, closeTo(16, 0.01));
+    expect(sortRect.center.dy, closeTo(closeRect.center.dy, 0.01));
+    await tester.tap(sort);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Oldest'));
+    await tester.pumpAndSettle();
+    expect(source.lastOrder, 'old');
+    await tester.tap(closeButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(ReaderCommentsSheet), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   Future<void> pumpComments(
     WidgetTester tester, {

@@ -119,22 +119,23 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
             delegate: _FrostedMenuLayout(
               anchorRect: anchorRect,
               bounds: bounds,
-              below: below,
             ),
             child: AnimatedBuilder(
               animation: progressAnimation,
-              child: _FrostedMenuSurface<T>(
-                animation: progressAnimation,
-                selected: selected,
-                options: options,
-                label: label,
-                keyPrefix: keyPrefix,
-                onSelected: (mode) {
-                  if (isCurrent &&
-                      animation.status != AnimationStatus.reverse) {
-                    navigator!.pop(mode);
-                  }
-                },
+              child: IntrinsicWidth(
+                child: _FrostedMenuSurface<T>(
+                  animation: progressAnimation,
+                  selected: selected,
+                  options: options,
+                  label: label,
+                  keyPrefix: keyPrefix,
+                  onSelected: (mode) {
+                    if (isCurrent &&
+                        animation.status != AnimationStatus.reverse) {
+                      navigator!.pop(mode);
+                    }
+                  },
+                ),
               ),
               builder: (context, child) {
                 final progress = progressAnimation.value;
@@ -165,27 +166,17 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
 }
 
 class _FrostedMenuLayout extends SingleChildLayoutDelegate {
-  const _FrostedMenuLayout({
-    required this.anchorRect,
-    required this.bounds,
-    required this.below,
-  });
+  const _FrostedMenuLayout({required this.anchorRect, required this.bounds});
 
   final Rect anchorRect;
   final Rect bounds;
-  final bool below;
-  static const gap = 8.0;
 
   @override
   BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
     final width = math.min(240.0, math.max(0.0, bounds.width));
-    final availableHeight = below
-        ? bounds.bottom - anchorRect.bottom - gap
-        : anchorRect.top - bounds.top - gap;
     return BoxConstraints(
-      minWidth: width,
       maxWidth: width,
-      maxHeight: math.max(0, availableHeight),
+      maxHeight: math.max(0, bounds.height),
     );
   }
 
@@ -195,14 +186,15 @@ class _FrostedMenuLayout extends SingleChildLayoutDelegate {
       bounds.left,
       math.max(bounds.left, bounds.right - childSize.width),
     ),
-    below ? anchorRect.bottom + gap : anchorRect.top - gap - childSize.height,
+    anchorRect.top.clamp(
+      bounds.top,
+      math.max(bounds.top, bounds.bottom - childSize.height),
+    ),
   );
 
   @override
   bool shouldRelayout(_FrostedMenuLayout oldDelegate) =>
-      anchorRect != oldDelegate.anchorRect ||
-      bounds != oldDelegate.bounds ||
-      below != oldDelegate.below;
+      anchorRect != oldDelegate.anchorRect || bounds != oldDelegate.bounds;
 }
 
 class _FrostedMenuSurface<T> extends StatelessWidget {
@@ -255,6 +247,7 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (final option in options)
                     Semantics(
@@ -279,7 +272,7 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
                               ),
                               child: Row(
                                 children: [
-                                  Expanded(
+                                  Flexible(
                                     child: Text(
                                       option.label,
                                       style: Theme.of(context)
@@ -295,7 +288,7 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
                                           ),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 8),
                                   SizedBox(
                                     width: 20,
                                     child: option.value == selected

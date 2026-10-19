@@ -7,6 +7,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
 import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/comments/comments_sort_scope.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_header.dart';
@@ -15,7 +16,7 @@ import 'comic_detail_panels.dart';
 import 'comic_detail_related_tab.dart';
 import 'comic_detail_view_primitives.dart';
 
-class ComicDetailBody extends StatelessWidget {
+class ComicDetailBody extends StatefulWidget {
   const ComicDetailBody({
     super.key,
     required this.scrollController,
@@ -43,250 +44,285 @@ class ComicDetailBody extends StatelessWidget {
   final CommentsWidgetBuilder commentsWidgetBuilder;
 
   @override
+  State<ComicDetailBody> createState() => _ComicDetailBodyState();
+}
+
+class _ComicDetailBodyState extends State<ComicDetailBody> {
+  final _sortBinding = CommentsSortBinding();
+
+  @override
+  void dispose() {
+    _sortBinding.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final scrollController = widget.scrollController;
+    final heroTag = widget.heroTag;
+    final comic = widget.comic;
+    final headerTitleKey = widget.headerTitleKey;
+    final favoriteRowKey = widget.favoriteRowKey;
+    final actionButtonsKey = widget.actionButtonsKey;
+    final isDesktopPanel = widget.isDesktopPanel;
+    final buildComicDetailPage = widget.buildComicDetailPage;
+    final commentsWidgetBuilder = widget.commentsWidgetBuilder;
     final scope = ComicDetailScope.of(context);
     final session = scope.session;
     final uiState = scope.uiState;
     final surface = Theme.of(context).colorScheme.surface;
     final isDesktop = Theme.of(context).platform == TargetPlatform.windows;
 
-    return ListenableBuilder(
-      listenable: session,
-      builder: (context, _) {
-        return FutureBuilder<ComicDetailsData>(
-          future: session.future,
-          builder: (context, snapshot) {
-            final details = snapshot.data;
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-            final skeletonColor = isDark
-                ? Colors.white.withValues(alpha: 0.1)
-                : Colors.black.withValues(alpha: 0.06);
+    return CommentsSortScope(
+      binding: _sortBinding,
+      child: ListenableBuilder(
+        listenable: session,
+        builder: (context, _) {
+          return FutureBuilder<ComicDetailsData>(
+            future: session.future,
+            builder: (context, snapshot) {
+              final details = snapshot.data;
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              final skeletonColor = isDark
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.black.withValues(alpha: 0.06);
 
-            final displayTitle = details?.title ?? comic.title;
-            final listCoverUrl = comic.cover.trim();
-            final displayCoverUrl = listCoverUrl.isNotEmpty
-                ? listCoverUrl
-                : (details?.cover.trim() ?? '');
-            final shouldAnimateInitialDetailReveal =
-                uiState.shouldAnimateInitialDetailReveal;
-            final shouldAnimateResolvedContent =
-                shouldAnimateInitialDetailReveal && details != null;
-            final supportsRelatedTab = scope.supportsRelatedTab;
-            final supportsCommentsTab = uiState.commentsTabIndex != null;
+              final displayTitle = details?.title ?? comic.title;
+              final listCoverUrl = comic.cover.trim();
+              final displayCoverUrl = listCoverUrl.isNotEmpty
+                  ? listCoverUrl
+                  : (details?.cover.trim() ?? '');
+              final shouldAnimateInitialDetailReveal =
+                  uiState.shouldAnimateInitialDetailReveal;
+              final shouldAnimateResolvedContent =
+                  shouldAnimateInitialDetailReveal && details != null;
+              final supportsRelatedTab = scope.supportsRelatedTab;
+              final supportsCommentsTab = uiState.commentsTabIndex != null;
 
-            uiState.updateAppBarMetadata(
-              title: displayTitle,
-              updateTime: details?.updateTime ?? '',
-            );
-            if (details != null) {
-              uiState.markComicDetailRevealHandled(details.id);
-            }
-            final header = RepaintBoundary(
-              child: ComicDetailHeaderSection(
-                isDesktop: isDesktop,
-                heroTag: heroTag,
-                details: details,
-                skeletonColor: skeletonColor,
-                displayTitle: displayTitle,
-                displayCoverUrl: displayCoverUrl,
-                headerTitleKey: headerTitleKey,
-                favoriteRowKey: favoriteRowKey,
-                actionButtonsKey: actionButtonsKey,
-                shouldAnimateInitialDetailReveal:
-                    shouldAnimateInitialDetailReveal,
-              ),
-            );
+              uiState.updateAppBarMetadata(
+                title: displayTitle,
+                updateTime: details?.updateTime ?? '',
+              );
+              if (details != null) {
+                uiState.markComicDetailRevealHandled(details.id);
+              }
+              final header = RepaintBoundary(
+                child: ComicDetailHeaderSection(
+                  isDesktop: isDesktop,
+                  heroTag: heroTag,
+                  details: details,
+                  skeletonColor: skeletonColor,
+                  displayTitle: displayTitle,
+                  displayCoverUrl: displayCoverUrl,
+                  headerTitleKey: headerTitleKey,
+                  favoriteRowKey: favoriteRowKey,
+                  actionButtonsKey: actionButtonsKey,
+                  shouldAnimateInitialDetailReveal:
+                      shouldAnimateInitialDetailReveal,
+                ),
+              );
 
-            return NestedScrollView(
-              controller: scrollController,
-              physics: const ClampingScrollPhysics(),
-              headerSliverBuilder: (context, _) {
-                return [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        isDesktop ? 24 : 23,
-                        isDesktop ? 28 : 12,
-                        isDesktop ? 24 : 23,
-                        0,
-                      ),
-                      child: isDesktop && shouldAnimateInitialDetailReveal
-                          ? AnimatedSize(
-                              duration: const Duration(milliseconds: 320),
-                              curve: Curves.easeOutCubic,
-                              alignment: Alignment.topCenter,
-                              clipBehavior: Clip.hardEdge,
-                              child: header,
-                            )
-                          : header,
-                    ),
-                  ),
-                  SliverOverlapAbsorber(
-                    handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                      context,
-                    ),
-                    sliver: SliverPersistentHeader(
-                      pinned: true,
-                      delegate: HazukiTabBarDelegate(
-                        TabBar(
-                          controller: uiState.tabController,
-                          onTap: (_) =>
-                              FocusManager.instance.primaryFocus?.unfocus(),
-                          isScrollable: true,
-                          tabAlignment: TabAlignment.start,
-                          padding: isDesktop
-                              ? const EdgeInsets.symmetric(horizontal: 24)
-                              : const EdgeInsets.symmetric(horizontal: 23),
-                          labelPadding: isDesktop
-                              ? const EdgeInsets.symmetric(horizontal: 18)
-                              : const EdgeInsets.only(right: 28),
-                          labelStyle: isDesktop
-                              ? null
-                              : Theme.of(context).textTheme.labelLarge
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                          unselectedLabelColor: isDesktop
-                              ? null
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
-                          indicator: isDesktop
-                              ? null
-                              : UnderlineTabIndicator(
-                                  borderSide: BorderSide(
-                                    width: 3,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                  borderRadius: BorderRadius.circular(3),
-                                  insets: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                ),
-                          indicatorSize: TabBarIndicatorSize.label,
-                          indicatorWeight: 3,
-                          dividerColor: isDesktop
-                              ? Colors.transparent
-                              : Theme.of(context).colorScheme.outlineVariant
-                                    .withValues(alpha: 0.45),
-                          tabs: [
-                            Tab(
-                              height: 44,
-                              text: l10n(context).comicDetailTabInfo,
-                            ),
-                            if (supportsCommentsTab)
-                              Tab(
-                                height: 44,
-                                text: l10n(context).comicDetailTabComments,
-                              ),
-                            if (supportsRelatedTab)
-                              Tab(
-                                height: 44,
-                                text: l10n(context).comicDetailTabRelated,
-                              ),
-                          ],
+              return NestedScrollView(
+                controller: scrollController,
+                physics: const ClampingScrollPhysics(),
+                headerSliverBuilder: (context, _) {
+                  return [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          isDesktop ? 24 : 23,
+                          isDesktop ? 28 : 12,
+                          isDesktop ? 24 : 23,
+                          0,
                         ),
-                        surface,
-                        detailsReady: details != null,
-                        shouldAnimateInitialDetailReveal:
-                            isDesktop && shouldAnimateInitialDetailReveal,
+                        child: isDesktop && shouldAnimateInitialDetailReveal
+                            ? AnimatedSize(
+                                duration: const Duration(milliseconds: 320),
+                                curve: Curves.easeOutCubic,
+                                alignment: Alignment.topCenter,
+                                clipBehavior: Clip.hardEdge,
+                                child: header,
+                              )
+                            : header,
                       ),
                     ),
-                  ),
-                ];
-              },
-              body: ColoredBox(
-                color: surface,
-                child: TabBarView(
-                  controller: uiState.tabController,
-                  physics: const ClampingScrollPhysics(),
-                  children: [
-                    ComicDetailTabTickerScope(
-                      tabController: uiState.tabController,
-                      tabIndex: 0,
-                      builder: (context, shouldRender) {
-                        return RepaintBoundary(
-                          child: ComicDetailInfoTab(
-                            isDesktop: isDesktop,
-                            details: details,
-                            error: snapshot.error,
-                            hasTimedOut: session.hasDetailsTimedOut,
-                            isRetrying: session.isRetryingDetails,
-                            onRetry: session.retry,
-                            skeletonColor: skeletonColor,
-                            isActiveInTabView: shouldRender,
-                            shouldAnimateResolvedContent:
-                                shouldAnimateResolvedContent,
-                          ),
-                        );
-                      },
-                    ),
-                    if (supportsCommentsTab)
-                      ComicDetailTabTickerScope(
-                        tabController: uiState.tabController,
-                        tabIndex: uiState.commentsTabIndex!,
-                        builder: (context, shouldRender) {
-                          return details != null
-                              ? RepaintBoundary(
-                                  child: commentsWidgetBuilder(
-                                    comicId: details.id,
-                                    subId: details.subId.isEmpty
-                                        ? null
-                                        : details.subId,
-                                    sourceKey: details.sourceKey,
-                                    showAppBar: true,
-                                    isTabView: true,
-                                    isActiveInTabView: shouldRender,
-                                    onRequestTabFullscreen:
-                                        uiState.ensureCommentsTabFullscreen,
-                                    debugOuterScrollStateBuilder:
-                                        uiState.buildCommentsTabDebugState,
-                                  ),
-                                )
-                              : const CommentsInitialLoadingView();
-                        },
+                    SliverOverlapAbsorber(
+                      handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                        context,
                       ),
-                    if (supportsRelatedTab)
-                      ComicDetailTabTickerScope(
-                        tabController: uiState.tabController,
-                        tabIndex: uiState.relatedTabIndex!,
-                        builder: (context, shouldRender) {
-                          return RepaintBoundary(
-                            child: ComicDetailRelatedTab(
-                              details: details,
-                              isActiveInTabView: shouldRender,
-                              onOpenComic: (comic, heroTag) {
-                                if (isDesktopPanel &&
-                                    useWindowsComicDetailPanel) {
-                                  WindowsComicDetailControllerScope.of(
+                      sliver: SliverPersistentHeader(
+                        pinned: true,
+                        delegate: HazukiTabBarDelegate(
+                          TabBar(
+                            controller: uiState.tabController,
+                            onTap: (_) =>
+                                FocusManager.instance.primaryFocus?.unfocus(),
+                            isScrollable: true,
+                            tabAlignment: TabAlignment.start,
+                            padding: isDesktop
+                                ? const EdgeInsets.symmetric(horizontal: 24)
+                                : const EdgeInsets.symmetric(horizontal: 23),
+                            labelPadding: isDesktop
+                                ? const EdgeInsets.symmetric(horizontal: 18)
+                                : const EdgeInsets.only(right: 28),
+                            labelStyle: isDesktop
+                                ? null
+                                : Theme.of(context).textTheme.labelLarge
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                            unselectedLabelColor: isDesktop
+                                ? null
+                                : Theme.of(
                                     context,
-                                  ).pushRelated(
-                                    comic,
-                                    heroTag,
-                                    historyTabIndex:
-                                        uiState.tabController.index,
-                                  );
-                                  return;
-                                }
-                                unawaited(
-                                  Navigator.of(context).push(
-                                    buildSnapshottingPageRoute<void>(
-                                      allowSnapshotting: false,
-                                      builder: (_) =>
-                                          buildComicDetailPage(comic, heroTag),
+                                  ).colorScheme.onSurfaceVariant,
+                            indicator: isDesktop
+                                ? null
+                                : UnderlineTabIndicator(
+                                    borderSide: BorderSide(
+                                      width: 3,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                    borderRadius: BorderRadius.circular(3),
+                                    insets: const EdgeInsets.symmetric(
+                                      horizontal: 4,
                                     ),
                                   ),
-                                );
-                              },
+                            indicatorSize: TabBarIndicatorSize.label,
+                            indicatorWeight: 3,
+                            dividerColor: isDesktop
+                                ? Colors.transparent
+                                : Theme.of(context).colorScheme.outlineVariant
+                                      .withValues(alpha: 0.45),
+                            tabs: [
+                              Tab(
+                                height: 44,
+                                text: l10n(context).comicDetailTabInfo,
+                              ),
+                              if (supportsCommentsTab)
+                                Tab(
+                                  height: 44,
+                                  text: l10n(context).comicDetailTabComments,
+                                ),
+                              if (supportsRelatedTab)
+                                Tab(
+                                  height: 44,
+                                  text: l10n(context).comicDetailTabRelated,
+                                ),
+                            ],
+                          ),
+                          surface,
+                          detailsReady: details != null,
+                          shouldAnimateInitialDetailReveal:
+                              isDesktop && shouldAnimateInitialDetailReveal,
+                          trailing: supportsCommentsTab
+                              ? ComicDetailCommentsSortAction(
+                                  tabController: uiState.tabController,
+                                  tabIndex: uiState.commentsTabIndex!,
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ];
+                },
+                body: ColoredBox(
+                  color: surface,
+                  child: TabBarView(
+                    controller: uiState.tabController,
+                    physics: const ClampingScrollPhysics(),
+                    children: [
+                      ComicDetailTabTickerScope(
+                        tabController: uiState.tabController,
+                        tabIndex: 0,
+                        builder: (context, shouldRender) {
+                          return RepaintBoundary(
+                            child: ComicDetailInfoTab(
+                              isDesktop: isDesktop,
+                              details: details,
+                              error: snapshot.error,
+                              hasTimedOut: session.hasDetailsTimedOut,
+                              isRetrying: session.isRetryingDetails,
+                              onRetry: session.retry,
+                              skeletonColor: skeletonColor,
+                              isActiveInTabView: shouldRender,
+                              shouldAnimateResolvedContent:
+                                  shouldAnimateResolvedContent,
                             ),
                           );
                         },
                       ),
-                  ],
+                      if (supportsCommentsTab)
+                        ComicDetailTabTickerScope(
+                          tabController: uiState.tabController,
+                          tabIndex: uiState.commentsTabIndex!,
+                          builder: (context, shouldRender) {
+                            return details != null
+                                ? RepaintBoundary(
+                                    child: commentsWidgetBuilder(
+                                      comicId: details.id,
+                                      subId: details.subId.isEmpty
+                                          ? null
+                                          : details.subId,
+                                      sourceKey: details.sourceKey,
+                                      showAppBar: true,
+                                      isTabView: true,
+                                      isActiveInTabView: shouldRender,
+                                      onRequestTabFullscreen:
+                                          uiState.ensureCommentsTabFullscreen,
+                                      debugOuterScrollStateBuilder:
+                                          uiState.buildCommentsTabDebugState,
+                                    ),
+                                  )
+                                : const CommentsInitialLoadingView();
+                          },
+                        ),
+                      if (supportsRelatedTab)
+                        ComicDetailTabTickerScope(
+                          tabController: uiState.tabController,
+                          tabIndex: uiState.relatedTabIndex!,
+                          builder: (context, shouldRender) {
+                            return RepaintBoundary(
+                              child: ComicDetailRelatedTab(
+                                details: details,
+                                isActiveInTabView: shouldRender,
+                                onOpenComic: (comic, heroTag) {
+                                  if (isDesktopPanel &&
+                                      useWindowsComicDetailPanel) {
+                                    WindowsComicDetailControllerScope.of(
+                                      context,
+                                    ).pushRelated(
+                                      comic,
+                                      heroTag,
+                                      historyTabIndex:
+                                          uiState.tabController.index,
+                                    );
+                                    return;
+                                  }
+                                  unawaited(
+                                    Navigator.of(context).push(
+                                      buildSnapshottingPageRoute<void>(
+                                        allowSnapshotting: false,
+                                        builder: (_) => buildComicDetailPage(
+                                          comic,
+                                          heroTag,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

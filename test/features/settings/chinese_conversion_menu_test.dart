@@ -99,7 +99,7 @@ void main() {
     (const Size(740, 360), Brightness.dark, 2.0),
   ]) {
     testWidgets(
-      'menu opens above a bottom button and fits $size at scale $scale',
+      'menu overlaps a bottom button and fits $size at scale $scale',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -152,11 +152,12 @@ void main() {
           const ValueKey('chinese-conversion-menu-surface'),
         );
         final menuRect = tester.getRect(surface);
-        expect(menuRect.bottom, closeTo(buttonRect.top - 8, 0.1));
+        expect(menuRect.overlaps(buttonRect), isTrue);
         expect(menuRect.right, closeTo(buttonRect.right, 0.1));
         expect(menuRect.left, greaterThanOrEqualTo(12));
         expect(menuRect.top, greaterThanOrEqualTo(12));
         expect(menuRect.right, lessThanOrEqualTo(size.width - 12));
+        expect(menuRect.bottom, lessThanOrEqualTo(size.height - 12));
         final choice = find.byKey(
           const ValueKey('chinese-conversion-choice-simplified'),
         );

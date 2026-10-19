@@ -11,6 +11,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
+import 'package:hazuki/shared/comments/comments_sort_scope.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart'
@@ -64,6 +65,7 @@ class CommentsPage extends StatefulWidget {
 class _CommentsPageState extends State<CommentsPage>
     with AutomaticKeepAliveClientMixin {
   late final CommentsPageController _controller;
+  CommentsSortBinding? _sortBinding;
   late final StreamSubscription<CommentsEffect> _effectSubscription;
   late final ScrollController _scrollController;
   late final bool _ownsScrollController;
@@ -125,7 +127,18 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final binding = CommentsSortScope.maybeOf(context);
+    if (identical(binding, _sortBinding)) return;
+    _sortBinding?.detach(_controller);
+    _sortBinding = binding;
+    binding?.attach(_controller);
+  }
+
+  @override
   void dispose() {
+    _sortBinding?.detach(_controller);
     for (final t in _fullscreenSyncTimers) {
       t.cancel();
     }
@@ -540,7 +553,7 @@ class _CommentsPageState extends State<CommentsPage>
     return ColoredBox(
       color: Theme.of(context).colorScheme.surface,
       child: _CommentsBodyList(
-        sortControl: _buildSortControl(),
+        sortControl: _sortBinding == null ? _buildSortControl() : null,
         comments: _comments,
         visibleComments: visibleComments,
         hiddenCount: hiddenCount,

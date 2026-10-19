@@ -7,6 +7,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
+import 'package:hazuki/shared/comments/comments_sort_delegate.dart';
 
 enum CommentsEffectType {
   initialLoadStarted,
@@ -26,7 +27,8 @@ class CommentsEffect {
   final Object? error;
 }
 
-class CommentsPageController extends ChangeNotifier {
+class CommentsPageController extends ChangeNotifier
+    implements CommentsSortDelegate {
   CommentsPageController({
     required SourceCommentsGateway sourceService,
     required CommentFilterService filterService,
@@ -60,8 +62,12 @@ class CommentsPageController extends ChangeNotifier {
 
   Stream<CommentsEffect> get effects => _effects.stream;
 
+  @override
   SourceCommentSortOptions get sortOptions =>
       _sourceService.commentSortOptionsForSource(sourceKey);
+
+  @override
+  String get selectedOrder => state.order;
 
   bool get isLogged => sourceKey.trim().isEmpty
       ? _sourceService.isLogged
@@ -228,6 +234,7 @@ class CommentsPageController extends ChangeNotifier {
     }
   }
 
+  @override
   Future<void> setOrder(String order) async {
     if (_disposed ||
         !sortOptions.orders.containsKey(order) ||
