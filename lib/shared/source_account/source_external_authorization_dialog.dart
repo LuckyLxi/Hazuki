@@ -5,12 +5,14 @@ import '../../services/source/account/source_external_authorization.dart';
 import '../../services/source/account/source_login_interaction.dart';
 import 'source_account_dialogs.dart';
 import 'source_login_interaction_text.dart';
+import 'source_login_dialog_controller.dart';
 
 Future<Object?> showSourceExternalAuthorization(
   BuildContext context,
   Map<String, dynamic> request,
-  SourceLoginCancellation cancellation,
-) async {
+  SourceLoginCancellation cancellation, {
+  SourceLoginDialogController? dialogController,
+}) async {
   final session = SourceExternalAuthorizationBroker.instance.require(
     request['id'] as String,
     cancellation,
@@ -21,10 +23,22 @@ Future<Object?> showSourceExternalAuthorization(
         (value) => (value, null),
         onError: (Object error) => (null, error),
       );
-  await showHomeAnimatedDialog<void>(
-    context,
-    child: _ExternalAuthorizationDialog(request, cancellation, outcome),
-  );
+  if (dialogController == null) {
+    await showHomeAnimatedDialog<void>(
+      context,
+      child: _ExternalAuthorizationDialog(request, cancellation, outcome),
+    );
+  } else {
+    await dialogController.present(
+      (finish) => _ExternalAuthorizationDialog(
+        request,
+        cancellation,
+        outcome,
+        onComplete: finish,
+      ),
+      cancellation,
+    );
+  }
   final (value, error) = await outcome;
   cancellation.check();
   if (error != null) throw error;
@@ -35,11 +49,13 @@ class _ExternalAuthorizationDialog extends StatefulWidget {
   const _ExternalAuthorizationDialog(
     this.request,
     this.cancellation,
-    this.outcome,
-  );
+    this.outcome, {
+    this.onComplete,
+  });
   final Map<String, dynamic> request;
   final SourceLoginCancellation cancellation;
   final Future<(Map<String, Object>?, Object?)> outcome;
+  final ValueChanged<Object?>? onComplete;
   @override
   State<_ExternalAuthorizationDialog> createState() =>
       _ExternalAuthorizationDialogState();
@@ -62,6 +78,10 @@ class _ExternalAuthorizationDialogState
       widget.outcome.then((_) {
         if (!mounted) return;
         _finished = true;
+        if (widget.onComplete != null) {
+          widget.onComplete!(true);
+          return;
+        }
         final route = _route;
         if (route?.isActive != true) return;
         if (route!.isCurrent) {
@@ -84,7 +104,8 @@ class _ExternalAuthorizationDialogState
     onPopInvokedWithResult: (didPop, _) {
       if (didPop && !_finished) widget.cancellation.cancel();
     },
-    child: AlertDialog(
+    child: SourceLoginStepContent(
+      embedded: widget.onComplete != null,
       backgroundColor: homeDialogBackgroundColor(context),
       title: Text(
         loginInteractionText(

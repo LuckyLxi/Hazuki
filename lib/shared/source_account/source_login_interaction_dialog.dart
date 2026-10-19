@@ -11,6 +11,7 @@ import 'source_account_dialogs.dart';
 import 'source_browser_authorization_dialog.dart';
 import 'source_external_authorization_dialog.dart';
 import 'source_login_interaction_text.dart';
+import 'source_login_dialog_controller.dart';
 
 /// Maps logical widget coordinates to unscaled image pixels, excluding padding.
 Offset? captchaImagePoint(Offset local, Size canvas, Size image) {
@@ -43,21 +44,42 @@ Uint8List _imageBytes(Object? raw) {
 Future<Object?> showSourceLoginInteraction(
   BuildContext context,
   Map<String, dynamic> request,
-  SourceLoginCancellation cancellation,
-) async {
+  SourceLoginCancellation cancellation, {
+  SourceLoginDialogController? dialogController,
+}) async {
   cancellation.check();
   if (!context.mounted) {
     cancellation.cancel();
     cancellation.check();
   }
   if (request['type'] == 'browserAuthorization') {
-    return showSourceBrowserAuthorization(context, request, cancellation);
+    return showSourceBrowserAuthorization(
+      context,
+      request,
+      cancellation,
+      dialogController: dialogController,
+    );
   }
   if (request['type'] == 'externalAuthorization') {
-    return showSourceExternalAuthorization(context, request, cancellation);
+    return showSourceExternalAuthorization(
+      context,
+      request,
+      cancellation,
+      dialogController: dialogController,
+    );
   }
   if (!const {'text', 'clickCaptcha'}.contains(request['type'])) {
     throw const FormatException('login_invalid_interaction');
+  }
+  if (dialogController != null) {
+    return dialogController.present(
+      (finish) => _LoginInteraction(
+        request: request,
+        cancellation: cancellation,
+        onComplete: finish,
+      ),
+      cancellation,
+    );
   }
   final result = await Future.any<Object?>([
     showHomeAnimatedDialog<Object>(
@@ -72,9 +94,14 @@ Future<Object?> showSourceLoginInteraction(
 }
 
 class _LoginInteraction extends StatefulWidget {
-  const _LoginInteraction({required this.request, required this.cancellation});
+  const _LoginInteraction({
+    required this.request,
+    required this.cancellation,
+    this.onComplete,
+  });
   final Map<String, dynamic> request;
   final SourceLoginCancellation cancellation;
+  final ValueChanged<Object?>? onComplete;
   @override
   State<_LoginInteraction> createState() => _LoginInteractionState();
 }
@@ -92,8 +119,13 @@ class _LoginInteractionState extends State<_LoginInteraction> {
   bool _answered = false;
 
   void _finish(Object value) {
+    if (_answered || widget.cancellation.isCancelled) return;
     _answered = true;
-    Navigator.pop(context, value);
+    if (widget.onComplete != null) {
+      widget.onComplete!(value);
+    } else {
+      Navigator.pop(context, value);
+    }
   }
 
   @override
@@ -136,6 +168,7 @@ class _LoginInteractionState extends State<_LoginInteraction> {
   }
 
   void _cancel() {
+    if (widget.onComplete != null) return;
     scheduleMicrotask(() {
       final route = _route;
       if (mounted && route != null && route.isActive) {
@@ -160,7 +193,36 @@ class _LoginInteractionState extends State<_LoginInteraction> {
   Widget build(BuildContext context) {
     final strings = l10n(context);
     final click = widget.request['type'] == 'clickCaptcha';
-    return AlertDialog(
+    const captchaButtonStyle = ButtonStyle(
+      padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 8)),
+      minimumSize: WidgetStatePropertyAll(Size(0, 48)),
+    );
+    final cancel = TextButton(
+      style: click ? captchaButtonStyle : null,
+      onPressed: widget.cancellation.cancel,
+      child: Text(strings.commonCancel, textAlign: TextAlign.center),
+    );
+    final confirm = FilledButton(
+      style: click ? captchaButtonStyle : null,
+      onPressed: click
+          ? _points.isEmpty ||
+                    (widget.request['pointCount'] != null &&
+                        _points.length != widget.request['pointCount'])
+                ? null
+                : () => _finish({
+                    'status': 'submitted',
+                    'points': [
+                      for (final p in _points)
+                        {'x': p.dx.floor(), 'y': p.dy.floor()},
+                    ],
+                  })
+          : _text.text.isEmpty
+          ? null
+          : () => _finish(_text.text),
+      child: Text(strings.commonConfirm, textAlign: TextAlign.center),
+    );
+    return SourceLoginStepContent(
+      embedded: widget.onComplete != null,
       backgroundColor: homeDialogBackgroundColor(context),
       title: Text(
         loginInteractionText(
@@ -189,131 +251,144 @@ class _LoginInteractionState extends State<_LoginInteraction> {
                     border: OutlineInputBorder(),
                   ),
                 ),
-              if (click && _error != null)
-                Text(strings.sourceLoginImageLoadFailed),
-              if (click && _error == null && _imageSize == null)
-                const CircularProgressIndicator(),
               if (_hint != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Image.memory(
-                    _hint!,
+                  child: SizedBox(
                     height: 64,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) =>
-                        Text(strings.sourceLoginImageLoadFailed),
+                    child: Image.memory(
+                      _hint!,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) =>
+                          Text(strings.sourceLoginImageLoadFailed),
+                    ),
                   ),
                 ),
-              if (_imageSize != null)
+              // Decoding must not change the step's layout on the next frame:
+              // consecutive size changes make AnimatedSize snap to its target.
+              if (click)
                 SizedBox(
                   height: 240,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final size = Size(constraints.maxWidth, 240);
-                      final destination = Alignment.center.inscribe(
-                        applyBoxFit(
-                          BoxFit.contain,
-                          _imageSize!,
-                          size,
-                        ).destination,
-                        Offset.zero & size,
-                      );
-                      return GestureDetector(
-                        key: const ValueKey('login-click-captcha'),
-                        onTapUp: (details) {
-                          final point = captchaImagePoint(
-                            details.localPosition,
-                            size,
-                            _imageSize!,
-                          );
-                          final limit =
-                              (widget.request['pointCount'] as num?)?.toInt() ??
-                              32;
-                          if (point != null && _points.length < limit) {
-                            setState(() => _points.add(point));
-                          }
-                        },
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.memory(_image!, fit: BoxFit.contain),
-                            for (var i = 0; i < _points.length; i++)
-                              Positioned(
-                                left:
-                                    destination.left +
-                                    _points[i].dx /
-                                        _imageSize!.width *
-                                        destination.width -
-                                    12,
-                                top:
-                                    destination.top +
-                                    _points[i].dy /
-                                        _imageSize!.height *
-                                        destination.height -
-                                    12,
-                                child: IgnorePointer(
-                                  child: CircleAvatar(
-                                    radius: 12,
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    foregroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimary,
-                                    child: Text(
-                                      '${i + 1}',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 240),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: _error != null
+                        ? Center(
+                            key: const ValueKey('captcha-image-error'),
+                            child: Text(strings.sourceLoginImageLoadFailed),
+                          )
+                        : _imageSize == null
+                        ? const Center(
+                            key: ValueKey('captcha-image-loading'),
+                            child: CircularProgressIndicator(),
+                          )
+                        : LayoutBuilder(
+                            key: const ValueKey('captcha-image-ready'),
+                            builder: (context, constraints) {
+                              final size = Size(constraints.maxWidth, 240);
+                              final destination = Alignment.center.inscribe(
+                                applyBoxFit(
+                                  BoxFit.contain,
+                                  _imageSize!,
+                                  size,
+                                ).destination,
+                                Offset.zero & size,
+                              );
+                              return GestureDetector(
+                                key: const ValueKey('login-click-captcha'),
+                                onTapUp: (details) {
+                                  final point = captchaImagePoint(
+                                    details.localPosition,
+                                    size,
+                                    _imageSize!,
+                                  );
+                                  final limit =
+                                      (widget.request['pointCount'] as num?)
+                                          ?.toInt() ??
+                                      32;
+                                  if (point != null && _points.length < limit) {
+                                    setState(() => _points.add(point));
+                                  }
+                                },
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Image.memory(_image!, fit: BoxFit.contain),
+                                    for (var i = 0; i < _points.length; i++)
+                                      Positioned(
+                                        left:
+                                            destination.left +
+                                            _points[i].dx /
+                                                _imageSize!.width *
+                                                destination.width -
+                                            12,
+                                        top:
+                                            destination.top +
+                                            _points[i].dy /
+                                                _imageSize!.height *
+                                                destination.height -
+                                            12,
+                                        child: IgnorePointer(
+                                          child: CircleAvatar(
+                                            radius: 12,
+                                            backgroundColor: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            foregroundColor: Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimary,
+                                            child: Text(
+                                              '${i + 1}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
+                              );
+                            },
+                          ),
                   ),
                 ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            widget.cancellation.cancel();
-          },
-          child: Text(strings.commonCancel),
-        ),
-        if (click)
-          TextButton(
-            onPressed: () => _finish({'status': 'refresh'}),
-            child: Text(strings.sourceLoginRefresh),
-          ),
-        if (click && _points.isNotEmpty)
-          IconButton(
-            onPressed: () => setState(() => _points.removeLast()),
-            tooltip: strings.sourceLoginUndoPoint,
-            icon: const Icon(Icons.undo),
-          ),
-        FilledButton(
-          onPressed: click
-              ? _points.isEmpty ||
-                        (widget.request['pointCount'] != null &&
-                            _points.length != widget.request['pointCount'])
-                    ? null
-                    : () => _finish({
-                        'status': 'submitted',
-                        'points': [
-                          for (final p in _points)
-                            {'x': p.dx.floor(), 'y': p.dy.floor()},
-                        ],
-                      })
-              : _text.text.isEmpty
-              ? null
-              : () => _finish(_text.text),
-          child: Text(strings.commonConfirm),
-        ),
-      ],
+      actions: click
+          ? [
+              Row(
+                key: const ValueKey('login-captcha-actions'),
+                mainAxisAlignment: MainAxisAlignment.end,
+                spacing: 8,
+                children: [
+                  Flexible(child: cancel),
+                  Flexible(
+                    flex: 2,
+                    child: TextButton(
+                      style: captchaButtonStyle,
+                      onPressed: () => _finish({'status': 'refresh'}),
+                      child: Text(
+                        strings.sourceLoginRefresh,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _points.isEmpty
+                        ? null
+                        : () => setState(() => _points.removeLast()),
+                    tooltip: strings.sourceLoginUndoPoint,
+                    icon: const Icon(Icons.undo),
+                  ),
+                  Flexible(child: confirm),
+                ],
+              ),
+            ]
+          : [cancel, confirm],
     );
   }
 }

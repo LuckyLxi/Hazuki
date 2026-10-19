@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:hazuki/shared/source_account/source_login_interaction_dialog.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -77,7 +76,7 @@ class HomeProfileFlow {
       context,
       loginMethods: methods,
       onDismissed: () => attempt?.cancel(),
-      onLoginMethod: (account, password, method) {
+      onLoginMethod: (account, password, method, present) {
         if (service.activeSourceKey != selectedSource) {
           throw const SourceLoginCancelled();
         }
@@ -92,8 +91,7 @@ class HomeProfileFlow {
                 password: password,
                 method: method,
                 cancellation: cancellation,
-                present: (request, token) =>
-                    showSourceLoginInteraction(context, request, token),
+                present: present,
               ),
         );
       },

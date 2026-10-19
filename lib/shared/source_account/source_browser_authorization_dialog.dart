@@ -10,12 +10,14 @@ import '../../services/source/account/source_login_interaction.dart';
 import 'source_account_dialogs.dart';
 import 'source_authorization_browser.dart';
 import 'source_login_interaction_text.dart';
+import 'source_login_dialog_controller.dart';
 
 Future<Object?> showSourceBrowserAuthorization(
   BuildContext context,
   Map<String, dynamic> request,
   SourceLoginCancellation cancellation, {
   SourceAuthorizationBrowser Function()? browserFactory,
+  SourceLoginDialogController? dialogController,
 }) async {
   cancellation.check();
   final session = SourceBrowserAuthorizationSession(
@@ -47,15 +49,20 @@ Future<Object?> showSourceBrowserAuthorization(
     // between creating the future and mounting FutureBuilder.
     unawaited(preparing.catchError((Object _) {}));
     if (!context.mounted) throw const SourceLoginCancelled();
-    await showHomeAnimatedDialog<Object>(
-      context,
-      child: _BrowserAuthorizationDialog(
-        session: session,
-        browser: browser,
-        preparing: preparing,
-        sourceName: request['sourceName']?.toString() ?? '',
-      ),
-    );
+    final preparedBrowser = browser;
+    Widget buildStep(ValueChanged<Object?>? finish) =>
+        _BrowserAuthorizationDialog(
+          session: session,
+          browser: preparedBrowser,
+          preparing: preparing!,
+          sourceName: request['sourceName']?.toString() ?? '',
+          onComplete: finish,
+        );
+    if (dialogController == null) {
+      await showHomeAnimatedDialog<Object>(context, child: buildStep(null));
+    } else {
+      await dialogController.present(buildStep, cancellation);
+    }
     if (session.isActive) cancellation.cancel();
     final (value, error) = await outcome;
     cancellation.check();
@@ -97,11 +104,13 @@ class _BrowserAuthorizationDialog extends StatefulWidget {
     required this.browser,
     required this.preparing,
     required this.sourceName,
+    this.onComplete,
   });
   final SourceBrowserAuthorizationSession session;
   final SourceAuthorizationBrowser browser;
   final Future<void> preparing;
   final String sourceName;
+  final ValueChanged<Object?>? onComplete;
   @override
   State<_BrowserAuthorizationDialog> createState() =>
       _BrowserAuthorizationDialogState();
@@ -136,6 +145,10 @@ class _BrowserAuthorizationDialogState
     if (!widget.session.isActive && !_finished) {
       _finished = true;
       scheduleMicrotask(() {
+        if (widget.onComplete != null) {
+          widget.onComplete!(true);
+          return;
+        }
         final route = _route;
         if (!mounted || route == null || !route.isActive) return;
         if (route.isCurrent) {
@@ -163,7 +176,9 @@ class _BrowserAuthorizationDialogState
       onPopInvokedWithResult: (didPop, _) {
         if (didPop && !_finished) widget.session.cancellation.cancel();
       },
-      child: AlertDialog(
+      child: SourceLoginStepContent(
+        embedded: widget.onComplete != null,
+        width: math.min(808, size.width - 80),
         backgroundColor: homeDialogBackgroundColor(context),
         title: Text(
           loginInteractionText(

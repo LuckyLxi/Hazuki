@@ -10,7 +10,7 @@ import 'package:hazuki/shared/source_account/source_account_dialogs.dart';
 
 void main() {
   testWidgets(
-    'cancelling nested input closes the whole login while preserving the page',
+    'cancelling embedded input closes the whole login while preserving the page',
     (tester) async {
       late BuildContext context;
       await tester.pumpWidget(
@@ -36,8 +36,8 @@ void main() {
           SourceLoginMethod(id: 'prompt', title: 'Prompt', input: 'none'),
         ],
         onLogin: (_, _) async => throw StateError('legacy'),
-        onLoginMethod: (_, _, _) async {
-          await showSourceLoginInteraction(context, {
+        onLoginMethod: (_, _, _, present) async {
+          await present({
             'type': 'text',
             'title': 'Additional input',
           }, cancellation);
@@ -49,7 +49,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byType(FilledButton));
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
       expect(find.text('Additional input'), findsOneWidget);
       await tester.tap(find.text('Cancel').last);
       await tester.pumpAndSettle();
@@ -223,7 +223,7 @@ void main() {
         ],
         onLogin: (_, _) async =>
             throw StateError('Legacy callback must not run'),
-        onLoginMethod: (account, password, method) {
+        onLoginMethod: (account, password, method, _) {
           calls.add('$account/$password/$method');
           return profile.future;
         },
