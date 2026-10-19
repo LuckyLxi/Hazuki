@@ -123,7 +123,12 @@ class CommentsPageController extends ChangeNotifier {
       state.initialLoading = true;
       state.loadingMore = false;
       state.hideFilterLoadMoreQueued = false;
+      state.expandedReplyIds.clear();
       state.loadingReplyIds.clear();
+      state.replyComments.clear();
+      state.replyPages.clear();
+      state.replyMaxPages.clear();
+      state.replyHasMore.clear();
     });
     final startedAt = DateTime.now();
     _logEvent('Comments load started', content: {'page': 1});
