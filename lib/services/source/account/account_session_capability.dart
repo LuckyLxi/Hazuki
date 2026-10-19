@@ -15,6 +15,8 @@ class SourceAccountSessionCapability {
 
   HazukiSourceFacade get facade => _runtimeHost.activeHandle.facade;
 
+  String? get cachedAvatarUrl => _loginOperations.cachedAvatarUrl;
+
   String? get currentAccount {
     if (!_runtimeHost.hasActiveSource) return null;
     final sourceKey = facade.sourceMeta?.key ?? facade.sourceKey;

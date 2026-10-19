@@ -779,6 +779,7 @@ class HazukiCachedCircleAvatar extends StatefulWidget {
     this.useShimmerFallback = false,
     this.ignoreNoImageMode = false,
     this.imageGateway,
+    this.onLoadError,
   });
 
   final String url;
@@ -787,6 +788,7 @@ class HazukiCachedCircleAvatar extends StatefulWidget {
   final bool useShimmerFallback;
   final bool ignoreNoImageMode;
   final SourceImageGateway? imageGateway;
+  final VoidCallback? onLoadError;
 
   @override
   State<HazukiCachedCircleAvatar> createState() =>
@@ -991,6 +993,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
         _setImageBytes(null);
         _loading = false;
       });
+      widget.onLoadError?.call();
     }
   }
 

@@ -7,6 +7,7 @@ import 'source_login_interaction.dart';
 abstract interface class SourceAccountOperations {
   bool get isLogged;
   String? get currentAccount;
+  String? get cachedAvatarUrl;
 
   bool isLoggedForSource(String sourceKey);
   String? currentAccountForSource(String sourceKey);
@@ -54,6 +55,8 @@ class SourceAccountOperationService
   bool get isLogged => _accountSession.isLogged;
   @override
   String? get currentAccount => _accountSession.currentAccount;
+  @override
+  String? get cachedAvatarUrl => _accountSession.cachedAvatarUrl;
 
   @override
   bool isLoggedForSource(String sourceKey) =>

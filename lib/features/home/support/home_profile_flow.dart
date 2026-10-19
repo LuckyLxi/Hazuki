@@ -34,6 +34,8 @@ class HomeProfileFlow {
     String password, {
     SourceAccountLoginOperation? loginOverride,
   }) async {
+    final sourceKey = sourceService.activeSourceKey;
+    final sourceRevision = sourceService.sourceRevision;
     final profile = await loginSourceAccountForDialog(
       sourceService: sourceService,
       account: account,
@@ -56,6 +58,15 @@ class HomeProfileFlow {
     if (!isMounted() || !context.mounted) {
       throw StateError('Home page disposed');
     }
+    if (sourceService.activeSourceKey != sourceKey ||
+        sourceService.sourceRevision != sourceRevision ||
+        !sourceService.isLogged) {
+      throw const SourceLoginCancelled();
+    }
+    profileController.applyLoginProfile(
+      username: profile.username,
+      avatarUrl: profile.avatarUrl,
+    );
     unawaited(showHazukiPrompt(context, l10n(context).homeLoginSuccess));
     return profile;
   }

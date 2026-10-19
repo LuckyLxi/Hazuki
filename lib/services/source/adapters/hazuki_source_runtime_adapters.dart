@@ -116,6 +116,8 @@ class HazukiSourceHomeAdapter extends HazukiSourceListenableAdapter
   @override
   String? get sourceRevision => runtime.sourceRevision;
   @override
+  String? get cachedAvatarUrl => _account.cachedAvatarUrl;
+  @override
   String? get activeSourceKey => runtime.activeSourceKey;
   @override
   bool get supportsLegacyRanking => runtime.supportsLegacyRanking;

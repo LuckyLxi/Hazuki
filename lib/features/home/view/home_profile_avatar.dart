@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
-class HomeProfileAvatar extends StatelessWidget {
+class HomeProfileAvatar extends StatefulWidget {
   const HomeProfileAvatar({
     super.key,
     required this.avatarUrl,
@@ -25,14 +27,48 @@ class HomeProfileAvatar extends StatelessWidget {
   final bool heroEnabled;
   final BorderRadius? borderRadius;
 
-  bool get _useRoundedRectangle => borderRadius != null;
+  @override
+  State<HomeProfileAvatar> createState() => _HomeProfileAvatarState();
+}
+
+class _HomeProfileAvatarState extends State<HomeProfileAvatar> {
+  Timer? _retryTimer;
+  int _retryCount = 0;
+
+  @override
+  void didUpdateWidget(covariant HomeProfileAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.avatarUrl != widget.avatarUrl ||
+        oldWidget.loading != widget.loading) {
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      _retryCount = 0;
+    }
+  }
+
+  void _scheduleRetry() {
+    if (_retryTimer != null || _retryCount >= 2) return;
+    _retryTimer = Timer(Duration(seconds: 1 + _retryCount * 2), () {
+      _retryTimer = null;
+      if (!mounted) return;
+      setState(() => _retryCount++);
+    });
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final resolvedAvatarUrl = (avatarUrl ?? '').trim();
+    final resolvedAvatarUrl = (widget.avatarUrl ?? '').trim();
+    final size = widget.size;
+    final borderWidth = widget.borderWidth;
     final radius = size / 2;
     final contentSize = (size - borderWidth * 2).clamp(0.0, size).toDouble();
-    final borderRadius = this.borderRadius;
+    final borderRadius = widget.borderRadius;
     final fallbackIcon = Icon(
       Icons.person_outline,
       size: contentSize * 0.58,
@@ -46,24 +82,26 @@ class HomeProfileAvatar extends StatelessWidget {
         shape: borderRadius == null ? BoxShape.circle : BoxShape.rectangle,
         borderRadius: borderRadius,
         color:
-            backgroundColor ??
+            widget.backgroundColor ??
             Theme.of(context).colorScheme.surfaceContainerHighest,
         border: borderWidth > 0
             ? Border.all(
                 color:
-                    borderColor ?? Theme.of(context).colorScheme.outlineVariant,
+                    widget.borderColor ??
+                    Theme.of(context).colorScheme.outlineVariant,
                 width: borderWidth,
               )
             : null,
       ),
       child: ClipRRect(
         borderRadius: borderRadius ?? BorderRadius.circular(radius),
-        child: loading
+        child: widget.loading
             ? HazukiShimmerLoading(width: contentSize, height: contentSize)
             : resolvedAvatarUrl.isEmpty
             ? Center(child: fallbackIcon)
-            : _useRoundedRectangle
+            : borderRadius != null
             ? HazukiCachedImage(
+                key: ValueKey(_retryCount),
                 url: resolvedAvatarUrl,
                 width: contentSize,
                 height: contentSize,
@@ -77,18 +115,25 @@ class HomeProfileAvatar extends StatelessWidget {
                   height: contentSize,
                 ),
                 ignoreNoImageMode: true,
+                onStateChanged: (_, state) {
+                  if (state == HazukiCachedImageLoadState.error) {
+                    _scheduleRetry();
+                  }
+                },
               )
             : HazukiCachedCircleAvatar(
+                key: ValueKey(_retryCount),
                 radius: contentSize / 2,
                 url: resolvedAvatarUrl,
                 useShimmerFallback: true,
                 ignoreNoImageMode: true,
+                onLoadError: _scheduleRetry,
               ),
       ),
     );
 
     return HeroMode(
-      enabled: heroEnabled,
+      enabled: widget.heroEnabled,
       child: Hero(
         tag: homeProfileAvatarHeroTag,
         child: Material(
@@ -107,12 +152,12 @@ class HomeProfileAvatar extends StatelessWidget {
   }
 
   BorderSide _heroBorderSide(BuildContext context) {
-    if (borderWidth <= 0) {
+    if (widget.borderWidth <= 0) {
       return BorderSide.none;
     }
     return BorderSide(
-      color: borderColor ?? Theme.of(context).colorScheme.outlineVariant,
-      width: borderWidth,
+      color: widget.borderColor ?? Theme.of(context).colorScheme.outlineVariant,
+      width: widget.borderWidth,
     );
   }
 }

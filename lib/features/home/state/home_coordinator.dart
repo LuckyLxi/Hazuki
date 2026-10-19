@@ -32,6 +32,7 @@ class HomeCoordinator extends ChangeNotifier {
        favoriteActionsBinding = FavoritePageActionsBinding() {
     _lastSourceKey = _sourceService.activeSourceKey;
     _lastSourceRevision = _sourceService.sourceRevision;
+    _awaitingSourceInit = !_sourceService.isInitialized;
     _profileController.addListener(_relayChange);
     _shellController.addListener(_relayChange);
     _dailyRecommendationService.addListener(_relayChange);
@@ -206,6 +207,13 @@ class HomeCoordinator extends ChangeNotifier {
 
   void _handleSourceChanged() {
     final nextSourceKey = _sourceService.activeSourceKey;
+    // Login can replace the runtime while keeping the source key and plugin
+    // revision unchanged. Track that initialization cycle as well as switches.
+    if (!_sourceService.isInitialized &&
+        !_sourceService.runtimeState.hasFailure &&
+        !_sourceService.runtimeState.isWaitingForRestart) {
+      _awaitingSourceInit = true;
+    }
     if (nextSourceKey != _lastSourceKey ||
         _lastSourceRevision != _sourceService.sourceRevision) {
       // 源发生切换，记录状态并立即同步（此时新源可能未初始化）
@@ -219,8 +227,11 @@ class HomeCoordinator extends ChangeNotifier {
         unawaited(syncUserProfile(context));
         unawaited(loadOtherSettings(context));
       }
-    } else if (_awaitingSourceInit && _sourceService.isInitialized) {
-      // 新源初始化完成，重新同步以获取正确的登录状态和头像
+    } else if (_awaitingSourceInit &&
+        (_sourceService.isInitialized ||
+            _sourceService.runtimeState.hasFailure ||
+            _sourceService.runtimeState.isWaitingForRestart)) {
+      // 初始化结束后重新同步，失败时也要结束资料加载状态。
       _awaitingSourceInit = false;
       _profileController.markSourceChanged();
       final context = _context;
@@ -233,7 +244,11 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   Future<void> _prewarmSourceRuntime(BuildContext context) async {
-    await _sourceService.prewarmInBackground();
+    try {
+      await _sourceService.prewarmInBackground();
+    } catch (_) {
+      // Synchronize terminal runtime state even when startup prewarming fails.
+    }
     if (!context.mounted) {
       return;
     }

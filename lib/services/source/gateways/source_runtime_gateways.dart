@@ -68,6 +68,7 @@ abstract interface class SourceSelectionGateway implements Listenable {
 
 abstract interface class SourceHomeGateway
     implements Listenable, SourceAccountGateway {
+  String? get cachedAvatarUrl;
   String? get sourceRevision;
   bool get supportsLegacyRanking;
   SourceMeta? get sourceMeta;

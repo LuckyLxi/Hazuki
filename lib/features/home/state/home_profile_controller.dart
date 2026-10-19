@@ -48,6 +48,14 @@ class HomeProfileController extends ChangeNotifier {
     } catch (_) {}
     // 异步等待后检查 context 是否仍然有效，防止 use_build_context_synchronously 警告
     if (!context.mounted || revision != _profileSyncRevision) return;
+    final sourceKey = _sourceService.activeSourceKey;
+    final sourceRevision = _sourceService.sourceRevision;
+    bool isCurrentSync() =>
+        !_disposed &&
+        context.mounted &&
+        revision == _profileSyncRevision &&
+        sourceKey == _sourceService.activeSourceKey &&
+        sourceRevision == _sourceService.sourceRevision;
     if (_sourceService.activeSourceKey?.isNotEmpty != true) {
       _username = l10n(context).homeGuestUser;
       _avatarUrl = null;
@@ -73,51 +81,57 @@ class HomeProfileController extends ChangeNotifier {
 
     final strings = l10n(context);
     var isLogged = _sourceService.isLogged;
-    var username = _sourceService.currentAccount ?? strings.homeGuestUser;
-    String? avatar;
+    _username = _sourceService.currentAccount ?? strings.homeGuestUser;
+    _avatarUrl = isLogged ? _sourceService.cachedAvatarUrl : null;
+    _profileLoading = false;
+    _notify();
+    String? avatar = _avatarUrl;
     if (isLogged) {
       try {
         avatar = await _sourceService.loadCurrentAvatarUrl();
       } catch (_) {
-        avatar = null;
+        avatar = _avatarUrl;
       }
     }
 
-    if (!context.mounted || revision != _profileSyncRevision) {
+    if (!isCurrentSync()) {
       return;
     }
 
     if (!isLogged && !_hasCompletedProfileSync) {
       await Future<void>.delayed(const Duration(milliseconds: 160));
-      if (!context.mounted || revision != _profileSyncRevision) {
+      if (!isCurrentSync()) {
         return;
       }
       try {
         await _sourceService.loadActiveSourcePreference();
       } catch (_) {}
-      if (!context.mounted || revision != _profileSyncRevision) {
+      if (!isCurrentSync()) {
         return;
       }
       isLogged = _sourceService.isLogged;
-      username = _sourceService.currentAccount ?? strings.homeGuestUser;
       if (isLogged) {
         try {
           avatar = await _sourceService.loadCurrentAvatarUrl();
         } catch (_) {
-          avatar = null;
+          avatar = _avatarUrl;
         }
       }
-      if (!context.mounted || revision != _profileSyncRevision) {
+      if (!isCurrentSync()) {
         return;
       }
     }
 
-    _username = username;
-    _avatarUrl = avatar;
+    _username = _sourceService.currentAccount ?? strings.homeGuestUser;
+    _avatarUrl = _sourceService.isLogged
+        ? (avatar ?? _sourceService.cachedAvatarUrl)
+        : null;
     _profileLoading = false;
     _hasCompletedProfileSync = true;
     _notify();
-    await refreshCheckInState(context);
+    if (context.mounted) {
+      await refreshCheckInState(context);
+    }
   }
 
   Future<void> loadFirstUseText(BuildContext context) async {
@@ -246,10 +260,26 @@ class HomeProfileController extends ChangeNotifier {
     _notify();
   }
 
+  void applyLoginProfile({
+    required String username,
+    required String avatarUrl,
+  }) {
+    if (_disposed) return;
+    // The login dialog has already resolved this profile. Publish the same
+    // result and invalidate any older synchronization still awaiting startup.
+    _profileSyncRevision++;
+    _username = username;
+    _avatarUrl = avatarUrl.trim().isEmpty ? null : avatarUrl.trim();
+    _profileLoading = false;
+    _hasCompletedProfileSync = true;
+    _notify();
+  }
+
   void markLoggedOut() {
     _profileSyncRevision++;
     _authVersion++;
     _checkedInToday = false;
+    _avatarUrl = null;
     _profileLoading = false;
     _hasCompletedProfileSync = true;
     _notify();
@@ -277,6 +307,7 @@ class HomeProfileController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _profileSyncRevision++;
     super.dispose();
   }
 }

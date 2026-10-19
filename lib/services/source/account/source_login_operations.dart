@@ -13,6 +13,8 @@ class SourceLoginOperations {
   final SourceRuntimeHost _runtimeHost;
   final SourceLoginSideDataOperations _sideData;
 
+  String? get cachedAvatarUrl => _sideData.cachedAvatarUrl;
+
   HazukiSourceFacade get facade => _runtimeHost.activeHandle.facade;
 
   Future<void> login({required String account, required String password}) =>
