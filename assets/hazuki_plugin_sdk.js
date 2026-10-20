@@ -118,6 +118,10 @@ return Object.freeze({
         return Object.freeze({
             PluginDialogCancelledError,
             isAvailable: async () => sendMessage({method: 'ui_available'}),
+            openWebView: options => sendMessage({method: 'ui_browser', options: {
+                completion: options?.callbacks?.length ? 'callback' : 'manual', ...options,
+            }}),
+            requestBrowserAuthorization: options => sendMessage({method: 'ui_browser', options}),
             alert: options => simpleDialog('alert', options),
             confirm: options => simpleDialog('confirm', options),
             prompt: options => simpleDialog('prompt', options),

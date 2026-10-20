@@ -83,15 +83,12 @@ void main() {
         );
       }
       expect(dialogs.every((d) => d.isClosed), true);
-      await expectLater(
-        engine.evaluate("Hazuki.ui.alert({title:'Denied'})"),
-        throwsA(anything),
-      );
-      expect(dialogs, hasLength(7));
+      await engine.evaluate("Hazuki.ui.alert({title:'Anywhere'})");
+      expect(dialogs, hasLength(8));
     },
   );
   test(
-    'runtime initialization and content inherit foreground UI, background actions do not',
+    'initialization, content and background actions can all show dialogs',
     () async {
       SharedPreferences.setMockInitialValues({});
       final directory = await Directory.systemTemp.createTemp('hazuki_dialog_');
@@ -153,8 +150,8 @@ void main() {
         'accepted',
       );
       expect(titles, ['Init', 'Search']);
-      expect(await assembly.runPluginAction('ui_runtime', 'ask'), 'background');
-      expect(titles, ['Init', 'Search']);
+      expect(await assembly.runPluginAction('ui_runtime', 'ask'), 'accepted');
+      expect(titles, ['Init', 'Search', 'Action']);
 
       final loginSteps = <Object>[];
       await (assembly.gateways.accountGateway
@@ -272,7 +269,7 @@ void main() {
         },
         'second': {'type': 'closed', 'reason': 'user'},
       });
-      expect(await engine.evaluate('Hazuki.ui.isAvailable()'), false);
+      expect(await engine.evaluate('Hazuki.ui.isAvailable()'), true);
     },
   );
 }

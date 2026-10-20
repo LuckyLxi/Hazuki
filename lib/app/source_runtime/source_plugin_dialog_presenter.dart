@@ -3,24 +3,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/shared/source_account/source_account_dialog_support.dart';
+import 'package:hazuki/shared/source_account/source_browser_authorization_dialog.dart';
+import 'package:hazuki/shared/source_account/source_authorization_browser.dart';
 import 'package:hazuki/shared/source_interaction/source_plugin_dialog.dart';
 
 /// Observes exact route identities, excluding this presenter's own dialog route.
 class SourcePluginDialogPresenter extends NavigatorObserver {
-  SourcePluginDialogPresenter(this.navigatorKey) {
+  SourcePluginDialogPresenter(this.navigatorKey, {this.browserFactory}) {
     final service = SourceUiService.instance;
     service.presenter = present;
     service.captureOwner = () =>
         _routes.where((r) => !_dialogRoutes.contains(r)).lastOrNull;
-    service.isOwnerAvailable = (owner) {
-      final index = owner is Route<dynamic> ? _routes.indexOf(owner) : -1;
-      return index >= 0 &&
-          !_routes.skip(index + 1).any((route) => route is PageRoute);
-    };
-    service.canPresent = (owner) =>
-        owner != null && _routes.isNotEmpty && identical(owner, _routes.last);
+    service.isOwnerAvailable = (_) => navigatorKey.currentState != null;
+    service.canPresent = (_) => navigatorKey.currentState != null;
   }
   final GlobalKey<NavigatorState> navigatorKey;
+  final SourceAuthorizationBrowser Function()? browserFactory;
   final List<Route<dynamic>> _routes = [];
   final Set<Route<dynamic>> _dialogRoutes = {};
   final Map<Route<dynamic>, SourceDialogSession> _sessions = {};
@@ -52,15 +50,17 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
     _pushingDialog = true;
     _pushingSession = dialog;
     try {
-      final shown = showHomeAnimatedDialog<void>(
-        context,
-        child: Builder(
-          builder: (context) {
-            route = ModalRoute.of(context);
-            return SourcePluginDialog(dialog: dialog);
-          },
-        ),
-      );
+      final shown = dialog.browserRequest != null
+          ? _presentBrowser(context, dialog)
+          : showHomeAnimatedDialog<void>(
+              context,
+              child: Builder(
+                builder: (context) {
+                  route = ModalRoute.of(context);
+                  return SourcePluginDialog(dialog: dialog);
+                },
+              ),
+            );
       route ??= _routes.lastOrNull;
       changed();
       _pushingDialog = false;
@@ -74,22 +74,27 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
       _pushingDialog = false;
       _pushingSession = null;
       dialog.removeListener(changed);
-      dialog.close('user');
+      // Browser failures must reach the queue before the session is closed.
+      if (dialog.browserRequest == null) dialog.close('user');
     }
+  }
+
+  Future<void> _presentBrowser(
+    BuildContext context,
+    SourceDialogSession dialog,
+  ) async {
+    dialog.markShown();
+    final result = await showSourceBrowserAuthorization(
+      context,
+      {...dialog.browserRequest!, 'sourceName': dialog.sourceName},
+      dialog.browserCancellation,
+      browserFactory: browserFactory,
+    );
+    dialog.completeBrowser(result);
   }
 
   void _sync() {
     final service = SourceUiService.instance;
-    for (final scope in service.scopes) {
-      if (scope.owner is Route && !_routes.contains(scope.owner)) {
-        scope.cancel('ownerGone');
-      } else if (_routes.isNotEmpty &&
-          scope.owner != null &&
-          !identical(scope.owner, _routes.last) &&
-          !_dialogRoutes.contains(_routes.last)) {
-        scope.cancel('ownerGone');
-      }
-    }
     service.schedulePump();
   }
 
@@ -105,7 +110,10 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    _sessions.remove(route)?.close('user');
+    final dialog = _sessions.remove(route);
+    // Browser completion is resolved after its route returns. Do not turn a
+    // successful navigation into cancellation while that result is in flight.
+    if (dialog?.browserRequest == null) dialog?.close('user');
     _routes.remove(route);
     _dialogRoutes.remove(route);
     _sync();
@@ -113,7 +121,8 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    _sessions.remove(route)?.close('user');
+    final dialog = _sessions.remove(route);
+    if (dialog?.browserRequest == null) dialog?.close('user');
     _routes.remove(route);
     _dialogRoutes.remove(route);
     _sync();
@@ -122,6 +131,8 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     final index = oldRoute == null ? -1 : _routes.indexOf(oldRoute);
+    final dialog = _sessions.remove(oldRoute);
+    if (dialog?.browserRequest == null) dialog?.close('user');
     _routes.remove(oldRoute);
     _dialogRoutes.remove(oldRoute);
     if (newRoute != null) {

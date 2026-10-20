@@ -192,6 +192,7 @@ class SourceBrowserAuthorizationSession extends ChangeNotifier {
   Timer? _timer;
   SourceAuthorizationState state = SourceAuthorizationState.preparing;
   String? origin;
+  String? currentUrl;
   bool loading = true;
   bool completing = false;
   bool missingCookies = false;
@@ -208,6 +209,7 @@ class SourceBrowserAuthorizationSession extends ChangeNotifier {
     final uri = authorizationHttpsUri(value);
     if (uri == null) return false;
     if (isMainFrame) {
+      currentUrl = value;
       if (!options.manual &&
           options.callbacks.any((rule) => rule.matches(uri))) {
         unawaited(complete(value));
@@ -254,7 +256,7 @@ class SourceBrowserAuthorizationSession extends ChangeNotifier {
       }
       _finish(SourceAuthorizationState.completed, {
         'status': 'completed',
-        'url': callbackUrl ?? options.url.toString(),
+        'url': callbackUrl ?? currentUrl ?? options.url.toString(),
         if (cookies.isNotEmpty) '_cookies': cookies,
         '_userAgent': ?userAgent,
       });

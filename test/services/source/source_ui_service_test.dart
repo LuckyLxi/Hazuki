@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/services/source/account/source_login_interaction.dart';
 import 'package:hazuki/services/source/interaction/source_dialog_model.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
@@ -29,6 +30,40 @@ SourceScriptExecution execution(
 );
 
 void main() {
+  test('browser user cancellation revokes its task scope', () async {
+    final service = SourceUiService();
+    addTearDown(service.detach);
+    service.presenter = (_) async => throw const SourceLoginCancelled();
+    const task = SourceScriptExecution(
+      taskId: 'cancelled-browser',
+      pluginId: 'test',
+      method: 'download',
+    );
+    await expectLater(
+      service.runBrowserAuthorization(
+        () => service.handle(
+          {
+            'method': 'ui_browser',
+            'options': {'url': 'https://site.example/', 'completion': 'manual'},
+          },
+          task,
+          'engine',
+          'Test',
+        ),
+        execution: task,
+        runtimeId: 'engine',
+        timeout: const Duration(minutes: 5),
+      ),
+      throwsA(
+        isA<SourceUiCancelled>().having((e) => e.reason, 'reason', 'user'),
+      ),
+    );
+    expect(service.scopes.single.reason, 'user');
+    service.releaseExecution(task, 'engine');
+    await Future<void>.delayed(Duration.zero);
+    expect(service.scopes, isEmpty);
+  });
+
   test(
     'browser authorization survives system activities and waits for foreground before continuing',
     () async {
@@ -124,18 +159,15 @@ void main() {
     },
   );
 
-  test(
-    'background execution cannot regain UI by nesting a foreground runner',
-    () async {
-      final service = SourceUiService();
-      await SourceUiScope.withoutInteraction(
-        () => service.run(() async {
-          expect(SourceUiScope.current, isNull);
-          expect(service.scopes, isEmpty);
-        }),
-      );
-    },
-  );
+  test('background callers can create an interaction scope', () async {
+    final service = SourceUiService();
+    await SourceUiScope.withoutInteraction(
+      () => service.run(() async {
+        expect(SourceUiScope.current, isNotNull);
+        expect(service.scopes, hasLength(1));
+      }),
+    );
+  });
 
   test(
     'source cancellation revokes work before any dialog and rejects late HTTP',
@@ -431,14 +463,13 @@ void main() {
   );
 
   test(
-    'background has no scope and runtime cleanup without dialogs does not cancel work',
+    'background execution retains interaction and runtime teardown cancels work',
     () async {
       final service = SourceUiService();
       service.presenter = (_) async {};
       await service
           .run(() async {
             final scope = SourceUiScope.current!..runtimeIds.add('engine');
-            service.cancelRuntime('engine');
             expect(scope.available, true);
             await SourceUiScope.withoutInteraction(() async {
               expect(SourceUiScope.current, isNull);
@@ -453,9 +484,11 @@ void main() {
               true,
             );
             service.setForeground(false);
+            expect(scope.available, true);
+            service.cancelRuntime('engine');
           })
           .then<void>(
-            (_) => fail('background must cancel the operation'),
+            (_) => fail('runtime teardown must cancel the operation'),
             onError: (Object e) {
               expect(e, isA<SourceUiCancelled>());
             },

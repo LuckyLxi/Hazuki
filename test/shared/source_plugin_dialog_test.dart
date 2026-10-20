@@ -241,7 +241,7 @@ void main() {
   );
 
   testWidgets(
-    'a replacement page revokes pending interaction without popping that page',
+    'a new page does not revoke plugin interaction or get popped on close',
     (tester) async {
       final key = GlobalKey<NavigatorState>();
       final presenter = SourcePluginDialogPresenter(key);
@@ -287,10 +287,6 @@ void main() {
           'Plugin',
         );
       });
-      final expected = expectLater(
-        operation,
-        throwsA(isA<SourceUiCancelled>()),
-      );
       await tester.pumpAndSettle();
       unawaited(
         key.currentState!.push(
@@ -300,7 +296,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await expected;
+      expect(find.text('New page'), findsOneWidget);
+      final scope = SourceUiService.instance.scopes.single;
+      expect(scope.available, true);
+      SourceUiService.instance.cancelRuntime('test');
+      await expectLater(operation, throwsA(isA<SourceUiCancelled>()));
+      await tester.pumpAndSettle();
       expect(find.text('New page'), findsOneWidget);
       expect(find.byType(AlertDialog), findsNothing);
       expect(tester.takeException(), isNull);

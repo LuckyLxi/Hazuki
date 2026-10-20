@@ -127,6 +127,15 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
     SourceRuntimeHandle handle,
     File sourceFile, {
     required bool runSourceInit,
+  }) => SourceUiService.instance.run(
+    () =>
+        _loadMetadataInternal(handle, sourceFile, runSourceInit: runSourceInit),
+  );
+
+  Future<SourceMeta> _loadMetadataInternal(
+    SourceRuntimeHandle handle,
+    File sourceFile, {
+    required bool runSourceInit,
   }) async {
     final facade = handle.facade;
     if (handle.isDisposed) throw Exception('source_runtime_disposed');

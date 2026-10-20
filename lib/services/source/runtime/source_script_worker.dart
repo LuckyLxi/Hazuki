@@ -124,6 +124,11 @@ class _SourceScriptWorker {
     final task = tasks[token];
     if (task != null && task.completed && task.references == 0) {
       tasks.remove(token);
+      if (!tasks.values.any(
+        (other) => other.execution['taskId'] == task.execution['taskId'],
+      )) {
+        send({'type': 'executionReleased', 'execution': task.execution});
+      }
     }
   }
 
@@ -158,6 +163,7 @@ class _SourceScriptWorker {
       tasks[token] = _WorkerTask(
         tasks[callbackToken]?.execution ?? command['execution'] as Map,
       );
+      send({'type': 'executionStarted', 'execution': tasks[token]!.execution});
       calls[id] = token;
       try {
         final value = native.withTaskContext(token, () {

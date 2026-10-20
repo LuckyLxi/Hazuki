@@ -15,7 +15,7 @@ bool isSourceUiCancellation(Object error) =>
     error is SourceUiCancelled ||
     error.toString().contains('plugin_ui_cancelled');
 
-/// Host-owned authorization. Only [id] crosses the worker boundary.
+/// Host-owned interaction lifetime. Only [id] crosses the worker boundary.
 class SourceUiScope extends ChangeNotifier {
   SourceUiScope({
     this.owner,
@@ -39,6 +39,7 @@ class SourceUiScope extends ChangeNotifier {
   final _cancelled = Completer<void>();
   final _waitingClock = Stopwatch();
   Timer? _waitingLimit;
+  bool _foreground = true;
   bool waiting = false;
   String? reason;
   Object? failure;
@@ -51,6 +52,8 @@ class SourceUiScope extends ChangeNotifier {
   Future<T> enter<T>(Future<T> Function() operation) =>
       runZoned(operation, zoneValues: {_zoneKey: this});
 
+  /// Detaches background work from its caller's cancellation and wait budget.
+  /// The legacy name does not prohibit the plugin from requesting its own UI.
   static Future<T> withoutInteraction<T>(Future<T> Function() operation) =>
       runZoned(operation, zoneValues: {_zoneKey: null, _disabledKey: true});
 
@@ -64,7 +67,7 @@ class SourceUiScope extends ChangeNotifier {
     if (waiting == value || finished) return;
     waiting = value;
     _waitingLimit?.cancel();
-    if (value) {
+    if (value && _foreground) {
       _waitingClock.start();
       final remaining = waitingTimeout - _waitingClock.elapsed;
       _waitingLimit = Timer(
@@ -75,6 +78,15 @@ class SourceUiScope extends ChangeNotifier {
       _waitingClock.stop();
     }
     notifyListeners();
+  }
+
+  /// Time away from the app does not consume the user's interaction budget.
+  void setForeground(bool value) {
+    if (_foreground == value) return;
+    _foreground = value;
+    if (!waiting || finished) return;
+    waiting = false;
+    setWaiting(true);
   }
 
   void cancel(String value, {Object? error}) {

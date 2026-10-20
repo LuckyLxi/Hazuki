@@ -56,6 +56,16 @@ class SourceInteractiveLoginOperations
           cancellation: cancellation,
         ),
         present: (dialog) async {
+          if (dialog.browserRequest != null) {
+            dialog.markShown();
+            final result = await present({
+              ...dialog.browserRequest!,
+              'type': 'browserAuthorization',
+              'sourceName': dialog.sourceName,
+            }, dialog.browserCancellation);
+            dialog.completeBrowser(result);
+            return;
+          }
           await present({
             'type': 'pluginDialog',
             'session': dialog,

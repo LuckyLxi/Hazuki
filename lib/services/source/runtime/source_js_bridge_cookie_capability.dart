@@ -11,6 +11,7 @@ import 'source_html_bridge.dart';
 import '../plugins/source_plugin_models.dart';
 import '../plugins/source_plugin_localization.dart';
 import '../interaction/source_ui_service.dart';
+import '../interaction/source_dialog_model.dart';
 
 /// Handles the JavaScript host bridge and its cookie operations.
 class SourceJsBridgeCookieCapability {
@@ -57,6 +58,39 @@ class SourceJsBridgeCookieCapability {
           handle.isDisposalRequested) {
         if (method == 'ui_available') return false;
         throw StateError('plugin_ui_unavailable');
+      }
+      if (method == 'ui_browser') {
+        final options = SourceBrowserAuthorizationOptions.parse(
+          dialogMap(map['options']),
+        );
+        return SourceUiService.instance
+            .runBrowserAuthorization(
+              () => SourceUiService.instance.handle(
+                map,
+                execution,
+                runtimeId,
+                sourceMeta?.call()?.name ??
+                    handle.runtime.sourceMeta?.name ??
+                    handle.sourceKey,
+              ),
+              execution: execution,
+              runtimeId: runtimeId,
+              timeout: options.timeout,
+            )
+            .then(
+              (value) => _importBrowserResponse(
+                handle,
+                options,
+                value as Map,
+                () {
+                  if (handle.isDisposalRequested) {
+                    throw StateError('plugin_runtime_disposed');
+                  }
+                  handle.loginCancellation?.check();
+                  SourceUiService.instance.checkExecution(execution, runtimeId);
+                },
+              ),
+            );
       }
       return SourceUiService.instance.handle(
         map,
@@ -124,56 +158,17 @@ class SourceJsBridgeCookieCapability {
                 ).timeout,
               )
             : present(request, cancellation);
-        result = presented.then((value) async {
+        result = presented.then((value) {
           cancellation.check();
           if (request['type'] != 'browserAuthorization' || value is! Map) {
             return value;
           }
-          final response = Map<String, dynamic>.from(value);
-          final cookies = response.remove('_cookies');
-          final userAgent = response.remove('_userAgent');
-          final options = SourceBrowserAuthorizationOptions.parse(request);
-          if (response['status'] == 'completed' &&
-              options.cookieScopes.isNotEmpty) {
-            if (cookies is! List) {
-              throw StateError('login_browser_cookie_missing');
-            }
-            if (userAgent is! String ||
-                userAgent.trim().isEmpty ||
-                userAgent.contains(RegExp(r'[\r\n]'))) {
-              throw const SourceBrowserAuthorizationException(
-                'login_browser_user_agent_unavailable',
-              );
-            }
-            final userAgents = handle.session.loadBrowserUserAgents();
-            for (final scope in options.cookieScopes) {
-              final selected = cookies
-                  .whereType<Map>()
-                  .where(
-                    (c) =>
-                        c['scopeUrl'] == scope.url &&
-                        scope.names.contains(c['name']),
-                  )
-                  .map(
-                    (c) => SourceCookie.fromMap(Map<String, dynamic>.from(c)),
-                  )
-                  .where(
-                    (c) =>
-                        c.matches(Uri.parse(scope.url)) &&
-                        !c.isExpired(DateTime.now().millisecondsSinceEpoch),
-                  )
-                  .toList();
-              if (scope.names.any((n) => !selected.any((c) => c.name == n))) {
-                throw StateError('login_browser_cookie_missing');
-              }
-              await handle.cookieStore.set(scope.url, selected);
-              userAgents[Uri.parse(scope.url).origin] = userAgent;
-              cancellation.check();
-            }
-            await handle.session.saveBrowserUserAgents(userAgents);
-            cancellation.check();
-          }
-          return response;
+          return _importBrowserResponse(
+            handle,
+            SourceBrowserAuthorizationOptions.parse(request),
+            value,
+            cancellation.check,
+          );
         });
         break;
       case 'html':
@@ -289,6 +284,55 @@ class SourceJsBridgeCookieCapability {
         throw UnsupportedError('Unsupported JS bridge method: $method');
     }
     return result;
+  }
+
+  Future<Map<String, dynamic>> _importBrowserResponse(
+    SourceRuntimeHandle handle,
+    SourceBrowserAuthorizationOptions options,
+    Map value,
+    void Function() checkActive,
+  ) async {
+    checkActive();
+    final response = Map<String, dynamic>.from(value);
+    final cookies = response.remove('_cookies');
+    final userAgent = response.remove('_userAgent');
+    if (response['status'] == 'completed' && options.cookieScopes.isNotEmpty) {
+      if (cookies is! List) {
+        throw StateError('login_browser_cookie_missing');
+      }
+      if (userAgent is! String ||
+          userAgent.trim().isEmpty ||
+          userAgent.contains(RegExp(r'[\r\n]'))) {
+        throw const SourceBrowserAuthorizationException(
+          'login_browser_user_agent_unavailable',
+        );
+      }
+      final userAgents = handle.session.loadBrowserUserAgents();
+      for (final scope in options.cookieScopes) {
+        final selected = cookies
+            .whereType<Map>()
+            .where(
+              (c) =>
+                  c['scopeUrl'] == scope.url && scope.names.contains(c['name']),
+            )
+            .map((c) => SourceCookie.fromMap(Map<String, dynamic>.from(c)))
+            .where(
+              (c) =>
+                  c.matches(Uri.parse(scope.url)) &&
+                  !c.isExpired(DateTime.now().millisecondsSinceEpoch),
+            )
+            .toList();
+        if (scope.names.any((n) => !selected.any((c) => c.name == n))) {
+          throw StateError('login_browser_cookie_missing');
+        }
+        await handle.cookieStore.set(scope.url, selected);
+        userAgents[Uri.parse(scope.url).origin] = userAgent;
+        checkActive();
+      }
+      await handle.session.saveBrowserUserAgents(userAgents);
+      checkActive();
+    }
+    return response;
   }
 
   void configureDioCookieBridge([SourceRuntimeHandle? handle]) =>

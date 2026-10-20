@@ -48,6 +48,7 @@ class SourcePluginScriptInspector {
           return null;
         }
         if (method == 'isLogged') return false;
+        if (method == 'ui_available') return false;
         if (const {
           'html',
           'convert',

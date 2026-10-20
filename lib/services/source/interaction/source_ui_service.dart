@@ -3,6 +3,8 @@ import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
+import '../account/source_browser_authorization.dart';
+import '../account/source_login_interaction.dart';
 import '../models/source_script_execution.dart';
 import '../models/source_task.dart';
 import 'source_dialog_model.dart';
@@ -64,6 +66,9 @@ class SourceUiService {
   bool Function(Object?)? canPresent;
   bool Function(Object?)? isOwnerAvailable;
   final Map<String, SourceUiScope> _scopes = {};
+  final Map<(String, String), SourceUiScope> _executionScopes = {};
+  final Map<(String, String), SourceUiScope> _contextScopes = {};
+  final Set<SourceUiScope> _releasedScopes = {};
   final Map<String, SourceDialogPresenter> _presenters = {};
   final Map<String, SourceDialogSession> _dialogs = {};
   final Queue<SourceDialogSession> _queue = Queue();
@@ -75,30 +80,103 @@ class SourceUiService {
 
   Iterable<SourceUiScope> get scopes => List.unmodifiable(_scopes.values);
 
-  void checkExecution(SourceScriptExecution execution, String runtimeId) {
-    if (execution.uiScopeId == null) return;
+  SourceUiScope? _findScope(
+    SourceScriptExecution execution,
+    String runtimeId,
+  ) =>
+      _executionScopes[(runtimeId, execution.taskId)] ??
+      _scopes[execution.uiScopeId] ??
+      _contextScopes[(runtimeId, execution.taskId)];
+
+  void retainExecution(SourceScriptExecution execution, String runtimeId) {
     final scope = _scopes[execution.uiScopeId];
-    if (scope == null || scope.finished) {
-      throw const SourceUiCancelled('operationFinished');
+    if (scope != null) {
+      _contextScopes[(runtimeId, execution.taskId)] = scope;
+    }
+  }
+
+  SourceUiScope _scopeFor(SourceScriptExecution execution, String runtimeId) {
+    final existing = _findScope(execution, runtimeId);
+    if (existing != null && (!existing.finished || existing.reason != null)) {
+      return existing;
+    }
+    final scope = SourceUiScope(waitingTimeout: interactionTimeout)
+      ..runtimeIds.add(runtimeId)
+      ..pluginIds.add(execution.pluginId)
+      ..setForeground(_foreground);
+    _executionScopes[(runtimeId, execution.taskId)] = scope;
+    _scopes[scope.id] = scope;
+    scope.addListener(() {
+      if (scope.reason == null && !scope.finished) return;
+      for (final dialog in _dialogs.values.toList()) {
+        if (identical(dialog.scope, scope)) {
+          dialog.close(scope.reason ?? 'operationFinished');
+        }
+      }
+    });
+    return scope;
+  }
+
+  /// Called after QuickJS releases all promises and callbacks for this task.
+  void releaseExecution(SourceScriptExecution execution, String runtimeId) {
+    _contextScopes.remove((runtimeId, execution.taskId));
+    final scope = _executionScopes[(runtimeId, execution.taskId)];
+    if (scope == null) return;
+    _releasedScopes.add(scope);
+    _releaseScopeIfIdle(scope);
+  }
+
+  void _releaseScopeIfIdle(SourceUiScope scope) {
+    if (!_releasedScopes.contains(scope) ||
+        _browserAuthorizations.containsKey(scope) ||
+        _dialogs.values.any((d) => identical(d.scope, scope) && !d.isClosed)) {
+      return;
+    }
+    _releasedScopes.remove(scope);
+    _executionScopes.removeWhere((_, value) => identical(value, scope));
+    _scopes.remove(scope.id);
+    _dialogs.removeWhere((_, dialog) => identical(dialog.scope, scope));
+    scheduleMicrotask(() {
+      scope.finish();
+      scope.dispose();
+    });
+  }
+
+  void _refreshWaiting(SourceUiScope scope) {
+    scope.setWaiting(
+      _dialogs.values.any((d) => identical(d.scope, scope) && d._waiting),
+    );
+  }
+
+  void checkExecution(SourceScriptExecution execution, String runtimeId) {
+    final scope = _findScope(execution, runtimeId);
+    if (scope == null) {
+      if (execution.uiScopeId != null) {
+        throw const SourceUiCancelled('operationFinished');
+      }
+      return;
     }
     if (scope.reason != null) throw SourceUiCancelled(scope.reason!);
-    if (!_foreground) throw const SourceUiCancelled('background');
-    if (!scope.runtimeIds.contains(runtimeId) ||
-        isOwnerAvailable?.call(scope.owner) == false) {
+    if (!_foreground && _browserAuthorizations.containsKey(scope)) {
+      throw const SourceUiCancelled('background');
+    }
+    if (!scope.runtimeIds.contains(runtimeId)) {
       throw const SourceUiCancelled('ownerGone');
     }
   }
 
   /// Android autofill/credential providers can stop the activity while the
-  /// owned WebView is still authorizing. Keep only that operation alive and
-  /// defer its result until foreground; route/runtime cancellation still wins.
+  /// owned WebView is still authorizing. Defer its result until foreground;
+  /// explicit operation/runtime cancellation still wins.
   Future<T> runBrowserAuthorization<T>(
     Future<T> Function() operation, {
     required SourceScriptExecution? execution,
     required String? runtimeId,
     required Duration timeout,
   }) async {
-    final scope = _scopes[execution?.uiScopeId] ?? SourceUiScope.current;
+    final scope = execution != null && runtimeId != null
+        ? _scopeFor(execution, runtimeId)
+        : SourceUiScope.current;
     if (scope == null) return operation();
     if (execution != null && runtimeId != null) {
       checkExecution(execution, runtimeId);
@@ -143,7 +221,7 @@ class SourceUiService {
       final remaining = _browserAuthorizations[scope]! - 1;
       if (remaining == 0) {
         _browserAuthorizations.remove(scope);
-        if (!_foreground && scope.available) scope.cancel('background');
+        _releaseScopeIfIdle(scope);
       } else {
         _browserAuthorizations[scope] = remaining;
       }
@@ -155,7 +233,6 @@ class SourceUiService {
     SourceUiOwner? owner,
     SourceDialogPresenter? present,
   }) async {
-    if (SourceUiScope.interactionDisabled) return operation();
     final current = SourceUiScope.current;
     if (current?.available == true &&
         present == null &&
@@ -171,6 +248,7 @@ class SourceUiService {
         owner?.wasCancelled = true;
       },
     );
+    scope.setForeground(_foreground);
     _scopes[scope.id] = scope;
     if (present != null) _presenters[scope.id] = present;
     owner?._scopes.add(scope);
@@ -226,29 +304,38 @@ class SourceUiService {
     String sourceName, {
     Map<String, dynamic> translation = const {},
   }) {
-    final scope = _scopes[execution.uiScopeId];
+    final existing = _findScope(execution, runtimeId);
     final available =
-        scope != null &&
-        scope.available &&
-        (isOwnerAvailable?.call(scope.owner) != false) &&
-        _foreground &&
-        (presenter != null || _presenters.containsKey(scope.id)) &&
-        scope.runtimeIds.contains(runtimeId);
+        (existing == null ||
+            (existing.available ||
+                    existing.finished && existing.reason == null) &&
+                existing.runtimeIds.contains(runtimeId)) &&
+        (presenter != null || _presenters.containsKey(existing?.id));
     if (request['method'] == 'ui_available') return available;
-    if (scope == null || !scope.runtimeIds.contains(runtimeId)) {
+    final scope = _scopeFor(execution, runtimeId);
+    if (!scope.runtimeIds.contains(runtimeId)) {
       throw StateError('plugin_ui_unavailable');
     }
-    if (request['method'] == 'ui_open') {
+    if (request['method'] == 'ui_open' || request['method'] == 'ui_browser') {
       if (!available) {
         if (scope.reason != null) throw SourceUiCancelled(scope.reason!);
         throw StateError('plugin_ui_unavailable');
       }
-      if (_dialogs.values.any(
-        (d) => identical(d.scope, scope) && !d.isClosed,
-      )) {
-        throw StateError('plugin_ui_already_open');
-      }
-      final model = SourceDialogModel.parse(request['options']);
+      final browser = request['method'] == 'ui_browser'
+          ? dialogMap(request['options'])
+          : null;
+      if (browser != null) SourceBrowserAuthorizationOptions.parse(browser);
+      final model = SourceDialogModel.parse(
+        browser == null
+            ? request['options']
+            : {
+                'title': browser['title'] ?? '',
+                'content': [],
+                'buttons': [
+                  {'id': 'close', 'text': ''},
+                ],
+              },
+      );
       final dialog = SourceDialogSession._(
         this,
         scope,
@@ -257,13 +344,16 @@ class SourceUiService {
         sourceName,
         model,
         translation,
+        browser,
       );
       _dialogs[dialog.id] = dialog;
       _queue.add(dialog);
-      scope.setWaiting(true);
-      dialog._queueTimer = Timer(queueTimeout, () => scope.cancel('timeout'));
+      dialog._setWaiting(true);
+      dialog._updateQueueTimer();
       unawaited(_pump());
-      return dialog._shown.future;
+      return browser == null
+          ? dialog._shown.future
+          : dialog._browserResult.future;
     }
     final dialog = _dialogs[request['id']];
     if (dialog == null ||
@@ -282,13 +372,13 @@ class SourceUiService {
 
   void setForeground(bool value) {
     _foreground = value;
-    if (!value) {
-      for (final scope in scopes) {
-        if (!_browserAuthorizations.containsKey(scope)) {
-          scope.cancel('background');
-        }
-      }
-    } else {
+    for (final scope in scopes) {
+      scope.setForeground(value);
+    }
+    for (final dialog in _queue) {
+      dialog._updateQueueTimer();
+    }
+    if (value) {
       final resumed = _foregroundResumed;
       _foregroundResumed = null;
       resumed?.complete();
@@ -305,6 +395,15 @@ class SourceUiService {
         dialog.scope.cancel('runtimeDisposed');
       }
     }
+    for (final entry in _executionScopes.entries.toList()) {
+      if (entry.key.$1 == runtimeId) {
+        final scope = entry.value;
+        scope.cancel('runtimeDisposed');
+        _releasedScopes.add(scope);
+        _releaseScopeIfIdle(scope);
+      }
+    }
+    _contextScopes.removeWhere((key, _) => key.$1 == runtimeId);
   }
 
   void closeRuntimeInteractions(String runtimeId) {
@@ -341,7 +440,7 @@ class SourceUiService {
     if (_pumping || _visible != null || !_foreground) return;
     _pumping = true;
     try {
-      while (_queue.isNotEmpty) {
+      while (_queue.isNotEmpty && _foreground) {
         final dialog = _queue.first;
         if (dialog.isClosed) {
           _queue.removeFirst();
@@ -357,11 +456,18 @@ class SourceUiService {
         _visible = dialog;
         dialog._presenting = true;
         dialog._queueTimer?.cancel();
+        dialog._queueClock.stop();
         try {
           // The presenter completes _shown after attaching its route/container.
           await present(dialog);
         } catch (error, stack) {
-          if (!dialog._shown.isCompleted) {
+          if (dialog.browserRequest != null && error is! SourceLoginCancelled) {
+            if (!dialog._browserResult.isCompleted) {
+              dialog._browserResult.completeError(error, stack);
+            }
+            dialog.close('error');
+          }
+          if (dialog.browserRequest == null && !dialog._shown.isCompleted) {
             dialog._shown.completeError(error, stack);
           }
         } finally {
@@ -383,6 +489,10 @@ class SourceUiService {
     for (final scope in scopes) {
       scope.cancel('ownerGone');
     }
+    for (final scope in _executionScopes.values.toSet().toList()) {
+      _releasedScopes.add(scope);
+      _releaseScopeIfIdle(scope);
+    }
   }
 }
 
@@ -395,6 +505,7 @@ class SourceDialogSession extends ChangeNotifier {
     this.sourceName,
     this.model,
     this.translation,
+    this.browserRequest,
   ) : values = model.initialValues;
   final SourceUiService service;
   final SourceUiScope scope;
@@ -402,6 +513,9 @@ class SourceDialogSession extends ChangeNotifier {
   final String runtimeId;
   final String sourceName;
   final Map<String, dynamic> translation;
+  final Map<String, dynamic>? browserRequest;
+  final SourceLoginCancellation browserCancellation = SourceLoginCancellation();
+  final _browserResult = Completer<Object?>();
   final String id = createSourceTaskId();
   SourceDialogModel model;
   Map<String, Object> values;
@@ -413,10 +527,34 @@ class SourceDialogSession extends ChangeNotifier {
   Map<String, Object?>? _event;
   Map<String, Object?>? _closedEvent;
   Timer? _queueTimer;
+  final _queueClock = Stopwatch();
+  bool _waiting = false;
   bool busy = false;
   bool _presenting = false;
   bool get isClosed => _closedEvent != null;
   Future<void> get whenClosed => _closed.future;
+
+  void _setWaiting(bool value) {
+    _waiting = value;
+    service._refreshWaiting(scope);
+  }
+
+  void _updateQueueTimer() {
+    _queueTimer?.cancel();
+    _queueClock.stop();
+    if (isClosed || _presenting || !service._foreground) return;
+    final remaining = service.queueTimeout - _queueClock.elapsed;
+    _queueClock.start();
+    _queueTimer = Timer(
+      remaining.isNegative ? Duration.zero : remaining,
+      () => close('timeout'),
+    );
+  }
+
+  void completeBrowser(Object? result) {
+    if (!_browserResult.isCompleted) _browserResult.complete(result);
+    close('plugin');
+  }
 
   void markShown() {
     if (!_shown.isCompleted) _shown.complete(id);
@@ -428,10 +566,10 @@ class SourceDialogSession extends ChangeNotifier {
     if (_event != null) {
       final event = _event!;
       _event = null;
-      scope.setWaiting(false);
+      _setWaiting(false);
       return Future.value(event);
     }
-    scope.setWaiting(true);
+    _setWaiting(true);
     _waiter = Completer<Map<String, Object?>>();
     return _waiter!.future;
   }
@@ -494,7 +632,7 @@ class SourceDialogSession extends ChangeNotifier {
     final waiter = _waiter;
     _waiter = null;
     if (waiter != null) {
-      scope.setWaiting(false);
+      _setWaiting(false);
       waiter.complete(event);
     } else {
       _event = event;
@@ -544,19 +682,26 @@ class SourceDialogSession extends ChangeNotifier {
   void close(String reason) {
     if (isClosed) return;
     _queueTimer?.cancel();
+    _queueClock.stop();
     _closedEvent = {'type': 'closed', 'reason': reason};
     _event = null;
-    if (!_shown.isCompleted) {
+    if (browserRequest != null) {
+      if (!_browserResult.isCompleted) {
+        _browserResult.completeError(SourceUiCancelled(reason));
+      }
+      browserCancellation.cancel();
+    } else if (!_shown.isCompleted) {
       _shown.completeError(SourceUiCancelled(reason));
     }
     _waiter?.complete(_closedEvent);
     _waiter = null;
-    scope.setWaiting(false);
+    _setWaiting(false);
     if (reason == 'user') scope.cancel('user');
     _closed.complete();
     notifyListeners();
     if (!_presenting) _release();
     service.schedulePump();
+    service._releaseScopeIfIdle(scope);
   }
 
   void _release() {

@@ -173,38 +173,47 @@ class SourceScriptEngine {
     SourceScriptExecution? execution,
   }) async {
     if (_closing) throw StateError('source_script_engine_closed');
+    // Callback cleanup must still run after its owner has cancelled.
+    final scope = inspection || kind == 'release'
+        ? null
+        : SourceUiScope.current;
     await ready;
     if (_closing) throw StateError('source_script_engine_closed');
+    if (scope?.reason case final reason?) throw SourceUiCancelled(reason);
     final id = ++_sequence;
     final completion = Completer<dynamic>();
     _pending[id] = completion;
-    final scope = inspection ? null : SourceUiScope.current;
     scope?.runtimeIds.add(runtimeId);
     scope?.pluginIds.add(pluginId);
+    final context =
+        (execution ??
+                SourceScriptExecution(
+                  taskId: createSourceTaskId(),
+                  pluginId: pluginId,
+                  method:
+                      arguments['name'] as String? ??
+                      RegExp(r'__hazuki_source\.([\w?.]+)')
+                          .firstMatch(arguments['code'] as String? ?? '')
+                          ?.group(1) ??
+                      'script.$kind',
+                  pluginVersion: _snapshot['__metadata'] is String
+                      ? (jsonDecode(_snapshot['__metadata'] as String)
+                                as Map)['version']
+                            ?.toString()
+                      : null,
+                ))
+            .withUiScope(scope?.id);
+    // Retain before dispatch: the caller can finish before the worker starts.
+    // Callback commands inherit their original execution inside the worker.
+    if (kind != 'callback') {
+      SourceUiService.instance.retainExecution(context, runtimeId);
+    }
     _worker!.send({
       'type': kind,
       'id': id,
       'runtimeId': runtimeId,
       ...arguments,
-      'execution':
-          (execution ??
-                  SourceScriptExecution(
-                    taskId: createSourceTaskId(),
-                    pluginId: pluginId,
-                    method:
-                        arguments['name'] as String? ??
-                        RegExp(r'__hazuki_source\.([\w?.]+)')
-                            .firstMatch(arguments['code'] as String? ?? '')
-                            ?.group(1) ??
-                        'script.$kind',
-                    pluginVersion: _snapshot['__metadata'] is String
-                        ? (jsonDecode(_snapshot['__metadata'] as String)
-                                  as Map)['version']
-                              ?.toString()
-                        : null,
-                  ))
-              .withUiScope(scope?.id)
-              .toMap(),
+      'execution': context.toMap(),
     });
     return completion.future;
   }
@@ -243,6 +252,16 @@ class SourceScriptEngine {
         }
       case 'host':
         _handleHost(message);
+      case 'executionReleased':
+        SourceUiService.instance.releaseExecution(
+          SourceScriptExecution.fromMap(message['execution'] as Map),
+          runtimeId,
+        );
+      case 'executionStarted':
+        SourceUiService.instance.retainExecution(
+          SourceScriptExecution.fromMap(message['execution'] as Map),
+          runtimeId,
+        );
       case 'rejection':
         if (!_closing) _rejectionHandler?.call(_codec.decode(message['value']));
       case 'failed':

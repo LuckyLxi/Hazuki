@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/app/source_runtime/source_plugin_dialog_presenter.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/models/source_script_execution.dart';
 import 'package:hazuki/services/source/account/source_browser_authorization.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 import 'package:hazuki/shared/source_account/source_authorization_browser.dart';
@@ -35,6 +38,163 @@ class _Browser
 }
 
 void main() {
+  for (final factoryFailure in [false, true]) {
+    testWidgets('global browser preserves failures and permits retry: '
+        'factoryFailure=$factoryFailure', (tester) async {
+      final key = GlobalKey<NavigatorState>();
+      final failedBrowser = _Browser()..ready.complete();
+      final retryBrowser = _Browser()..ready.complete();
+      var attempts = 0;
+      final code = factoryFailure
+          ? 'login_browser_unavailable'
+          : 'login_browser_load_failed';
+      final presenter = SourcePluginDialogPresenter(
+        key,
+        browserFactory: () {
+          if (attempts++ == 0) {
+            if (factoryFailure) {
+              throw SourceBrowserAuthorizationException(code);
+            }
+            return failedBrowser;
+          }
+          return retryBrowser;
+        },
+      );
+      addTearDown(presenter.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: key,
+          navigatorObservers: [presenter],
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: Text('Home')),
+        ),
+      );
+      const execution = SourceScriptExecution(
+        taskId: 'browser-retry',
+        pluginId: 'test',
+        method: 'download',
+      );
+      final service = SourceUiService.instance;
+      Future<dynamic> open() => service.runBrowserAuthorization(
+        () => service.handle(
+          {
+            'method': 'ui_browser',
+            'options': {'url': 'https://site.example/', 'completion': 'manual'},
+          },
+          execution,
+          'retry-runtime',
+          'Test',
+        ),
+        execution: execution,
+        runtimeId: 'retry-runtime',
+        timeout: const Duration(minutes: 5),
+      );
+      final rejected = expectLater(
+        open(),
+        throwsA(
+          isA<SourceBrowserAuthorizationException>().having(
+            (error) => error.code,
+            'code',
+            code,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      if (!factoryFailure) failedBrowser.session.fail(code);
+      await tester.pumpAndSettle();
+      await rejected;
+      expect(service.scopes.single.available, true);
+      final retry = open();
+      await tester.pumpAndSettle();
+      expect(find.text('Browser content'), findsOneWidget);
+      await retryBrowser.session.complete();
+      await tester.pumpAndSettle();
+      expect((await retry as Map)['status'], 'completed');
+      expect(find.text('Home'), findsOneWidget);
+      expect(retryBrowser.closed, true);
+      expect(tester.takeException(), isNull);
+      service.releaseExecution(execution, 'retry-runtime');
+      await tester.pumpAndSettle();
+      expect(service.scopes, isEmpty);
+    });
+  }
+
+  for (final covered in [false, true]) {
+    testWidgets(
+      'global WebView completes without a login scope, covered: $covered',
+      (tester) async {
+        final key = GlobalKey<NavigatorState>();
+        final browser = _Browser()..ready.complete();
+        final presenter = SourcePluginDialogPresenter(
+          key,
+          browserFactory: () => browser,
+        );
+        addTearDown(presenter.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            navigatorKey: key,
+            navigatorObservers: [presenter],
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: Text('Home')),
+          ),
+        );
+        const execution = SourceScriptExecution(
+          taskId: 'global-web',
+          pluginId: 'test',
+          method: 'download',
+        );
+        final result =
+            SourceUiService.instance.handle(
+                  {
+                    'method': 'ui_browser',
+                    'options': {
+                      'title': 'Verify website',
+                      'url': 'https://site.example/',
+                      'completion': 'manual',
+                    },
+                  },
+                  execution,
+                  'web-runtime',
+                  'Test',
+                )
+                as Future;
+        await tester.pumpAndSettle();
+        expect(find.text('Browser content'), findsOneWidget);
+        if (covered) {
+          unawaited(
+            key.currentState!.push(
+              MaterialPageRoute<void>(
+                builder: (_) => const Scaffold(body: Text('New page')),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        browser.session.navigate(
+          'https://site.example/verified',
+          isMainFrame: true,
+        );
+        if (covered) {
+          await browser.session.complete();
+        } else {
+          await tester.tap(find.text('Complete login'));
+        }
+        await tester.pumpAndSettle();
+        expect(await result, {
+          'status': 'completed',
+          'url': 'https://site.example/verified',
+        });
+        expect(browser.closed, true);
+        expect(find.text(covered ? 'New page' : 'Home'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        SourceUiService.instance.releaseExecution(execution, 'web-runtime');
+      },
+    );
+  }
+
   Future<BuildContext> mount(WidgetTester tester) async {
     late BuildContext context;
     await tester.pumpWidget(
