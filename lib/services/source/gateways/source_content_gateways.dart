@@ -172,6 +172,7 @@ abstract interface class SourceFavoriteGateway implements Listenable {
   String? get activeSourceKey;
   bool get isLogged;
   bool get supportFavoriteFolderDelete;
+  bool get supportFavoriteFolderRename;
   bool get supportFavoriteFolderAdd;
   bool get supportFavoriteFolderLoad;
   bool get supportFavoriteSortOrder;
@@ -202,6 +203,11 @@ abstract interface class SourceFavoriteGateway implements Listenable {
     String sourceKey = '',
   });
   Future<void> setFavoriteSortOrder(String order);
+  Future<void> renameFavoriteFolder(
+    String folderId,
+    String name, {
+    String sourceKey = '',
+  });
 }
 
 abstract interface class SourceReaderGateway {

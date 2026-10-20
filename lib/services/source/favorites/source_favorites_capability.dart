@@ -109,6 +109,8 @@ class SourceFavoritesCapability {
     return _policy.supportFavoriteFolderDelete;
   }
 
+  bool get supportFavoriteFolderRename => _policy.supportFavoriteFolderRename;
+
   bool get supportFavoriteFolderLoad {
     return _policy.supportFavoriteFolderLoad;
   }
@@ -284,6 +286,33 @@ class SourceFavoritesCapability {
         final dynamic result = await engine.evaluate(
           _scriptFactory.addFolder(name),
           name: 'source_favorite_add_folder.js',
+        );
+        await facade.js.resolve(result);
+      }, context: _reloginContext(facade));
+    });
+  }
+
+  Future<void> renameFavoriteFolder(
+    String folderId,
+    String name, {
+    String sourceKey = '',
+  }) async {
+    final facade = _facadeForSource(sourceKey);
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      await _reloginCoordinator.runWithReloginRetry(() async {
+        final engine = facade.js.engine;
+        if (engine == null) throw Exception('source_not_initialized');
+        if (!facade.js.asBool(
+          await engine.evaluate(
+            'typeof this.__hazuki_source.favorites?.renameFolder === "function"',
+          ),
+        )) {
+          throw Exception('favorite_folder_rename_not_supported');
+        }
+        final dynamic result = await engine.evaluate(
+          _scriptFactory.renameFolder(folderId, name),
+          name: 'source_favorite_rename_folder.js',
         );
         await facade.js.resolve(result);
       }, context: _reloginContext(facade));

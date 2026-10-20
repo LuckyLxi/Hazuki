@@ -138,10 +138,17 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       await sync.writeLocalActiveSource('edited source');
       await sync.reloadFromLocalSourceFiles();
+      expect(favorite.supportFavoriteFolderRename, isTrue);
+      await favorite.renameFavoriteFolder(
+        'shelf',
+        'Renamed',
+        sourceKey: 'picacg',
+      );
 
       expect(received, hasLength(1));
       expect(runtimeOperations.writtenSource, 'edited source');
       expect(runtimeOperations.reloadCalls, 1);
+      expect(favorites.renameCalls, [('shelf', 'Renamed', 'picacg')]);
       await subscription.cancel();
       await favorites.dispose();
     },
@@ -216,6 +223,19 @@ class _FakeContentOperations implements SourceContentOperations {
 
 class _FakeFavoritesOperations implements SourceFavoritesOperations {
   final _changes = StreamController<void>.broadcast();
+  final renameCalls = <(String, String, String)>[];
+
+  @override
+  bool get supportFavoriteFolderRename => true;
+
+  @override
+  Future<void> renameFavoriteFolder(
+    String folderId,
+    String name, {
+    String sourceKey = '',
+  }) async {
+    renameCalls.add((folderId, name, sourceKey));
+  }
 
   void emitChanged() => _changes.add(null);
   Future<void> dispose() => _changes.close();

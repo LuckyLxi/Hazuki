@@ -433,6 +433,9 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   bool get supportFavoriteFolderDelete =>
       _favorites.supportFavoriteFolderDelete;
   @override
+  bool get supportFavoriteFolderRename =>
+      _favorites.supportFavoriteFolderRename;
+  @override
   bool get supportFavoriteFolderAdd => _favorites.supportFavoriteFolderAdd;
   @override
   bool get supportFavoriteFolderLoad => _favorites.supportFavoriteFolderLoad;
@@ -489,6 +492,12 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   @override
   Future<void> setFavoriteSortOrder(String order) =>
       _favorites.setFavoriteSortOrder(order);
+  @override
+  Future<void> renameFavoriteFolder(
+    String folderId,
+    String name, {
+    String sourceKey = '',
+  }) => _favorites.renameFavoriteFolder(folderId, name, sourceKey: sourceKey);
 }
 
 class HazukiSourceReaderAdapter

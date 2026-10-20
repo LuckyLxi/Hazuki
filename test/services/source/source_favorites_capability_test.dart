@@ -5,8 +5,96 @@ import 'package:hazuki/services/source/favorites/source_favorites_capability.dar
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
+import 'package:hazuki/services/source/runtime/source_script_engine.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'rename is optional, encodes arguments, and propagates plugin failures',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final host = _createHost();
+      addTearDown(host.dispose);
+      final engine = SourceScriptEngine();
+      addTearDown(engine.close);
+      host.handleFor('jm').runtime.engine = engine;
+      final capability = _createCapability(host);
+      await engine.evaluate(
+        'globalThis.__hazuki_source = {comic: {}, favorites: {}}',
+      );
+      expect(capability.supportFavoriteFolderRename, isFalse);
+      await engine.evaluate(
+        'globalThis.__hazuki_source.favorites.renameFolder = true',
+      );
+      expect(capability.supportFavoriteFolderRename, isFalse);
+      await expectLater(
+        capability.renameFavoriteFolder('shelf', 'new'),
+        throwsA(
+          predicate(
+            (error) => error.toString().contains(
+              'favorite_folder_rename_not_supported',
+            ),
+          ),
+        ),
+      );
+
+      await engine.evaluate('''
+globalThis.__hazuki_source.favorites.renameFolder = async (id, name) => {
+  await Promise.resolve();
+  globalThis.renamed = [id, name];
+};
+''');
+      expect(capability.supportFavoriteFolderRename, isTrue);
+      await capability.renameFavoriteFolder(
+        'shelf"id',
+        'new\nname',
+        sourceKey: 'jm',
+      );
+      expect(await engine.evaluate('globalThis.renamed'), [
+        'shelf"id',
+        'new\nname',
+      ]);
+
+      await engine.evaluate('''
+globalThis.__hazuki_source.favorites.renameFolder = async () => {
+  throw new Error('rename rejected');
+};
+''');
+      await expectLater(
+        capability.renameFavoriteFolder('shelf', 'new', sourceKey: 'jm'),
+        throwsA(
+          predicate((error) => error.toString().contains('rename rejected')),
+        ),
+      );
+    },
+  );
+
+  test(
+    'rename targets the requested source even when another source is active',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final host = _createHost();
+      addTearDown(host.dispose);
+      final engine = SourceScriptEngine();
+      addTearDown(engine.close);
+      host.handleFor('copy_manga').runtime.engine = engine;
+      await engine.evaluate('''
+globalThis.__hazuki_source = {comic: {}, favorites: {
+  renameFolder: (id, name) => { globalThis.renamed = [id, name]; }
+}};
+''');
+
+      await _createCapability(
+        host,
+      ).renameFavoriteFolder('shelf', 'new', sourceKey: 'copy_manga');
+
+      expect(host.activeSourceKey, 'jm');
+      expect(await engine.evaluate('globalThis.renamed'), ['shelf', 'new']);
+    },
+  );
+
   test(
     'normalizes folders, merges comics, and preserves parsed source keys',
     () {

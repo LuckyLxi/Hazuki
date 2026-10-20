@@ -28,6 +28,11 @@ class SourceFavoritesScriptFactory {
         '${jsonEncode(folderId)})';
   }
 
+  String renameFolder(String folderId, String name) {
+    return 'this.__hazuki_source.favorites.renameFolder('
+        '${jsonEncode(folderId)}, ${jsonEncode(name)})';
+  }
+
   String toggleFavorite({
     required String comicId,
     required String folderId,

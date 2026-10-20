@@ -163,27 +163,37 @@ class FavoriteFolderCoordinator {
     }
   }
 
-  Future<String?> renameLocalFolder(String folderId, String name) async {
-    if (_state.mode != FavoritePageMode.local) {
-      return null;
-    }
-
+  Future<String?> renameFolder(String folderId, String name) async {
     final normalizedFolderId = folderId.trim();
-    if (normalizedFolderId.isEmpty) {
+    if (normalizedFolderId.isEmpty ||
+        (_state.mode == FavoritePageMode.cloud &&
+            (normalizedFolderId == '0' ||
+                !_cloudFlow.isLogged ||
+                !_cloudFlow.supportsFolderRename))) {
       return null;
     }
 
     final context = _captureContext();
     try {
-      await _localFlow.renameFolder(
-        folderId: normalizedFolderId,
-        name: name,
-        sourceKey: context.sourceKey,
-      );
-      if (!_isCurrentContext(context)) {
-        return null;
+      if (context.mode == FavoritePageMode.local) {
+        await _localFlow.renameFolder(
+          folderId: normalizedFolderId,
+          name: name,
+          sourceKey: context.sourceKey,
+        );
+        if (!_isCurrentContext(context)) return null;
+        await reloadLocalFolders();
+      } else {
+        await _cloudFlow.renameFolder(
+          normalizedFolderId,
+          name,
+          sourceKey: context.sourceKey,
+        );
+        if (!_isCurrentContext(context)) return null;
+        String? loadError;
+        await reloadFolders(onError: (error) => loadError = error);
+        return _isCurrentContext(context) ? loadError : null;
       }
-      await reloadLocalFolders();
       return null;
     } catch (e) {
       return '$e';

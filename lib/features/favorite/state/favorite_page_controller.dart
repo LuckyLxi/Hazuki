@@ -142,6 +142,9 @@ class FavoritePageController extends ChangeNotifier {
       !_cloudFlow.isLogged;
 
   bool get supportsFolderLoad => true;
+  bool get supportsFolderRename =>
+      _state.mode == FavoritePageMode.local ||
+      (_cloudFlow.isLogged && _cloudFlow.supportsFolderRename);
   String get _activeSourceKey => (_sourceService.activeSourceKey ?? '');
 
   bool get supportsFolderDelete => _state.mode == FavoritePageMode.local
@@ -433,8 +436,8 @@ class FavoritePageController extends ChangeNotifier {
     onFolderLoadError: onFolderLoadError,
   );
 
-  Future<String?> renameLocalFolder(String folderId, String name) =>
-      _folders.renameLocalFolder(folderId, name);
+  Future<String?> renameFolder(String folderId, String name) =>
+      _folders.renameFolder(folderId, name);
 
   Future<String?> changeSortOrder(
     String order, {

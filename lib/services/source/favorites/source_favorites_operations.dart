@@ -9,6 +9,7 @@ abstract interface class SourceFavoritesOperations {
   bool get favoriteSingleFolderForSingleComic;
   bool get supportFavoriteFolderAdd;
   bool get supportFavoriteFolderDelete;
+  bool get supportFavoriteFolderRename;
   bool get supportFavoriteFolderLoad;
   bool get supportFavoriteSortOrder;
   bool get supportFavoriteToggle;
@@ -30,6 +31,11 @@ abstract interface class SourceFavoritesOperations {
   });
   Future<void> addFavoriteFolder(String name, {String sourceKey = ''});
   Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''});
+  Future<void> renameFavoriteFolder(
+    String folderId,
+    String name, {
+    String sourceKey = '',
+  });
   Future<void> toggleFavorite({
     required String comicId,
     required bool isAdding,
@@ -66,6 +72,9 @@ class SourceFavoritesOperationService implements SourceFavoritesOperations {
   @override
   bool get supportFavoriteFolderDelete =>
       _favorites.supportFavoriteFolderDelete;
+  @override
+  bool get supportFavoriteFolderRename =>
+      _favorites.supportFavoriteFolderRename;
   @override
   bool get supportFavoriteFolderLoad => _favorites.supportFavoriteFolderLoad;
   @override
@@ -110,6 +119,12 @@ class SourceFavoritesOperationService implements SourceFavoritesOperations {
   @override
   Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''}) =>
       _favorites.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
+  @override
+  Future<void> renameFavoriteFolder(
+    String folderId,
+    String name, {
+    String sourceKey = '',
+  }) => _favorites.renameFavoriteFolder(folderId, name, sourceKey: sourceKey);
   @override
   Future<void> toggleFavorite({
     required String comicId,

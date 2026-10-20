@@ -92,6 +92,8 @@ void main() {
     ];
     localFolders = [_folder('local-1', 'one', FavoriteFolderSource.local)];
     when(() => source.supportFavoriteFolderLoad).thenReturn(true);
+    when(() => source.isLogged).thenReturn(true);
+    when(() => source.supportFavoriteFolderRename).thenReturn(false);
     when(() => source.favoriteSortOrders).thenReturn(['mr', 'mp']);
     when(source.loadFavoriteFolders).thenAnswer((_) async {
       events.add('cloud.load');
@@ -358,7 +360,7 @@ void main() {
 
     test('local rename trims the id and reloads directories', () async {
       state.mode = FavoritePageMode.local;
-      expect(await folders.renameLocalFolder(' local-1 ', 'renamed'), isNull);
+      expect(await folders.renameFolder(' local-1 ', 'renamed'), isNull);
       expect(events, [
         'local.rename:local-1:renamed:jm',
         'notify:true:local-1',
@@ -367,12 +369,121 @@ void main() {
       ]);
     });
 
-    test('rename ignores cloud mode and empty local ids', () async {
-      await folders.renameLocalFolder('cloud-1', 'renamed');
-      state.mode = FavoritePageMode.local;
-      await folders.renameLocalFolder('  ', 'renamed');
-      expect(events, isEmpty);
+    test(
+      'rename ignores unsupported cloud plugins and empty local ids',
+      () async {
+        await folders.renameFolder('cloud-1', 'renamed');
+        state.mode = FavoritePageMode.local;
+        await folders.renameFolder('  ', 'renamed');
+        expect(events, isEmpty);
+      },
+    );
+
+    test('cloud rename refreshes names and preserves selection', () async {
+      when(() => source.supportFavoriteFolderRename).thenReturn(true);
+      state.selectedCloudFolderId = 'cloud-1';
+      state.folders = cloudFolders;
+      when(
+        () =>
+            source.renameFavoriteFolder('cloud-1', 'renamed', sourceKey: 'jm'),
+      ).thenAnswer((_) async {
+        events.add('cloud.rename');
+        cloudFolders = [
+          defaultCloudFavoriteFolder,
+          _folder('cloud-1', 'renamed', FavoriteFolderSource.cloud),
+        ];
+      });
+
+      expect(await folders.renameFolder(' cloud-1 ', 'renamed'), isNull);
+      expect(state.folders.last.name, 'renamed');
+      expect(state.selectedCloudFolderId, 'cloud-1');
+      expect(events, [
+        'cloud.rename',
+        'notify:true:cloud-1',
+        'cloud.load',
+        'notify:false:cloud-1',
+      ]);
     });
+
+    test(
+      'cloud rename ignores the all folder and logged-out accounts',
+      () async {
+        when(() => source.supportFavoriteFolderRename).thenReturn(true);
+        await folders.renameFolder('0', 'renamed');
+        when(() => source.isLogged).thenReturn(false);
+        await folders.renameFolder('cloud-1', 'renamed');
+        verifyNever(
+          () => source.renameFavoriteFolder(
+            any(),
+            any(),
+            sourceKey: any(named: 'sourceKey'),
+          ),
+        );
+        expect(events, isEmpty);
+      },
+    );
+
+    test(
+      'cloud rename failure is returned without reloading folders',
+      () async {
+        when(() => source.supportFavoriteFolderRename).thenReturn(true);
+        when(
+          () => source.renameFavoriteFolder(
+            'cloud-1',
+            'renamed',
+            sourceKey: 'jm',
+          ),
+        ).thenThrow(StateError('rename failed'));
+        expect(
+          await folders.renameFolder('cloud-1', 'renamed'),
+          contains('rename failed'),
+        );
+        expect(events, isEmpty);
+      },
+    );
+
+    test('cloud rename reports a failed folder refresh', () async {
+      when(() => source.supportFavoriteFolderRename).thenReturn(true);
+      when(
+        () =>
+            source.renameFavoriteFolder('cloud-1', 'renamed', sourceKey: 'jm'),
+      ).thenAnswer((_) async {});
+      when(
+        source.loadFavoriteFolders,
+      ).thenAnswer((_) async => FavoriteFoldersResult.error('refresh failed'));
+      expect(
+        await folders.renameFolder('cloud-1', 'renamed'),
+        'refresh failed',
+      );
+      expect(state.loadingFolders, isFalse);
+    });
+
+    for (final change in ['source', 'mode', 'dispose']) {
+      test('cloud rename completion after $change does not reload', () async {
+        when(() => source.supportFavoriteFolderRename).thenReturn(true);
+        final pending = Completer<void>();
+        when(
+          () => source.renameFavoriteFolder(
+            'cloud-1',
+            'renamed',
+            sourceKey: 'jm',
+          ),
+        ).thenAnswer((_) => pending.future);
+        final rename = folders.renameFolder('cloud-1', 'renamed');
+        switch (change) {
+          case 'source':
+            sourceKey = 'other';
+            folders.invalidate();
+          case 'mode':
+            state.mode = FavoritePageMode.local;
+          case 'dispose':
+            disposed = true;
+        }
+        pending.complete();
+        expect(await rename, isNull);
+        expect(events, isEmpty);
+      });
+    }
 
     test('rename failure is returned without a directory reload', () async {
       state.mode = FavoritePageMode.local;
@@ -384,7 +495,7 @@ void main() {
         ),
       ).thenThrow(StateError('rename failed'));
       expect(
-        await folders.renameLocalFolder('local-1', 'renamed'),
+        await folders.renameFolder('local-1', 'renamed'),
         contains('rename failed'),
       );
       expect(events, isEmpty);
@@ -400,7 +511,7 @@ void main() {
           sourceKey: 'jm',
         ),
       ).thenAnswer((_) => pending.future);
-      final rename = folders.renameLocalFolder('local-1', 'renamed');
+      final rename = folders.renameFolder('local-1', 'renamed');
       disposed = true;
       pending.complete();
       expect(await rename, isNull);
@@ -461,7 +572,7 @@ void main() {
 
           final mutation = switch (action) {
             'create' => folders.createFolder('new', timeoutMessage: 'timeout'),
-            'rename' => folders.renameLocalFolder('local-1', 'new'),
+            'rename' => folders.renameFolder('local-1', 'new'),
             _ => folders.deleteCurrentFolder(timeoutMessage: 'timeout'),
           };
           sourceKey = 'other';

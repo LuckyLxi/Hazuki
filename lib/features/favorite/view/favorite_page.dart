@@ -317,18 +317,24 @@ class FavoritePageState extends State<FavoritePage>
     unawaited(showHazukiPrompt(context, error, isError: true));
   }
 
-  Future<void> _renameLocalFolder(FavoriteFolder folder) async {
-    if (_controller.mode != FavoritePageMode.local || folder.isAllFolder) {
+  Future<void> _renameFolder(FavoriteFolder folder) async {
+    if (!_controller.supportsFolderRename || folder.isAllFolder) {
       return;
     }
 
+    final mode = _controller.mode;
+    final sourceKey = widget.sourceService.activeSourceKey;
     unawaited(HapticFeedback.lightImpact());
     final strings = _strings(context);
     final renamed = await showFavoriteRenameFolderDialog(
       context,
       initialName: folder.name,
     );
-    if (renamed == null) {
+    if (!mounted ||
+        renamed == null ||
+        mode != _controller.mode ||
+        sourceKey != widget.sourceService.activeSourceKey ||
+        !_controller.supportsFolderRename) {
       return;
     }
 
@@ -337,7 +343,7 @@ class FavoritePageState extends State<FavoritePage>
       return;
     }
 
-    final error = await _controller.renameLocalFolder(folder.id, normalized);
+    final error = await _controller.renameFolder(folder.id, normalized);
     if (!mounted || error == null) {
       return;
     }
@@ -518,9 +524,8 @@ class FavoritePageState extends State<FavoritePage>
                       enableDeleteAction: _controller.canDeleteSelectedFolder,
                       onDeleteCurrentFolder: _deleteCurrentFolder,
                       onSelectFolder: _handleSelectFolder,
-                      onLongPressFolder:
-                          _controller.mode == FavoritePageMode.local
-                          ? _renameLocalFolder
+                      onLongPressFolder: _controller.supportsFolderRename
+                          ? _renameFolder
                           : null,
                     ),
                   FavoritePageContentSection(

@@ -81,6 +81,7 @@ Future<_Source> _pumpPage(
   when(() => source.supportFavoriteSortOrder).thenReturn(false);
   when(() => source.supportFavoriteFolderAdd).thenReturn(false);
   when(() => source.supportFavoriteFolderDelete).thenReturn(false);
+  when(() => source.supportFavoriteFolderRename).thenReturn(false);
   when(() => source.supportFavoriteFolderLoad).thenReturn(false);
   when(() => source.favoriteSortOrder).thenReturn('');
   when(() => source.favoriteSortOrders).thenReturn([]);

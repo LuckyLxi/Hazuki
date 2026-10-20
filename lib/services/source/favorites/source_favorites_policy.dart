@@ -61,6 +61,9 @@ class SourceFavoritesPolicy {
       _evaluateActive('!!this.__hazuki_source.favorites?.addFolder');
   bool get supportFavoriteFolderDelete =>
       _evaluateActive('!!this.__hazuki_source.favorites?.deleteFolder');
+  bool get supportFavoriteFolderRename => _evaluateActive(
+    'typeof this.__hazuki_source.favorites?.renameFolder === "function"',
+  );
   bool get supportFavoriteFolderLoad =>
       _evaluateActive('!!this.__hazuki_source.favorites?.loadFolders');
   bool get supportFavoriteLoadComics =>

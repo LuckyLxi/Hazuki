@@ -10,6 +10,7 @@ class FavoriteCloudFlow {
 
   bool get isLogged => sourceService.isLogged;
   bool get supportsFolderDelete => sourceService.supportFavoriteFolderDelete;
+  bool get supportsFolderRename => sourceService.supportFavoriteFolderRename;
   bool get supportsFolderAdd => sourceService.supportFavoriteFolderAdd;
   bool get supportsFolderLoad => sourceService.supportFavoriteFolderLoad;
   bool get supportsSortOrder => sourceService.supportFavoriteSortOrder;
@@ -45,6 +46,18 @@ class FavoriteCloudFlow {
 
   Future<void> deleteFolder(String folderId) {
     return sourceService.deleteFavoriteFolder(folderId);
+  }
+
+  Future<void> renameFolder(
+    String folderId,
+    String name, {
+    required String sourceKey,
+  }) {
+    return sourceService.renameFavoriteFolder(
+      folderId,
+      name,
+      sourceKey: sourceKey,
+    );
   }
 
   Future<void> setSortOrder(String order) {

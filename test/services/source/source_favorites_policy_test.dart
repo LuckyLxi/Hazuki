@@ -15,6 +15,7 @@ void main() {
 
     expect(policy.favoriteSingleFolderForSingleComic, isFalse);
     expect(policy.supportFavoriteFolderManagement, isFalse);
+    expect(policy.supportFavoriteFolderRename, isFalse);
     expect(policy.supportFavoriteLoadComics, isFalse);
     expect(policy.supportFavoriteToggle, isFalse);
     expect(policy.favoriteSortOrder, 'mr');
