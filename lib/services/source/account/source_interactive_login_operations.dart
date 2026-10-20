@@ -200,6 +200,15 @@ class SourceInteractiveLoginOperations
       host.notifyActiveRuntimeChanged(key);
       successful = true;
     } finally {
+      final local = attempt;
+      if (local != null) {
+        for (final runtimeId in {
+          ...local.loadingRuntimeIds,
+          if (local.runtime.engine != null) local.runtime.engine!.runtimeId,
+        }) {
+          SourceUiService.instance.closeRuntimeInteractions(runtimeId);
+        }
+      }
       if (!successful) cancellation.cancel();
       storage.discard();
       host.removeListener(checkSource);

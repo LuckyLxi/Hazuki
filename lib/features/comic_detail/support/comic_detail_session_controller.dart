@@ -53,7 +53,7 @@ class ComicDetailSessionController extends ChangeNotifier {
 
   void initialize() {
     _future = _createComicDetailsFuture();
-    unawaited(_warmupReaderImages());
+    unawaited(_sourceUi.runBackground(_warmupReaderImages));
     // Route return can precede the reader's asynchronous exit save.
     _readingProgressSubscription = _repository
         .watchReadingProgressChanges()

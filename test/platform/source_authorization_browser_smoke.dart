@@ -57,6 +57,14 @@ Future<void> main() async {
       final controller = await ready.future.timeout(
         const Duration(seconds: 30),
       );
+      final userAgent = await backend.readUserAgent();
+      report['actualUserAgentRead'] = userAgent.trim().isNotEmpty;
+      if (userAgent.trim().isEmpty) throw StateError('user_agent_missing');
+      final pageUserAgent = await controller.evaluateJavascript(
+        source: 'navigator.userAgent',
+      );
+      report['userAgentMatchesBrowser'] = pageUserAgent == userAgent;
+      if (pageUserAgent != userAgent) throw StateError('user_agent_mismatch');
       final deadline = DateTime.now().add(const Duration(seconds: 30));
       while (session.loading &&
           session.isActive &&

@@ -41,6 +41,7 @@ Future<Object?> showSourceBrowserAuthorization(
         );
       }
       final cookieBrowser = browser as SourceAuthorizationCookieBrowser;
+      session.readUserAgent = cookieBrowser.readUserAgent;
       session.readCookies = () =>
           cookieBrowser.readCookies(session.options.cookieScopes);
     }

@@ -43,6 +43,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   final List<Directory>? _legacyDirectories;
   PluginPackageValidator? validatePackage;
   Future<void> Function(List<SourceCatalogEntry>)? onCatalogChanged;
+  Future<void> Function(String)? onUninstalled;
   final Map<String, InstalledSourcePlugin> _installed = {};
   final Map<String, String> _installedVersions = {};
   // Pending edits change stored files without publishing a new runtime revision.
@@ -623,6 +624,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
       await _commit();
       committed = true;
       await onCatalogChanged?.call(catalog);
+      await onUninstalled?.call(id);
     } catch (_) {
       _installed[id] = old;
       if (oldError != null) _fileErrors[id] = oldError;
@@ -632,7 +634,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
       }
       rethrow;
     }
-    // Retain packages as rollback/edited-script backups and retain all source data.
+    // Retain packages and user data; discard only the browser authorization UA.
     _deferredCatalogEntries.remove(id);
     _runtimeErrors.remove(id);
     _notify();

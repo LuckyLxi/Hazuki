@@ -19,6 +19,7 @@ export 'source_runtime_metadata.dart' show parseSourceSettingsDefaults;
 import 'source_script_storage.dart';
 import 'source_text_downloader.dart';
 import '../interaction/source_ui_scope.dart';
+import '../interaction/source_ui_service.dart';
 
 abstract interface class SourceRuntimeLoadClient {
   Future<SourceRuntimeLoadResult> ensureLocalSource(
@@ -257,6 +258,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
       // received live metadata updates or been disposed while init awaited.
       // Restoring a captured state would overwrite either of those outcomes.
       htmlBridge.clear();
+      SourceUiService.instance.closeRuntimeInteractions(engine.runtimeId);
       await engine.close();
       rethrow;
     } finally {

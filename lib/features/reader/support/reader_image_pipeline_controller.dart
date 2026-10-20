@@ -12,6 +12,7 @@ import 'package:hazuki/features/reader/state/reader_image_content_state.dart';
 import 'reader_image_loader.dart';
 import 'reader_image_prefetch_scheduler.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class ReaderImagePipelineController {
   final _sourceUi = SourceUiOwner();
@@ -104,9 +105,12 @@ class ReaderImagePipelineController {
   late final ReaderImageLoader _imageLoader;
   late final ReaderImagePrefetchScheduler _prefetchScheduler;
 
-  void prefetchAround(int index) => _prefetchScheduler.prefetchAround(index);
-  void requestPrefetchAhead(int index) =>
-      _prefetchScheduler.requestPrefetchAhead(index);
+  void prefetchAround(int index) => SourceUiScope.withoutInteractionSync(
+    () => _prefetchScheduler.prefetchAround(index),
+  );
+  void requestPrefetchAhead(int index) => SourceUiScope.withoutInteractionSync(
+    () => _prefetchScheduler.requestPrefetchAhead(index),
+  );
 
   void _logDecodedAspectRatio(String url, double aspectRatio) {
     final index = _pipelineState.imageIndexMap[url];

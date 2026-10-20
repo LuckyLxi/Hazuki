@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorite_sort.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
@@ -96,6 +97,7 @@ class FavoritePageController extends ChangeNotifier {
   final FavoriteSelectionStore _selectionStore;
 
   void _invalidateRequests() {
+    _cloudFlow.cancel();
     _listLoader.invalidate();
     _folders.invalidate();
   }
@@ -191,6 +193,24 @@ class FavoritePageController extends ChangeNotifier {
   }
 
   Future<void> loadInitial({
+    required String timeoutMessage,
+    ValueChanged<String>? onFolderLoadError,
+  }) => _runVisible(
+    () => _loadInitial(
+      timeoutMessage: timeoutMessage,
+      onFolderLoadError: onFolderLoadError,
+    ),
+  );
+
+  Future<void> _runVisible(Future<void> Function() operation) async {
+    try {
+      await _cloudFlow.run(operation);
+    } catch (error) {
+      if (!isSourceUiCancellation(error)) rethrow;
+    }
+  }
+
+  Future<void> _loadInitial({
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
   }) async {
@@ -339,6 +359,16 @@ class FavoritePageController extends ChangeNotifier {
   Future<void> refresh({
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
+  }) => _runVisible(
+    () => _refresh(
+      timeoutMessage: timeoutMessage,
+      onFolderLoadError: onFolderLoadError,
+    ),
+  );
+
+  Future<void> _refresh({
+    required String timeoutMessage,
+    ValueChanged<String>? onFolderLoadError,
   }) async {
     if (_state.refreshing) {
       return;
@@ -384,6 +414,18 @@ class FavoritePageController extends ChangeNotifier {
   }
 
   Future<void> selectFolder(
+    String folderId, {
+    required String timeoutMessage,
+    bool forceReload = false,
+  }) => _runVisible(
+    () => _selectFolder(
+      folderId,
+      timeoutMessage: timeoutMessage,
+      forceReload: forceReload,
+    ),
+  );
+
+  Future<void> _selectFolder(
     String folderId, {
     required String timeoutMessage,
     bool forceReload = false,
@@ -491,6 +533,7 @@ class FavoritePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _cloudFlow.dispose();
     _disposed = true;
     _listLoader.dispose();
     _changes.dispose();
@@ -630,7 +673,9 @@ class FavoritePageController extends ChangeNotifier {
     }
     // 必须用 loadInitial 而非 refresh：resetForReload 将 initialLoading 置为 true，
     // 只有 loadInitial 会在完成后将其重置为 false，refresh 不处理 initialLoading
-    await loadInitial(timeoutMessage: '');
+    await SourceUiScope.withoutInteraction(
+      () => loadInitial(timeoutMessage: ''),
+    );
   }
 
   Future<void> _syncLocalFavoritesAfterExternalChange() async {
@@ -681,12 +726,14 @@ class FavoritePageController extends ChangeNotifier {
     _notify();
 
     try {
-      final result = await _listLoader.load(
-        request: requestVersion,
-        sortOrder: _state.favoriteSortOrder,
-        page: 1,
-        folderId: selectedFolderId,
-        timeoutMessage: 'Timeout',
+      final result = await SourceUiScope.withoutInteraction(
+        () => _listLoader.load(
+          request: requestVersion,
+          sortOrder: _state.favoriteSortOrder,
+          page: 1,
+          folderId: selectedFolderId,
+          timeoutMessage: 'Timeout',
+        ),
       );
       if (_disposed ||
           _state.mode != FavoritePageMode.cloud ||

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 import '../state/favorite_folder_state.dart';
 import 'favorite_cloud_flow.dart';
@@ -102,7 +103,17 @@ class FavoriteFolderCoordinator {
     _state.loadingFolders = true;
     _notify();
 
-    final result = await _cloudFlow.loadFolders();
+    FavoriteFoldersResult result;
+    try {
+      result = await _cloudFlow.loadFolders();
+    } catch (error) {
+      if (!isSourceUiCancellation(error)) rethrow;
+      if (_isCurrentFolderRequest(request)) {
+        _state.loadingFolders = false;
+        _notify();
+      }
+      return;
+    }
     if (!_isCurrentFolderRequest(request)) {
       return;
     }

@@ -91,6 +91,9 @@ class SourceRuntimeAssembly {
         plugins.historicalPresentationFor;
     // Installation uses local script inspection; init runs when the source is used.
     plugins.onCatalogChanged = _runtimeHost.replaceCatalog;
+    plugins.onUninstalled = (id) => _secureSessionStorage.delete(
+      SourceSecureSessionStorageKeys.browserUserAgents(id),
+    );
     if (initialCatalog.isEmpty) {
       _runtimeHost.runtimeRegistry.prepareCatalog = plugins.initialize;
     }

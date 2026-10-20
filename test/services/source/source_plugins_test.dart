@@ -207,6 +207,9 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
         'user',
         'password',
       ]);
+      await handle.session.saveBrowserUserAgents({
+        'https://example.com': 'Synthetic UA',
+      });
       await assembly.gateways.reader.loadChapterImages(
         comicId: 'comic',
         epId: '10',
@@ -868,6 +871,7 @@ Hazuki.registerSource({
       final restored = assembly.testing.handleFor('independent');
       await restored.session.ensurePrefs();
       expect(restored.facade.loadAccountDataSync(), ['user', 'password']);
+      expect(restored.session.loadBrowserUserAgents(), isEmpty);
       // Manager belongs to the test; dispose the host separately at teardown.
       addTearDown(
         () => assembly.testing.handleFor('independent').requestDispose(),

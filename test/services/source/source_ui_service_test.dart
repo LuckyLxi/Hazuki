@@ -29,6 +29,137 @@ SourceScriptExecution execution(
 );
 
 void main() {
+  test(
+    'browser authorization survives system activities and waits for foreground before continuing',
+    () async {
+      final service = SourceUiService();
+      final browser = Completer<String>();
+      late SourceUiScope scope;
+      late SourceScriptExecution task;
+      var continued = false;
+      final running = service.run(() async {
+        scope = SourceUiScope.current!..runtimeIds.add('engine');
+        task = execution(scope);
+        final value = await service.runBrowserAuthorization(
+          () => browser.future,
+          execution: task,
+          runtimeId: 'engine',
+          timeout: const Duration(seconds: 5),
+        );
+        service.checkExecution(task, 'engine');
+        continued = true;
+        return value;
+      });
+      service.setForeground(false);
+      service.setForeground(false);
+      expect(scope.available, true);
+      expect(
+        () => service.checkExecution(task, 'engine'),
+        throwsA(isA<SourceUiCancelled>()),
+      );
+      browser.complete('authorized');
+      await Future<void>.delayed(Duration.zero);
+      expect(continued, false);
+      service.setForeground(true);
+      expect(await running, 'authorized');
+      expect(continued, true);
+    },
+  );
+
+  for (final reason in ['user', 'ownerGone', 'runtimeDisposed']) {
+    test('browser suspension still respects cancellation: $reason', () async {
+      final service = SourceUiService();
+      final browser = Completer<String>();
+      late SourceUiScope scope;
+      final running = service.run(() async {
+        scope = SourceUiScope.current!..runtimeIds.add('engine');
+        return service.runBrowserAuthorization(
+          () => browser.future,
+          execution: execution(scope),
+          runtimeId: 'engine',
+          timeout: const Duration(seconds: 5),
+        );
+      });
+      final rejected = expectLater(running, throwsA(isA<SourceUiCancelled>()));
+      service.setForeground(false);
+      if (reason == 'runtimeDisposed') {
+        service.cancelRuntime('engine');
+      } else {
+        scope.cancel(reason);
+      }
+      await rejected;
+      browser.complete('late');
+      service.setForeground(true);
+    });
+  }
+
+  test(
+    'browser completion in background cannot extend the authorization deadline',
+    () async {
+      final service = SourceUiService();
+      final browser = Completer<String>();
+      final running = service.run(() async {
+        final scope = SourceUiScope.current!..runtimeIds.add('engine');
+        return service.runBrowserAuthorization(
+          () => browser.future,
+          execution: execution(scope),
+          runtimeId: 'engine',
+          timeout: Duration.zero,
+        );
+      });
+      final rejected = expectLater(
+        running,
+        throwsA(
+          isA<SourceUiCancelled>().having(
+            (error) => error.reason,
+            'reason',
+            'timeout',
+          ),
+        ),
+      );
+      service.setForeground(false);
+      browser.complete('authorized');
+      await rejected;
+      service.setForeground(true);
+    },
+  );
+
+  test(
+    'background execution cannot regain UI by nesting a foreground runner',
+    () async {
+      final service = SourceUiService();
+      await SourceUiScope.withoutInteraction(
+        () => service.run(() async {
+          expect(SourceUiScope.current, isNull);
+          expect(service.scopes, isEmpty);
+        }),
+      );
+    },
+  );
+
+  test(
+    'source cancellation revokes work before any dialog and rejects late HTTP',
+    () async {
+      final service = SourceUiService();
+      final pending = Completer<void>();
+      late SourceScriptExecution task;
+      final running = service.run(() async {
+        final scope = SourceUiScope.current!
+          ..runtimeIds.add('engine')
+          ..pluginIds.add('plugin');
+        task = execution(scope);
+        await pending.future;
+      });
+      final rejected = expectLater(running, throwsA(isA<SourceUiCancelled>()));
+      service.cancelPlugin('plugin', 'sourceChanged');
+      await rejected;
+      expect(
+        () => service.checkExecution(task, 'engine'),
+        throwsA(isA<SourceUiCancelled>()),
+      );
+      pending.complete();
+    },
+  );
   test('validates descriptors, images, ids and values before use', () {
     final raw = options();
     expect(SourceDialogModel.parse(raw).initialValues, {

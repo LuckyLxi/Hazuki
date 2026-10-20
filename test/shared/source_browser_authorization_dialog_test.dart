@@ -12,6 +12,8 @@ class _Browser
     implements SourceAuthorizationBrowser, SourceAuthorizationCookieBrowser {
   List<Map<String, Object?>> cookies = [];
   @override
+  Future<String> readUserAgent() async => 'Synthetic browser UA';
+  @override
   Future<List<Map<String, Object?>>> readCookies(
     List<SourceAuthorizationCookieScope> scopes,
   ) async => cookies;
@@ -282,6 +284,10 @@ void main() {
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
       messenger.setMockMethodCallHandler(channel, (call) async {
         calls.add(call.method);
+        if (call.method == 'userAgent') {
+          expect(call.arguments['id'], isA<String>());
+          return 'Actual Android UA';
+        }
         return true;
       });
       addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
@@ -291,6 +297,7 @@ void main() {
       );
       final backend = AndroidSourceAuthorizationBrowser();
       await backend.prepare(session);
+      expect(await backend.readUserAgent(), 'Actual Android UA');
       Future<void> event(String value) async {
         final done = Completer<void>();
         await messenger.handlePlatformMessage(
@@ -310,7 +317,7 @@ void main() {
         'url': 'https://site.example/done?token=synthetic',
       });
       await backend.close();
-      expect(calls, ['prepare', 'close']);
+      expect(calls, ['prepare', 'userAgent', 'close']);
       session.dispose();
     },
   );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 
 import 'favorite_selection_result.dart';
@@ -28,6 +29,7 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
   final bool _singleFolderOnly;
 
   bool _disposed = false;
+  final _sourceUi = SourceUiOwner();
 
   bool _isLoading = true;
   bool _isBusy = false;
@@ -79,7 +81,9 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
         sourceKey: _details.sourceKey,
       );
       final cloudResult = _canLoadCloudFolders
-          ? await _repository.loadCloudFavoriteFolders(comicId: _details.id)
+          ? await _sourceUi.run(
+              () => _repository.loadCloudFavoriteFolders(comicId: _details.id),
+            )
           : const FavoriteFoldersResult.success(
               folders: <FavoriteFolder>[],
               favoritedFolderIds: <String>{},
@@ -203,7 +207,7 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
           sourceKey: _details.sourceKey,
         );
       } else {
-        await _repository.addCloudFavoriteFolder(name);
+        await _sourceUi.run(() => _repository.addCloudFavoriteFolder(name));
       }
       if (_disposed) return;
       await load(preserveSelection: true);
@@ -226,7 +230,9 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
           sourceKey: _details.sourceKey,
         );
       } else {
-        await _repository.deleteCloudFavoriteFolder(folder.id);
+        await _sourceUi.run(
+          () => _repository.deleteCloudFavoriteFolder(folder.id),
+        );
       }
       if (_disposed) return;
       await load(preserveSelection: true);
@@ -256,6 +262,7 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _sourceUi.dispose();
     _disposed = true;
     super.dispose();
   }

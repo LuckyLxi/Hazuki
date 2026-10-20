@@ -87,6 +87,7 @@ class SourceRuntimeHandle
   @override
   late final SourceCookieStore cookieStore = SourceCookieStore(
     loadCookies: session.loadCookieStore,
+    onDelete: session.deleteBrowserUserAgent,
     saveCookies: (cookies) async {
       if (_disposed || loginCancellation?.isCancelled == true) return;
       await session.saveCookieStore(cookies);
@@ -126,6 +127,7 @@ class SourceRuntimeHandle
     sourceKey: sourceKey,
     cookieStore: cookieStore,
     networkLogSink: networkLogSink,
+    browserUserAgents: session.loadBrowserUserAgents,
     onResponseStatus: _onResponseStatus,
   );
   late final HazukiSourceFacade facade = HazukiSourceFacade(

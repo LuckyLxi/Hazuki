@@ -6,6 +6,8 @@ import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/comments/comments_sort_delegate.dart';
 
@@ -59,6 +61,7 @@ class CommentsPageController extends ChangeNotifier
   final CommentFilterService _filterService;
   final _effects = StreamController<CommentsEffect>.broadcast(sync: true);
   bool _disposed = false;
+  final _sourceUi = SourceUiOwner();
 
   Stream<CommentsEffect> get effects => _effects.stream;
 
@@ -94,8 +97,9 @@ class CommentsPageController extends ChangeNotifier
   }
 
   Future<ComicCommentsPageResult> _loadPage(int page, {String? replyTo}) {
-    return _sourceService
-        .loadCommentsPage(
+    return _sourceUi.run(
+      () => SourceUiScope.timeout(
+        _sourceService.loadCommentsPage(
           comicId: comicId,
           subId: subId,
           chapterId: chapterId,
@@ -104,8 +108,10 @@ class CommentsPageController extends ChangeNotifier
           pageSize: pageSize,
           replyTo: replyTo,
           order: state.order,
-        )
-        .timeout(loadTimeout);
+        ),
+        loadTimeout,
+      ),
+    );
   }
 
   bool _isCurrent(int epoch) => !_disposed && state.loadEpoch == epoch;
@@ -161,6 +167,7 @@ class CommentsPageController extends ChangeNotifier
       );
     } catch (error) {
       if (!_isCurrent(epoch)) return;
+      if (isSourceUiCancellation(error)) return;
       _update(() => state.loadError = error);
       _logEvent(
         'Comments load failed',
@@ -287,19 +294,23 @@ class CommentsPageController extends ChangeNotifier
       });
     });
     try {
-      await _sourceService.likeComment(
-        comicId: comicId,
-        subId: subId,
-        sourceKey: sourceKey,
-        commentId: id,
-        isLike: nextLiked,
+      await _sourceUi.run(
+        () => _sourceService.likeComment(
+          comicId: comicId,
+          subId: subId,
+          sourceKey: sourceKey,
+          commentId: id,
+          isLike: nextLiked,
+        ),
       );
       _emit(nextLiked ? CommentsEffectType.liked : CommentsEffectType.unliked);
     } catch (error) {
       if (_isCurrent(epoch)) {
         _update(() => _updateCommentById(id, (_) => comment));
       }
-      _emit(CommentsEffectType.likeFailed, error: error);
+      if (!isSourceUiCancellation(error)) {
+        _emit(CommentsEffectType.likeFailed, error: error);
+      }
     } finally {
       _update(() => state.likingCommentIds.remove(id));
     }
@@ -383,20 +394,24 @@ class CommentsPageController extends ChangeNotifier
     final replyTo = state.replyToComment?.id;
     _update(() => state.sendingComment = true);
     try {
-      await _sourceService.sendComment(
-        comicId: comicId,
-        subId: subId,
-        chapterId: chapterId,
-        sourceKey: sourceKey,
-        content: text,
-        replyTo: replyTo,
+      await _sourceUi.run(
+        () => _sourceService.sendComment(
+          comicId: comicId,
+          subId: subId,
+          chapterId: chapterId,
+          sourceKey: sourceKey,
+          content: text,
+          replyTo: replyTo,
+        ),
       );
       if (_disposed) return;
       _update(() => state.replyToComment = null);
       _emit(CommentsEffectType.sendSucceeded);
       await loadInitial();
     } catch (error) {
-      _emit(CommentsEffectType.sendFailed, error: error);
+      if (!isSourceUiCancellation(error)) {
+        _emit(CommentsEffectType.sendFailed, error: error);
+      }
     } finally {
       _update(() => state.sendingComment = false);
     }
@@ -510,6 +525,7 @@ class CommentsPageController extends ChangeNotifier
 
   @override
   void dispose() {
+    _sourceUi.dispose();
     _disposed = true;
     _filterService.removeListener(_onFilterChanged);
     // Keep cached content for the next surface, but release this surface's work.

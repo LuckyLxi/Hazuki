@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
 
 import 'package:hazuki/shared/favorites/favorite_folders_view_model.dart';
@@ -24,6 +26,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
 
   final ComicDetailFeatureFacade _repository;
   bool _disposed = false;
+  final _sourceUi = SourceUiOwner();
 
   bool _busy = false;
   bool _likeBusy = false;
@@ -69,10 +72,12 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _repository.toggleComicLike(
-        comicId: details.id,
-        isLike: nextLiked,
-        sourceKey: details.sourceKey,
+      await _sourceUi.run(
+        () => _repository.toggleComicLike(
+          comicId: details.id,
+          isLike: nextLiked,
+          sourceKey: details.sourceKey,
+        ),
       );
       if (_disposed) return;
       _likedOverride = nextLiked;
@@ -85,7 +90,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
         ),
       );
     } catch (e) {
-      if (_disposed) return;
+      if (_disposed || isSourceUiCancellation(e)) return;
       unawaited(
         showHazukiPrompt(
           context,
@@ -213,16 +218,19 @@ class ComicDetailFavoriteController extends ChangeNotifier {
       if (changed == null || _disposed) return;
 
       if (!changed.hasChanges) return;
+      final selection = changed;
 
       _busy = true;
       notifyListeners();
 
       try {
-        final result = await applyFavoriteFolderSelectionChanges(
-          repository: _repository,
-          details: details,
-          selection: changed,
-          singleFolderOnly: singleFolderOnly,
+        final result = await _sourceUi.run(
+          () => applyFavoriteFolderSelectionChanges(
+            repository: _repository,
+            details: details,
+            selection: selection,
+            singleFolderOnly: singleFolderOnly,
+          ),
         );
         if (_disposed) return;
         _favoriteOverride = result.hasSelection;
@@ -235,7 +243,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
           ),
         );
       } catch (e) {
-        if (_disposed) return;
+        if (_disposed || isSourceUiCancellation(e)) return;
         unawaited(
           showHazukiPrompt(
             context,
@@ -258,6 +266,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _sourceUi.dispose();
     _disposed = true;
     super.dispose();
   }

@@ -114,19 +114,38 @@ class SourceJsBridgeCookieCapability {
         if (count != null && (count is! int || count < 1 || count > 32)) {
           throw const FormatException('login_invalid_point_count');
         }
-        result = present(request, cancellation).then((value) async {
+        final presented = request['type'] == 'browserAuthorization'
+            ? SourceUiService.instance.runBrowserAuthorization(
+                () => present(request, cancellation),
+                execution: execution,
+                runtimeId: runtimeId,
+                timeout: SourceBrowserAuthorizationOptions.parse(
+                  request,
+                ).timeout,
+              )
+            : present(request, cancellation);
+        result = presented.then((value) async {
           cancellation.check();
           if (request['type'] != 'browserAuthorization' || value is! Map) {
             return value;
           }
           final response = Map<String, dynamic>.from(value);
           final cookies = response.remove('_cookies');
+          final userAgent = response.remove('_userAgent');
           final options = SourceBrowserAuthorizationOptions.parse(request);
           if (response['status'] == 'completed' &&
               options.cookieScopes.isNotEmpty) {
             if (cookies is! List) {
               throw StateError('login_browser_cookie_missing');
             }
+            if (userAgent is! String ||
+                userAgent.trim().isEmpty ||
+                userAgent.contains(RegExp(r'[\r\n]'))) {
+              throw const SourceBrowserAuthorizationException(
+                'login_browser_user_agent_unavailable',
+              );
+            }
+            final userAgents = handle.session.loadBrowserUserAgents();
             for (final scope in options.cookieScopes) {
               final selected = cookies
                   .whereType<Map>()
@@ -148,8 +167,11 @@ class SourceJsBridgeCookieCapability {
                 throw StateError('login_browser_cookie_missing');
               }
               await handle.cookieStore.set(scope.url, selected);
+              userAgents[Uri.parse(scope.url).origin] = userAgent;
               cancellation.check();
             }
+            await handle.session.saveBrowserUserAgents(userAgents);
+            cancellation.check();
           }
           return response;
         });
@@ -179,10 +201,19 @@ class SourceJsBridgeCookieCapability {
         );
         break;
       case 'http':
+        if (execution != null && runtimeId != null) {
+          SourceUiService.instance.checkExecution(execution, runtimeId);
+        }
         result = handle.facade.httpGateway.sendJsHttpRequest(
           map,
           execution: execution,
           runtimeId: runtimeId,
+          checkActive: () {
+            handle.loginCancellation?.check();
+            if (execution != null && runtimeId != null) {
+              SourceUiService.instance.checkExecution(execution, runtimeId);
+            }
+          },
         );
         break;
       case 'cookie':

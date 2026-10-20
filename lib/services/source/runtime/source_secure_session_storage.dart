@@ -21,6 +21,9 @@ class SourceSecureSessionStorageKeys {
 
   static String cookies(String sourceKey) =>
       'hazuki_source_cookies_v1_${sourceKey.trim()}';
+
+  static String browserUserAgents(String sourceKey) =>
+      'hazuki_source_browser_user_agents_v1_${sourceKey.trim()}';
 }
 
 class FlutterSourceSecureSessionStorage implements SourceSecureSessionStorage {

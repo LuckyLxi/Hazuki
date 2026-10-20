@@ -13,7 +13,7 @@ typedef SourceDialogPresenter =
 
 /// A feature controller owns its requests even when their plugin is shared.
 class SourceUiOwner {
-  SourceUiOwner() : _routeOwner = SourceUiService.instance.captureOwner?.call();
+  SourceUiOwner();
   Object? _routeOwner;
   final Set<SourceUiScope> _scopes = {};
   bool wasCancelled = false;
@@ -24,10 +24,20 @@ class SourceUiOwner {
     wasCancelled = false;
   }
 
-  Future<T> run<T>(Future<T> Function() operation) {
+  Future<T> run<T>(Future<T> Function() operation) async {
     if (_disposed) return Future.error(const SourceUiCancelled('ownerGone'));
-    return SourceUiService.instance.run(operation, owner: this);
+    SourceUiScope? entered;
+    final value = await SourceUiService.instance.run(() {
+      entered = SourceUiScope.current;
+      return operation();
+    }, owner: this);
+    final reason = entered?.reason;
+    if (reason != null) throw SourceUiCancelled(reason);
+    return value;
   }
+
+  Future<T> runBackground<T>(Future<T> Function() operation) =>
+      SourceUiScope.withoutInteraction(operation);
 
   void cancel(String reason) {
     for (final scope in _scopes.toList()) {
@@ -59,15 +69,93 @@ class SourceUiService {
   final Queue<SourceDialogSession> _queue = Queue();
   SourceDialogSession? _visible;
   bool _foreground = true;
+  Completer<void>? _foregroundResumed;
+  final Map<SourceUiScope, int> _browserAuthorizations = {};
   bool _pumping = false;
 
   Iterable<SourceUiScope> get scopes => List.unmodifiable(_scopes.values);
+
+  void checkExecution(SourceScriptExecution execution, String runtimeId) {
+    if (execution.uiScopeId == null) return;
+    final scope = _scopes[execution.uiScopeId];
+    if (scope == null || scope.finished) {
+      throw const SourceUiCancelled('operationFinished');
+    }
+    if (scope.reason != null) throw SourceUiCancelled(scope.reason!);
+    if (!_foreground) throw const SourceUiCancelled('background');
+    if (!scope.runtimeIds.contains(runtimeId) ||
+        isOwnerAvailable?.call(scope.owner) == false) {
+      throw const SourceUiCancelled('ownerGone');
+    }
+  }
+
+  /// Android autofill/credential providers can stop the activity while the
+  /// owned WebView is still authorizing. Keep only that operation alive and
+  /// defer its result until foreground; route/runtime cancellation still wins.
+  Future<T> runBrowserAuthorization<T>(
+    Future<T> Function() operation, {
+    required SourceScriptExecution? execution,
+    required String? runtimeId,
+    required Duration timeout,
+  }) async {
+    final scope = _scopes[execution?.uiScopeId] ?? SourceUiScope.current;
+    if (scope == null) return operation();
+    if (execution != null && runtimeId != null) {
+      checkExecution(execution, runtimeId);
+    }
+    _browserAuthorizations.update(
+      scope,
+      (count) => count + 1,
+      ifAbsent: () => 1,
+    );
+    final elapsed = Stopwatch()..start();
+    Future<T> authorize() async {
+      final value = await operation();
+      while (!_foreground) {
+        final remaining = timeout - elapsed.elapsed;
+        await Future.any<void>([
+          (_foregroundResumed ??= Completer<void>()).future,
+          scope.whenCancelled.then<void>(
+            (_) => throw SourceUiCancelled(scope.reason ?? 'operationFinished'),
+          ),
+        ]).timeout(
+          remaining.isNegative ? Duration.zero : remaining,
+          onTimeout: () {
+            scope.cancel('timeout');
+            throw const SourceUiCancelled('timeout');
+          },
+        );
+      }
+      if (!scope.available) {
+        throw SourceUiCancelled(scope.reason ?? 'operationFinished');
+      }
+      return value;
+    }
+
+    try {
+      return await Future.any<T>([
+        authorize(),
+        scope.whenCancelled.then<T>(
+          (_) => throw SourceUiCancelled(scope.reason ?? 'operationFinished'),
+        ),
+      ]);
+    } finally {
+      final remaining = _browserAuthorizations[scope]! - 1;
+      if (remaining == 0) {
+        _browserAuthorizations.remove(scope);
+        if (!_foreground && scope.available) scope.cancel('background');
+      } else {
+        _browserAuthorizations[scope] = remaining;
+      }
+    }
+  }
 
   Future<T> run<T>(
     Future<T> Function() operation, {
     SourceUiOwner? owner,
     SourceDialogPresenter? present,
   }) async {
+    if (SourceUiScope.interactionDisabled) return operation();
     final current = SourceUiScope.current;
     if (current?.available == true &&
         present == null &&
@@ -196,14 +284,22 @@ class SourceUiService {
     _foreground = value;
     if (!value) {
       for (final scope in scopes) {
-        scope.cancel('background');
+        if (!_browserAuthorizations.containsKey(scope)) {
+          scope.cancel('background');
+        }
       }
     } else {
+      final resumed = _foregroundResumed;
+      _foregroundResumed = null;
+      resumed?.complete();
       schedulePump();
     }
   }
 
   void cancelRuntime(String runtimeId) {
+    for (final scope in scopes) {
+      if (scope.runtimeIds.contains(runtimeId)) scope.cancel('runtimeDisposed');
+    }
     for (final dialog in _dialogs.values.toList()) {
       if (dialog.runtimeId == runtimeId && !dialog.isClosed) {
         dialog.scope.cancel('runtimeDisposed');
@@ -215,9 +311,17 @@ class SourceUiService {
     for (final dialog in _dialogs.values.toList()) {
       if (dialog.runtimeId == runtimeId) dialog.close('operationFinished');
     }
+    // A verified private login runtime is retired before its enclosing login
+    // operation returns. Its normal teardown must not cancel the committed login.
+    for (final scope in scopes) {
+      scope.runtimeIds.remove(runtimeId);
+    }
   }
 
   void cancelPlugin(String pluginId, String reason) {
+    for (final scope in scopes) {
+      if (scope.pluginIds.contains(pluginId)) scope.cancel(reason);
+    }
     for (final dialog in _dialogs.values.toList()) {
       if (dialog.pluginId == pluginId && !dialog.isClosed) {
         dialog.scope.cancel(reason);

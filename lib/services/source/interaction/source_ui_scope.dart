@@ -24,6 +24,8 @@ class SourceUiScope extends ChangeNotifier {
     this.waitingTimeout = const Duration(minutes: 5),
   });
   static final Object _zoneKey = Object();
+  static final Object _disabledKey = Object();
+  static bool get interactionDisabled => Zone.current[_disabledKey] == true;
   static SourceUiScope? get current {
     final scope = Zone.current[_zoneKey] as SourceUiScope?;
     return scope?.finished == true ? null : scope;
@@ -42,6 +44,7 @@ class SourceUiScope extends ChangeNotifier {
   Object? failure;
   bool finished = false;
   final Set<String> runtimeIds = {};
+  final Set<String> pluginIds = {};
   bool get available => !finished && reason == null;
   Future<void> get whenCancelled => _cancelled.future;
 
@@ -49,10 +52,10 @@ class SourceUiScope extends ChangeNotifier {
       runZoned(operation, zoneValues: {_zoneKey: this});
 
   static Future<T> withoutInteraction<T>(Future<T> Function() operation) =>
-      runZoned(operation, zoneValues: {_zoneKey: null});
+      runZoned(operation, zoneValues: {_zoneKey: null, _disabledKey: true});
 
   static T withoutInteractionSync<T>(T Function() operation) =>
-      runZoned(operation, zoneValues: {_zoneKey: null});
+      runZoned(operation, zoneValues: {_zoneKey: null, _disabledKey: true});
 
   static Timer timer(Duration duration, VoidCallback callback) =>
       _SourceUiTimer(current, duration, callback);

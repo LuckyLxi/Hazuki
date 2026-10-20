@@ -180,6 +180,7 @@ class SourceScriptEngine {
     _pending[id] = completion;
     final scope = inspection ? null : SourceUiScope.current;
     scope?.runtimeIds.add(runtimeId);
+    scope?.pluginIds.add(pluginId);
     _worker!.send({
       'type': kind,
       'id': id,

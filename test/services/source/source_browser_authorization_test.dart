@@ -33,6 +33,7 @@ void main() {
       );
       addTearDown(session.dispose);
       session.readCookies = () async => [];
+      session.readUserAgent = () async => 'Synthetic browser UA';
       await session.complete();
       expect(session.missingCookies, isTrue);
       expect(session.isActive, isTrue);
@@ -46,9 +47,51 @@ void main() {
       ];
       await session.complete();
       expect((await session.result)['status'], 'completed');
+      expect((await session.result)['_userAgent'], 'Synthetic browser UA');
       expect(session.isActive, isFalse);
     },
   );
+  for (final invalid in ['', 'invalid\r\nUA']) {
+    test(
+      'rejects unavailable or malformed browser UA: ${invalid.isEmpty}',
+      () async {
+        final session = SourceBrowserAuthorizationSession(
+          SourceBrowserAuthorizationOptions.parse({
+            'url': 'https://site.example/',
+            'completion': 'manual',
+            'cookieScopes': [
+              {
+                'url': 'https://site.example/',
+                'names': ['sid'],
+              },
+            ],
+          }),
+          SourceLoginCancellation(),
+        );
+        addTearDown(session.dispose);
+        session.readCookies = () async => [
+          {
+            'scopeUrl': 'https://site.example/',
+            'name': 'sid',
+            'value': 'synthetic',
+          },
+        ];
+        session.readUserAgent = () async => invalid;
+        final rejected = expectLater(
+          session.result,
+          throwsA(
+            isA<SourceBrowserAuthorizationException>().having(
+              (e) => e.code,
+              'code',
+              'login_browser_user_agent_unavailable',
+            ),
+          ),
+        );
+        await session.complete();
+        await rejected;
+      },
+    );
+  }
   test('cancelled cookie extraction cannot finish the login', () async {
     final cancellation = SourceLoginCancellation();
     final session = SourceBrowserAuthorizationSession(

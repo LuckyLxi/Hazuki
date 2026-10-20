@@ -196,6 +196,7 @@ class SourceBrowserAuthorizationSession extends ChangeNotifier {
   bool completing = false;
   bool missingCookies = false;
   Future<List<Map<String, Object?>>> Function()? readCookies;
+  Future<String> Function()? readUserAgent;
   bool get isActive =>
       state == SourceAuthorizationState.preparing ||
       state == SourceAuthorizationState.browsing;
@@ -237,10 +238,25 @@ class SourceBrowserAuthorizationSession extends ChangeNotifier {
         ),
       );
       if (missingCookies) return;
+      String? userAgent;
+      if (options.cookieScopes.isNotEmpty) {
+        try {
+          userAgent = await readUserAgent!();
+          if (userAgent.trim().isEmpty ||
+              userAgent.contains(RegExp(r'[\r\n]'))) {
+            throw StateError('invalid_user_agent');
+          }
+        } catch (_) {
+          fail('login_browser_user_agent_unavailable');
+          return;
+        }
+        if (!isActive) return;
+      }
       _finish(SourceAuthorizationState.completed, {
         'status': 'completed',
         'url': callbackUrl ?? options.url.toString(),
         if (cookies.isNotEmpty) '_cookies': cookies,
+        '_userAgent': ?userAgent,
       });
     } catch (_) {
       fail('login_browser_cookie_unavailable');

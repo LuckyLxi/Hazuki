@@ -13,6 +13,8 @@ import '../../services/source/account/source_browser_authorization.dart';
 import '../../services/source/runtime/source_cookie_store.dart';
 
 abstract interface class SourceAuthorizationCookieBrowser {
+  Future<String> readUserAgent();
+
   Future<List<Map<String, Object?>>> readCookies(
     List<SourceAuthorizationCookieScope> scopes,
   );
@@ -38,6 +40,10 @@ class AndroidSourceAuthorizationBrowser
   static const _host = MethodChannel('hazuki/browser_authorization');
   late SourceBrowserAuthorizationSession _session;
   MethodChannel? _events;
+
+  @override
+  Future<String> readUserAgent() async =>
+      await _host.invokeMethod<String>('userAgent', {'id': _session.id}) ?? '';
 
   @override
   Future<void> prepare(SourceBrowserAuthorizationSession session) async {
@@ -152,6 +158,12 @@ class WindowsSourceAuthorizationBrowser
   Directory? _directory;
   SourceBrowserAuthorizationSession? _session;
   final _viewKey = GlobalKey<_WindowsAuthorizationViewState>();
+
+  @override
+  Future<String> readUserAgent() async =>
+      (await _viewKey.currentState?._controllers[null]?.getSettings())
+          ?.userAgent ??
+      '';
 
   @override
   Future<void> prepare(SourceBrowserAuthorizationSession session) async {

@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/account/source_interactive_login_operations.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_catalog_resolver.dart';
 import 'package:hazuki/services/source/runtime/source_js_bridge_cookie_capability.dart';
@@ -20,6 +21,32 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'foreground candidate cleanup preserves the original initialization error',
+    () async {
+      final fixture = await _createRuntimeFixture();
+      await fixture.file.writeAsString(
+        _runtimeScript(
+          '2.0.0',
+          init: "throw Error('synthetic_initialization_failure');",
+        ),
+      );
+      await expectLater(
+        SourceUiService.instance.run(
+          () => fixture.loader.loadMetadata(
+            fixture.host.activeHandle,
+            fixture.file,
+          ),
+        ),
+        throwsA(
+          predicate<Object>(
+            (error) =>
+                error.toString().contains('synthetic_initialization_failure'),
+          ),
+        ),
+      );
+    },
+  );
   test('extracts the source class name and rejects invalid scripts', () {
     expect(
       extractSourceClassName('class ExampleSource extends ComicSource {}'),

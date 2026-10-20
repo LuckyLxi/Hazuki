@@ -4,11 +4,14 @@ class SourceCookieStore {
   SourceCookieStore({
     required List<SourceCookie> Function() loadCookies,
     required Future<void> Function(List<SourceCookie>) saveCookies,
+    Future<void> Function(String url)? onDelete,
   }) : _loadCookies = loadCookies,
-       _saveCookies = saveCookies;
+       _saveCookies = saveCookies,
+       _onDelete = onDelete;
 
   final List<SourceCookie> Function() _loadCookies;
   final Future<void> Function(List<SourceCookie>) _saveCookies;
+  final Future<void> Function(String url)? _onDelete;
 
   Future<dynamic> handleOperation(Map<String, dynamic> request) async {
     final fn = request['function']?.toString();
@@ -79,6 +82,7 @@ class SourceCookieStore {
     if (uri == null) return;
     final all = _loadCookies()..removeWhere((cookie) => cookie.matches(uri));
     await _saveCookies(all);
+    await _onDelete?.call(url);
   }
 
   String? buildHeader(String url) {

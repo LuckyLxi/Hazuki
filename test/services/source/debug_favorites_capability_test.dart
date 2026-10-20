@@ -39,6 +39,7 @@ void main() {
           : 'diagnostics time out pending script evaluation and ignore late results',
       (tester) async {
         final engine = _Engine();
+        when(() => engine.runtimeId).thenReturn('debug-favorites');
         when(() => engine.close()).thenAnswer((_) async {});
         when(
           () => engine.evaluate(any(), name: any(named: 'name')),

@@ -69,6 +69,21 @@ return Object.freeze({
     delay: ms => sendMessage({method: 'delay', time: ms}),
     error(code, message) { return new Error(`HAZUKI_${code}: ${message}`); },
     ui: (() => {
+        // QuickJS exposes ArrayBuffer as native bytes. Typed-array views must
+        // retain only their selected range before crossing the host bridge.
+        function serializeImages(options) {
+            if (!Array.isArray(options?.content)) return options;
+            const bytes = value => value instanceof Uint8Array
+                ? value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)
+                : value;
+            return {...options, content: options.content.map(component => {
+                if (!component || typeof component !== 'object') return component;
+                return {...component,
+                    ...(component.image != null ? {image: bytes(component.image)} : {}),
+                    ...(component.hintImage != null ? {hintImage: bytes(component.hintImage)} : {}),
+                };
+            })};
+        }
         class PluginDialogCancelledError extends Error {
             constructor(reason = 'user') {
                 super(`plugin_ui_cancelled:${reason}`);
@@ -107,7 +122,7 @@ return Object.freeze({
             confirm: options => simpleDialog('confirm', options),
             prompt: options => simpleDialog('prompt', options),
             async openDialog(options) {
-                const id = await sendMessage({method: 'ui_open', options});
+                const id = await sendMessage({method: 'ui_open', options: serializeImages(options)});
                 let terminal;
                 return Object.freeze({
                     async nextEvent() {
@@ -118,7 +133,7 @@ return Object.freeze({
                     },
                     async update(patch) {
                         if (terminal) throw new Error('plugin_ui_closed');
-                        await sendMessage({method: 'ui_update', id, patch});
+                        await sendMessage({method: 'ui_update', id, patch: serializeImages(patch)});
                     },
                     async close() {
                         if (terminal) return;

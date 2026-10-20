@@ -11,13 +11,17 @@ class SourceHttpGateway {
     required String sourceKey,
     required SourceCookieStore cookieStore,
     required SourceNetworkLogSink networkLogSink,
+    Map<String, String> Function()? browserUserAgents,
     void Function(int statusCode)? onResponseStatus,
   }) : _cookieStore = cookieStore,
+       _browserUserAgents = browserUserAgents ?? _noUserAgents,
        _networkLogSink = networkLogSink,
        _onResponseStatus = onResponseStatus,
        _client = HazukiNetworkClient(dio: dio, sourceKey: sourceKey);
 
   final SourceCookieStore _cookieStore;
+  static Map<String, String> _noUserAgents() => const {};
+  final Map<String, String> Function() _browserUserAgents;
   final SourceNetworkLogSink _networkLogSink;
   final void Function(int statusCode)? _onResponseStatus;
   final HazukiNetworkClient _client;
@@ -40,19 +44,79 @@ class SourceHttpGateway {
     HazukiNetworkRetryPolicy retryPolicy =
         HazukiNetworkRetryPolicy.conservative,
     bool withCookies = true,
-  }) {
-    return _client.request<T>(
-      url,
-      method: method,
-      data: data,
-      options: _mergeOptions(
-        options,
-        extra: withCookies ? null : const {'hazukiSkipCookieBridge': true},
-      ),
-      onReceiveProgress: onReceiveProgress,
-      cancelToken: cancelToken,
-      retryPolicy: retryPolicy,
+    void Function()? checkActive,
+  }) async {
+    // Native redirects would carry the pinned UA to a different origin without
+    // passing through Dio interceptors. Rebuild each hop from caller headers.
+    final manageRedirects =
+        withCookies &&
+        _browserUserAgents().isNotEmpty &&
+        (options?.followRedirects ?? dio.options.followRedirects);
+    var currentUrl = normalizeUrl(url);
+    var currentMethod = method.toUpperCase();
+    var currentData = data;
+    var currentOptions = _mergeOptions(
+      options,
+      extra: withCookies ? null : const {'hazukiSkipCookieBridge': true},
     );
+    if (manageRedirects) {
+      currentOptions = currentOptions.copyWith(followRedirects: false);
+    }
+    final maxRedirects = options?.maxRedirects ?? dio.options.maxRedirects;
+    for (var redirects = 0; ; redirects++) {
+      checkActive?.call();
+      final response = await _client.request<T>(
+        currentUrl,
+        method: currentMethod,
+        data: currentData,
+        options: currentOptions,
+        onReceiveProgress: onReceiveProgress,
+        cancelToken: cancelToken,
+        retryPolicy: retryPolicy,
+      );
+      final status = response.statusCode;
+      final location = response.headers.value('location');
+      final redirect =
+          const [301, 302, 303, 307, 308].contains(status) &&
+          (currentMethod == 'GET' ||
+              currentMethod == 'HEAD' ||
+              status == 303 ||
+              status == 307 ||
+              status == 308);
+      if (!manageRedirects || !redirect || location == null) return response;
+      if (redirects >= maxRedirects) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          type: DioExceptionType.badResponse,
+          error: StateError('http_too_many_redirects'),
+        );
+      }
+      final previous = Uri.parse(currentUrl);
+      final next = previous.resolve(location);
+      final headers = Map<String, dynamic>.from(currentOptions.headers ?? {});
+      if (next.origin != previous.origin) {
+        headers.removeWhere(
+          (key, _) => const {
+            'authorization',
+            'proxy-authorization',
+            'cookie',
+          }.contains(key.toLowerCase()),
+        );
+      }
+      if (status == 303 && currentMethod != 'HEAD') {
+        currentMethod = 'GET';
+        currentData = null;
+        headers.removeWhere(
+          (key, _) => const {
+            'content-type',
+            'content-length',
+          }.contains(key.toLowerCase()),
+        );
+      }
+      currentOptions = currentOptions.copyWith(headers: headers);
+      currentUrl = next.toString();
+    }
   }
 
   Future<Response<List<int>>> getBytes(
@@ -77,6 +141,7 @@ class SourceHttpGateway {
     Map<String, dynamic> request, {
     SourceScriptExecution? execution,
     String? runtimeId,
+    void Function()? checkActive,
   }) async {
     Response<dynamic>? response;
     String? error;
@@ -94,6 +159,7 @@ class SourceHttpGateway {
         requestUrl,
         method: method,
         data: data,
+        checkActive: checkActive,
         options: Options(
           responseType: bytes ? ResponseType.bytes : ResponseType.plain,
           headers: headers,
@@ -121,7 +187,9 @@ class SourceHttpGateway {
         startedAt: startedAt,
         source: 'js_http',
         category: bytes ? 'image_download' : 'js_http',
-        requestHeaders: Map<String, dynamic>.from(headers),
+        requestHeaders: Map<String, dynamic>.from(
+          response?.requestOptions.headers ?? headers,
+        ),
         requestData: data,
         responseHeaders: _flattenHeaders(response?.headers),
         responseBody: response?.data,
@@ -153,6 +221,18 @@ class SourceHttpGateway {
           }
           options.extra['hazukiStartedAt'] = DateTime.now();
           if (options.extra['hazukiSkipCookieBridge'] != true) {
+            final uri = Uri.parse(normalizedUrl);
+            final userAgent = uri.scheme == 'https'
+                ? _browserUserAgents()[uri.origin]
+                : null;
+            if (userAgent != null) {
+              options.headers = {
+                for (final entry in options.headers.entries)
+                  if (entry.key.toLowerCase() != 'user-agent')
+                    entry.key: entry.value,
+                'User-Agent': userAgent,
+              };
+            }
             final cookieHeader = _cookieStore.buildHeader(normalizedUrl);
             if (cookieHeader != null && cookieHeader.isNotEmpty) {
               final existing = options.headers['cookie'];
