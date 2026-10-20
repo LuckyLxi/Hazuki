@@ -149,7 +149,30 @@ class _JSObject extends JSRef {
 
 /// JS function wrapper
 class _JSFunction extends _JSObject implements JSInvokable, _IsolateEncodable {
-  _JSFunction(Pointer<JSContext> ctx, Pointer<JSValue> val) : super(ctx, val);
+  int _capturedTask = 0;
+  int _capturedWork = 0;
+  _JSFunction(Pointer<JSContext> ctx, Pointer<JSValue> val) : super(ctx, val) {
+    final rt = jsGetRuntime(ctx);
+    if (runtimeOpaques[rt]?.taskControlEnabled == true) {
+      _capturedTask = jsGetTaskContext(rt);
+      _capturedWork = jsGetWorkContext(rt);
+      jsRetainTaskContext(rt, _capturedTask);
+      jsRetainWorkContext(rt, _capturedWork);
+    }
+  }
+
+  @override
+  void destroy() {
+    final ctx = _ctx;
+    if (ctx != null) {
+      final rt = jsGetRuntime(ctx);
+      jsReleaseTaskContext(rt, _capturedTask);
+      jsReleaseWorkContext(rt, _capturedWork);
+      _capturedTask = 0;
+      _capturedWork = 0;
+    }
+    super.destroy();
+  }
 
   @override
   invoke(List<dynamic> arguments, [dynamic thisVal]) {
@@ -166,6 +189,24 @@ class _JSFunction extends _JSObject implements JSInvokable, _IsolateEncodable {
   }
 
   Pointer<JSValue> _invoke(List<dynamic> arguments, [dynamic thisVal]) {
+    final ctx = _ctx;
+    if (ctx == null) throw JSError('InternalError: JSValue released');
+    final rt = jsGetRuntime(ctx);
+    final previous = jsGetTaskContext(rt);
+    final previousWork = jsGetWorkContext(rt);
+    if (_capturedWork != 0) {
+      jsSetTaskContext(rt, _capturedTask);
+      jsSetWorkContext(rt, _capturedWork);
+    }
+    try {
+      return _invokeCurrent(arguments, thisVal);
+    } finally {
+      jsSetTaskContext(rt, previous);
+      jsSetWorkContext(rt, previousWork);
+    }
+  }
+
+  Pointer<JSValue> _invokeCurrent(List<dynamic> arguments, dynamic thisVal) {
     final ctx = _ctx;
     final val = _val;
     if (ctx == null || val == null)

@@ -316,6 +316,12 @@ struct JSRuntime {
     uint64_t host_task_context;
     JSHostTaskReference *host_task_reference;
     void *host_task_reference_opaque;
+    uint64_t host_work_context, host_last_job_task;
+    JSHostWorkControl *host_work_control;
+    void *host_work_opaque;
+    int host_stop_reason, host_cleanup_depth, host_last_job_stop;
+    bool host_observer;
+    struct list_head host_promises;
     // for smuggling the parent promise from js_promise_then
     // to js_promise_constructor
     JSValueLink *parent_promise;
@@ -883,6 +889,7 @@ typedef struct JSAsyncFunctionState {
 typedef struct JSAsyncFunctionData {
     JSGCObjectHeader header; /* must come first */
     JSValue resolving_funcs[2];
+    uint64_t host_promise_work;
     bool is_active; /* true if the async function state is valid */
     JSAsyncFunctionState func_state;
 } JSAsyncFunctionData;
@@ -985,6 +992,8 @@ typedef struct JSJobEntry {
     JSContext *ctx;
     JSJobFunc *job_func;
     uint64_t host_task_context;
+    uint64_t host_work_context;
+    bool host_observer;
     int argc;
     JSValue argv[];
 } JSJobEntry;
@@ -1052,7 +1061,9 @@ struct JSObject {
             uint16_t class_id; /* see JS_CLASS_x */
         };
     };
-    /* byte offsets: 16/24 */
+    uint64_t host_stop_task;
+    int host_stop_reason;
+    /* byte offsets below exclude the optional host bookkeeping. */
     JSShape *shape; /* prototype and property names + flag */
     JSProperty *prop; /* array of properties */
     /* byte offsets: 24/40 */
@@ -1452,6 +1463,7 @@ static void add_gc_object(JSRuntime *rt, JSGCObjectHeader *h,
                           JSGCObjectTypeEnum type);
 static void remove_gc_object(JSGCObjectHeader *h);
 static void js_async_function_free0(JSRuntime *rt, JSAsyncFunctionData *s);
+static uint64_t host_promise_work(JSValueConst promise);
 static JSValue js_instantiate_prototype(JSContext *ctx, JSObject *p, JSAtom atom, void *opaque);
 static JSValue js_module_ns_autoinit(JSContext *ctx, JSObject *p, JSAtom atom,
                                  void *opaque);
@@ -1969,6 +1981,7 @@ JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque)
     init_list_head(&rt->string_list);
 #endif
     init_list_head(&rt->job_list);
+    init_list_head(&rt->host_promises);
 
     if (JS_InitAtoms(rt))
         goto fail;
@@ -2123,7 +2136,29 @@ void JS_SetHostTaskReference(JSRuntime *rt, JSHostTaskReference *callback, void 
 }
 
 uint64_t JS_GetHostTaskContext(JSRuntime *rt) { return rt->host_task_context; }
-void JS_SetHostTaskContext(JSRuntime *rt, uint64_t token) { rt->host_task_context = token; }
+void JS_SetHostTaskContext(JSRuntime *rt, uint64_t token) {
+    rt->host_task_context = token;
+    rt->host_work_context = rt->host_work_control ?
+        rt->host_work_control(rt, 6, token, 0, rt->host_work_opaque) : 0;
+}
+static uint64_t host_work(JSRuntime *rt, int op, uint64_t a, uint64_t b) {
+    return rt->host_work_control ? rt->host_work_control(rt, op, a, b, rt->host_work_opaque) : 0;
+}
+void JS_SetHostWorkControl(JSRuntime *rt, JSHostWorkControl *callback, void *opaque) {
+    rt->host_work_control = callback; rt->host_work_opaque = opaque;
+}
+uint64_t JS_GetHostWorkContext(JSRuntime *rt) { return rt->host_work_context; }
+void JS_SetHostWorkContext(JSRuntime *rt, uint64_t work) { rt->host_work_context = work; }
+void JS_SetHostStopReason(JSRuntime *rt, int reason) { rt->host_stop_reason = reason; }
+void JS_SetHostObserver(JSRuntime *rt, bool enabled) { rt->host_observer = rt->host_work_control && enabled; }
+uint64_t JS_GetLastJobTask(JSRuntime *rt) { return rt->host_last_job_task; }
+int JS_GetLastJobStopReason(JSRuntime *rt) { return rt->host_last_job_stop; }
+int JS_GetHostStopError(JSValueConst error, uint64_t *task) {
+    if (!JS_IsObject(error)) return 0;
+    JSObject *object = JS_VALUE_GET_OBJ(error);
+    if (task) *task = object->host_stop_task;
+    return object->host_stop_reason;
+}
 void JS_RetainHostTaskContext(JSRuntime *rt, uint64_t token)
 {
     if (token && rt->host_task_reference)
@@ -2135,8 +2170,9 @@ void JS_ReleaseHostTaskContext(JSRuntime *rt, uint64_t token)
         rt->host_task_reference(rt, token, -1, rt->host_task_reference_opaque);
 }
 
-static int js_enqueue_job_with_task(JSContext *ctx, JSJobFunc *job_func,
-                                  int argc, JSValueConst *argv, uint64_t task)
+static int js_enqueue_job_with_context(JSContext *ctx, JSJobFunc *job_func,
+                                  int argc, JSValueConst *argv, uint64_t task,
+                                  uint64_t work, bool observer)
 {
     JSRuntime *rt = ctx->rt;
     JSJobEntry *e;
@@ -2150,6 +2186,9 @@ static int js_enqueue_job_with_task(JSContext *ctx, JSJobFunc *job_func,
     e->ctx = ctx;
     e->job_func = job_func;
     e->host_task_context = task;
+    e->host_work_context = work;
+    e->host_observer = observer;
+    host_work(rt, 2, work, 0);
     JS_RetainHostTaskContext(rt, task);
     e->argc = argc;
     for(i = 0; i < argc; i++) {
@@ -2162,7 +2201,8 @@ static int js_enqueue_job_with_task(JSContext *ctx, JSJobFunc *job_func,
 int JS_EnqueueJob(JSContext *ctx, JSJobFunc *job_func,
                  int argc, JSValueConst *argv)
 {
-    return js_enqueue_job_with_task(ctx, job_func, argc, argv, ctx->rt->host_task_context);
+    return js_enqueue_job_with_context(ctx, job_func, argc, argv,
+        ctx->rt->host_task_context, ctx->rt->host_work_context, ctx->rt->host_observer);
 }
 
 bool JS_IsJobPending(JSRuntime *rt)
@@ -2197,8 +2237,15 @@ int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx)
     list_del(&e->link);
     ctx = e->ctx;
     uint64_t previous_task = rt->host_task_context;
+    uint64_t previous_work = rt->host_work_context;
+    bool previous_observer = rt->host_observer;
     rt->host_task_context = e->host_task_context;
+    rt->host_work_context = e->host_work_context;
+    rt->host_observer = e->host_observer;
+    rt->host_last_job_task = e->host_task_context;
+    rt->host_stop_reason = 0;
     res = e->job_func(e->ctx, e->argc, vc(e->argv));
+    rt->host_last_job_stop = rt->host_stop_reason;
     for(i = 0; i < e->argc; i++)
         JS_FreeValue(ctx, e->argv[i]);
     if (JS_IsException(res))
@@ -2207,6 +2254,9 @@ int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx)
         ret = 1;
     JS_FreeValue(ctx, res);
     rt->host_task_context = previous_task;
+    rt->host_work_context = previous_work;
+    rt->host_observer = previous_observer;
+    host_work(rt, 3, e->host_work_context, 0);
     JS_ReleaseHostTaskContext(rt, e->host_task_context);
     js_free(ctx, e);
     *pctx = ctx;
@@ -2311,6 +2361,7 @@ void JS_FreeRuntime(JSRuntime *rt)
         for(i = 0; i < e->argc; i++)
             JS_FreeValueRT(rt, e->argv[i]);
         JS_ReleaseHostTaskContext(rt, e->host_task_context);
+        host_work(rt, 3, e->host_work_context, 0);
         js_free_rt(rt, e);
     }
     init_list_head(&rt->job_list);
@@ -5761,6 +5812,8 @@ static JSValue JS_NewObjectFromShape(JSContext *ctx, JSShape *sh, JSClassID clas
     if (unlikely(!p))
         goto fail;
     p->class_id = class_id;
+    p->host_stop_task = 0;
+    p->host_stop_reason = 0;
     p->extensible = true;
     p->free_mark = 0;
     p->is_exotic = 0;
@@ -8224,14 +8277,27 @@ static JSValue JS_ThrowTypeErrorInvalidClass(JSContext *ctx, int class_id)
 static void JS_ThrowInterrupted(JSContext *ctx)
 {
     JS_ThrowInternalError(ctx, "interrupted");
+    if (ctx->rt->host_work_control && JS_IsObject(ctx->rt->current_exception)) {
+        JSObject *error = JS_VALUE_GET_OBJ(ctx->rt->current_exception);
+        error->host_stop_task = ctx->rt->host_task_context;
+        error->host_stop_reason = ctx->rt->host_stop_reason;
+    }
     JS_SetUncatchableError(ctx, ctx->rt->current_exception);
+}
+int JS_CheckHostTask(JSContext *ctx) {
+    JSRuntime *rt = ctx->rt;
+    if (!rt->host_cleanup_depth && !rt->host_observer) {
+        int reason = host_work(rt, 5, rt->host_work_context, 0);
+        if (reason) { rt->host_stop_reason = reason; JS_ThrowInterrupted(ctx); return -1; }
+    }
+    return 0;
 }
 
 static no_inline __exception int __js_poll_interrupts(JSContext *ctx)
 {
     JSRuntime *rt = ctx->rt;
     ctx->interrupt_counter = JS_INTERRUPT_COUNTER_INIT;
-    if (rt->interrupt_handler) {
+    if (!rt->host_cleanup_depth && !rt->host_observer && rt->interrupt_handler) {
         if (rt->interrupt_handler(rt, rt->interrupt_opaque)) {
             JS_ThrowInterrupted(ctx);
             return -1;
@@ -20725,12 +20791,16 @@ static bool js_async_function_resume(JSContext *ctx, JSAsyncFunctionData *s)
     func_ret = async_func_resume(ctx, &s->func_state);
     if (JS_IsException(func_ret)) {
     fail:
-        if (unlikely(JS_IsUncatchableError(ctx->rt->current_exception))) {
+        if (unlikely(JS_IsUncatchableError(ctx->rt->current_exception)) &&
+            !JS_GetHostStopError(ctx->rt->current_exception, NULL)) {
             is_success = false;
         } else {
             JSValue error = JS_GetException(ctx);
+            bool stopped = JS_GetHostStopError(error, NULL) != 0;
+            if (stopped) ctx->rt->host_cleanup_depth++;
             ret2 = JS_Call(ctx, s->resolving_funcs[1], JS_UNDEFINED,
                            1, vc(&error));
+            if (stopped) ctx->rt->host_cleanup_depth--;
             JS_FreeValue(ctx, error);
         resolved:
             if (unlikely(JS_IsException(ret2))) {
@@ -20832,6 +20902,7 @@ static JSValue js_async_function_call(JSContext *ctx, JSValueConst func_obj,
     promise = JS_NewPromiseCapability(ctx, s->resolving_funcs);
     if (JS_IsException(promise))
         goto fail;
+    s->host_promise_work = host_promise_work(promise);
 
     if (async_func_init(ctx, &s->func_state, func_obj, this_obj, argc, argv)) {
     fail:
@@ -52734,12 +52805,20 @@ static const JSCFunctionListEntry js_generator_proto_funcs[] = {
 
 typedef struct JSPromiseData {
     uint64_t host_task_context;
+    uint64_t host_work_context;
+    struct list_head host_link;
+    JSValue host_promise; /* weak; removed by finalizer */
+    JSContext *host_context; /* context is retained by the promise's realm */
     JSPromiseStateEnum promise_state;
     /* 0=fulfill, 1=reject, list of JSPromiseReactionData.link */
     struct list_head promise_reactions[2];
     bool is_handled; /* Note: only useful to debug */
     JSValue promise_result;
 } JSPromiseData;
+static uint64_t host_promise_work(JSValueConst promise) {
+    JSPromiseData *data = JS_GetOpaque(promise, JS_CLASS_PROMISE);
+    return data ? data->host_work_context : 0;
+}
 
 typedef struct JSPromiseFunctionDataResolved {
     int ref_count;
@@ -52756,6 +52835,9 @@ typedef struct JSPromiseReactionData {
     JSValue resolving_funcs[2];
     JSValue handler;
     uint64_t host_task_context;
+    uint64_t host_work_context;
+    bool host_observer;
+    JSValue host_observer_reject;
 } JSPromiseReactionData;
 
 JSPromiseStateEnum JS_PromiseState(JSContext *ctx, JSValueConst promise)
@@ -52795,7 +52877,9 @@ static void promise_reaction_data_free(JSRuntime *rt,
     JS_FreeValueRT(rt, rd->resolving_funcs[0]);
     JS_FreeValueRT(rt, rd->resolving_funcs[1]);
     JS_FreeValueRT(rt, rd->handler);
+    JS_FreeValueRT(rt, rd->host_observer_reject);
     JS_ReleaseHostTaskContext(rt, rd->host_task_context);
+    host_work(rt, 3, rd->host_work_context, 0);
     js_free_rt(rt, rd);
 }
 
@@ -52817,14 +52901,46 @@ static JSValue promise_reaction_job(JSContext *ctx, int argc,
     JSValueConst arg;
     bool is_reject;
 
-    assert(argc == 5);
+    assert(argc == 6);
     handler = argv[2];
     is_reject = JS_ToBool(ctx, argv[3]);
     arg = argv[4];
+    JSValue observer_error = JS_UNDEFINED;
+    int observer_stop = ctx->rt->host_observer ?
+        host_work(ctx->rt, 8, ctx->rt->host_task_context, 0) : 0;
+    if (observer_stop) {
+        observer_error = JS_NewError(ctx);
+        if (JS_IsException(observer_error)) return JS_EXCEPTION;
+        JSObject *error = JS_VALUE_GET_OBJ(observer_error);
+        error->host_stop_task = ctx->rt->host_task_context;
+        error->host_stop_reason = observer_stop;
+        handler = argv[5];
+        arg = observer_error;
+        is_reject = true;
+        ctx->rt->host_stop_reason = observer_stop;
+    }
 
     promise_trace(ctx, "promise_reaction_job: is_reject=%d\n", is_reject);
 
-    if (JS_IsUndefined(handler)) {
+    if (JS_CheckHostTask(ctx) < 0) {
+        // Await continuations have no derived capability. Terminate their
+        // suspended frame and reject the outer async promise directly.
+        if (JS_IsObject(handler)) {
+            JSObject *object = JS_VALUE_GET_OBJ(handler);
+            if (object->class_id == JS_CLASS_ASYNC_FUNCTION_RESOLVE ||
+                object->class_id == JS_CLASS_ASYNC_FUNCTION_REJECT) {
+                JSAsyncFunctionData *state = object->u.async_function_data;
+                JSValue error = JS_GetException(ctx);
+                ctx->rt->host_cleanup_depth++;
+                res2 = JS_Call(ctx, state->resolving_funcs[1], JS_UNDEFINED, 1, vc(&error));
+                ctx->rt->host_cleanup_depth--;
+                JS_FreeValue(ctx, error);
+                js_async_function_terminate(ctx->rt, state);
+                return res2;
+            }
+        }
+        res = JS_EXCEPTION;
+    } else if (JS_IsUndefined(handler)) {
         if (is_reject) {
             res = JS_Throw(ctx, js_dup(arg));
         } else {
@@ -52833,9 +52949,11 @@ static JSValue promise_reaction_job(JSContext *ctx, int argc,
     } else {
         res = JS_Call(ctx, handler, JS_UNDEFINED, 1, &arg);
     }
+    JS_FreeValue(ctx, observer_error);
     is_reject = JS_IsException(res);
     if (is_reject) {
-        if (unlikely(JS_IsUncatchableError(ctx->rt->current_exception)))
+        if (unlikely(JS_IsUncatchableError(ctx->rt->current_exception)) &&
+            !JS_GetHostStopError(ctx->rt->current_exception, NULL))
             return JS_EXCEPTION;
         res = JS_GetException(ctx);
     }
@@ -52844,7 +52962,10 @@ static JSValue promise_reaction_job(JSContext *ctx, int argc,
        creating a dummy promise in the 'await' implementation of async
        functions */
     if (!JS_IsUndefined(func)) {
+        bool stopped = JS_GetHostStopError(res, NULL) != 0;
+        if (stopped) ctx->rt->host_cleanup_depth++;
         res2 = JS_Call(ctx, func, JS_UNDEFINED, 1, vc(&res));
+        if (stopped) ctx->rt->host_cleanup_depth--;
     } else {
         res2 = JS_UNDEFINED;
     }
@@ -52873,12 +52994,13 @@ static void fulfill_or_reject_promise(JSContext *ctx, JSValueConst promise,
     JSPromiseData *s = JS_GetOpaque(promise, JS_CLASS_PROMISE);
     struct list_head *el, *el1;
     JSPromiseReactionData *rd;
-    JSValueConst args[5];
+    JSValueConst args[6];
 
     if (!s || s->promise_state != JS_PROMISE_PENDING)
         return; /* should never happen */
     set_value(ctx, &s->promise_result, js_dup(value));
     s->promise_state = JS_PROMISE_FULFILLED + is_reject;
+    host_work(ctx->rt, 7, s->host_work_context, 0);
 
     promise_trace(ctx, "fulfill_or_reject_promise: is_reject=%d\n", is_reject);
 
@@ -52904,7 +53026,9 @@ static void fulfill_or_reject_promise(JSContext *ctx, JSValueConst promise,
         args[2] = rd->handler;
         args[3] = js_bool(is_reject);
         args[4] = value;
-        js_enqueue_job_with_task(ctx, promise_reaction_job, 5, args, rd->host_task_context);
+        args[5] = rd->host_observer_reject;
+        js_enqueue_job_with_context(ctx, promise_reaction_job, 6, args,
+            rd->host_task_context, rd->host_work_context, rd->host_observer);
         list_del(&rd->link);
         promise_reaction_data_free(ctx->rt, rd);
     }
@@ -52936,19 +53060,76 @@ static JSValue js_promise_resolve_thenable_job(JSContext *ctx,
         rt->promise_hook(ctx, JS_PROMISE_HOOK_BEFORE, promise, JS_UNDEFINED,
                          rt->promise_hook_opaque);
     }
-    res = JS_Call(ctx, then, thenable, 2, vc(args));
+    res = JS_CheckHostTask(ctx) < 0 ? JS_EXCEPTION : JS_Call(ctx, then, thenable, 2, vc(args));
     if (rt->promise_hook) {
         rt->promise_hook(ctx, JS_PROMISE_HOOK_AFTER, promise, JS_UNDEFINED,
                          rt->promise_hook_opaque);
     }
     if (JS_IsException(res)) {
         JSValue error = JS_GetException(ctx);
+        bool stopped = JS_GetHostStopError(error, NULL) != 0;
+        if (stopped) rt->host_cleanup_depth++;
         res = JS_Call(ctx, args[1], JS_UNDEFINED, 1, vc(&error));
+        if (stopped) rt->host_cleanup_depth--;
         JS_FreeValue(ctx, error);
     }
     JS_FreeValue(ctx, args[0]);
     JS_FreeValue(ctx, args[1]);
     return res;
+}
+
+// Called only by the owning worker between JS entries. Weak promise records
+// are pinned while the sweep settles capabilities and releases suspended frames.
+int JS_SweepStoppedPromises(JSContext *ctx) {
+    JSRuntime *rt = ctx->rt;
+    struct list_head *el;
+    int count = 0, index = 0, changed = 0;
+    if (!rt->host_work_control) return 0;
+    list_for_each(el, &rt->host_promises) count++;
+    JSValue *promises = js_malloc(ctx, sizeof(JSValue) * (count ? count : 1));
+    if (!promises) return -1;
+    list_for_each(el, &rt->host_promises) {
+        JSPromiseData *data = list_entry(el, JSPromiseData, host_link);
+        promises[index++] = js_dup(data->host_promise);
+    }
+    for (int n = 0; n < count; n++) {
+        JSPromiseData *data = JS_GetOpaque(promises[n], JS_CLASS_PROMISE);
+        if (data->promise_state != JS_PROMISE_PENDING) continue;
+        // Detach dead branches even when their source is maintained by another
+        // task. Run the native settlement path, never the cancelled user handler.
+        for (int side = 0; side < 2; side++) {
+            struct list_head *next;
+            list_for_each_safe(el, next, &data->promise_reactions[side]) {
+                JSPromiseReactionData *rd = list_entry(el, JSPromiseReactionData, link);
+                int reason = rd->host_observer ? host_work(rt, 8, rd->host_task_context, 0) :
+                    host_work(rt, 5, rd->host_work_context, 0);
+                if (!reason) continue;
+                JSValueConst args[6] = {rd->resolving_funcs[0], rd->resolving_funcs[1],
+                    rd->handler, JS_TRUE, JS_UNDEFINED, rd->host_observer_reject};
+                if (!rd->host_observer || side == 1)
+                    js_enqueue_job_with_context(data->host_context, promise_reaction_job, 6, args,
+                        rd->host_task_context, rd->host_work_context, rd->host_observer);
+                list_del(&rd->link);
+                promise_reaction_data_free(rt, rd);
+                changed++;
+            }
+        }
+        int reason = host_work(rt, 5, data->host_work_context, 0);
+        if (reason) {
+            JSValue error = JS_NewError(data->host_context);
+            if (!JS_IsException(error)) {
+                JSObject *object = JS_VALUE_GET_OBJ(error);
+                object->host_stop_task = data->host_task_context;
+                object->host_stop_reason = reason;
+                fulfill_or_reject_promise(data->host_context, promises[n], error, true);
+                JS_FreeValue(data->host_context, error);
+                changed++;
+            }
+        }
+    }
+    for (int n = 0; n < count; n++) JS_FreeValue(ctx, promises[n]);
+    js_free(ctx, promises);
+    return changed;
 }
 
 static void js_promise_resolve_function_free_resolved(JSRuntime *rt,
@@ -52957,6 +53138,26 @@ static void js_promise_resolve_function_free_resolved(JSRuntime *rt,
     if (--sr->ref_count == 0) {
         js_free_rt(rt, sr);
     }
+}
+
+JSValue JS_SettleHostFuture(JSContext *ctx, JSValueConst resolver, JSValueConst value) {
+    JSObject *object = JS_IsObject(resolver) ? JS_VALUE_GET_OBJ(resolver) : NULL;
+    if (object && (object->class_id == JS_CLASS_PROMISE_RESOLVE_FUNCTION ||
+                   object->class_id == JS_CLASS_PROMISE_REJECT_FUNCTION)) {
+        JSValue promise = object->u.promise_function_data->promise;
+        JSPromiseData *data = JS_GetOpaque(promise, JS_CLASS_PROMISE);
+        int reason = host_work(ctx->rt, 5, data->host_work_context, 0);
+        if (reason) {
+            JSValue error = JS_NewError(ctx);
+            if (JS_IsException(error)) return JS_EXCEPTION;
+            JS_VALUE_GET_OBJ(error)->host_stop_task = data->host_task_context;
+            JS_VALUE_GET_OBJ(error)->host_stop_reason = reason;
+            fulfill_or_reject_promise(ctx, promise, error, true);
+            JS_FreeValue(ctx, error);
+            return JS_UNDEFINED;
+        }
+    }
+    return JS_Call(ctx, resolver, JS_UNDEFINED, 1, &value);
 }
 
 static int js_create_resolving_functions(JSContext *ctx,
@@ -53072,7 +53273,10 @@ static JSValue js_promise_resolve_function_call(JSContext *ctx,
         args[1] = resolution;
         args[2] = then;
         JSPromiseData *promise_data = JS_GetOpaque(s->promise, JS_CLASS_PROMISE);
-        js_enqueue_job_with_task(ctx, js_promise_resolve_thenable_job, 3, args, promise_data->host_task_context);
+        JSPromiseData *source_data = JS_GetOpaque(resolution, JS_CLASS_PROMISE);
+        if (source_data) host_work(ctx->rt, 4, promise_data->host_work_context, source_data->host_work_context);
+        js_enqueue_job_with_context(ctx, js_promise_resolve_thenable_job, 3, args,
+            promise_data->host_task_context, promise_data->host_work_context, false);
         JS_FreeValue(ctx, then);
     }
     return JS_UNDEFINED;
@@ -53095,6 +53299,8 @@ static void js_promise_finalizer(JSRuntime *rt, JSValueConst val)
     }
     JS_FreeValueRT(rt, s->promise_result);
     JS_ReleaseHostTaskContext(rt, s->host_task_context);
+    host_work(rt, 3, s->host_work_context, 0);
+    list_del(&s->host_link);
     js_free_rt(rt, s);
 }
 
@@ -53138,6 +53344,11 @@ static JSValue js_promise_new(JSContext *ctx, JSValueConst new_target,
     }
     s->promise_state = JS_PROMISE_PENDING;
     s->host_task_context = ctx->rt->host_task_context;
+    s->host_work_context = host_work(ctx->rt, 1, s->host_task_context, 0);
+    host_work(ctx->rt, 4, s->host_work_context, ctx->rt->host_work_context);
+    s->host_promise = obj;
+    s->host_context = ctx;
+    list_add_tail(&s->host_link, &ctx->rt->host_promises);
     JS_RetainHostTaskContext(ctx->rt, s->host_task_context);
     s->is_handled = false;
     init_list_head(&s->promise_reactions[0]);
@@ -53666,12 +53877,32 @@ static __exception int perform_promise_then(JSContext *ctx,
 
     rd_array[0] = NULL;
     rd_array[1] = NULL;
+    uint64_t work = ctx->rt->host_observer ? 0 : host_work(ctx->rt, 1, ctx->rt->host_task_context, 0);
+    host_work(ctx->rt, 4, work, s->host_work_context);
+    // The derived promise (or async outer promise) depends on this reaction,
+    // not on every other branch belonging to its originating task.
+    if (ctx->rt->host_work_control) {
+        JSValueConst resolver = cap_resolving_funcs[0];
+        if (JS_IsObject(resolver) && JS_VALUE_GET_OBJ(resolver)->class_id == JS_CLASS_PROMISE_RESOLVE_FUNCTION) {
+            JSValue result = JS_VALUE_GET_OBJ(resolver)->u.promise_function_data->promise;
+            JSPromiseData *derived = JS_GetOpaque(result, JS_CLASS_PROMISE);
+            host_work(ctx->rt, 7, derived->host_work_context, 0);
+            host_work(ctx->rt, 4, derived->host_work_context, work);
+        } else if (JS_IsObject(resolve_reject[0]) &&
+                   JS_VALUE_GET_OBJ(resolve_reject[0])->class_id == JS_CLASS_ASYNC_FUNCTION_RESOLVE) {
+            JSAsyncFunctionData *state = JS_VALUE_GET_OBJ(resolve_reject[0])->u.async_function_data;
+            host_work(ctx->rt, 4, state->host_promise_work, work);
+        } else {
+            host_work(ctx->rt, 4, ctx->rt->host_work_context, work);
+        }
+    }
     for(i = 0; i < 2; i++) {
         JSValueConst handler;
         rd = js_mallocz(ctx, sizeof(*rd));
         if (!rd) {
             if (i == 1)
                 promise_reaction_data_free(ctx->rt, rd_array[0]);
+            host_work(ctx->rt, 3, work, 0);
             return -1;
         }
         for(j = 0; j < 2; j++)
@@ -53681,15 +53912,20 @@ static __exception int perform_promise_then(JSContext *ctx,
             handler = JS_UNDEFINED;
         rd->handler = js_dup(handler);
         rd->host_task_context = ctx->rt->host_task_context;
+        rd->host_work_context = work;
+        rd->host_observer = ctx->rt->host_observer;
+        rd->host_observer_reject = ctx->rt->host_observer ? js_dup(resolve_reject[1]) : JS_UNDEFINED;
+        host_work(ctx->rt, 2, work, 0);
         JS_RetainHostTaskContext(ctx->rt, rd->host_task_context);
         rd_array[i] = rd;
     }
+    host_work(ctx->rt, 3, work, 0);
 
     if (s->promise_state == JS_PROMISE_PENDING) {
         for(i = 0; i < 2; i++)
             list_add_tail(&rd_array[i]->link, &s->promise_reactions[i]);
     } else {
-        JSValueConst args[5];
+        JSValueConst args[6];
         if (s->promise_state == JS_PROMISE_REJECTED && !s->is_handled) {
             JSRuntime *rt = ctx->rt;
             if (rt->host_promise_rejection_tracker)
@@ -53703,7 +53939,9 @@ static __exception int perform_promise_then(JSContext *ctx,
         args[2] = rd->handler;
         args[3] = js_bool(i);
         args[4] = s->promise_result;
-        js_enqueue_job_with_task(ctx, promise_reaction_job, 5, args, rd->host_task_context);
+        args[5] = rd->host_observer_reject;
+        js_enqueue_job_with_context(ctx, promise_reaction_job, 6, args,
+            rd->host_task_context, rd->host_work_context, rd->host_observer);
         for(i = 0; i < 2; i++)
             promise_reaction_data_free(ctx->rt, rd_array[i]);
     }
@@ -53749,6 +53987,16 @@ static JSValue js_promise_then(JSContext *ctx, JSValueConst this_val,
         return JS_EXCEPTION;
     }
     return result_promise;
+}
+
+int JS_ObserveHostPromise(JSContext *ctx, JSValueConst promise, JSValueConst resolve, JSValueConst reject) {
+    JSValueConst handlers[2] = {resolve, reject};
+    JSValueConst capabilities[2] = {JS_UNDEFINED, JS_UNDEFINED};
+    bool previous = ctx->rt->host_observer;
+    ctx->rt->host_observer = true;
+    int result = perform_promise_then(ctx, promise, handlers, capabilities);
+    ctx->rt->host_observer = previous;
+    return result;
 }
 
 static JSValue js_promise_catch(JSContext *ctx, JSValueConst this_val,

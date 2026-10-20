@@ -16,6 +16,7 @@ export 'ffi.dart' show JSEvalFlag, JSRef, QuickJsHostReply;
 part './isolate.dart';
 part './object.dart';
 part './wrapper.dart';
+part './task_control.dart';
 
 /// Handler function to manage js module.
 typedef _JsModuleHandler = String Function(String name);
@@ -46,6 +47,12 @@ class QuickJsRuntime2 extends JavascriptRuntime {
   /// Handler function to manage js module.
   final _JsHostPromiseRejectionHandler? hostPromiseRejectionHandler;
   final void Function(int token, int delta)? taskReferenceHandler;
+  final bool taskControlEnabled;
+  QuickJsTaskControl? _taskControl;
+  QuickJsTaskControl? get taskControl {
+    _ensureEngine();
+    return _taskControl;
+  }
 
   QuickJsRuntime2({
     this.moduleHandler,
@@ -54,6 +61,7 @@ class QuickJsRuntime2 extends JavascriptRuntime {
     this.memoryLimit,
     this.hostPromiseRejectionHandler,
     this.taskReferenceHandler,
+    this.taskControlEnabled = false,
   }) {
     this.init();
   }
@@ -135,6 +143,10 @@ class QuickJsRuntime2 extends JavascriptRuntime {
     final memoryLimit = this.memoryLimit ?? 0;
     if (memoryLimit > 0) jsSetMemoryLimit(rt, memoryLimit);
     _rt = rt;
+    if (taskControlEnabled) {
+      runtimeOpaques[rt]!.taskControlEnabled = true;
+      _taskControl = QuickJsTaskControl.fromId(jsEnableTaskControl(rt));
+    }
     _ctx = jsNewContext(rt);
   }
 
@@ -144,6 +156,7 @@ class QuickJsRuntime2 extends JavascriptRuntime {
     final ctx = _ctx;
     _rt = null;
     _ctx = null;
+    _taskControl = null;
     if (ctx != null) jsFreeContext(ctx);
     if (rt == null) return;
     _executePendingJob();
@@ -158,6 +171,13 @@ class QuickJsRuntime2 extends JavascriptRuntime {
   }
 
   void _executePendingJob() {
+    if (taskControlEnabled) {
+      while (true) {
+        final step = executePendingJobStep();
+        if (step.status == QuickJsJobStatus.idle) return;
+        if (step.status == QuickJsJobStatus.failed) throw step.error;
+      }
+    }
     final rt = _rt;
     final ctx = _ctx;
     if (rt == null || ctx == null) return;
@@ -172,10 +192,47 @@ class QuickJsRuntime2 extends JavascriptRuntime {
 
   /// One job, allowing an owner to yield for control messages at checkpoints.
   int executePendingJobOnce() {
+    if (taskControlEnabled) {
+      final step = executePendingJobStep();
+      if (step.status == QuickJsJobStatus.failed) throw step.error;
+      return step.status == QuickJsJobStatus.idle ? 0 : 1;
+    }
     if (_rt == null) return 0;
     final result = jsExecutePendingJob(_rt!);
     if (result < 0) throw _parseJSException(_ctx!);
     return result;
+  }
+
+  /// Execute one checkpoint without attributing a failed job to other callers.
+  QuickJsJobStep executePendingJobStep() {
+    final rt = _rt;
+    if (rt == null) return const QuickJsJobStep(0, QuickJsJobStatus.idle);
+    if (taskControlEnabled && jsSweepStoppedPromises(_ctx!) < 0) {
+      return QuickJsJobStep(
+        0,
+        QuickJsJobStatus.failed,
+        error: _parseJSException(_ctx!),
+      );
+    }
+    final result = jsExecutePendingJob(rt);
+    if (result == 0) return const QuickJsJobStep(0, QuickJsJobStatus.idle);
+    final token = jsLastJobTask(rt);
+    final reason = jsLastJobStopReason(rt);
+    final error = result < 0 ? _parseJSException(_ctx!) : null;
+    if (reason != 0) {
+      final stop = QuickJsStopReason.values[reason - 1];
+      return QuickJsJobStep(
+        token,
+        QuickJsJobStatus.stopped,
+        error: error ?? QuickJsTaskStoppedError(token, stop),
+        stopReason: stop,
+      );
+    }
+    return QuickJsJobStep(
+      token,
+      result < 0 ? QuickJsJobStatus.failed : QuickJsJobStatus.executed,
+      error: error,
+    );
   }
 
   int get taskContext => _rt == null ? 0 : jsGetTaskContext(_rt!);
@@ -193,11 +250,13 @@ class QuickJsRuntime2 extends JavascriptRuntime {
   T withTaskContext<T>(int token, T Function() action) {
     _ensureEngine();
     final previous = jsGetTaskContext(_rt!);
+    final previousWork = jsGetWorkContext(_rt!);
     jsSetTaskContext(_rt!, token);
     try {
       return action();
     } finally {
       jsSetTaskContext(_rt!, previous);
+      jsSetWorkContext(_rt!, previousWork);
     }
   }
 

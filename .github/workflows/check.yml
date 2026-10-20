@@ -103,7 +103,7 @@ jobs:
 
       - name: Check patched QuickJS formatting
         working-directory: third_party/pub_overrides/quickjs_engine
-        run: dart format --output=none --set-exit-if-changed lib/quickjs/ffi.dart lib/quickjs/quickjs_runtime2.dart lib/quickjs/wrapper.dart test/runtime_lifecycle_test.dart test/worker_support_test.dart
+        run: dart format --output=none --set-exit-if-changed lib/quickjs/ffi.dart lib/quickjs/object.dart lib/quickjs/quickjs_runtime2.dart lib/quickjs/wrapper.dart lib/quickjs/task_control.dart test/runtime_lifecycle_test.dart test/worker_support_test.dart test/task_control_test.dart
 
       - name: Analyze patched QuickJS
         working-directory: third_party/pub_overrides/quickjs_engine
