@@ -88,6 +88,66 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await ensureTestServiceLocator();
   });
+  for (final multiSelect in [null, false, true]) {
+    testWidgets(
+      'download confirmation enforces its own source selection policy ($multiSelect)',
+      (tester) async {
+        final facade = _DownloadSelectionDetailFacade();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.android),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => withTestSourcePresentation(
+              child!,
+              catalog: [
+                const SourceCatalogEntry(
+                  key: 'jm',
+                  name: 'Other',
+                  fileName: 'other.js',
+                  presentation: {'downloadMultiSelect': true},
+                ),
+                SourceCatalogEntry(
+                  key: 'copy_manga',
+                  name: 'Sample',
+                  fileName: 'sample.js',
+                  presentation: {'downloadMultiSelect': ?multiSelect},
+                ),
+              ],
+            ),
+            home: _buildDesktopTestDetail(
+              comic: const ExploreComic(
+                id: 'download-policy',
+                sourceKey: 'copy_manga',
+                title: 'Comic',
+                subTitle: '',
+                cover: '',
+              ),
+              facade: facade,
+              shouldAnimateInitialRevealOverride: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
+        await tester.pumpAndSettle();
+        // Even an outdated/custom panel callback cannot bypass the policy.
+        tester
+            .widget<ComicDetailChaptersPanel>(
+              find.byType(ComicDetailChaptersPanel),
+            )
+            .onDownloadConfirm({'2', '1'});
+        await tester.pumpAndSettle();
+        expect(facade.queued, multiSelect == true ? ['1', '2'] : ['2']);
+        expect(tester.takeException(), isNull);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
   for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
     testWidgets('reader icon moves smoothly as the label shrinks ($platform)', (
       tester,
@@ -1896,6 +1956,46 @@ class _DesktopDetailFacade extends ComicDetailFeatureFacade {
     isFavorite: false,
     subId: '',
   );
+}
+
+class _DownloadSelectionDetailFacade extends _DesktopDetailFacade {
+  final queued = <String>[];
+
+  @override
+  Future<ComicDetailsData> loadComicDetails(
+    String id, {
+    String sourceKey = '',
+    bool forceRefresh = false,
+  }) async => (await super.loadComicDetails(
+    id,
+  )).copyWith(chapters: const {'1': 'Chapter 1', '2': 'Chapter 2'});
+
+  @override
+  Future<MangaDownloadConflict> checkDownloadConflict({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) async => MangaDownloadConflict(
+    comicTitle: details.title,
+    existingChapters: const [],
+  );
+
+  @override
+  Future<MangaDownloadConflict> checkDownloadTaskConflict({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) => checkDownloadConflict(details: details, chapters: chapters);
+
+  @override
+  Future<MangaDownloadEnqueueResult> enqueueDownload({
+    required ComicDetailsData details,
+    required String coverUrl,
+    required String description,
+    required List<MangaChapterDownloadTarget> chapters,
+    bool redownloadExisting = false,
+  }) async {
+    queued.addAll(chapters.map((chapter) => chapter.epId));
+    return MangaDownloadEnqueueResult.queued;
+  }
 }
 
 class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {

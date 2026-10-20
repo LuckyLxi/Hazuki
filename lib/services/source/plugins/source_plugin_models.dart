@@ -93,9 +93,10 @@ class SourcePluginManifest {
         : const <String, dynamic>{};
     DirectComicIdRules.parse(presentation['directComicIdRules']);
     DailyRecommendationConfig.parse(presentation['dailyRecommendation']);
-    if (presentation.containsKey('showComments') &&
-        presentation['showComments'] is! bool) {
-      throw const SourcePluginException('plugin_invalid_manifest');
+    for (final flag in ['showComments', 'downloadMultiSelect']) {
+      if (presentation.containsKey(flag) && presentation[flag] is! bool) {
+        throw const SourcePluginException('plugin_invalid_manifest');
+      }
     }
     final commentOrders = presentation['commentOrders'];
     if ((commentOrders != null &&

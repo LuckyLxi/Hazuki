@@ -32,6 +32,22 @@ Map<String, dynamic> sourcePresentation(
 bool sourceFeature(String sourceKey, String feature, {BuildContext? context}) =>
     sourcePresentation(sourceKey, context: context)[feature] == true;
 
+/// Online chapter batch selection requires an installed plugin's explicit opt-in.
+bool sourceDownloadMultiSelectEnabled(
+  String sourceKey, {
+  required BuildContext context,
+  bool listen = true,
+}) {
+  final registry = listen
+      ? SourcePresentationScope.maybeOf(context)
+      : SourcePresentationScope.read(context);
+  final key = sourceKey.trim().isEmpty
+      ? registry?.activeSourceKey ?? ''
+      : sourceKey.trim();
+  return registry?.isAllowedSourceKey(key) == true &&
+      registry!.presentationFor(key)['downloadMultiSelect'] == true;
+}
+
 /// Comments require an explicit declaration from an enabled, installed plugin.
 bool sourceCommentsEnabled(
   String sourceKey, {

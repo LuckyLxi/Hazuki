@@ -7,6 +7,7 @@ import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 class ComicDetailChaptersPanel extends StatefulWidget {
   const ComicDetailChaptersPanel({
@@ -29,7 +30,33 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
   final ScrollController _scrollController = ScrollController();
   final Set<String> _selectedEpIds = <String>{};
   bool _showDownloadSelection = false;
+  bool _allowDownloadMultiSelect = false;
   String? _groupId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateDownloadSelectionPolicy();
+  }
+
+  @override
+  void didUpdateWidget(covariant ComicDetailChaptersPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateDownloadSelectionPolicy();
+  }
+
+  void _updateDownloadSelectionPolicy() {
+    _allowDownloadMultiSelect = sourceDownloadMultiSelectEnabled(
+      widget.details.sourceKey,
+      context: context,
+    );
+    if (!_allowDownloadMultiSelect && _selectedEpIds.length > 1) {
+      final first = _selectedEpIds.first;
+      _selectedEpIds
+        ..clear()
+        ..add(first);
+    }
+  }
 
   Map<String, String> get _visibleChapters {
     final groups = widget.details.chapterGroups;
@@ -49,6 +76,7 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
   }
 
   void _toggleSelectAllChapters() {
+    if (!_allowDownloadMultiSelect) return;
     final chapters = _visibleChapters;
     setState(() {
       if (chapters.keys.every(_selectedEpIds.contains)) {
@@ -223,36 +251,39 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Align(
-                              alignment: AlignmentDirectional.centerEnd,
-                              child: TextButton.icon(
-                                onPressed: chapters.isEmpty
-                                    ? null
-                                    : _showDownloadSelection
-                                    ? _toggleSelectAllChapters
-                                    : () => _setSelectionMode(true),
-                                icon: Icon(
-                                  _showDownloadSelection
-                                      ? allSelected
-                                            ? Icons.deselect_rounded
-                                            : Icons.done_all_rounded
-                                      : Icons.download_outlined,
-                                  size: 18,
-                                ),
-                                label: Text(
-                                  _showDownloadSelection
-                                      ? allSelected
-                                            ? strings.commonDeselectAll
-                                            : strings.commonSelectAll
-                                      : strings.downloadsDownloadAction,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                          if (!_showDownloadSelection ||
+                              _allowDownloadMultiSelect) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: TextButton.icon(
+                                  onPressed: chapters.isEmpty
+                                      ? null
+                                      : _showDownloadSelection
+                                      ? _toggleSelectAllChapters
+                                      : () => _setSelectionMode(true),
+                                  icon: Icon(
+                                    _showDownloadSelection
+                                        ? allSelected
+                                              ? Icons.deselect_rounded
+                                              : Icons.done_all_rounded
+                                        : Icons.download_outlined,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    _showDownloadSelection
+                                        ? allSelected
+                                              ? strings.commonDeselectAll
+                                              : strings.commonSelectAll
+                                        : strings.downloadsDownloadAction,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -330,6 +361,9 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
                                       if (selected) {
                                         _selectedEpIds.remove(entry.key);
                                       } else {
+                                        if (!_allowDownloadMultiSelect) {
+                                          _selectedEpIds.clear();
+                                        }
                                         _selectedEpIds.add(entry.key);
                                       }
                                     });
