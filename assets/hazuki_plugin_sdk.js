@@ -15,6 +15,10 @@ return Object.freeze({
             throw new Error('plugin_required_capability_missing');
         }
         const key = source.id || source.key;
+        if (source.comic.downloadChapter != null &&
+            typeof source.comic.downloadChapter !== 'function') {
+            throw new Error('plugin_invalid_chapter_download');
+        }
         if (typeof key !== 'string' || !/^[a-z][a-z0-9_.-]{0,63}$/.test(key)) {
             throw new Error('plugin_invalid_identity');
         }

@@ -36,6 +36,7 @@ class SourceHttpGateway {
     Object? data,
     Options? options,
     ProgressCallback? onReceiveProgress,
+    CancelToken? cancelToken,
     HazukiNetworkRetryPolicy retryPolicy =
         HazukiNetworkRetryPolicy.conservative,
     bool withCookies = true,
@@ -49,6 +50,7 @@ class SourceHttpGateway {
         extra: withCookies ? null : const {'hazukiSkipCookieBridge': true},
       ),
       onReceiveProgress: onReceiveProgress,
+      cancelToken: cancelToken,
       retryPolicy: retryPolicy,
     );
   }

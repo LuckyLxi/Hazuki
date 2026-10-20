@@ -69,8 +69,10 @@ dependencies:
   material_new_shapes: ^1.0.0
   get_it: ^9.3.0
   flutter_secure_storage: ^10.3.4
+  koni_archive: ^0.9.0
 
 dev_dependencies:
+  archive: ^4.5.2
   flutter_test:
     sdk: flutter
   # build_runner 2.17 requires build 5; drift_dev currently requires build <5.

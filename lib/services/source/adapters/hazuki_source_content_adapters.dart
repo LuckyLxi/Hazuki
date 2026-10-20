@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import '../plugins/source_search_capabilities.dart';
+import '../download/source_chapter_archive.dart';
 import '../plugins/source_sort_options.dart';
 import 'package:flutter/foundation.dart';
 
@@ -502,7 +505,10 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
 
 class HazukiSourceReaderAdapter
     with SourceCloudReadingAdapter
-    implements SourceReaderGateway, SourceReadingProgressGateway {
+    implements
+        SourceReaderGateway,
+        SourceReadingProgressGateway,
+        SourceChapterArchiveGateway {
   @override
   Object get cloudReadingDelegate => _content;
   HazukiSourceReaderAdapter({
@@ -519,6 +525,41 @@ class HazukiSourceReaderAdapter
   final SourceImagePreparationCapability _imagePreparation;
   final SourceImageOperations _image;
   final SourceDebugOperations _debug;
+
+  @override
+  Future<SourceChapterArchive?> loadChapterArchive({
+    required String comicId,
+    required String epId,
+    String sourceKey = '',
+  }) {
+    final content = _content;
+    return content is SourceChapterArchiveGateway
+        ? (content as SourceChapterArchiveGateway).loadChapterArchive(
+            comicId: comicId,
+            epId: epId,
+            sourceKey: sourceKey,
+          )
+        : Future.value(null);
+  }
+
+  @override
+  Future<void> downloadChapterArchive(
+    SourceChapterArchive archive,
+    File destination, {
+    required String sourceKey,
+    required bool Function() shouldCancel,
+  }) {
+    final content = _content;
+    if (content is! SourceChapterArchiveGateway) {
+      throw StateError('chapter_archive_not_supported');
+    }
+    return (content as SourceChapterArchiveGateway).downloadChapterArchive(
+      archive,
+      destination,
+      sourceKey: sourceKey,
+      shouldCancel: shouldCancel,
+    );
+  }
 
   @override
   Future<void> reportReadingProgress(

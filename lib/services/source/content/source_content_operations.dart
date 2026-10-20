@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'source_cloud_reading.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -18,6 +19,8 @@ import '../debug/source_task_log_recorder.dart';
 import '../models/source_task.dart';
 import '../runtime/source_task_registry.dart';
 import '../gateways/source_content_gateways.dart';
+import '../download/source_chapter_archive.dart';
+import '../download/source_chapter_archive_capability.dart';
 
 abstract interface class SourceContentOperations {
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
@@ -71,6 +74,7 @@ class SourceContentOperationService
     implements
         SourceContentOperations,
         SourceReadingProgressGateway,
+        SourceChapterArchiveGateway,
         SourceCloudReadingGateway,
         SourceCloudReadingEvents {
   SourceContentOperationService({
@@ -93,6 +97,34 @@ class SourceContentOperationService
   final SourceExploreCapability _explore;
   final SourceCategoryCapability _category;
   final SourceComicDetailsCapability _comicDetails;
+  late final _archives = SourceChapterArchiveCapability(
+    _runtimeHost,
+    _runtimeOperations,
+  );
+
+  @override
+  Future<SourceChapterArchive?> loadChapterArchive({
+    required String comicId,
+    required String epId,
+    String sourceKey = '',
+  }) => _archives.loadChapterArchive(
+    comicId: comicId,
+    epId: epId,
+    sourceKey: sourceKey,
+  );
+
+  @override
+  Future<void> downloadChapterArchive(
+    SourceChapterArchive archive,
+    File destination, {
+    required String sourceKey,
+    required bool Function() shouldCancel,
+  }) => _archives.downloadChapterArchive(
+    archive,
+    destination,
+    sourceKey: sourceKey,
+    shouldCancel: shouldCancel,
+  );
   final Map<String, Future<void>> _progressQueues = {};
   final SourceTaskRegistry _searchTasks = SourceTaskRegistry();
   List<SourceTaskSnapshot> get activeSearchTasks => _searchTasks.activeTasks;
