@@ -173,10 +173,13 @@ class SourceUiService {
     required SourceScriptExecution? execution,
     required String? runtimeId,
     required Duration timeout,
+    SourceUiScope? interactionScope,
   }) async {
-    final scope = execution != null && runtimeId != null
-        ? _scopeFor(execution, runtimeId)
-        : SourceUiScope.current;
+    final scope =
+        interactionScope ??
+        (execution != null && runtimeId != null
+            ? _scopeFor(execution, runtimeId)
+            : SourceUiScope.current);
     if (scope == null) return operation();
     if (execution != null && runtimeId != null) {
       checkExecution(execution, runtimeId);
@@ -297,6 +300,21 @@ class SourceUiService {
     }
   }
 
+  SourceDialogSession browserSession(
+    String id,
+    SourceScriptExecution execution,
+    String runtimeId,
+  ) {
+    final dialog = _dialogs[id];
+    if (dialog == null ||
+        dialog.browserRequest == null ||
+        dialog.pluginId != execution.pluginId ||
+        dialog.runtimeId != runtimeId) {
+      throw StateError('plugin_ui_unavailable');
+    }
+    return dialog;
+  }
+
   dynamic handle(
     Map<String, dynamic> request,
     SourceScriptExecution execution,
@@ -304,6 +322,23 @@ class SourceUiService {
     String sourceName, {
     Map<String, dynamic> translation = const {},
   }) {
+    if (request['method'] == 'ui_browser_result' ||
+        request['method'] == 'ui_browser_close') {
+      final dialog = browserSession(
+        request['id']?.toString() ?? '',
+        execution,
+        runtimeId,
+      );
+      if (request['method'] == 'ui_browser_result') {
+        return dialog._browserResult.future;
+      }
+      if (!dialog.isClosed) {
+        dialog.completeBrowser({'status': 'closed', 'reason': 'plugin'});
+      }
+      return dialog._presenting
+          ? dialog._dismissed.future
+          : Future<void>.value();
+    }
     final existing = _findScope(execution, runtimeId);
     final available =
         (existing == null ||
@@ -316,12 +351,14 @@ class SourceUiService {
     if (!scope.runtimeIds.contains(runtimeId)) {
       throw StateError('plugin_ui_unavailable');
     }
-    if (request['method'] == 'ui_open' || request['method'] == 'ui_browser') {
+    if (request['method'] == 'ui_open' ||
+        request['method'] == 'ui_browser' ||
+        request['method'] == 'ui_browser_create') {
       if (!available) {
         if (scope.reason != null) throw SourceUiCancelled(scope.reason!);
         throw StateError('plugin_ui_unavailable');
       }
-      final browser = request['method'] == 'ui_browser'
+      final browser = request['method'] != 'ui_open'
           ? dialogMap(request['options'])
           : null;
       if (browser != null) SourceBrowserAuthorizationOptions.parse(browser);
@@ -351,6 +388,7 @@ class SourceUiService {
       dialog._setWaiting(true);
       dialog._updateQueueTimer();
       unawaited(_pump());
+      if (request['method'] == 'ui_browser_create') return dialog.id;
       return browser == null
           ? dialog._shown.future
           : dialog._browserResult.future;
@@ -474,6 +512,7 @@ class SourceUiService {
           dialog.close('user');
           dialog._release();
           _visible = null;
+          dialog._dismissed.complete();
         }
       }
     } finally {
@@ -506,7 +545,9 @@ class SourceDialogSession extends ChangeNotifier {
     this.model,
     this.translation,
     this.browserRequest,
-  ) : values = model.initialValues;
+  ) : values = model.initialValues {
+    if (browserRequest != null) _browserResult.future.ignore();
+  }
   final SourceUiService service;
   final SourceUiScope scope;
   final String pluginId;
@@ -523,6 +564,7 @@ class SourceDialogSession extends ChangeNotifier {
   final Map<String, Object?> fieldErrors = {};
   final _shown = Completer<String>();
   final _closed = Completer<void>();
+  final _dismissed = Completer<void>();
   Completer<Map<String, Object?>>? _waiter;
   Map<String, Object?>? _event;
   Map<String, Object?>? _closedEvent;

@@ -59,9 +59,16 @@ class SourceJsBridgeCookieCapability {
         if (method == 'ui_available') return false;
         throw StateError('plugin_ui_unavailable');
       }
-      if (method == 'ui_browser') {
+      if (method == 'ui_browser' || method == 'ui_browser_result') {
+        final browserSession = method == 'ui_browser_result'
+            ? SourceUiService.instance.browserSession(
+                map['id']?.toString() ?? '',
+                execution,
+                runtimeId,
+              )
+            : null;
         final options = SourceBrowserAuthorizationOptions.parse(
-          dialogMap(map['options']),
+          browserSession?.browserRequest ?? dialogMap(map['options']),
         );
         return SourceUiService.instance
             .runBrowserAuthorization(
@@ -76,6 +83,7 @@ class SourceJsBridgeCookieCapability {
               execution: execution,
               runtimeId: runtimeId,
               timeout: options.timeout,
+              interactionScope: browserSession?.scope,
             )
             .then(
               (value) => _importBrowserResponse(

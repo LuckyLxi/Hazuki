@@ -329,6 +329,121 @@ void main() {
   );
 
   test(
+    'WebView requests close across callbacks and await presenter cleanup',
+    () async {
+      final showing = Completer<SourceDialogSession>();
+      final cleanup = Completer<void>();
+      service.presenter = (dialog) async {
+        dialog.markShown();
+        showing.complete(dialog);
+        await dialog.whenClosed;
+        await cleanup.future;
+      };
+      final outcome = engine.evaluate(
+        '''globalThis.webView = Hazuki.ui.openWebView({
+        url:'https://site.example/',
+        cookieScopes:[{url:'https://site.example/',names:['session']}]
+      }); webView''',
+      );
+      final dialog = await showing.future;
+      const otherPlugin = SourceScriptExecution(
+        taskId: 'other',
+        pluginId: 'other',
+        method: 'close',
+      );
+      const samePlugin = SourceScriptExecution(
+        taskId: 'other',
+        pluginId: 'anywhere',
+        method: 'close',
+      );
+      for (final (task, runtime) in [
+        (otherPlugin, engine.runtimeId),
+        (samePlugin, 'other-runtime'),
+      ]) {
+        expect(
+          () => service.handle(
+            {'method': 'ui_browser_close', 'id': dialog.id},
+            task,
+            runtime,
+            'Test',
+          ),
+          throwsStateError,
+        );
+      }
+      expect(dialog.isClosed, false);
+      var closed = false;
+      final closing = engine
+          .evaluate('Promise.all([webView.close(), webView.close()])')
+          .then((value) {
+            closed = true;
+            return value;
+          });
+      expect(await outcome, {'status': 'closed', 'reason': 'plugin'});
+      expect(dialog.isClosed, true);
+      expect(closed, false);
+      expect(handle.cookieStore.buildHeader('https://site.example/'), isNull);
+      expect(handle.session.loadBrowserUserAgents(), isEmpty);
+      cleanup.complete();
+      await closing;
+      expect(closed, true);
+      await engine.evaluate('webView.close()');
+      expect(await engine.evaluate('webView'), {
+        'status': 'closed',
+        'reason': 'plugin',
+      });
+    },
+  );
+
+  test(
+    'plugins can close queued WebViews before returning to foreground',
+    () async {
+      service.presenter = (_) async =>
+          fail('closed queued WebView must never show');
+      service.setForeground(false);
+      expect(
+        await engine.evaluate('''(async () => {
+      globalThis.queuedWebView=Hazuki.ui.openWebView({url:'https://site.example/'});
+      await queuedWebView.close();
+      return true;
+    })()'''),
+        true,
+      );
+      service.setForeground(true);
+      expect(await engine.evaluate('queuedWebView'), {
+        'status': 'closed',
+        'reason': 'plugin',
+      });
+      // Retained promises also retain their JS task context until released.
+      await engine.evaluate('delete globalThis.queuedWebView');
+      await engine.evaluate('0');
+      expect(service.scopes, isEmpty);
+    },
+  );
+
+  test(
+    'WebView close preserves successful authorization and is repeatable',
+    () async {
+      service.presenter = (dialog) async {
+        dialog.markShown();
+        dialog.completeBrowser({
+          'status': 'completed',
+          'url': 'https://site.example/done',
+        });
+      };
+      expect(
+        await engine.evaluate('''(async () => {
+      const view=Hazuki.ui.requestBrowserAuthorization({url:'https://site.example/',completion:'manual'});
+      const result=await view;
+      await view.close();
+      await view.close();
+      return result;
+    })()'''),
+        {'status': 'completed', 'url': 'https://site.example/done'},
+      );
+    },
+  );
+
+  test(
     'retiring runtime interactions still releases independent dialog scopes',
     () async {
       final shown = Completer<SourceDialogSession>();

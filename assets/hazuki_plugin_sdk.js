@@ -115,13 +115,32 @@ return Object.freeze({
                 await dialog.close();
             }
         }
+        function browserRequest(options) {
+            const created = Promise.resolve().then(() =>
+                sendMessage({method: 'ui_browser_create', options}));
+            const result = created.then(id => sendMessage({method: 'ui_browser_result', id}));
+            // Plugins may only close the window and never await its outcome.
+            result.catch(() => {});
+            let closing;
+            Object.defineProperty(result, 'close', {value() {
+                return closing ??= created.then(async id => {
+                    try {
+                        await sendMessage({method: 'ui_browser_close', id});
+                    } catch (error) {
+                        if (!String(error).includes('plugin_ui_unavailable') &&
+                            !String(error).includes('plugin_ui_cancelled')) throw error;
+                    }
+                });
+            }});
+            return Object.freeze(result);
+        }
         return Object.freeze({
             PluginDialogCancelledError,
             isAvailable: async () => sendMessage({method: 'ui_available'}),
-            openWebView: options => sendMessage({method: 'ui_browser', options: {
+            openWebView: options => browserRequest({
                 completion: options?.callbacks?.length ? 'callback' : 'manual', ...options,
-            }}),
-            requestBrowserAuthorization: options => sendMessage({method: 'ui_browser', options}),
+            }),
+            requestBrowserAuthorization: browserRequest,
             alert: options => simpleDialog('alert', options),
             confirm: options => simpleDialog('confirm', options),
             prompt: options => simpleDialog('prompt', options),

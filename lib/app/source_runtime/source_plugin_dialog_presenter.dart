@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
-import 'package:hazuki/shared/source_account/source_account_dialog_support.dart';
+import 'package:hazuki/shared/source_interaction/source_animated_dialog.dart';
 import 'package:hazuki/shared/source_account/source_browser_authorization_dialog.dart';
 import 'package:hazuki/shared/source_account/source_authorization_browser.dart';
 import 'package:hazuki/shared/source_interaction/source_plugin_dialog.dart';
@@ -52,7 +52,7 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
     try {
       final shown = dialog.browserRequest != null
           ? _presentBrowser(context, dialog)
-          : showHomeAnimatedDialog<void>(
+          : showSourceAnimatedDialog<void>(
               context,
               child: Builder(
                 builder: (context) {

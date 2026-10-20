@@ -38,6 +38,107 @@ class _Browser
 }
 
 void main() {
+  testWidgets(
+    'plugin close waits for WebView exit before showing the next dialog',
+    (tester) async {
+      final key = GlobalKey<NavigatorState>();
+      final browser = _Browser()..ready.complete();
+      final presenter = SourcePluginDialogPresenter(
+        key,
+        browserFactory: () => browser,
+      );
+      addTearDown(presenter.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: key,
+          navigatorObservers: [presenter],
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: Text('Home')),
+        ),
+      );
+      final service = SourceUiService.instance;
+      const task = SourceScriptExecution(
+        taskId: 'web-close',
+        pluginId: 'test',
+        method: 'callback',
+      );
+      final id = service.handle(
+        {
+          'method': 'ui_browser_create',
+          'options': {'url': 'https://site.example/', 'completion': 'manual'},
+        },
+        task,
+        'web-runtime',
+        'Test',
+      );
+      final result =
+          service.handle(
+                {'method': 'ui_browser_result', 'id': id},
+                task,
+                'web-runtime',
+                'Test',
+              )
+              as Future;
+      await tester.pumpAndSettle();
+      final next =
+          service.handle(
+                {
+                  'method': 'ui_open',
+                  'options': {
+                    'title': 'Next dialog',
+                    'content': [],
+                    'buttons': [
+                      {'id': 'ok', 'text': 'OK'},
+                    ],
+                  },
+                },
+                task,
+                'web-runtime',
+                'Test',
+              )
+              as Future;
+      var finished = false;
+      final closing =
+          (service.handle(
+                    {'method': 'ui_browser_close', 'id': id},
+                    task,
+                    'web-runtime',
+                    'Test',
+                  )
+                  as Future)
+              .then((_) => finished = true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(browser.closed, false);
+      expect(finished, false);
+      expect(find.text('Browser content'), findsOneWidget);
+      expect(find.text('Next dialog'), findsNothing);
+      await tester.pumpAndSettle();
+      await closing;
+      expect(browser.closed, true);
+      expect(finished, true);
+      expect(await result, {'status': 'closed', 'reason': 'plugin'});
+      expect(find.text('Next dialog'), findsOneWidget);
+      service.handle(
+        {'method': 'ui_browser_close', 'id': id},
+        task,
+        'web-runtime',
+        'Test',
+      );
+      expect(find.text('Next dialog'), findsOneWidget);
+      service.handle(
+        {'method': 'ui_close', 'id': await next},
+        task,
+        'web-runtime',
+        'Test',
+      );
+      await tester.pumpAndSettle();
+      service.releaseExecution(task, 'web-runtime');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final factoryFailure in [false, true]) {
     testWidgets('global browser preserves failures and permits retry: '
         'factoryFailure=$factoryFailure', (tester) async {
@@ -258,6 +359,10 @@ void main() {
         },
       ];
       await tester.tap(find.text('Complete login'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(browser.closed, isFalse);
+      expect(find.text('Browser content'), findsOneWidget);
       await tester.pumpAndSettle();
       expect((await future as Map)['status'], 'completed');
       expect(browser.closed, isTrue);

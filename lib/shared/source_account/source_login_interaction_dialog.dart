@@ -13,6 +13,7 @@ import 'source_external_authorization_dialog.dart';
 import 'source_login_interaction_text.dart';
 import 'source_login_dialog_controller.dart';
 import '../source_interaction/source_plugin_dialog.dart';
+import '../source_interaction/source_animated_dialog.dart';
 import '../../services/source/interaction/source_ui_service.dart';
 
 /// Maps logical widget coordinates to unscaled image pixels, excluding padding.
@@ -100,7 +101,7 @@ Future<Object?> showSourceLoginInteraction(
     );
   }
   final result = await Future.any<Object?>([
-    showHomeAnimatedDialog<Object>(
+    showSourceAnimatedDialog<Object>(
       context,
       child: _LoginInteraction(request: request, cancellation: cancellation),
     ),
