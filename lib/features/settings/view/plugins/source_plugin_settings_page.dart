@@ -5,6 +5,8 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'source_plugin_action_widgets.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class SourcePluginSettingsPage extends StatelessWidget {
   const SourcePluginSettingsPage({
@@ -48,6 +50,13 @@ class _SourcePluginSettingsContentState
   Map<String, dynamic> _translation = {};
   List<SourcePluginAction> _actions = [];
   int _loadRevision = 0;
+  final _sourceUi = SourceUiOwner();
+  @override
+  void dispose() {
+    _sourceUi.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +67,7 @@ class _SourcePluginSettingsContentState
   void didUpdateWidget(covariant SourcePluginSettingsContent oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.id != widget.id || oldWidget.gateway != widget.gateway) {
+      _sourceUi.restart();
       _settings = {};
       _translation = {};
       _actions = [];
@@ -93,9 +103,12 @@ class _SourcePluginSettingsContentState
 
   Future<void> _set(String key, dynamic value) async {
     try {
-      await widget.gateway.saveSetting(widget.id, key, value);
+      await _sourceUi.run(
+        () => widget.gateway.saveSetting(widget.id, key, value),
+      );
       if (mounted) setState(() {});
     } catch (error) {
+      if (isSourceUiCancellation(error)) return;
       if (mounted) {
         unawaited(showHazukiPrompt(context, error.toString(), isError: true));
       }

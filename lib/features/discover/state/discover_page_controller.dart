@@ -5,6 +5,8 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
 import 'discover_page_state.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class DiscoverPageController extends ChangeNotifier {
   DiscoverPageController({
@@ -23,6 +25,7 @@ class DiscoverPageController extends ChangeNotifier {
   final SourceDiscoverGateway _sourceService;
   final DiscoverPageState _state = DiscoverPageState();
   bool _disposed = false;
+  final _sourceUi = SourceUiOwner();
   int _sourceGeneration = 0;
   late String? _lastActiveSourceKey;
   String? _lastSourceRevision;
@@ -35,6 +38,7 @@ class DiscoverPageController extends ChangeNotifier {
 
   void _onSourceChanged() {
     final activeKey = _sourceService.activeSourceKey;
+    if (activeKey != _lastActiveSourceKey) _sourceUi.cancel('sourceChanged');
     if (activeKey != _lastActiveSourceKey ||
         _lastSourceRevision != _sourceService.sourceRevision) {
       // 源发生了实际切换，通知 View 执行刷新
@@ -65,6 +69,7 @@ class DiscoverPageController extends ChangeNotifier {
     required String timeoutMessage,
     required String Function(String) loadFailedMessage,
   }) async {
+    _sourceUi.restart();
     if (showLoginRequired) {
       _state.sections = const [];
       _state.errorMessage = null;
@@ -78,12 +83,17 @@ class DiscoverPageController extends ChangeNotifier {
     List<ExploreSection>? loadedSections;
     String? error;
     try {
-      loadedSections = await _sourceService.loadExploreSections().timeout(
-        _discoverLoadTimeout,
-        onTimeout: () => throw Exception('discover_load_timeout'),
+      loadedSections = await _sourceUi.run(
+        () => SourceUiScope.timeout(
+          _sourceService.loadExploreSections(),
+          _discoverLoadTimeout,
+          onTimeout: () => throw Exception('discover_load_timeout'),
+        ),
       );
     } catch (e) {
-      error = e.toString().contains('discover_load_timeout')
+      error = isSourceUiCancellation(e)
+          ? null
+          : e.toString().contains('discover_load_timeout')
           ? timeoutMessage
           : loadFailedMessage('$e');
     }
@@ -119,6 +129,7 @@ class DiscoverPageController extends ChangeNotifier {
     required String Function(String) loadFailedMessage,
   }) async {
     if (_state.refreshing) return;
+    _sourceUi.restart();
     if (showLoginRequired) {
       _state.sections = const [];
       _state.errorMessage = null;
@@ -139,14 +150,17 @@ class DiscoverPageController extends ChangeNotifier {
     List<ExploreSection>? refreshedSections;
     String? error;
     try {
-      refreshedSections = await _sourceService
-          .loadExploreSections(forceRefresh: true)
-          .timeout(
-            _discoverLoadTimeout,
-            onTimeout: () => throw Exception('discover_load_timeout'),
-          );
+      refreshedSections = await _sourceUi.run(
+        () => SourceUiScope.timeout(
+          _sourceService.loadExploreSections(forceRefresh: true),
+          _discoverLoadTimeout,
+          onTimeout: () => throw Exception('discover_load_timeout'),
+        ),
+      );
     } catch (e) {
-      error = e.toString().contains('discover_load_timeout')
+      error = isSourceUiCancellation(e)
+          ? null
+          : e.toString().contains('discover_load_timeout')
           ? timeoutMessage
           : loadFailedMessage('$e');
     }
@@ -218,9 +232,11 @@ class DiscoverPageController extends ChangeNotifier {
     try {
       while (true) {
         final nextPage = currentPage + 1;
-        final result = await _sourceService.loadCategoryComicsByViewMore(
-          viewMoreUrl: viewMoreUrl,
-          page: nextPage,
+        final result = await _sourceUi.run(
+          () => _sourceService.loadCategoryComicsByViewMore(
+            viewMoreUrl: viewMoreUrl,
+            page: nextPage,
+          ),
         );
         if (_disposed ||
             sourceGeneration != _sourceGeneration ||
@@ -290,6 +306,7 @@ class DiscoverPageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _sourceUi.dispose();
     _disposed = true;
     _sourceService.removeListener(_onSourceChanged);
     super.dispose();

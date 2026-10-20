@@ -6,6 +6,8 @@ import '../runtime/source_runtime_host.dart';
 import 'source_login_interaction.dart';
 import 'source_login_side_data_operations.dart';
 import 'source_login_storage_transaction.dart';
+import '../interaction/source_ui_scope.dart';
+import '../interaction/source_ui_service.dart';
 
 class SourceInteractiveLoginOperations
     implements SourceInteractiveAccountGateway {
@@ -38,6 +40,38 @@ class SourceInteractiveLoginOperations
 
   @override
   Future<void> loginInteractive({
+    required String account,
+    required String password,
+    required String method,
+    required SourceLoginPresenter present,
+    required SourceLoginCancellation cancellation,
+  }) async {
+    try {
+      await SourceUiService.instance.run(
+        () => _loginInteractive(
+          account: account,
+          password: password,
+          method: method,
+          present: present,
+          cancellation: cancellation,
+        ),
+        present: (dialog) async {
+          await present({
+            'type': 'pluginDialog',
+            'session': dialog,
+          }, cancellation);
+        },
+      );
+    } catch (error) {
+      if (isSourceUiCancellation(error)) {
+        cancellation.cancel();
+        throw const SourceLoginCancelled();
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _loginInteractive({
     required String account,
     required String password,
     required String method,
@@ -101,6 +135,7 @@ class SourceInteractiveLoginOperations
             [account, password, method],
           ),
         );
+        SourceUiService.instance.closeRuntimeInteractions(engine.runtimeId);
         cancellation.check();
         await SourceLoginSideDataOperations(
           runtimeHost: host,

@@ -6,6 +6,8 @@ import 'package:hazuki/models/hazuki_models.dart';
 
 import '../repository/comic_detail_repository.dart';
 import 'package:hazuki/shared/ui_flags.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class ComicDetailSessionController extends ChangeNotifier {
   ComicDetailSessionController({
@@ -32,6 +34,7 @@ class ComicDetailSessionController extends ChangeNotifier {
   _applyInitialFavoriteOverrides;
 
   bool _disposed = false;
+  final _sourceUi = SourceUiOwner();
 
   late Future<ComicDetailsData> _future;
   Timer? _detailsTimeoutTimer;
@@ -79,6 +82,7 @@ class ComicDetailSessionController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _sourceUi.dispose();
     _disposed = true;
     unawaited(_readingProgressSubscription?.cancel());
     _detailsTimeoutTimer?.cancel();
@@ -146,6 +150,15 @@ class ComicDetailSessionController extends ChangeNotifier {
   Future<ComicDetailsData> _createComicDetailsFuture({
     bool forceRefresh = false,
   }) {
+    _sourceUi.restart();
+    return _sourceUi.run(
+      () => _createComicDetailsFutureWithUi(forceRefresh: forceRefresh),
+    );
+  }
+
+  Future<ComicDetailsData> _createComicDetailsFutureWithUi({
+    bool forceRefresh = false,
+  }) {
     final requestId = ++_detailsRequestId;
     final sourceFuture = _repository.loadComicDetails(
       _comic.id,
@@ -154,9 +167,9 @@ class ComicDetailSessionController extends ChangeNotifier {
     );
 
     late final Timer timeoutTimer;
-    timeoutTimer = Timer(const Duration(seconds: 30), () {
+    timeoutTimer = SourceUiScope.timer(const Duration(seconds: 30), () {
       if (_disposed || requestId != _detailsRequestId) return;
-      if (!_hasAutomaticallyRetriedDetails) {
+      if (!_hasAutomaticallyRetriedDetails && !_sourceUi.wasCancelled) {
         _hasAutomaticallyRetriedDetails = true;
         _startDetailRetry();
         return;

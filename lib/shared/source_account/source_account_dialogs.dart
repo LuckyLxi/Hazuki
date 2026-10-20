@@ -4,6 +4,9 @@ import 'source_login_interaction_text.dart';
 import 'source_login_interaction_dialog.dart';
 import 'source_login_dialog_controller.dart';
 import 'source_account_dialog_support.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/shared/source_interaction/source_plugin_dialog.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -463,9 +466,45 @@ Future<void> showHomeLoginDialog(
                                                     try {
                                                       final profile =
                                                           selectedMethod == null
-                                                          ? await onLogin(
-                                                              account,
-                                                              password,
+                                                          ? await SourceUiService.instance.run(
+                                                              () => onLogin(
+                                                                account,
+                                                                password,
+                                                              ),
+                                                              present: (dialog) async {
+                                                                final cancellation =
+                                                                    SourceLoginCancellation();
+                                                                try {
+                                                                  await interactions.present((
+                                                                    finish,
+                                                                  ) {
+                                                                    unawaited(
+                                                                      dialog
+                                                                          .whenClosed
+                                                                          .then(
+                                                                            (
+                                                                              _,
+                                                                            ) => finish(
+                                                                              true,
+                                                                            ),
+                                                                          ),
+                                                                    );
+                                                                    return SourcePluginDialog(
+                                                                      dialog:
+                                                                          dialog,
+                                                                      embedded:
+                                                                          true,
+                                                                      onUserClose:
+                                                                          cancellation
+                                                                              .cancel,
+                                                                    );
+                                                                  }, cancellation);
+                                                                } finally {
+                                                                  dialog.close(
+                                                                    'user',
+                                                                  );
+                                                                }
+                                                              },
                                                             )
                                                           : await onLoginMethod!(
                                                               selectedMethod!
@@ -517,7 +556,10 @@ Future<void> showHomeLoginDialog(
                                                             dialogContext,
                                                           );
                                                       if (error
-                                                          is SourceLoginCancelled) {
+                                                              is SourceLoginCancelled ||
+                                                          isSourceUiCancellation(
+                                                            error,
+                                                          )) {
                                                         if (route?.isActive ==
                                                             true) {
                                                           if (route!

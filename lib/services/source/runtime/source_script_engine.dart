@@ -9,6 +9,8 @@ import 'source_script_codec.dart';
 import 'source_script_worker.dart';
 import '../models/source_script_execution.dart';
 import '../models/source_task.dart';
+import '../interaction/source_ui_scope.dart';
+import '../interaction/source_ui_service.dart';
 
 /// An asynchronous proxy. All QuickJS objects belong exclusively to its worker.
 class SourceScriptEngine {
@@ -30,59 +32,66 @@ class SourceScriptEngine {
       },
       decodeCallback: (id) => SourceScriptCallback._(this, id),
     );
-    _messages.listen(_receive);
-    _errors.listen(
-      (error) => _workerFailed(
-        StateError('source_script_worker_failed'),
-        StackTrace.fromString('$error'),
+    SourceUiScope.withoutInteractionSync(() => _messages.listen(_receive));
+    SourceUiScope.withoutInteractionSync(
+      () => _errors.listen(
+        (error) => _workerFailed(
+          StateError('source_script_worker_failed'),
+          StackTrace.fromString('$error'),
+        ),
       ),
     );
-    _exit.listen((_) {
-      // Let the final worker acknowledgement on the other port arrive first.
-      Timer.run(() {
-        if (!_acknowledgedClose && _workerFailure == null) {
-          _workerFailed(
-            StateError('source_script_worker_exited_without_cleanup'),
-            StackTrace.current,
-          );
-        }
-        _fail(StateError('source_script_worker_closed'), StackTrace.current);
-        if (!_closed.isCompleted) {
-          if (_workerFailure case final error?) {
-            _closed.completeError(error, _workerFailureStack);
-          } else {
-            _closed.complete();
+    SourceUiScope.withoutInteractionSync(
+      () => _exit.listen((_) {
+        // Let the final worker acknowledgement on the other port arrive first.
+        Timer.run(() {
+          if (!_acknowledgedClose && _workerFailure == null) {
+            _workerFailed(
+              StateError('source_script_worker_exited_without_cleanup'),
+              StackTrace.current,
+            );
           }
-        }
-        _messages.close();
-        _errors.close();
-        _exit.close();
-      });
-    });
-    _ready.future.ignore();
-    _closed.future.ignore();
-    unawaited(
-      Isolate.spawn(
-        runSourceScriptWorker,
-        {
-          'port': _messages.sendPort,
-          'runtimeId': runtimeId,
-          'pluginId': pluginId,
-          'timeout': timeout,
-          'memoryLimit': memoryLimit,
-          'inspection': inspection,
-        },
-        onError: _errors.sendPort,
-        onExit: _exit.sendPort,
-      ).then<void>(
-        (_) {},
-        onError: (Object error, StackTrace stack) {
-          _workerFailed(error, stack);
-          if (!_closed.isCompleted) _closed.completeError(error, stack);
+          _fail(StateError('source_script_worker_closed'), StackTrace.current);
+          if (!_closed.isCompleted) {
+            if (_workerFailure case final error?) {
+              _closed.completeError(error, _workerFailureStack);
+            } else {
+              _closed.complete();
+            }
+          }
           _messages.close();
           _errors.close();
           _exit.close();
-        },
+        });
+      }),
+    );
+    _ready.future.ignore();
+    _closed.future.ignore();
+    unawaited(
+      SourceUiScope.withoutInteraction(
+        () =>
+            Isolate.spawn(
+              runSourceScriptWorker,
+              {
+                'port': _messages.sendPort,
+                'runtimeId': runtimeId,
+                'pluginId': pluginId,
+                'timeout': timeout,
+                'memoryLimit': memoryLimit,
+                'inspection': inspection,
+              },
+              onError: _errors.sendPort,
+              onExit: _exit.sendPort,
+            ).then<void>(
+              (_) {},
+              onError: (Object error, StackTrace stack) {
+                _workerFailed(error, stack);
+                if (!_closed.isCompleted) _closed.completeError(error, stack);
+                _messages.close();
+                _errors.close();
+                _exit.close();
+              },
+            ),
       ),
     );
   }
@@ -169,6 +178,8 @@ class SourceScriptEngine {
     final id = ++_sequence;
     final completion = Completer<dynamic>();
     _pending[id] = completion;
+    final scope = inspection ? null : SourceUiScope.current;
+    scope?.runtimeIds.add(runtimeId);
     _worker!.send({
       'type': kind,
       'id': id,
@@ -191,6 +202,7 @@ class SourceScriptEngine {
                               ?.toString()
                         : null,
                   ))
+              .withUiScope(scope?.id)
               .toMap(),
     });
     return completion.future;
@@ -318,6 +330,7 @@ class SourceScriptEngine {
   }
 
   void _fail(Object error, StackTrace stack) {
+    SourceUiService.instance.cancelRuntime(runtimeId);
     _closing = true;
     if (!_ready.isCompleted) _ready.completeError(error, stack);
     for (final completion in _pending.values) {

@@ -23,6 +23,8 @@ import 'app/launch_shortcut_coordinator.dart';
 import 'app/source_runtime/source_runtime_coordinator.dart';
 import 'app/source_runtime/source_runtime_bootstrap_overlay.dart';
 import 'app/source_runtime/source_update_dialog_support.dart';
+import 'app/source_runtime/source_plugin_dialog_presenter.dart';
+import 'services/source/interaction/source_ui_service.dart';
 import 'app/theme/theme_reveal_support.dart';
 import 'app/windows/windows_title_bar_controller.dart';
 import 'app/software_update/software_update_dialog_support.dart';
@@ -114,6 +116,7 @@ class HazukiApp extends StatefulWidget {
 class _HazukiAppState extends State<HazukiApp>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  late final SourcePluginDialogPresenter _pluginDialogPresenter;
   final SourceRuntimeCoordinator _sourceRuntimeCoordinator =
       SourceRuntimeCoordinator();
   final SourceUpdateDialogSupport _sourceUpdateDialogSupport =
@@ -139,6 +142,7 @@ class _HazukiAppState extends State<HazukiApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _pluginDialogPresenter = SourcePluginDialogPresenter(_navigatorKey);
     _themeController = HazukiThemeController(
       settingsStore: widget.settingsStore,
       initialSettings: widget.initialAppearance,
@@ -195,6 +199,12 @@ class _HazukiAppState extends State<HazukiApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      SourceUiService.instance.setForeground(false);
+    } else if (state == AppLifecycleState.resumed) {
+      SourceUiService.instance.setForeground(true);
+    }
     sl<MangaDownloadService>().handleAppLifecycleState(state);
     unawaited(sl<PasswordLockService>().handleAppLifecycleState(state));
   }
@@ -202,6 +212,7 @@ class _HazukiAppState extends State<HazukiApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pluginDialogPresenter.dispose();
     _launchShortcutCoordinator.dispose();
     _themeRevealSupport.dispose();
     _themeController.dispose();
@@ -320,7 +331,10 @@ class _HazukiAppState extends State<HazukiApp>
                 GlobalCupertinoLocalizations.delegate,
               ],
               supportedLocales: AppLocalizations.supportedLocales,
-              navigatorObservers: [hazukiPromptNavigatorObserver],
+              navigatorObservers: [
+                hazukiPromptNavigatorObserver,
+                _pluginDialogPresenter,
+              ],
               themeMode: _themeController.themeMode,
               theme: HazukiThemeFactory.buildLight(appearance, lightDynamic),
               darkTheme: HazukiThemeFactory.buildDark(appearance, darkDynamic),

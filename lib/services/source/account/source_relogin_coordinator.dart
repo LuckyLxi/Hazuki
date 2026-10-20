@@ -1,5 +1,6 @@
 import '../runtime/source_cookie_store.dart';
 import '../runtime/source_runtime_facade.dart';
+import '../interaction/source_ui_scope.dart';
 
 abstract interface class SourceReloginContext {
   String get sourceKey;
@@ -108,10 +109,12 @@ class SourceReloginCoordinator {
     if (accountData == null || accountData.length < 2) return false;
     if (!force && context.shouldSkipRelogin(_reloginInterval)) return true;
     try {
-      await _loginWithStoredAccount(
-        context,
-        account: accountData[0],
-        password: accountData[1],
+      await SourceUiScope.withoutInteraction(
+        () => _loginWithStoredAccount(
+          context,
+          account: accountData[0],
+          password: accountData[1],
+        ),
       );
       context.lastReloginAt = DateTime.now();
       return true;

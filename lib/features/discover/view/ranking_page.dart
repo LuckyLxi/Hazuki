@@ -11,6 +11,8 @@ import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 enum _RankingComicLayout { list, grid3 }
 
@@ -31,6 +33,7 @@ class RankingPage extends StatefulWidget {
 }
 
 class _RankingPageState extends State<RankingPage> {
+  final _sourceUi = SourceUiOwner();
   static const _loadTimeout = Duration(seconds: 25);
   static const _comicLayoutPreferenceKey = 'ranking_comic_layout';
 
@@ -100,6 +103,7 @@ class _RankingPageState extends State<RankingPage> {
 
   @override
   void dispose() {
+    _sourceUi.dispose();
     _scrollController
       ..removeListener(_onScroll)
       ..dispose();
@@ -150,9 +154,12 @@ class _RankingPageState extends State<RankingPage> {
     final timeoutMessage = AppLocalizations.of(
       context,
     )!.rankingLoadOptionsTimeout;
-    return _sourceService.loadCategoryRankingOptions().timeout(
-      _loadTimeout,
-      onTimeout: () => throw Exception(timeoutMessage),
+    return _sourceUi.run(
+      () => SourceUiScope.timeout(
+        _sourceService.loadCategoryRankingOptions(),
+        _loadTimeout,
+        onTimeout: () => throw Exception(timeoutMessage),
+      ),
     );
   }
 
@@ -161,18 +168,23 @@ class _RankingPageState extends State<RankingPage> {
     required int page,
   }) {
     final timeoutMessage = AppLocalizations.of(context)!.rankingLoadTimeout;
-    return _sourceService
-        .loadCategoryRankingComics(rankingOption: rankingOption, page: page)
-        .timeout(
-          _loadTimeout,
-          onTimeout: () => throw Exception(timeoutMessage),
-        );
+    return _sourceUi.run(
+      () => SourceUiScope.timeout(
+        _sourceService.loadCategoryRankingComics(
+          rankingOption: rankingOption,
+          page: page,
+        ),
+        _loadTimeout,
+        onTimeout: () => throw Exception(timeoutMessage),
+      ),
+    );
   }
 
   Future<void> _loadInitial({bool forceRefresh = false}) async {
     if (!mounted) {
       return;
     }
+    _sourceUi.restart();
 
     if (forceRefresh) {
       setState(() {
@@ -182,6 +194,7 @@ class _RankingPageState extends State<RankingPage> {
 
     try {
       final rankingOptions = await _loadRankingOptions();
+      if (_sourceUi.wasCancelled) return;
       if (!mounted) {
         return;
       }
@@ -238,6 +251,7 @@ class _RankingPageState extends State<RankingPage> {
 
     final targetPage = reset ? 1 : (append ? _rankingPage + 1 : _rankingPage);
     final requestToken = ++_rankingRequestToken;
+    _sourceUi.restart();
 
     setState(() {
       if (append) {

@@ -12,6 +12,8 @@ import 'source_browser_authorization_dialog.dart';
 import 'source_external_authorization_dialog.dart';
 import 'source_login_interaction_text.dart';
 import 'source_login_dialog_controller.dart';
+import '../source_interaction/source_plugin_dialog.dart';
+import '../../services/source/interaction/source_ui_service.dart';
 
 /// Maps logical widget coordinates to unscaled image pixels, excluding padding.
 Offset? captchaImagePoint(Offset local, Size canvas, Size image) {
@@ -48,6 +50,22 @@ Future<Object?> showSourceLoginInteraction(
   SourceLoginDialogController? dialogController,
 }) async {
   cancellation.check();
+  if (request['type'] == 'pluginDialog') {
+    final dialog = request['session'] as SourceDialogSession;
+    if (dialogController == null) {
+      dialog.close('ownerGone');
+      throw StateError('plugin_ui_unavailable');
+    }
+    await dialogController.present((finish) {
+      unawaited(dialog.whenClosed.then((_) => finish(true)));
+      return SourcePluginDialog(
+        dialog: dialog,
+        embedded: true,
+        onUserClose: cancellation.cancel,
+      );
+    }, cancellation);
+    return true;
+  }
   if (!context.mounted) {
     cancellation.cancel();
     cancellation.check();

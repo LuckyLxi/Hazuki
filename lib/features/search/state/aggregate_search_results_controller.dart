@@ -6,6 +6,8 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 
 import '../support/search_contracts.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 typedef AggregateSearchPageLoader =
     Future<SearchComicsResult> Function({
@@ -20,6 +22,7 @@ class AggregateSearchSectionState {
     : order = normalizeSourceSearchOrder('', source.presentation);
 
   SourceCatalogEntry source;
+  final SourceUiOwner sourceUi = SourceUiOwner();
   String order;
   List<ExploreComic> comics = const [];
   String? errorMessage;
@@ -69,6 +72,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
   void clear() {
     _keyword = '';
     for (final section in sections) {
+      section.sourceUi.restart();
       section
         ..requestToken = section.requestToken + 1
         ..comics = const []
@@ -90,6 +94,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
     _lastMessages = messages;
     final groupId = createSourceTaskId();
     for (final section in sections) {
+      section.sourceUi.restart();
       section
         ..taskGroupId = groupId
         ..requestToken = section.requestToken + 1
@@ -178,6 +183,26 @@ class AggregateSearchResultsController extends ChangeNotifier {
     required int page,
     required bool append,
   }) async {
+    try {
+      await section.sourceUi.run(
+        () => _loadSectionPageWithUi(
+          messages,
+          section,
+          page: page,
+          append: append,
+        ),
+      );
+    } catch (error) {
+      if (!isSourceUiCancellation(error)) rethrow;
+    }
+  }
+
+  Future<void> _loadSectionPageWithUi(
+    SearchMessages messages,
+    AggregateSearchSectionState section, {
+    required int page,
+    required bool append,
+  }) async {
     final token = section.requestToken;
     var timedOut = false;
     final taskOrigin = SourceTaskOrigin(
@@ -210,7 +235,8 @@ class AggregateSearchResultsController extends ChangeNotifier {
               sourceKey: sourceKey,
               taskOrigin: taskOrigin,
             );
-      final result = await request.timeout(
+      final result = await SourceUiScope.timeout(
+        request,
         searchLoadTimeout,
         onTimeout: () {
           timedOut = true;
@@ -242,7 +268,9 @@ class AggregateSearchResultsController extends ChangeNotifier {
           !reachedMaxPage && result.comics.isNotEmpty && !noNewItems;
     } catch (error) {
       if (!_isCurrent(section, token)) return;
-      section.errorMessage = messages.failed('$error');
+      section.errorMessage = isSourceUiCancellation(error)
+          ? null
+          : messages.failed('$error');
     } finally {
       if (_isCurrent(section, token)) {
         section
@@ -291,11 +319,15 @@ class AggregateSearchResultsController extends ChangeNotifier {
         }
         updated.add(previous);
       } else {
-        if (previous != null) previous.requestToken++;
+        if (previous != null) {
+          previous.sourceUi.dispose();
+          previous.requestToken++;
+        }
         updated.add(AggregateSearchSectionState(source: source));
       }
     }
     for (final removed in current.values) {
+      removed.sourceUi.dispose();
       removed.requestToken++;
     }
     sections
@@ -327,6 +359,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
     _disposed = true;
     _sourceService.removeListener(_syncSources);
     for (final section in sections) {
+      section.sourceUi.dispose();
       section.requestToken++;
     }
     super.dispose();

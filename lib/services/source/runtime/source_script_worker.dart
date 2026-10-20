@@ -456,6 +456,7 @@ const _snapshotExpressions = <String>[
   "!!this.__hazuki_source.favorites?.addFolder",
   "!!this.__hazuki_source.favorites?.addOrDelFavorite",
   "!!this.__hazuki_source.favorites?.deleteFolder",
+  'typeof this.__hazuki_source.favorites?.renameFolder === "function"',
   "!!this.__hazuki_source.favorites?.loadComics",
   "!!this.__hazuki_source.favorites?.loadFolders",
   "!!this.__hazuki_source.favorites?.loadNext",

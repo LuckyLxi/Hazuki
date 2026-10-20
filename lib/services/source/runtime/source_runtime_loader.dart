@@ -18,6 +18,7 @@ import 'source_runtime_metadata.dart';
 export 'source_runtime_metadata.dart' show parseSourceSettingsDefaults;
 import 'source_script_storage.dart';
 import 'source_text_downloader.dart';
+import '../interaction/source_ui_scope.dart';
 
 abstract interface class SourceRuntimeLoadClient {
   Future<SourceRuntimeLoadResult> ensureLocalSource(
@@ -151,6 +152,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
     // published. Track its close so disposal also waits for worker cleanup.
     void cancelCandidate() => handle.closeEngine(engine).ignore();
     cancellation?.addListener(cancelCandidate);
+    handle.loadingRuntimeIds.add(engine.runtimeId);
     try {
       engine.setContextMessageHandler(
         (dynamic message, execution) => _jsBridge.handleJsMessageForHandle(
@@ -221,9 +223,13 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
       }
       candidateMeta = meta;
       if (runSourceInit) {
-        await engine
-            .evaluate('this.__hazuki_source.init?.()', name: 'source_init.js')
-            .timeout(const Duration(seconds: 90));
+        await SourceUiScope.timeout(
+          engine.evaluate(
+            'this.__hazuki_source.init?.()',
+            name: 'source_init.js',
+          ),
+          const Duration(seconds: 90),
+        );
       }
       if (handle.isDisposed) throw Exception('source_runtime_disposed');
       final finalSettings = await readSettings();
@@ -254,6 +260,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
       await engine.close();
       rethrow;
     } finally {
+      handle.loadingRuntimeIds.remove(engine.runtimeId);
       cancellation?.removeListener(cancelCandidate);
     }
   }

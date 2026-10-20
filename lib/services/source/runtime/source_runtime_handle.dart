@@ -20,6 +20,7 @@ import 'source_secure_session_storage.dart';
 import 'source_script_engine.dart';
 import 'source_session_store.dart';
 import '../account/source_login_interaction.dart';
+import '../interaction/source_ui_service.dart';
 import '../../logging/app_log_store.dart';
 
 Dio _createSourceDio() {
@@ -71,6 +72,9 @@ class SourceRuntimeHandle
   int _activeOperationCount = 0;
   final Object _operationZoneKey = Object();
   final Set<SourceScriptEngine> _retiredEngines = {};
+
+  /// Includes candidate engines that are not published as runtime.engine yet.
+  final Set<String> loadingRuntimeIds = {};
   final List<Future<void>> _engineClosures = [];
   late final SourceSessionStore session = SourceSessionStore(
     sourceKey: sourceKey,
@@ -164,6 +168,7 @@ class SourceRuntimeHandle
 
   @override
   bool get isDisposed => _disposed;
+  bool get isDisposalRequested => _disposeRequested || _disposed;
 
   bool get recreationRequested => _recreationRequested;
 
@@ -222,6 +227,13 @@ class SourceRuntimeHandle
 
   @override
   void requestDispose() {
+    for (final id in loadingRuntimeIds.toList()) {
+      SourceUiService.instance.cancelRuntime(id);
+    }
+    final engine = runtime.engine;
+    if (engine != null) {
+      SourceUiService.instance.cancelRuntime(engine.runtimeId);
+    }
     if (_disposed || _disposeRequested) {
       return;
     }

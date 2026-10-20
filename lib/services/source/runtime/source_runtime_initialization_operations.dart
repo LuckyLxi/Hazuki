@@ -5,6 +5,7 @@ import 'source_runtime_handle.dart';
 import 'source_runtime_host.dart';
 import 'source_runtime_loader.dart';
 import 'source_runtime_state_controller.dart';
+import '../interaction/source_ui_scope.dart';
 
 /// Coordinates source activation and the runtime initialization state machine.
 class SourceRuntimeInitializationOperations {
@@ -26,7 +27,10 @@ class SourceRuntimeInitializationOperations {
   Future<void> activateSource(String sourceKey) =>
       _runtimeHost.activateSource(sourceKey);
 
-  Future<void> prewarmInBackground() async {
+  Future<void> prewarmInBackground() =>
+      SourceUiScope.withoutInteraction(_prewarmInBackground);
+
+  Future<void> _prewarmInBackground() async {
     if (!_runtimeHost.hasActiveSource) return;
     final handle = _runtimeHost.activeHandle;
     if (handle.facade.initFuture == null && _isHandleInitialized(handle)) {
@@ -106,6 +110,10 @@ class SourceRuntimeInitializationOperations {
       return;
     }
 
+    final scope = SourceUiScope.current;
+    if (scope?.reason != null) {
+      throw scope!.failure ?? SourceUiCancelled(scope.reason!);
+    }
     facade.initFuture = null;
     await _initHandle(handle, prewarm: false);
 

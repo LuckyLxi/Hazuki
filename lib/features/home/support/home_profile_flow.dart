@@ -9,6 +9,8 @@ import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/shared/source_account/source_account_login.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class HomeProfileFlow {
   const HomeProfileFlow({
@@ -127,7 +129,12 @@ class HomeProfileFlow {
       return;
     }
 
-    await sourceService.logout();
+    try {
+      await SourceUiService.instance.run(sourceService.logout);
+    } catch (error) {
+      if (isSourceUiCancellation(error)) return;
+      rethrow;
+    }
     if (!isMounted() || !context.mounted) {
       return;
     }

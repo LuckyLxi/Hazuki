@@ -5,6 +5,7 @@ import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class HomeShellController extends ChangeNotifier {
   HomeShellController({required int initialTabIndex})
@@ -32,6 +33,7 @@ class HomeShellController extends ChangeNotifier {
       return;
     }
     await HapticFeedback.lightImpact();
+    SourceUiService.instance.cancelAll('ownerGone');
     _currentIndex = index;
     notifyListeners();
   }

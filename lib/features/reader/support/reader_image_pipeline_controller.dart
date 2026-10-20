@@ -11,8 +11,10 @@ import 'package:hazuki/features/reader/state/reader_image_content_state.dart';
 
 import 'reader_image_loader.dart';
 import 'reader_image_prefetch_scheduler.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class ReaderImagePipelineController {
+  final _sourceUi = SourceUiOwner();
   ReaderImagePipelineController({
     required ReaderImageContentState runtimeState,
     required ReaderImagePipelineState pipelineState,
@@ -192,16 +194,19 @@ class ReaderImagePipelineController {
   }
 
   Future<void> loadChapterImages({String trigger = 'manual'}) async {
+    _sourceUi.restart();
     _logEvent(
       'Reader chapter images loading started',
       source: 'reader_data',
       content: _logPayload({'trigger': trigger}),
     );
     try {
-      final images = await _sourceService.loadChapterImages(
-        comicId: _comicId,
-        epId: _epId,
-        sourceKey: _sourceKey,
+      final images = await _sourceUi.run(
+        () => _sourceService.loadChapterImages(
+          comicId: _comicId,
+          epId: _epId,
+          sourceKey: _sourceKey,
+        ),
       );
       if (!_isMounted()) {
         return;
@@ -436,6 +441,7 @@ class ReaderImagePipelineController {
   }
 
   void dispose() {
+    _sourceUi.dispose();
     _pipelineState.dispose();
   }
 

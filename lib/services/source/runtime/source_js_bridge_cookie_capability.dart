@@ -10,6 +10,7 @@ import 'source_cookie_store.dart';
 import 'source_html_bridge.dart';
 import '../plugins/source_plugin_models.dart';
 import '../plugins/source_plugin_localization.dart';
+import '../interaction/source_ui_service.dart';
 
 /// Handles the JavaScript host bridge and its cookie operations.
 class SourceJsBridgeCookieCapability {
@@ -50,6 +51,26 @@ class SourceJsBridgeCookieCapability {
     if (message is! Map) return null;
     final map = Map<String, dynamic>.from(message);
     final method = map['method']?.toString();
+    if (method != null && method.startsWith('ui_')) {
+      if (execution == null ||
+          runtimeId == null ||
+          handle.isDisposalRequested) {
+        if (method == 'ui_available') return false;
+        throw StateError('plugin_ui_unavailable');
+      }
+      return SourceUiService.instance.handle(
+        map,
+        execution,
+        runtimeId,
+        sourceMeta?.call()?.name ??
+            handle.runtime.sourceMeta?.name ??
+            handle.sourceKey,
+        translation:
+            sourceMeta?.call()?.translation ??
+            handle.runtime.sourceMeta?.translation ??
+            const {},
+      );
+    }
     dynamic result;
     if (handle.isDisposed) throw StateError('plugin_runtime_disposed');
     handle.loginCancellation?.check();

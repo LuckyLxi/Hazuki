@@ -11,6 +11,8 @@ import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
 import '../support/category_tag_navigation.dart';
 import 'discover_section_page.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class TagCategoryPage extends StatefulWidget {
   const TagCategoryPage({
@@ -75,6 +77,7 @@ class _TagCategoryGroupCard extends StatelessWidget {
 }
 
 class _TagCategoryPageState extends State<TagCategoryPage> {
+  final _sourceUi = SourceUiOwner();
   static const _loadTimeout = Duration(seconds: 25);
 
   SourceCategoryGateway get _sourceService => widget.categorySource;
@@ -118,6 +121,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
 
   @override
   void dispose() {
+    _sourceUi.dispose();
     _logTagCategoryEvent('Tag category session ended');
     if (_frameTimingsCallbackAttached) {
       WidgetsBinding.instance.removeTimingsCallback(_handleFrameTimings);
@@ -180,9 +184,12 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
 
   Future<List<CategoryTagGroup>> _loadTagGroups() {
     final timeoutMessage = AppLocalizations.of(context)!.tagCategoryLoadTimeout;
-    return _sourceService.loadCategoryTagGroups().timeout(
-      _loadTimeout,
-      onTimeout: () => throw Exception(timeoutMessage),
+    return _sourceUi.run(
+      () => SourceUiScope.timeout(
+        _sourceService.loadCategoryTagGroups(),
+        _loadTimeout,
+        onTimeout: () => throw Exception(timeoutMessage),
+      ),
     );
   }
 

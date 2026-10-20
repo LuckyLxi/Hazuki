@@ -3,6 +3,8 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
 import 'discover_section_page_state.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class DiscoverSectionPageController extends ChangeNotifier {
   static const _initialComicsFilterValue = '__hazuki_initial_comics__';
@@ -35,6 +37,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
   String Function(String)? _loadFailedMessage;
   final DiscoverSectionPageState _state = DiscoverSectionPageState();
   bool _disposed = false;
+  final _sourceUi = SourceUiOwner();
 
   List<ExploreComic> get comics => _state.comics;
   List<CategoryRankingOption> get sortOptions => _state.sortOptions;
@@ -91,8 +94,10 @@ class DiscoverSectionPageController extends ChangeNotifier {
     }
 
     try {
-      final optionGroups = await _sourceService
-          .loadCategoryOptionGroupsByViewMore(viewMoreUrl: url);
+      final optionGroups = await _sourceUi.run(
+        () =>
+            _sourceService.loadCategoryOptionGroupsByViewMore(viewMoreUrl: url),
+      );
       if (_disposed) return;
 
       final resolvedOptionGroups = _addInitialComicsFilter(optionGroups);
@@ -113,9 +118,10 @@ class DiscoverSectionPageController extends ChangeNotifier {
       _state.errorMessage = null;
       _notify();
 
-      await _loadPage();
-    } catch (_) {
+      if (!_sourceUi.wasCancelled) await _loadPage();
+    } catch (error) {
       if (_disposed) return;
+      if (isSourceUiCancellation(error) || _sourceUi.wasCancelled) return;
       _state.sortOptions = const <CategoryRankingOption>[];
       _state.sortOptionGroups = const <List<CategoryRankingOption>>[];
       _state.selectedSortValue = null;
@@ -201,6 +207,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
     final nextPage = _state.currentPage + 1;
     final showFooter = nextPage > 1 && _state.comics.isNotEmpty;
     final requestVersion = ++_state.requestVersion;
+    _sourceUi.restart();
 
     _state.loadingMore = true;
     _state.showLoadMoreFooter = showFooter;
@@ -208,11 +215,13 @@ class DiscoverSectionPageController extends ChangeNotifier {
     _notify();
 
     try {
-      final result = await _sourceService.loadCategoryComicsByViewMore(
-        viewMoreUrl: url,
-        page: nextPage,
-        order: _state.selectedSortValue ?? '',
-        orders: _state.selectedSortValues,
+      final result = await _sourceUi.run(
+        () => _sourceService.loadCategoryComicsByViewMore(
+          viewMoreUrl: url,
+          page: nextPage,
+          order: _state.selectedSortValue ?? '',
+          orders: _state.selectedSortValues,
+        ),
       );
 
       if (_disposed || requestVersion != _state.requestVersion) return;
@@ -239,7 +248,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
       _notify();
     } catch (e) {
       if (_disposed || requestVersion != _state.requestVersion) return;
-      _state.errorMessage = failedMsg('$e');
+      _state.errorMessage = isSourceUiCancellation(e) ? null : failedMsg('$e');
       _notify();
     } finally {
       if (!_disposed && requestVersion == _state.requestVersion) {
@@ -327,6 +336,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _sourceUi.dispose();
     _disposed = true;
     super.dispose();
   }

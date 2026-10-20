@@ -5,6 +5,8 @@ import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class HomeProfileController extends ChangeNotifier {
   HomeProfileController({required SourceHomeGateway sourceService})
@@ -13,6 +15,7 @@ class HomeProfileController extends ChangeNotifier {
   final SourceHomeGateway _sourceService;
 
   bool _disposed = false;
+  final _sourceUi = SourceUiOwner();
   String _username = '';
   String? _avatarUrl;
   String _firstUseText = '';
@@ -222,7 +225,12 @@ class HomeProfileController extends ChangeNotifier {
     _checkInBusy = true;
     _notify();
     try {
-      final result = await _sourceService.performDailyCheckIn();
+      _sourceUi.restart();
+      final result = triggeredAutomatically
+          ? await SourceUiScope.withoutInteraction(
+              _sourceService.performDailyCheckIn,
+            )
+          : await _sourceUi.run(_sourceService.performDailyCheckIn);
       if (!context.mounted) {
         return;
       }
@@ -239,6 +247,7 @@ class HomeProfileController extends ChangeNotifier {
           : l10n(context).homeCheckInAlreadyDone;
       await showHazukiPrompt(context, promptMessage);
     } catch (error) {
+      if (isSourceUiCancellation(error)) return;
       if (!context.mounted) {
         return;
       }
@@ -306,6 +315,7 @@ class HomeProfileController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _sourceUi.dispose();
     _disposed = true;
     _profileSyncRevision++;
     super.dispose();

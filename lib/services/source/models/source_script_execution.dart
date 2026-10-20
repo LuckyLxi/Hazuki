@@ -10,6 +10,7 @@ class SourceScriptExecution {
     this.ownerId,
     this.groupId,
     this.requestSequence,
+    this.uiScopeId,
   });
   factory SourceScriptExecution.fromTask(SourceTaskSnapshot task) =>
       SourceScriptExecution.fromMap(task.toJson());
@@ -22,6 +23,7 @@ class SourceScriptExecution {
         ownerId: value['ownerId'] as String?,
         groupId: value['groupId'] as String?,
         requestSequence: value['requestSequence'] as int?,
+        uiScopeId: value['uiScopeId'] as String?,
       );
   final String taskId;
   final String pluginId;
@@ -30,6 +32,17 @@ class SourceScriptExecution {
   final String? ownerId;
   final String? groupId;
   final int? requestSequence;
+  final String? uiScopeId;
+  SourceScriptExecution withUiScope(String? id) => SourceScriptExecution(
+    taskId: taskId,
+    pluginId: pluginId,
+    method: method,
+    pluginVersion: pluginVersion,
+    ownerId: ownerId,
+    groupId: groupId,
+    requestSequence: requestSequence,
+    uiScopeId: id,
+  );
   Map<String, Object?> toMap() => {
     'taskId': taskId,
     'pluginId': pluginId,
@@ -38,5 +51,6 @@ class SourceScriptExecution {
     'ownerId': ownerId,
     'groupId': groupId,
     'requestSequence': requestSequence,
+    if (uiScopeId != null) 'uiScopeId': uiScopeId,
   };
 }

@@ -9,6 +9,7 @@ import 'source_runtime_handle.dart';
 import 'source_runtime_registry.dart';
 import 'source_secure_session_storage.dart';
 import '../../logging/app_log_store.dart';
+import '../interaction/source_ui_service.dart';
 
 /// Owns source selection and the lifetime of per-source runtime handles.
 ///
@@ -123,6 +124,9 @@ class SourceRuntimeHost extends ChangeNotifier {
   }
 
   Future<void> activateSource(String sourceKey) {
+    if (normalize(sourceKey) != activeSourceKey) {
+      SourceUiService.instance.cancelPlugin(activeSourceKey, 'sourceChanged');
+    }
     return _coordinator.activate(
       sourceKey,
       persistSelection: (nextHandle) async {
@@ -136,6 +140,15 @@ class SourceRuntimeHost extends ChangeNotifier {
   }
 
   Future<void> replaceCatalog(List<SourceCatalogEntry> catalog) async {
+    final enabled = catalog.map((source) => source.normalizedKey).toSet();
+    for (final old in _catalog) {
+      if (!enabled.contains(old.normalizedKey)) {
+        SourceUiService.instance.cancelPlugin(
+          old.normalizedKey,
+          'runtimeDisposed',
+        );
+      }
+    }
     await _coordinator.replaceCatalog(
       catalog,
       beforeReplace: (nextSourceKey) async {

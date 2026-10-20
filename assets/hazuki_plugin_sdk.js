@@ -64,6 +64,72 @@ return Object.freeze({
     log: (message, level = 'info') => sendMessage({method: 'log', level, title: 'Plugin', content: message}),
     delay: ms => sendMessage({method: 'delay', time: ms}),
     error(code, message) { return new Error(`HAZUKI_${code}: ${message}`); },
+    ui: (() => {
+        class PluginDialogCancelledError extends Error {
+            constructor(reason = 'user') {
+                super(`plugin_ui_cancelled:${reason}`);
+                this.name = 'PluginDialogCancelledError';
+                this.code = 'plugin_ui_cancelled';
+                this.reason = reason;
+            }
+        }
+        async function simpleDialog(kind, options) {
+            const content = [];
+            if (options.message != null) content.push({id: 'message', type: 'text', text: options.message});
+            if (kind === 'prompt') {
+                const {label, initialValue, placeholder, obscure, keyboardType, required, maxLength} = options;
+                content.push({id: 'value', type: 'input', label, initialValue, placeholder,
+                    obscure, keyboardType, required, maxLength});
+            }
+            const buttons = kind === 'alert' ? [] : [{id: 'cancel',
+                text: options.cancelText ?? {zh_CN: '取消', en_US: 'Cancel'}}];
+            buttons.push({id: 'confirm', text: options.confirmText ?? {zh_CN: '确定', en_US: 'OK'},
+                role: 'primary', validate: true});
+            const dialog = await Hazuki.ui.openDialog({title: options.title, content, buttons});
+            try {
+                const event = await dialog.nextEvent();
+                if (event.type === 'closed') throw new PluginDialogCancelledError(event.reason);
+                if (kind === 'alert') return;
+                if (kind === 'confirm') return event.id === 'confirm';
+                return event.id === 'confirm' ? event.values.value : null;
+            } finally {
+                await dialog.close();
+            }
+        }
+        return Object.freeze({
+            PluginDialogCancelledError,
+            isAvailable: async () => sendMessage({method: 'ui_available'}),
+            alert: options => simpleDialog('alert', options),
+            confirm: options => simpleDialog('confirm', options),
+            prompt: options => simpleDialog('prompt', options),
+            async openDialog(options) {
+                const id = await sendMessage({method: 'ui_open', options});
+                let terminal;
+                return Object.freeze({
+                    async nextEvent() {
+                        if (terminal) return terminal;
+                        const event = await sendMessage({method: 'ui_next_event', id});
+                        if (event.type === 'closed') terminal = event;
+                        return event;
+                    },
+                    async update(patch) {
+                        if (terminal) throw new Error('plugin_ui_closed');
+                        await sendMessage({method: 'ui_update', id, patch});
+                    },
+                    async close() {
+                        if (terminal) return;
+                        try {
+                            await sendMessage({method: 'ui_close', id});
+                        } catch (error) {
+                            if (!String(error).includes('plugin_ui_unavailable') &&
+                                !String(error).includes('plugin_ui_cancelled')) throw error;
+                        }
+                        terminal = {type: 'closed', reason: 'plugin'};
+                    },
+                });
+            },
+        });
+    })(),
 });
 })();
 
