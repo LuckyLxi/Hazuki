@@ -21,7 +21,6 @@ void main() {
           {'id': 'copyComicId', 'location': 'comicDetailInfo'},
         ],
         'enrichMissingTags': true,
-        'downloadMultiSelect': true,
       },
     );
     final registry = SourceRuntimeRegistry(
@@ -42,11 +41,6 @@ void main() {
           home: Builder(
             builder: (context) => Column(
               children: [
-                if (sourceDownloadMultiSelectEnabled(
-                  'custom',
-                  context: context,
-                ))
-                  const Text('Download multi-select'),
                 if (sourceCommentsEnabled('custom', context: context))
                   const Text('Comments entry'),
                 const SourceComicTags(sourceKey: 'custom', tags: ['Saved tag']),
@@ -67,13 +61,11 @@ void main() {
     expect(find.text('Saved tag'), findsOneWidget);
     expect(find.text('Plugin action'), findsOneWidget);
     expect(find.text('Comments entry'), findsOneWidget);
-    expect(find.text('Download multi-select'), findsOneWidget);
     registry.replaceCatalog([]);
     await tester.pump();
     expect(find.text('Saved tag'), findsOneWidget);
     expect(find.text('Plugin action'), findsNothing);
     expect(find.text('Comments entry'), findsNothing);
-    expect(find.text('Download multi-select'), findsNothing);
     expect(registry.displayPresentationFor('custom')['showComments'], isNull);
     expect(registry.presentationFor('custom'), isEmpty);
     expect(

@@ -90,7 +90,7 @@ void main() {
   });
   for (final multiSelect in [null, false, true]) {
     testWidgets(
-      'download confirmation enforces its own source selection policy ($multiSelect)',
+      'download confirmation queues every selected chapter regardless of legacy declaration ($multiSelect)',
       (tester) async {
         final facade = _DownloadSelectionDetailFacade();
         await tester.pumpWidget(
@@ -132,14 +132,14 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
         await tester.pumpAndSettle();
-        // Even an outdated/custom panel callback cannot bypass the policy.
+        // Legacy plugin metadata must not truncate a batch download.
         tester
             .widget<ComicDetailChaptersPanel>(
               find.byType(ComicDetailChaptersPanel),
             )
             .onDownloadConfirm({'2', '1'});
         await tester.pumpAndSettle();
-        expect(facade.queued, multiSelect == true ? ['1', '2'] : ['2']);
+        expect(facade.queued, ['1', '2']);
         expect(tester.takeException(), isNull);
         await tester.pump(const Duration(seconds: 3));
         await tester.pumpAndSettle();

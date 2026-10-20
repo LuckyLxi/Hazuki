@@ -6,7 +6,6 @@ import 'manga_download_models.dart';
 import 'manga_download_state.dart';
 import 'manga_download_files.dart';
 import 'manga_download_storage_support.dart';
-import 'manga_chapter_archive_downloader.dart';
 
 class MangaDownloadQueueExecutor {
   MangaDownloadQueueExecutor({
@@ -60,7 +59,6 @@ class MangaDownloadQueueExecutor {
   }
 
   Future<void> _runTask(MangaDownloadTask selected) async {
-    var usingArchive = false;
     var task = selected.copyWith(
       status: MangaDownloadTaskStatus.downloading,
       clearErrorMessage: true,
@@ -148,17 +146,11 @@ class MangaDownloadQueueExecutor {
           continue;
         }
 
-        final archiveGateway = sourceReader is SourceChapterArchiveGateway
-            ? sourceReader as SourceChapterArchiveGateway
-            : null;
-        // Treat callback failures as failures even before a request is returned.
-        usingArchive = archiveGateway != null;
-        final archive = await archiveGateway?.loadChapterArchive(
+        final imageUrls = await sourceReader.loadChapterImages(
           comicId: task.comicId,
           epId: target.epId,
           sourceKey: task.sourceKey,
         );
-        usingArchive = archive != null;
         if (_state.shouldAbortTask(task.storageKey)) {
           return;
         }
@@ -168,92 +160,63 @@ class MangaDownloadQueueExecutor {
         );
 
         final savedPaths = <String>[];
-        if (archive != null) {
-          task = task.copyWith(
-            currentChapterEpId: target.epId,
-            currentChapterTitle: target.title,
-            currentImageIndex: 0,
-            currentImageTotal: 0,
+        for (var i = 0; i < imageUrls.length; i++) {
+          final existingPath = await _files.findExistingImagePath(
+            chapterDir,
+            i + 1,
           );
-          if (!_state.updateTask(task.storageKey, task)) return;
-          await _flushState();
-          savedPaths.addAll(
-            await MangaChapterArchiveDownloader().download(
-              gateway: archiveGateway!,
-              request: archive,
-              chapterDir: chapterDir,
-              sourceKey: task.sourceKey,
-              shouldCancel: () =>
-                  _state.shouldAbortTask(task.storageKey) ||
-                  _shouldSuspendDownloads(),
-            ),
-          );
-          if (_state.shouldAbortTask(task.storageKey)) return;
-        } else {
-          final imageUrls = await sourceReader.loadChapterImages(
+          if (existingPath != null) {
+            savedPaths.add(existingPath);
+          }
+        }
+        task = task.copyWith(
+          currentChapterEpId: target.epId,
+          currentChapterTitle: target.title,
+          currentImageIndex: savedPaths.length,
+          currentImageTotal: imageUrls.length,
+        );
+        if (!_state.updateTask(task.storageKey, task)) {
+          return;
+        }
+        await _flushState();
+
+        for (var i = savedPaths.length; i < imageUrls.length; i++) {
+          if (_state.shouldAbortTask(task.storageKey)) {
+            return;
+          }
+          if (_shouldSuspendDownloads()) {
+            await _requeueTaskForRetry(
+              task,
+              reason: 'downloads_suspended_before_image',
+            );
+            return;
+          }
+          final imageUrl = imageUrls[i];
+          final prepared = await sourceReader.prepareChapterImageData(
+            imageUrl,
             comicId: task.comicId,
             epId: target.epId,
             sourceKey: task.sourceKey,
           );
-          if (_state.shouldAbortTask(task.storageKey)) return;
-          for (var i = 0; i < imageUrls.length; i++) {
-            final existingPath = await _files.findExistingImagePath(
-              chapterDir,
-              i + 1,
-            );
-            if (existingPath != null) {
-              savedPaths.add(existingPath);
-            }
+          if (_state.shouldAbortTask(task.storageKey)) {
+            return;
           }
+          final path = await _files.writeChapterImage(
+            chapterDir,
+            i + 1,
+            prepared,
+          );
+          savedPaths.add(path);
           task = task.copyWith(
             currentChapterEpId: target.epId,
             currentChapterTitle: target.title,
-            currentImageIndex: savedPaths.length,
+            currentImageIndex: i + 1,
             currentImageTotal: imageUrls.length,
           );
           if (!_state.updateTask(task.storageKey, task)) {
             return;
           }
           await _flushState();
-
-          for (var i = savedPaths.length; i < imageUrls.length; i++) {
-            if (_state.shouldAbortTask(task.storageKey)) {
-              return;
-            }
-            if (_shouldSuspendDownloads()) {
-              await _requeueTaskForRetry(
-                task,
-                reason: 'downloads_suspended_before_image',
-              );
-              return;
-            }
-            final imageUrl = imageUrls[i];
-            final prepared = await sourceReader.prepareChapterImageData(
-              imageUrl,
-              comicId: task.comicId,
-              epId: target.epId,
-              sourceKey: task.sourceKey,
-            );
-            if (_state.shouldAbortTask(task.storageKey)) {
-              return;
-            }
-            final path = await _files.writeChapterImage(
-              chapterDir,
-              i + 1,
-              prepared,
-            );
-            savedPaths.add(path);
-            task = task.copyWith(
-              currentChapterEpId: target.epId,
-              currentChapterTitle: target.title,
-              currentImageIndex: i + 1,
-              currentImageTotal: imageUrls.length,
-            );
-            if (!_state.updateTask(task.storageKey, task)) {
-              return;
-            }
-            await _flushState();
-          }
         }
 
         downloadedChapters.add(
@@ -315,18 +278,7 @@ class MangaDownloadQueueExecutor {
       await _files.writeMetadataFile(comicDir, downloadedComic);
       await _flushState();
     } catch (e) {
-      if (e is SourceChapterArchiveCancelled) {
-        if (_state.shouldAbortTask(task.storageKey)) return;
-        if (_shouldSuspendDownloads()) {
-          await _requeueTaskForRetry(
-            task,
-            reason: 'downloads_suspended_during_archive',
-          );
-          return;
-        }
-      }
-      if (!usingArchive &&
-          _isTransientDownloadError(e) &&
+      if (_isTransientDownloadError(e) &&
           _shouldRecoverTransientNetworkError()) {
         await _requeueTaskForRetry(
           task,
@@ -353,9 +305,7 @@ class MangaDownloadQueueExecutor {
           clearCurrentChapterTitle: true,
           currentImageIndex: 0,
           currentImageTotal: 0,
-          errorMessage: usingArchive && e is! MangaArchiveExtractionFailure
-              ? '$mangaArchiveDownloadErrorPrefix$e'
-              : e.toString(),
+          errorMessage: e.toString(),
           retryCount: 0,
         ),
       );

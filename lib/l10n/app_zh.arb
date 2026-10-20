@@ -1,8 +1,5 @@
 {
   "@@locale": "zh",
-  "downloadsArchiveExtractionStatus": "解压失败",
-  "downloadsArchiveDownloadStatus": "下载失败",
-  "downloadsArchiveExtractionFailed": "压缩包解压失败，请使用文件管理器手动解压：{path}",
   "appTitle": "Hazuki",
   "settingsTitle": "设置",
   "settingsCacheTitle": "存储",

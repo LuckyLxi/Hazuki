@@ -5,100 +5,8 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/comic_detail_models.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_registry.dart';
-import 'package:hazuki/shared/source_presentation.dart';
 
 void main() {
-  for (final declaration in [null, false]) {
-    testWidgets('online downloads default to single selection ($declaration)', (
-      tester,
-    ) async {
-      Set<String>? selected;
-      await _openPanel(
-        tester,
-        downloadMultiSelect: declaration,
-        onDownloadConfirm: (value) => selected = value,
-      );
-      await tester.tap(find.text('Download'));
-      await tester.pumpAndSettle();
-      expect(find.text('Select all'), findsNothing);
-      await tester.tap(find.text('Chapter 1'));
-      await tester.tap(find.text('Chapter 2'));
-      await tester.pumpAndSettle();
-      expect(find.text('1 / 3'), findsOneWidget);
-      expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
-      await tester.tap(find.byType(FilledButton));
-      expect(selected, {'ep-2'});
-      await tester.tap(find.text('Chapter 2'));
-      await tester.pumpAndSettle();
-      expect(find.text('0 / 3'), findsOneWidget);
-      expect(
-        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-        isNull,
-      );
-    });
-  }
-
-  testWidgets('single selection replaces a chapter in another group', (
-    tester,
-  ) async {
-    Set<String>? selected;
-    await _openPanel(
-      tester,
-      chapters: {'a': 'Chapter A', 'b': 'Chapter B'},
-      chapterGroups: const [
-        ComicChapterGroup(
-          id: 'a',
-          title: 'Serial',
-          chapters: {'a': 'Chapter A'},
-        ),
-        ComicChapterGroup(
-          id: 'b',
-          title: 'Other',
-          chapters: {'b': 'Chapter B'},
-        ),
-      ],
-      onDownloadConfirm: (value) => selected = value,
-    );
-    await tester.tap(find.text('Download'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Chapter A'));
-    await tester.tap(find.byType(HazukiFrostedDropdown<String>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Other').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Chapter B'));
-    await tester.tap(find.byType(FilledButton));
-    expect(selected, {'b'});
-  });
-
-  testWidgets(
-    'revoking multi-select clears extra selections in an open panel',
-    (tester) async {
-      Set<String>? selected;
-      final registry = await _openPanel(
-        tester,
-        downloadMultiSelect: true,
-        onDownloadConfirm: (value) => selected = value,
-      );
-      await tester.tap(find.text('Download'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Select all'));
-      await tester.pumpAndSettle();
-      expect(find.text('3 / 3'), findsOneWidget);
-      registry.definitionFor('sample').presentation['downloadMultiSelect'] =
-          false;
-      registry.notifyChanged();
-      await tester.pumpAndSettle();
-      expect(find.text('1 / 3'), findsOneWidget);
-      expect(find.text('Select all'), findsNothing);
-      expect(find.text('Clear all'), findsNothing);
-      await tester.tap(find.byType(FilledButton));
-      expect(selected, {'ep-1'});
-    },
-  );
-
   testWidgets(
     'group switching preserves download selections and global chapter indices',
     (tester) async {
@@ -118,7 +26,6 @@ void main() {
       Set<String>? selected;
       await _openPanel(
         tester,
-        downloadMultiSelect: true,
         chapters: const {'10': 'Chapter A', '2': 'Chapter B', '1': 'Chapter C'},
         chapterGroups: groups,
         onChapterTap: (_, _, index) => taps.add(index),
@@ -167,11 +74,7 @@ void main() {
     tester,
   ) async {
     final downloads = <Set<String>>[];
-    await _openPanel(
-      tester,
-      onDownloadConfirm: downloads.add,
-      downloadMultiSelect: true,
-    );
+    await _openPanel(tester, onDownloadConfirm: downloads.add);
     await tester.tap(find.text('Download'));
     await tester.pumpAndSettle();
 
@@ -190,6 +93,17 @@ void main() {
       <String>{'ep-2'},
     ]);
 
+    await tester.tap(find.text('Chapter 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 / 3'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_rounded), findsNWidgets(2));
+    await tester.tap(find.widgetWithIcon(FilledButton, Icons.download_rounded));
+    expect(downloads.last, {'ep-1', 'ep-2'});
+
+    await tester.tap(find.text('Chapter 2'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 / 3'), findsOneWidget);
+
     await tester.tap(find.text('Select all'));
     await tester.pumpAndSettle();
     expect(find.text('3 / 3'), findsOneWidget);
@@ -197,7 +111,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(confirmButton().onPressed, isNull);
     // The callback receives a snapshot, unaffected by subsequent selection.
-    expect(downloads.single, <String>{'ep-2'});
+    expect(downloads.first, <String>{'ep-2'});
     expect(tester.takeException(), isNull);
   });
 
@@ -267,7 +181,6 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       await _openPanel(
         tester,
-        downloadMultiSelect: true,
         textScale: scenario.scale,
         dark: scenario.dark,
         chapters: {
@@ -309,9 +222,8 @@ void main() {
   });
 }
 
-Future<SourceRuntimeRegistry> _openPanel(
+Future<void> _openPanel(
   WidgetTester tester, {
-  bool? downloadMultiSelect,
   List<ComicChapterGroup> chapterGroups = const [],
   Map<String, String> chapters = const {
     'ep-1': 'Chapter 1',
@@ -324,23 +236,6 @@ Future<SourceRuntimeRegistry> _openPanel(
   bool dark = false,
   bool disableAnimations = false,
 }) async {
-  final entry = SourceCatalogEntry(
-    key: 'sample',
-    name: 'Sample',
-    fileName: 'sample.js',
-    presentation: {'downloadMultiSelect': ?downloadMultiSelect},
-  );
-  final registry = SourceRuntimeRegistry(
-    allowedSources: [entry],
-    activeSourceKey: () => 'sample',
-    definitionFor: (_) => entry,
-    loadActiveSourcePreference: () async {},
-    activateSource: (_) async {},
-    ensureInitialized: ({sourceKey}) async {},
-    currentAccountForSource: (_) => null,
-    isLoggedForSource: (_) => false,
-  );
-  addTearDown(registry.dispose);
   await tester.pumpWidget(
     MaterialApp(
       theme: ThemeData(
@@ -359,7 +254,7 @@ Future<SourceRuntimeRegistry> _openPanel(
           padding: const EdgeInsets.only(top: 24, bottom: 24),
           disableAnimations: disableAnimations,
         ),
-        child: SourcePresentationScope(registry: registry, child: child!),
+        child: child!,
       ),
       home: Scaffold(
         body: Builder(
@@ -372,7 +267,6 @@ Future<SourceRuntimeRegistry> _openPanel(
               builder: (context) => ComicDetailChaptersPanel(
                 details: ComicDetailsData(
                   id: 'comic',
-                  sourceKey: 'sample',
                   title: 'A comic title',
                   subTitle: '',
                   cover: '',
@@ -398,5 +292,4 @@ Future<SourceRuntimeRegistry> _openPanel(
   );
   await tester.tap(find.text('Open'));
   await tester.pumpAndSettle();
-  return registry;
 }

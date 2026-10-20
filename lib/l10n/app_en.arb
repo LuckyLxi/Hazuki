@@ -1,11 +1,5 @@
 {
   "@@locale": "en",
-  "downloadsArchiveExtractionStatus": "Unpack failed",
-  "downloadsArchiveDownloadStatus": "Download failed",
-  "downloadsArchiveExtractionFailed": "Archive extraction failed. Use a file manager to extract it manually: {path}",
-  "@downloadsArchiveExtractionFailed": {
-    "placeholders": {"path": {"type": "String"}}
-  },
   "appTitle": "Hazuki",
   "settingsTitle": "Settings",
   "settingsCacheTitle": "Storage",

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:archive/archive.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -86,106 +85,6 @@ void main() {
         'ep-1',
         'ep-2',
       ]);
-    },
-  );
-
-  test(
-    'declared archives populate offline chapters without loading page URLs',
-    () async {
-      reader.archive = const SourceChapterArchive(
-        url: 'https://example.com/a.zip',
-        fileName: 'chapter.zip',
-      );
-      reader.archiveBytes = ZipEncoder().encode(
-        Archive()..addFile(ArchiveFile.bytes('pages/1.jpg', [7, 8, 9])),
-      );
-      state.restoreTasks([_task()]);
-      await queue.processQueue();
-      expect(state.tasks, isEmpty);
-      expect(reader.chapters, isEmpty);
-      expect(reader.images, isEmpty);
-      final chapter = state.downloadedComics.single.chapters.single;
-      expect(chapter.epId, 'ep-1');
-      expect(await File(chapter.imagePaths.single).readAsBytes(), [7, 8, 9]);
-      expect(reader.archiveScopes, ['jm', 'jm']);
-    },
-  );
-
-  test(
-    'archive callback and transfer errors fail without fallback or automatic retry',
-    () async {
-      recoverTransient = true;
-      for (final duringRequest in [true, false]) {
-        reader.archive = const SourceChapterArchive(
-          url: 'https://example.com/a.zip',
-        );
-        reader.archiveRequestError = duringRequest
-            ? const SocketException('offline')
-            : null;
-        reader.archiveTransferError = duringRequest
-            ? null
-            : const SocketException('offline');
-        state.restoreTasks([_task()]);
-        await queue.processQueue();
-        expect(state.tasks.single.status, MangaDownloadTaskStatus.failed);
-        expect(state.tasks.single.completedEpIds, isEmpty);
-        expect(state.downloadedComics, isEmpty);
-        expect(reader.chapters, isEmpty);
-        expect(reader.images, isEmpty);
-      }
-    },
-  );
-
-  test(
-    'extraction failure keeps the package and an actionable error path',
-    () async {
-      reader.archive = const SourceChapterArchive(
-        url: 'https://example.com/a.zip',
-        fileName: 'chapter.zip',
-      );
-      reader.archiveBytes = [1, 2, 3];
-      state.restoreTasks([_task()]);
-      await queue.processQueue();
-      final failed = state.tasks.single;
-      expect(failed.status, MangaDownloadTaskStatus.failed);
-      expect(
-        failed.errorMessage,
-        startsWith(mangaArchiveExtractionErrorPrefix),
-      );
-      expect(
-        await File(
-          failed.errorMessage!.substring(
-            mangaArchiveExtractionErrorPrefix.length,
-          ),
-        ).readAsBytes(),
-        [1, 2, 3],
-      );
-      expect(state.downloadedComics, isEmpty);
-      expect(reader.chapters, isEmpty);
-    },
-  );
-
-  test(
-    'pause during archive transfer preserves pause and allows retry',
-    () async {
-      final task = _task();
-      reader.archive = const SourceChapterArchive(
-        url: 'https://example.com/a.zip',
-        fileName: 'chapter.zip',
-      );
-      reader.archiveBytes = ZipEncoder().encode(
-        Archive()..addFile(ArchiveFile.bytes('1.jpg', [1])),
-      );
-      reader.afterArchiveTransfer = () => state.pauseTask(task.storageKey);
-      state.restoreTasks([task]);
-      await queue.processQueue();
-      expect(state.tasks.single.status, MangaDownloadTaskStatus.paused);
-      expect(state.downloadedComics, isEmpty);
-      reader.afterArchiveTransfer = null;
-      state.resumeTask(task.storageKey);
-      await queue.processQueue();
-      expect(state.tasks, isEmpty);
-      expect(state.downloadedComics.single.chapters, hasLength(1));
     },
   );
 
@@ -477,39 +376,7 @@ class _Access extends MangaDownloadAccess {
   Future<Directory> ensureRootDir() async => root;
 }
 
-class _Reader extends Fake
-    implements SourceReaderGateway, SourceChapterArchiveGateway {
-  SourceChapterArchive? archive;
-  Object? archiveRequestError;
-  Object? archiveTransferError;
-  List<int> archiveBytes = [];
-  final archiveScopes = <String>[];
-  void Function()? afterArchiveTransfer;
-
-  @override
-  Future<SourceChapterArchive?> loadChapterArchive({
-    required String comicId,
-    required String epId,
-    String sourceKey = '',
-  }) async {
-    archiveScopes.add(sourceKey);
-    if (archiveRequestError != null) throw archiveRequestError!;
-    return archive;
-  }
-
-  @override
-  Future<void> downloadChapterArchive(
-    SourceChapterArchive request,
-    File destination, {
-    required String sourceKey,
-    required bool Function() shouldCancel,
-  }) async {
-    archiveScopes.add(sourceKey);
-    if (archiveTransferError != null) throw archiveTransferError!;
-    await destination.writeAsBytes(archiveBytes);
-    afterArchiveTransfer?.call();
-  }
-
+class _Reader extends Fake implements SourceReaderGateway {
   Future<List<String>> Function(String epId)? load;
   Future<PreparedChapterImageData> Function(String url)? prepare;
   final chapters = <String>[];

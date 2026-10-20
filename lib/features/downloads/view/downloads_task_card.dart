@@ -170,7 +170,7 @@ class DownloadsOngoingTaskCard extends StatelessWidget {
                 task.errorMessage?.trim().isNotEmpty == true) ...[
               const SizedBox(height: 8),
               Text(
-                _errorMessage(context),
+                task.errorMessage!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -237,30 +237,11 @@ class DownloadsOngoingTaskCard extends StatelessWidget {
         foreground: colorScheme.onSecondaryContainer,
       ),
       MangaDownloadTaskStatus.failed => _TaskStatusMeta(
-        label:
-            task.errorMessage?.startsWith(mangaArchiveExtractionErrorPrefix) ==
-                true
-            ? l10n(context).downloadsArchiveExtractionStatus
-            : task.errorMessage?.startsWith(mangaArchiveDownloadErrorPrefix) ==
-                  true
-            ? l10n(context).downloadsArchiveDownloadStatus
-            : l10n(context).downloadsStatusFailed(_errorMessage(context)),
+        label: l10n(context).downloadsStatusFailed(task.errorMessage ?? ''),
         background: colorScheme.errorContainer,
         foreground: colorScheme.error,
       ),
     };
-  }
-
-  String _errorMessage(BuildContext context) {
-    final message = task.errorMessage ?? '';
-    if (message.startsWith(mangaArchiveDownloadErrorPrefix)) {
-      return message.substring(mangaArchiveDownloadErrorPrefix.length);
-    }
-    return message.startsWith(mangaArchiveExtractionErrorPrefix)
-        ? l10n(context).downloadsArchiveExtractionFailed(
-            message.substring(mangaArchiveExtractionErrorPrefix.length),
-          )
-        : message;
   }
 }
 

@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/chapter_title_resolver.dart';
-import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/shared/category_tag_navigation.dart';
@@ -510,18 +509,10 @@ class ComicDetailActionsController extends ChangeNotifier {
     required Set<String> selectedEpIds,
   }) async {
     if (selectedEpIds.isEmpty) return;
-    final selectedIds =
-        sourceDownloadMultiSelectEnabled(
-          details.sourceKey,
-          context: context,
-          listen: false,
-        )
-        ? selectedEpIds
-        : selectedEpIds.take(1).toSet();
     final targets = <MangaChapterDownloadTarget>[];
     for (var i = 0; i < details.chapters.length; i++) {
       final entry = details.chapters.entries.elementAt(i);
-      if (selectedIds.contains(entry.key)) {
+      if (selectedEpIds.contains(entry.key)) {
         targets.add(
           MangaChapterDownloadTarget(
             epId: entry.key,

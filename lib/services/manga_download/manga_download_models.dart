@@ -1,8 +1,5 @@
 import '../../models/hazuki_models.dart';
 
-const mangaArchiveExtractionErrorPrefix = 'chapter_archive_extraction_failed:';
-const mangaArchiveDownloadErrorPrefix = 'chapter_archive_download_failed:';
-
 enum MangaDownloadTaskStatus { queued, downloading, paused, failed }
 
 enum MangaDownloadEnqueueResult { queued, alreadyQueued, nothingToQueue }

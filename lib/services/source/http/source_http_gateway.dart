@@ -40,7 +40,6 @@ class SourceHttpGateway {
     Object? data,
     Options? options,
     ProgressCallback? onReceiveProgress,
-    CancelToken? cancelToken,
     HazukiNetworkRetryPolicy retryPolicy =
         HazukiNetworkRetryPolicy.conservative,
     bool withCookies = true,
@@ -71,7 +70,6 @@ class SourceHttpGateway {
         data: currentData,
         options: currentOptions,
         onReceiveProgress: onReceiveProgress,
-        cancelToken: cancelToken,
         retryPolicy: retryPolicy,
       );
       final status = response.statusCode;
