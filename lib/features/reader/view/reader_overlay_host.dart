@@ -118,8 +118,8 @@ class ReaderOverlayHost extends StatelessWidget {
       ),
     ];
     // Sliding controls must not repaint the comic or the surrounding scaffold.
-    // Keep the glass live: repaint boundaries retain display lists, rather than
-    // taking a background snapshot that would become stale on page changes.
+    // Windows shares a repaint-driven content texture between the glass
+    // controls; page changes update it without repainting the comic for slides.
     final content = RepaintBoundary(child: child);
     final controls = Positioned.fill(
       child: RepaintBoundary(child: Stack(children: overlays)),
@@ -132,6 +132,7 @@ class ReaderOverlayHost extends StatelessWidget {
     return GlassScaffold(
       backgroundColor: readerTheme.colorScheme.surface,
       enableBackgroundSampling: false,
+      enableBackdropRefraction: true,
       resizeToAvoidBottomInset: false,
       edgeFade: false,
       body: content,

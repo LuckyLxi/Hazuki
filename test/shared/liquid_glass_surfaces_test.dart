@@ -323,11 +323,16 @@ void main() {
           }
           // Tint should identify the theme without masking the backdrop.
           expect((body - backdrop).abs(), lessThan(0.09));
-          // A narrow reflection and inset shade give the edge optical depth.
+          // The circular material has a fine lip and an inner light bloom;
+          // the old standard material uses a wider dark inset bevel.
           final lip = luminanceAt(180, 58);
           final bevel = luminanceAt(180, 60);
           expect(lip, greaterThan(bevel + 0.02));
-          expect(bevel, lessThan(body - 0.01));
+          if (Platform.isWindows) {
+            expect(bevel, greaterThan(body + 0.005));
+          } else {
+            expect(bevel, lessThan(body - 0.01));
+          }
         } finally {
           snapshot.dispose();
         }

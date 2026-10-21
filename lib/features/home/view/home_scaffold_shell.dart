@@ -575,41 +575,49 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                         ),
                       ],
                     );
-                    return Scaffold(
-                      key: scaffoldKey,
-                      extendBody: true,
-                      appBar: PreferredSize(
-                        preferredSize: appBar.preferredSize,
-                        child: RepaintBoundary(
-                          key: const ValueKey('home-app-bar-repaint-boundary'),
-                          child: HomeDrawerSnapshot(
-                            animation: _profileDrawerController,
-                            enabled: !Platform.isWindows,
-                            // The app bar normally composites over Scaffold's
-                            // background. Include it in the isolated raster
-                            // so its translucent glass keeps the same tint.
-                            child: ColoredBox(
-                              color: Theme.of(context).scaffoldBackgroundColor,
-                              child: appBar,
+                    return HazukiLiquidGlass.backdropScope(
+                      child: Scaffold(
+                        key: scaffoldKey,
+                        extendBody: true,
+                        appBar: PreferredSize(
+                          preferredSize: appBar.preferredSize,
+                          child: RepaintBoundary(
+                            key: const ValueKey(
+                              'home-app-bar-repaint-boundary',
+                            ),
+                            child: HomeDrawerSnapshot(
+                              animation: _profileDrawerController,
+                              enabled: !Platform.isWindows,
+                              // The app bar normally composites over Scaffold's
+                              // background. Include it in the isolated raster
+                              // so its translucent glass keeps the same tint.
+                              child: ColoredBox(
+                                color: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                child: appBar,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      drawerEnableOpenDragGesture: false,
-                      drawer: null,
-                      // Cache the body and header separately. A full-page
-                      // snapshot would rasterize the cached header again and
-                      // allocate a second texture containing the same pixels.
-                      body: HomeDrawerSnapshot(
-                        animation: _profileDrawerController,
-                        enabled: !Platform.isWindows,
-                        contentAnimating: _homeContentAnimating,
-                        child: ColoredBox(
-                          color: Theme.of(context).scaffoldBackgroundColor,
-                          child: body,
+                        drawerEnableOpenDragGesture: false,
+                        drawer: null,
+                        // Cache the body and header separately. A full-page
+                        // snapshot would rasterize the cached header again and
+                        // allocate a second texture containing the same pixels.
+                        body: HazukiLiquidGlass.backdropSource(
+                          child: HomeDrawerSnapshot(
+                            animation: _profileDrawerController,
+                            enabled: !Platform.isWindows,
+                            contentAnimating: _homeContentAnimating,
+                            child: ColoredBox(
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              child: body,
+                            ),
+                          ),
                         ),
+                        bottomNavigationBar: null,
                       ),
-                      bottomNavigationBar: null,
                     );
                   },
                 );

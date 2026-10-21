@@ -12,6 +12,7 @@ import '../../src/renderer/liquid_glass_renderer.dart';
 import '../../theme/glass_theme.dart';
 
 import 'inherited_liquid_glass.dart';
+import 'glass_backdrop_scope.dart';
 
 /// Returns the [RenderRepaintBoundary] for [key] only when it is fully safe
 /// to use — the element must be *active* and the render object *attached*.
@@ -480,6 +481,9 @@ class _LightweightLiquidGlassState extends State<LightweightLiquidGlass>
       backdropLuma: backdropLuma,
       backgroundImage: _backgroundImage,
       backgroundKey: widget.backgroundKey,
+      backdrop: settings.lensModel == GlassLensModel.spherical
+          ? null
+          : GlassBackdropScope.maybeOf(context),
       child: widget.child,
     );
 
@@ -512,6 +516,7 @@ class _LightweightGlassEffect extends SingleChildRenderObjectWidget {
     required this.backdropLuma,
     this.backgroundImage,
     this.backgroundKey,
+    this.backdrop,
     required super.child,
   });
 
@@ -525,6 +530,7 @@ class _LightweightGlassEffect extends SingleChildRenderObjectWidget {
   final double backdropLuma;
   final ui.Image? backgroundImage;
   final GlobalKey? backgroundKey;
+  final GlassBackdropData? backdrop;
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -539,6 +545,7 @@ class _LightweightGlassEffect extends SingleChildRenderObjectWidget {
       backdropLuma: backdropLuma,
       backgroundImage: backgroundImage,
       backgroundKey: backgroundKey,
+      backdrop: backdrop,
     );
   }
 
@@ -557,7 +564,8 @@ class _LightweightGlassEffect extends SingleChildRenderObjectWidget {
       ..indicatorWeight = indicatorWeight
       ..backdropLuma = backdropLuma
       ..backgroundImage = backgroundImage
-      ..backgroundKey = backgroundKey;
+      ..backgroundKey = backgroundKey
+      ..backdrop = backdrop;
   }
 }
 
@@ -574,6 +582,7 @@ class _RenderLightweightGlass extends RenderProxyBox
     required double backdropLuma,
     ui.Image? backgroundImage,
     GlobalKey? backgroundKey,
+    GlassBackdropData? backdrop,
   })  : _shader = shader,
         _settings = settings,
         _shape = shape,
@@ -585,7 +594,9 @@ class _RenderLightweightGlass extends RenderProxyBox
         _backgroundImage = backgroundImage,
         _backgroundKey = backgroundKey,
         _cachedLightCos = math.cos(settings.lightAngle),
-        _cachedLightSin = -math.sin(settings.lightAngle);
+        _cachedLightSin = -math.sin(settings.lightAngle) {
+    this.backdrop = backdrop;
+  }
 
   @override
   void onTransformChanged() {
@@ -699,6 +710,38 @@ class _RenderLightweightGlass extends RenderProxyBox
     markNeedsPaint();
   }
 
+  GlassBackdropData? _backdrop;
+  set backdrop(GlassBackdropData? value) {
+    if (_backdrop == value) return;
+    _backdrop?.removeListener(_onBackdropChanged);
+    _backdrop = value;
+    _backdrop?.addListener(_onBackdropChanged);
+    markNeedsPaint();
+  }
+
+  bool get _isInsideBackdrop {
+    final source = _backdrop?.source;
+    if (source == null) return false;
+    RenderObject? ancestor = parent;
+    while (ancestor != null) {
+      if (ancestor == source) return true;
+      ancestor = ancestor.parent;
+    }
+    return false;
+  }
+
+  void _onBackdropChanged() {
+    // A surface painted into the source must not feed its old image back into
+    // itself. OverlayPortal children paint outside that source and can sample.
+    if (!_isInsideBackdrop) markNeedsPaint();
+  }
+
+  @override
+  void dispose() {
+    _backdrop?.removeListener(_onBackdropChanged);
+    super.dispose();
+  }
+
   // ── Cached light direction (Task 1.3) ─────────────────────────────────────
   // Matches the caching pattern in LiquidGlassRenderObject._cachedLightDir.
   // Avoids recomputing cos/sin on every _updateShaderUniforms call.
@@ -778,7 +821,9 @@ class _RenderLightweightGlass extends RenderProxyBox
     }
 
     final blurSigma = _settings.effectiveBlur;
-    if (blurSigma > 0 && !_skipBlur) {
+    if (blurSigma > 0 &&
+        !_skipBlur &&
+        (_backdrop?.image == null || _isInsideBackdrop)) {
       // Compose blur + saturation to match Premium's background treatment.
       // Premium applies Gaussian blur then boosts saturation on the blurred result,
       // giving it richer, deeper colours (the "blue sky through glass" effect).
@@ -823,8 +868,16 @@ class _RenderLightweightGlass extends RenderProxyBox
 
     Offset bgRelativeOffset = Offset.zero;
     Size bgSize = const Size(1, 1);
+    final sharedSource = _backdrop?.source;
+    final sharedImage = _isInsideBackdrop ? null : _backdrop?.image;
+    if (sharedSource != null && sharedSource.attached && sharedImage != null) {
+      bgRelativeOffset = sharedSource.globalToLocal(localToGlobal(Offset.zero));
+      bgSize = sharedSource.size;
+    }
 
-    if (_backgroundKey != null && _backgroundImage != null) {
+    if (sharedImage == null &&
+        _backgroundKey != null &&
+        _backgroundImage != null) {
       final boundary = _safeGetBoundary(_backgroundKey);
       if (boundary != null) {
         final bgGlobalPos = boundary.localToGlobal(Offset.zero);
@@ -839,10 +892,10 @@ class _RenderLightweightGlass extends RenderProxyBox
 
     _updateShaderUniforms(size, uOrigin, uScale, bgRelativeOffset, bgSize);
 
-    if (_backgroundImage != null) {
+    if (sharedImage != null || _backgroundImage != null) {
       _shader!.setImageSampler(
         0,
-        _backgroundImage!,
+        sharedImage ?? _backgroundImage!,
         filterQuality: FilterQuality.medium, // coverage:ignore-line
       );
     } else {
@@ -1040,5 +1093,13 @@ class _RenderLightweightGlass extends RenderProxyBox
     // 34: uBodyMode — 0.0 = adaptive, 1.0 = clear.
     shader.setFloat(
         index++, _settings.bodyMode == GlassBodyMode.clear ? 1.0 : 0.0);
+
+    // Circular lenses share the premium renderer's logical-pixel profile.
+    shader.setFloat(index++, _settings.lensModel.index.toDouble());
+    shader.setFloat(index++, _settings.effectiveRefractionAmount);
+    shader.setFloat(index++, _settings.rimShade);
+    shader.setFloat(index++, _settings.rimShadeEnds);
+    shader.setFloat(index++, _settings.rimLight);
+    shader.setFloat(index++, _settings.effectiveBlur);
   }
 }

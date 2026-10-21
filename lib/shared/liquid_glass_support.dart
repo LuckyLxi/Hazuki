@@ -24,6 +24,14 @@ abstract final class HazukiLiquidGlass {
   static bool get isAvailable => _rendererReady && _enabled.value;
   static Listenable get changes => _enabled;
 
+  /// A stable Windows scope; toggling glass never remounts the page content.
+  static Widget backdropScope({required Widget child}) =>
+      Platform.isWindows ? GlassBackdropScope(child: child) : child;
+
+  /// Capture content separately from floating controls to avoid feedback.
+  static Widget backdropSource({required Widget child}) =>
+      Platform.isWindows ? GlassBackdropSource(child: child) : child;
+
   /// Host-app tests cannot resolve the package's premium shader asset paths.
   /// Production uses premium where shader filters are supported. Tests and
   /// other renderers use standard so the same controls remain usable.
@@ -52,25 +60,28 @@ abstract final class HazukiLiquidGlass {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final premium = _usesPremiumRenderer(context, quality);
+    // Windows draws the same lens profile with an ordinary fragment shader
+    // and a shared content texture, without requiring shader image filters.
+    final circularLens = premium || Platform.isWindows;
     return LiquidGlassSettings(
       visibility: visibility,
-      thickness: premium ? 72 : 10,
+      thickness: circularLens ? 72 : 10,
       blur: 2,
       refractiveIndex: 1.18,
-      lensModel: premium
+      lensModel: circularLens
           ? GlassLensModel.circularArc
           : GlassLensModel.spherical,
-      refractionAmount: premium ? 24 : 0,
+      refractionAmount: circularLens ? 24 : 0,
       chromaticAberration: 0,
       lightAngle: 2.356194490192345,
-      lightIntensity: premium ? 0.65 : 0.9,
+      lightIntensity: circularLens ? 0.65 : 0.9,
       fresnelStrength: 1.2,
       // Pair the bright lip with a subtle shaded bevel so the edge has depth.
-      // Standard uses thickness/absorption; premium also supports inset rims.
+      // Circular lenses share the inset rim treatment on Windows and Impeller.
       edgeAbsorption: isDark ? 0.14 : 0.12,
-      rimShade: premium ? (isDark ? 0.45 : 0.65) : 0,
+      rimShade: circularLens ? (isDark ? 0.45 : 0.65) : 0,
       rimShadeEnds: isDark ? 0 : 0.2,
-      rimLight: premium ? (isDark ? 1.05 : 0.85) : 0,
+      rimLight: circularLens ? (isDark ? 1.05 : 0.85) : 0,
       ambientStrength: 0,
       saturation: 1.15,
       glassColor: isDark ? const Color(0x20141820) : const Color(0x14FFFFFF),

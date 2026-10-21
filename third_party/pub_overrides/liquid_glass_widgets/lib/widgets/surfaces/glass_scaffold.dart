@@ -11,6 +11,7 @@ import '../../src/widgets/surfaces/vertical_bar_title_row.dart';
 import '../../types/glass_quality.dart';
 import '../../theme/glass_theme_data.dart';
 import '../shared/glass_accessibility_scope.dart';
+import '../shared/glass_backdrop_scope.dart';
 import '../shared/glass_content_aware_scope.dart';
 import '../shared/glass_isolation_scope.dart';
 import '../shared/glass_page.dart';
@@ -132,6 +133,7 @@ class GlassScaffold extends StatelessWidget {
     this.edgeToEdge = false,
     this.themeOverride,
     this.enableBackgroundSampling,
+    this.enableBackdropRefraction = false,
     this.edgeFade = true,
     this.topEdgeFade,
     this.bottomEdgeFade,
@@ -231,6 +233,11 @@ class GlassScaffold extends StatelessWidget {
   /// Whether to capture the background as a GPU texture for glass colour
   /// absorption. See [GlassPage.enableBackgroundSampling].
   final bool? enableBackgroundSampling;
+
+  /// Captures the scrolling body for floating glass on Windows. Unlike
+  /// [enableBackgroundSampling], this samples content rather than wallpaper.
+  /// The capture is shared and refreshed only when its layer changes.
+  final bool enableBackdropRefraction;
 
   // ===========================================================================
   // Edge fading
@@ -530,6 +537,18 @@ class GlassScaffold extends StatelessWidget {
       bodyContent = GlassContentAwareContent(child: bodyContent);
     }
 
+    final captureBackdrop = enableBackdropRefraction &&
+        defaultTargetPlatform == TargetPlatform.windows;
+    if (captureBackdrop) {
+      bodyContent = GlassBackdropSource(
+        child: ColoredBox(
+          color: backgroundColor ??
+              CupertinoTheme.of(context).scaffoldBackgroundColor,
+          child: bodyContent,
+        ),
+      );
+    }
+
     // Build the Stack with guaranteed z-ordering.
     // All conditional children have explicit Keys so that Flutter can track
     // them by identity rather than position. Without keys, toggling header
@@ -733,7 +752,7 @@ class GlassScaffold extends StatelessWidget {
       );
     }
 
-    return GlassPage(
+    final page = GlassPage(
       background: effectiveBackground,
       settings: settings,
       // GlassScaffold handles AnnotatedRegion itself, so tell GlassPage to
@@ -744,5 +763,6 @@ class GlassScaffold extends StatelessWidget {
       enableBackgroundSampling: enableBackgroundSampling,
       child: scaffold,
     );
+    return captureBackdrop ? GlassBackdropScope(child: page) : page;
   }
 }

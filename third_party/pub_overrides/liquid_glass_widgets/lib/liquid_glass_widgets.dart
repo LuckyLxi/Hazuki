@@ -50,6 +50,8 @@ export 'widgets/shared/glass_content_aware_scope.dart'; // GlassContentAwareScop
 export 'widgets/shared/glass_page.dart' show GlassPage, GlassStatusBarStyle;
 export 'widgets/shared/glass_motion_scope.dart';
 export 'widgets/shared/glass_snapshot.dart';
+export 'widgets/shared/glass_backdrop_scope.dart'
+    show GlassBackdropScope, GlassBackdropSource;
 export 'widgets/shared/glass_scroll_edge_effect.dart';
 export 'widgets/shared/inherited_liquid_glass.dart';
 export 'widgets/shared/lightweight_liquid_glass.dart';
