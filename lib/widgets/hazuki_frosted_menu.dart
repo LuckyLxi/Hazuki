@@ -533,7 +533,7 @@ class _AnimatedMenuGlass extends StatelessWidget {
                     position: DecorationPosition.foreground,
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(
-                        alpha: 0.45 * dimAnimation.value,
+                        alpha: 0.12 * dimAnimation.value,
                       ),
                     ),
                     child: child,

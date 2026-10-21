@@ -12,9 +12,11 @@ Future<Rect> _openMenu(
   ValueChanged<int>? onSelected,
   TextScaler textScaler = TextScaler.noScaling,
   List<HazukiFrostedMenuOption<int>>? options,
+  Brightness brightness = Brightness.light,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
+      theme: ThemeData(brightness: brightness),
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(textScaler: textScaler),
         child: child!,
@@ -58,82 +60,100 @@ void main() {
     HazukiFrostedMenuOption(value: 2, label: 'Root option'),
   ];
 
-  testWidgets(
-    'submenus animate over a shrinking dimmed parent and return one leaf value',
-    (tester) async {
-      final values = <int>[];
-      await _openMenu(tester, options: nested, onSelected: values.add);
-      final originalParent = tester.getRect(_surface);
-      await tester.tap(find.text('Group'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 70));
-      final opacity = find.byKey(
-        const ValueKey('hazuki-frosted-menu-submenu-opacity'),
-      );
-      expect(tester.widget<Opacity>(opacity).opacity, inExclusiveRange(0, 1));
-      expect(
-        tester.getRect(_surface).width,
-        inExclusiveRange(originalParent.width * 0.96, originalParent.width),
-      );
-      await tester.pumpAndSettle();
-      expect(_surface, findsOneWidget);
-      expect(
-        tester.getRect(_surface).width,
-        closeTo(originalParent.width * 0.96, 0.01),
-      );
-      expect(
-        tester.getRect(_surface).height,
-        closeTo(originalParent.height * 0.96, 0.01),
-      );
-      expect(
-        tester.getRect(_surface).center.dx,
-        closeTo(originalParent.center.dx, 0.01),
-      );
-      expect(
-        tester.getRect(_surface).center.dy,
-        closeTo(originalParent.center.dy, 0.01),
-      );
-      expect(
-        (tester.widget<DecoratedBox>(
-          find.byKey(const ValueKey('hazuki-frosted-menu-dim')),
-        )).decoration,
-        BoxDecoration(color: Colors.black.withValues(alpha: 0.45)),
-      );
-      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
-      expect(
-        tester
-            .getRect(_surface)
-            .overlaps(
-              tester.getRect(
-                find.byKey(
-                  const ValueKey('hazuki-frosted-menu-submenu-surface'),
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'submenus gently dim a shrinking parent and return one leaf value ($brightness)',
+      (tester) async {
+        final values = <int>[];
+        await _openMenu(
+          tester,
+          options: nested,
+          onSelected: values.add,
+          brightness: brightness,
+        );
+        final originalParent = tester.getRect(_surface);
+        await tester.tap(find.text('Group'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 70));
+        final opacity = find.byKey(
+          const ValueKey('hazuki-frosted-menu-submenu-opacity'),
+        );
+        expect(tester.widget<Opacity>(opacity).opacity, inExclusiveRange(0, 1));
+        expect(
+          tester.getRect(_surface).width,
+          inExclusiveRange(originalParent.width * 0.96, originalParent.width),
+        );
+        await tester.pumpAndSettle();
+        expect(_surface, findsOneWidget);
+        expect(
+          tester.getRect(_surface).width,
+          closeTo(originalParent.width * 0.96, 0.01),
+        );
+        expect(
+          tester.getRect(_surface).height,
+          closeTo(originalParent.height * 0.96, 0.01),
+        );
+        expect(
+          tester.getRect(_surface).center.dx,
+          closeTo(originalParent.center.dx, 0.01),
+        );
+        expect(
+          tester.getRect(_surface).center.dy,
+          closeTo(originalParent.center.dy, 0.01),
+        );
+        expect(
+          (tester.widget<DecoratedBox>(
+            find.byKey(const ValueKey('hazuki-frosted-menu-dim')),
+          )).decoration,
+          BoxDecoration(color: Colors.black.withValues(alpha: 0.12)),
+        );
+        expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+        expect(
+          tester
+              .getRect(_surface)
+              .overlaps(
+                tester.getRect(
+                  find.byKey(
+                    const ValueKey('hazuki-frosted-menu-submenu-surface'),
+                  ),
                 ),
               ),
-            ),
-        isTrue,
-      );
-      final middleSurface = find.byKey(
-        const ValueKey('hazuki-frosted-menu-submenu-surface'),
-      );
-      final originalMiddle = tester.getRect(middleSurface);
-      await tester.tap(find.text('More'));
-      await tester.pumpAndSettle();
-      expect(
-        tester.getRect(middleSurface).width,
-        closeTo(originalMiddle.width * 0.96, 0.01),
-      );
-      expect(
-        tester.getRect(_surface).width,
-        closeTo(originalParent.width * 0.96, 0.01),
-      );
-      await tester.tap(find.text('Last'));
-      await tester.pumpAndSettle();
-      expect(values, [1]);
-      expect(_surface, findsNothing);
-      expect(find.byType(BackdropFilter), findsNothing);
-      expect(tester.takeException(), isNull);
-    },
-  );
+          isTrue,
+        );
+        final middleSurface = find.byKey(
+          const ValueKey('hazuki-frosted-menu-submenu-surface'),
+        );
+        final originalMiddle = tester.getRect(middleSurface);
+        await tester.tap(find.text('More'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(middleSurface).width,
+          closeTo(originalMiddle.width * 0.96, 0.01),
+        );
+        expect(
+          tester.getRect(_surface).width,
+          closeTo(originalParent.width * 0.96, 0.01),
+        );
+        for (final prefix in [
+          'hazuki-frosted-menu',
+          'hazuki-frosted-menu-submenu',
+        ]) {
+          final dim = tester.widget<DecoratedBox>(
+            find.byKey(ValueKey('$prefix-dim')),
+          );
+          final overlay = (dim.decoration as BoxDecoration).color!;
+          // Additional nesting must keep each covered menu only gently dimmed.
+          expect(overlay.a, inExclusiveRange(0, 0.15));
+        }
+        await tester.tap(find.text('Last'));
+        await tester.pumpAndSettle();
+        expect(values, [1]);
+        expect(_surface, findsNothing);
+        expect(find.byType(BackdropFilter), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'header, system back and outside tap return to parent without selecting',
@@ -162,6 +182,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(_surface, findsOneWidget);
         expect(tester.getRect(_surface), originalParent);
+        final dim = tester.widget<DecoratedBox>(
+          find.byKey(const ValueKey('hazuki-frosted-menu-dim')),
+        );
+        expect((dim.decoration as BoxDecoration).color!.a, 0);
         expect(
           find.byKey(const ValueKey('hazuki-frosted-menu-submenu-surface')),
           findsNothing,
