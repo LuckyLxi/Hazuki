@@ -32,7 +32,9 @@ AppLocalizations _strings(BuildContext context) =>
     AppLocalizations.of(context)!;
 
 class FavoritePage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const FavoritePage({
+    required this.taskControl,
     super.key,
     required this.sourceService,
     this.readerService,
@@ -93,6 +95,7 @@ class FavoritePageState extends State<FavoritePage>
           emptySourcePresentation,
       localFavoritesRepository: widget.localFavoritesRepository,
       localFavoritesPreferences: widget.localFavoritesPreferences,
+      taskControl: widget.taskControl,
     );
     _coverPrefetcher = ComicCoverPrefetcher(imageGateway: widget.imageGateway);
     _controller.addListener(_handleControllerChanged);

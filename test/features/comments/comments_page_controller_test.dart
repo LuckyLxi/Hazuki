@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -26,6 +27,7 @@ void main() {
       chapterId: 'chapter',
       sourceKey: 'source',
       state: state,
+      taskControl: FakeSourceTaskControl(),
     );
     next.effects.listen(effects.add);
     return next;
@@ -519,6 +521,7 @@ void main() {
             sourceService: source,
             filterService: filter,
             comicId: 'comic',
+            taskControl: FakeSourceTaskControl(),
           ),
         ),
       );
@@ -627,6 +630,7 @@ class _Source extends Fake implements SourceCommentsGateway {
     int pageSize = 16,
     String? replyTo,
     String order = '',
+    SourceTaskOrigin? taskOrigin,
   }) {
     final request = _PageRequest(
       comicId: comicId,
@@ -649,6 +653,7 @@ class _Source extends Fake implements SourceCommentsGateway {
     String sourceKey = '',
     required String commentId,
     required bool isLike,
+    SourceTaskOrigin? taskOrigin,
   }) {
     final result = Completer<void>();
     likes.add((sourceKey: sourceKey, result: result));
@@ -663,6 +668,7 @@ class _Source extends Fake implements SourceCommentsGateway {
     String sourceKey = '',
     required String content,
     String? replyTo,
+    SourceTaskOrigin? taskOrigin,
   }) {
     final result = Completer<void>();
     sends.add((

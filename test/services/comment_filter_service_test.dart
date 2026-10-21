@@ -1,3 +1,4 @@
+import '../support/fake_source_task_control.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app_preferences.dart';
@@ -261,6 +262,7 @@ void main() {
           );
         })(),
         filterService: service,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(controller.dispose);
       const comments = [
@@ -302,6 +304,7 @@ void main() {
           );
         })(),
         filterService: service,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(controller.dispose);
       const comments = [

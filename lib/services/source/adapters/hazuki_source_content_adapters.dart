@@ -110,22 +110,32 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
   @override
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
-  }) => _content.loadExploreSections(forceRefresh: forceRefresh);
+    SourceTaskOrigin? taskOrigin,
+  }) => _content.loadExploreSections(
+    forceRefresh: forceRefresh,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
-  }) => _content.loadCategoryOptionGroupsByViewMore(viewMoreUrl: viewMoreUrl);
+    SourceTaskOrigin? taskOrigin,
+  }) => _content.loadCategoryOptionGroupsByViewMore(
+    viewMoreUrl: viewMoreUrl,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
     String order = '',
     List<String>? orders,
+    SourceTaskOrigin? taskOrigin,
   }) => _content.loadCategoryComicsByViewMore(
     viewMoreUrl: viewMoreUrl,
     page: page,
     order: order,
     orders: orders,
+    taskOrigin: taskOrigin,
   );
 }
 
@@ -145,20 +155,25 @@ class HazukiSourceCategoryAdapter implements SourceCategoryGateway {
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _content.loadCategoryTagGroups(
     forceRefresh: forceRefresh,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
-  Future<List<CategoryRankingOption>> loadCategoryRankingOptions() =>
-      _content.loadCategoryRankingOptions();
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
+    SourceTaskOrigin? taskOrigin,
+  }) => _content.loadCategoryRankingOptions(taskOrigin: taskOrigin);
   @override
   Future<CategoryComicsResult> loadCategoryRankingComics({
     required String rankingOption,
     required int page,
+    SourceTaskOrigin? taskOrigin,
   }) => _content.loadCategoryRankingComics(
     rankingOption: rankingOption,
     page: page,
+    taskOrigin: taskOrigin,
   );
   @override
   void addApplicationLog({
@@ -215,6 +230,7 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
     int pageSize = 16,
     String? replyTo,
     String order = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _comments.loadCommentsPage(
     comicId: comicId,
     subId: subId,
@@ -224,6 +240,7 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
     pageSize: pageSize,
     replyTo: replyTo,
     order: order,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<void> sendComment({
@@ -233,6 +250,7 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
     String sourceKey = '',
     required String content,
     String? replyTo,
+    SourceTaskOrigin? taskOrigin,
   }) => _comments.sendComment(
     comicId: comicId,
     subId: subId,
@@ -240,6 +258,7 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
     sourceKey: sourceKey,
     content: content,
     replyTo: replyTo,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<void> likeComment({
@@ -248,12 +267,14 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
     String sourceKey = '',
     required String commentId,
     required bool isLike,
+    SourceTaskOrigin? taskOrigin,
   }) => _comments.likeComment(
     comicId: comicId,
     subId: subId,
     sourceKey: sourceKey,
     commentId: commentId,
     isLike: isLike,
+    taskOrigin: taskOrigin,
   );
   @override
   void addApplicationLog({
@@ -329,9 +350,11 @@ class HazukiSourceComicDetailAdapter
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _content.loadCategoryTagGroups(
     forceRefresh: forceRefresh,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<Uint8List> downloadImageBytes(
@@ -381,13 +404,32 @@ class HazukiSourceComicDetailAdapter
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,
     String sourceKey = '',
-  }) => _favorites.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.loadFavoriteFolders(
+    comicId: comicId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) =>
-      _favorites.addFavoriteFolder(name, sourceKey: sourceKey);
+  Future<void> addFavoriteFolder(
+    String name, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.addFavoriteFolder(
+    name,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''}) =>
-      _favorites.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
+  Future<void> deleteFavoriteFolder(
+    String folderId, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.deleteFavoriteFolder(
+    folderId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<void> toggleFavorite({
     required String comicId,
@@ -395,22 +437,26 @@ class HazukiSourceComicDetailAdapter
     String folderId = '0',
     String? favoriteId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _favorites.toggleFavorite(
     comicId: comicId,
     isAdding: isAdding,
     folderId: folderId,
     favoriteId: favoriteId,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<void> toggleComicLike({
     required String comicId,
     required bool isLike,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _content.toggleComicLike(
     comicId: comicId,
     isLike: isLike,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
 }
 
@@ -468,18 +514,42 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,
     String sourceKey = '',
-  }) => _favorites.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.loadFavoriteFolders(
+    comicId: comicId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<FavoriteComicsResult> loadFavoriteComics({
     required int page,
     required String folderId,
-  }) => _favorites.loadFavoriteComics(page: page, folderId: folderId);
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.loadFavoriteComics(
+    page: page,
+    folderId: folderId,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) =>
-      _favorites.addFavoriteFolder(name, sourceKey: sourceKey);
+  Future<void> addFavoriteFolder(
+    String name, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.addFavoriteFolder(
+    name,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''}) =>
-      _favorites.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
+  Future<void> deleteFavoriteFolder(
+    String folderId, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.deleteFavoriteFolder(
+    folderId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<void> toggleFavorite({
     required String comicId,
@@ -487,12 +557,14 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
     String folderId = '0',
     String? favoriteId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _favorites.toggleFavorite(
     comicId: comicId,
     isAdding: isAdding,
     folderId: folderId,
     favoriteId: favoriteId,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<void> setFavoriteSortOrder(String order) =>
@@ -502,7 +574,13 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
     String folderId,
     String name, {
     String sourceKey = '',
-  }) => _favorites.renameFavoriteFolder(folderId, name, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.renameFavoriteFolder(
+    folderId,
+    name,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
 }
 
 class HazukiSourceReaderAdapter

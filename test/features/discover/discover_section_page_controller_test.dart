@@ -1,3 +1,5 @@
+import '../../support/fake_source_task_control.dart';
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/discover/state/discover_section_page_controller.dart';
@@ -34,6 +36,7 @@ void main() {
         viewMoreUrl: 'category:Serial updates@0',
         initialComics: preview,
         initiallyOffersInitialComicsFilter: true,
+        taskControl: FakeSourceTaskControl(),
       )..setInitialComicsFilterLabel('Home preview');
 
       await controller.loadSortOptionsAndInitial(
@@ -64,6 +67,7 @@ void main() {
       viewMoreUrl: 'category:Serial updates@0',
       initialComics: [_comic('preview')],
       initiallyOffersInitialComicsFilter: true,
+      taskControl: FakeSourceTaskControl(),
     )..setInitialComicsFilterLabel('Home preview');
 
     await controller.loadSortOptionsAndInitial(
@@ -84,6 +88,7 @@ void main() {
       viewMoreUrl: 'category:Serial updates@0',
       initialComics: [_comic('preview')],
       initiallyOffersInitialComicsFilter: true,
+      taskControl: FakeSourceTaskControl(),
     )..setInitialComicsFilterLabel('Home preview');
 
     await controller.loadSortOptionsAndInitial(
@@ -100,6 +105,7 @@ void main() {
       sourceService: source,
       viewMoreUrl: 'category:Han updates@hanman',
       initialComics: [_comic('preview')],
+      taskControl: FakeSourceTaskControl(),
     )..setInitialComicsFilterLabel('Home preview');
 
     await controller.loadSortOptionsAndInitial(
@@ -118,6 +124,7 @@ void main() {
     final controller = DiscoverSectionPageController(
       sourceService: source,
       viewMoreUrl: 'category:genre',
+      taskControl: FakeSourceTaskControl(),
     );
     addTearDown(controller.dispose);
     await controller.loadSortOptionsAndInitial(
@@ -167,11 +174,13 @@ class _FakeDiscoverGateway extends ChangeNotifier
   @override
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) async => const [];
 
   @override
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     if (throwOnOptionsLoad) throw Exception('options unavailable');
     return optionGroups;
@@ -183,6 +192,7 @@ class _FakeDiscoverGateway extends ChangeNotifier
     required int page,
     String order = '',
     List<String>? orders,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     comicsRequestCount++;
     lastOrder = order;

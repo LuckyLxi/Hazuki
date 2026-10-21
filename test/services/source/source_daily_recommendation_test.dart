@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -75,6 +76,7 @@ void main() {
         final service = DiscoverDailyRecommendationService(
           source: gateway,
           cacheStore: cacheStore,
+          taskControl: FakeSourceTaskControl(),
         );
         addTearDown(service.dispose);
         final state = await service.ensurePrepared(enabled: true);
@@ -110,6 +112,7 @@ void main() {
         final restored = DiscoverDailyRecommendationService(
           source: gateway,
           cacheStore: cacheStore,
+          taskControl: FakeSourceTaskControl(),
         );
         addTearDown(restored.dispose);
         final cached = await restored.ensurePrepared(enabled: true);
@@ -137,7 +140,10 @@ void main() {
           prefs.getString('discover_daily_recommendation_cache_website'),
           isNull,
         );
-        final nextSession = DiscoverDailyRecommendationService(source: gateway);
+        final nextSession = DiscoverDailyRecommendationService(
+          source: gateway,
+          taskControl: FakeSourceTaskControl(),
+        );
         addTearDown(nextSession.dispose);
         expect(
           (await nextSession.ensurePrepared(enabled: true)).recommendations,
@@ -164,6 +170,7 @@ void main() {
     await assembly.runtimeRegistry.ensureInitialized(sourceKey: 'website');
     final service = DiscoverDailyRecommendationService(
       source: assembly.gateways.dailyRecommendation,
+      taskControl: FakeSourceTaskControl(),
     );
     addTearDown(service.dispose);
     final entry = (await service.ensurePrepared(

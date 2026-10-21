@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_task_owner.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -10,18 +11,23 @@ class DiscoverSectionPageController extends ChangeNotifier {
   static const _initialComicsFilterValue = '__hazuki_initial_comics__';
 
   DiscoverSectionPageController({
+    required SourceTaskControlGateway taskControl,
     required SourceDiscoverGateway sourceService,
     String? viewMoreUrl,
     List<ExploreComic>? initialComics,
     String? initialComicsFilterLabel,
     bool initiallyOffersInitialComicsFilter = false,
-  }) : _viewMoreUrl = viewMoreUrl,
+  }) : _readTasks = SourceTaskOwner(taskControl),
+       _viewMoreUrl = viewMoreUrl,
        _sourceService = sourceService,
        _initialComics = List<ExploreComic>.unmodifiable(
          initialComics ?? const [],
        ),
        _initialComicsFilterLabel = initialComicsFilterLabel,
        _offersInitialComicsFilter = initiallyOffersInitialComicsFilter {
+    _sourceKey = sourceService.activeSourceKey;
+    _sourceRevision = sourceService.sourceRevision;
+    sourceService.addListener(_sourceChanged);
     if (viewMoreUrl == null && initialComics != null) {
       _state.comics = List<ExploreComic>.of(initialComics);
       _state.hasMore = false;
@@ -38,6 +44,27 @@ class DiscoverSectionPageController extends ChangeNotifier {
   final DiscoverSectionPageState _state = DiscoverSectionPageState();
   bool _disposed = false;
   final _sourceUi = SourceUiOwner();
+  final SourceTaskOwner _readTasks;
+  String? _sourceKey;
+  String? _sourceRevision;
+
+  void _sourceChanged() {
+    final key = _sourceService.activeSourceKey;
+    final revision = _sourceService.sourceRevision;
+    if (key == _sourceKey && revision == _sourceRevision) return;
+    _readTasks.restart(
+      key != _sourceKey
+          ? SourceTaskStopReason.sourceChanged
+          : SourceTaskStopReason.pluginUpdated,
+    );
+    _sourceKey = key;
+    _sourceRevision = revision;
+    _sourceUi.cancel('sourceChanged');
+    _state.requestVersion++;
+    _state.loadingMore = false;
+    _state.sortLoading = false;
+    _notify();
+  }
 
   List<ExploreComic> get comics => _state.comics;
   List<CategoryRankingOption> get sortOptions => _state.sortOptions;
@@ -84,6 +111,8 @@ class DiscoverSectionPageController extends ChangeNotifier {
   Future<void> loadSortOptionsAndInitial({
     required String Function(String) loadFailedMessage,
   }) async {
+    _readTasks.restart();
+    final generation = _readTasks.generation;
     _loadFailedMessage = loadFailedMessage;
     final url = _viewMoreUrl;
     if (url == null) return;
@@ -95,10 +124,12 @@ class DiscoverSectionPageController extends ChangeNotifier {
 
     try {
       final optionGroups = await _sourceUi.run(
-        () =>
-            _sourceService.loadCategoryOptionGroupsByViewMore(viewMoreUrl: url),
+        () => _sourceService.loadCategoryOptionGroupsByViewMore(
+          viewMoreUrl: url,
+          taskOrigin: _readTasks.origin(),
+        ),
       );
-      if (_disposed) return;
+      if (_disposed || generation != _readTasks.generation) return;
 
       final resolvedOptionGroups = _addInitialComicsFilter(optionGroups);
       _state.sortOptionGroups = resolvedOptionGroups;
@@ -120,8 +151,11 @@ class DiscoverSectionPageController extends ChangeNotifier {
 
       if (!_sourceUi.wasCancelled) await _loadPage();
     } catch (error) {
-      if (_disposed) return;
-      if (isSourceUiCancellation(error) || _sourceUi.wasCancelled) return;
+      if (_disposed || generation != _readTasks.generation) return;
+      if ((isSourceUiCancellation(error) || isSourceTaskCancellation(error)) ||
+          _sourceUi.wasCancelled) {
+        return;
+      }
       _state.sortOptions = const <CategoryRankingOption>[];
       _state.sortOptionGroups = const <List<CategoryRankingOption>>[];
       _state.selectedSortValue = null;
@@ -129,7 +163,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
       _notify();
       await _loadPage();
     } finally {
-      if (!_disposed) {
+      if (!_disposed && generation == _readTasks.generation) {
         _state.sortLoading = false;
         _notify();
       }
@@ -144,6 +178,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
   Future<void> selectSortOption({required String value}) async {
     if (_state.selectedSortValue == value || _state.loadingMore) return;
 
+    _readTasks.restart();
     _state.selectedSortValue = value;
     _state.errorMessage = null;
     _state.currentPage = 0;
@@ -167,6 +202,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
     if (next[groupIndex] == value) return;
 
     next[groupIndex] = value;
+    _readTasks.restart();
     _state.selectedSortValues = next;
     _state.selectedSortValue = next.isEmpty ? null : next.first;
     _state.errorMessage = null;
@@ -221,6 +257,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
           page: nextPage,
           order: _state.selectedSortValue ?? '',
           orders: _state.selectedSortValues,
+          taskOrigin: _readTasks.origin(),
         ),
       );
 
@@ -248,7 +285,10 @@ class DiscoverSectionPageController extends ChangeNotifier {
       _notify();
     } catch (e) {
       if (_disposed || requestVersion != _state.requestVersion) return;
-      _state.errorMessage = isSourceUiCancellation(e) ? null : failedMsg('$e');
+      _state.errorMessage =
+          (isSourceUiCancellation(e) || isSourceTaskCancellation(e))
+          ? null
+          : failedMsg('$e');
       _notify();
     } finally {
       if (!_disposed && requestVersion == _state.requestVersion) {
@@ -336,6 +376,8 @@ class DiscoverSectionPageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _sourceService.removeListener(_sourceChanged);
+    _readTasks.dispose();
     _sourceUi.dispose();
     _disposed = true;
     super.dispose();

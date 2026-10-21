@@ -1,3 +1,6 @@
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -18,7 +21,10 @@ class SourceInteractiveLoginOperations
   });
   final SourceRuntimeHost host;
   final Future<void> Function(SourceRuntimeHandle) loadRuntime;
-  final Future<List<SourceLoginMethod>> Function(String sourceKey)?
+  final Future<List<SourceLoginMethod>> Function(
+    String sourceKey,
+    SourceOperationContext context,
+  )?
   readLoginMethods;
   final Set<String> _running = {};
   final Map<String, SourceLoginCancellation> _cancellations = {};
@@ -27,19 +33,74 @@ class SourceInteractiveLoginOperations
   void cancelPendingLogin() => _cancellations[host.activeSourceKey]?.cancel();
 
   @override
-  Future<List<SourceLoginMethod>> loadLoginMethods() async {
+  Future<List<SourceLoginMethod>> loadLoginMethods({
+    SourceTaskOrigin? taskOrigin,
+  }) => runSourceOperation(host, host.activeHandle, 'account.loginMethods', (
+    context,
+  ) async {
     final handle = host.activeHandle;
-    if (readLoginMethods != null) return readLoginMethods!(handle.sourceKey);
+    if (readLoginMethods != null) {
+      return readLoginMethods!(handle.sourceKey, context);
+    }
     await handle.facade.ensureInitialized();
     return SourceLoginMethod.parse(
-      await handle.runtime.engine!.evaluate(
+      await context.evaluate(
+        handle.runtime.engine!,
         'this.__hazuki_source.account?.loginMethods',
       ),
     );
-  }
+  }, origin: taskOrigin);
 
   @override
   Future<void> loginInteractive({
+    required String account,
+    required String password,
+    required String method,
+    required SourceLoginPresenter present,
+    required SourceLoginCancellation cancellation,
+    SourceTaskOrigin? taskOrigin,
+  }) async {
+    try {
+      await runSourceOperation(
+        host,
+        host.activeHandle,
+        'account.loginInteractive',
+        (context) async {
+          void stop() {
+            if (!cancellation.isCleanupCancellation) {
+              context.task.requestStop(SourceTaskStopReason.user);
+            }
+          }
+
+          cancellation.addListener(stop);
+          context.task.whenStopped.then((_) => cancellation.cancel());
+          if (cancellation.isCancelled) stop();
+          try {
+            return await context.commit(
+              () => _loginInteractiveWithTask(
+                context,
+                account: account,
+                password: password,
+                method: method,
+                present: present,
+                cancellation: cancellation,
+              ),
+            );
+          } finally {
+            cancellation.removeListener(stop);
+          }
+        },
+        origin: taskOrigin,
+        sensitiveValues: [account, password],
+      );
+    } on SourceTaskCancelled {
+      cancellation.cancel();
+      throw const SourceLoginCancelled();
+    }
+  }
+
+  Future<void> _loginInteractiveWithTask(
+    SourceOperationContext context, {
     required String account,
     required String password,
     required String method,
@@ -49,6 +110,7 @@ class SourceInteractiveLoginOperations
     try {
       await SourceUiService.instance.run(
         () => _loginInteractive(
+          context,
           account: account,
           password: password,
           method: method,
@@ -81,14 +143,15 @@ class SourceInteractiveLoginOperations
     }
   }
 
-  Future<void> _loginInteractive({
+  Future<void> _loginInteractive(
+    SourceOperationContext context, {
     required String account,
     required String password,
     required String method,
     required SourceLoginPresenter present,
     required SourceLoginCancellation cancellation,
   }) async {
-    final original = host.activeHandle;
+    final original = context.resource as SourceRuntimeHandle;
     final key = original.sourceKey;
     if (!_running.add(key)) throw StateError('login_already_running');
     _cancellations[key] = cancellation;
@@ -101,6 +164,7 @@ class SourceInteractiveLoginOperations
       if (host.activeSourceKey != key ||
           !host.isCurrentHandle(original) ||
           !host.runtimeRegistry.isAllowedSourceKey(key)) {
+        context.task.requestStop(SourceTaskStopReason.sourceChanged);
         cancellation.cancel();
       }
     }
@@ -133,13 +197,17 @@ class SourceInteractiveLoginOperations
         cancellation.check();
         final engine = local.runtime.engine!;
         final methods = SourceLoginMethod.parse(
-          await engine.evaluate('this.__hazuki_source.account?.loginMethods'),
+          await context.evaluate(
+            engine,
+            'this.__hazuki_source.account?.loginMethods',
+          ),
         );
         if (!methods.any((m) => m.id == method)) {
           throw StateError('login_method_unavailable');
         }
         final result = await local.facade.js.resolve(
-          engine.invoke(
+          context.invoke(
+            engine,
             '''(account, password, method) =>
           this.__hazuki_source.account.login(account, password, __hazukiCreateLoginContext(method))''',
             [account, password, method],
@@ -219,7 +287,7 @@ class SourceInteractiveLoginOperations
           SourceUiService.instance.closeRuntimeInteractions(runtimeId);
         }
       }
-      if (!successful) cancellation.cancel();
+      if (!successful) cancellation.cancelForCleanup();
       storage.discard();
       host.removeListener(checkSource);
       host.runtimeRegistry.removeListener(checkSource);

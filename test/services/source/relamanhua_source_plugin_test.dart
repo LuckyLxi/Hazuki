@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -169,6 +170,7 @@ void main() {
       () async {
         final controller = DiscoverPageController(
           sourceService: assembly.gateways.discover,
+          taskControl: FakeSourceTaskControl(),
         );
         addTearDown(controller.dispose);
         await controller.loadInitial(

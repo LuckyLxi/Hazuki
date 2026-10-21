@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -132,6 +133,7 @@ void main() {
         filterService: filter,
         comicId: 'comic',
         sourceKey: 'comment_ui',
+        taskControl: FakeSourceTaskControl(),
       );
       var disposed = false;
       addTearDown(() {

@@ -11,6 +11,7 @@ import 'source_secure_session_storage.dart';
 import '../../logging/app_log_store.dart';
 import '../interaction/source_ui_service.dart';
 import 'source_task_registry.dart';
+import '../models/source_task.dart';
 
 /// Owns source selection and the lifetime of per-source runtime handles.
 ///
@@ -62,6 +63,7 @@ class SourceRuntimeHost extends ChangeNotifier {
   final bool Function(String sourceKey) _isLoggedForSource;
   final AppLogStore logStore;
   final SourceTaskRegistry tasks = SourceTaskRegistry();
+  final String serviceTaskOwnerId = createSourceTaskId();
   final void Function(String, SourceRuntimeState)? onRuntimeState;
 
   late final SourceRuntimeCoordinator<SourceRuntimeHandle> _coordinator;
@@ -125,11 +127,12 @@ class SourceRuntimeHost extends ChangeNotifier {
     _preferenceLoaded = true;
   }
 
-  Future<void> activateSource(String sourceKey) {
+  Future<void> activateSource(String sourceKey) async {
+    final previous = optionalActiveHandle;
     if (normalize(sourceKey) != activeSourceKey) {
       SourceUiService.instance.cancelPlugin(activeSourceKey, 'sourceChanged');
     }
-    return _coordinator.activate(
+    await _coordinator.activate(
       sourceKey,
       persistSelection: (nextHandle) async {
         final prefs = await nextHandle.session.ensurePrefs();
@@ -139,18 +142,17 @@ class SourceRuntimeHost extends ChangeNotifier {
         );
       },
     );
+    if (previous != null && activeSourceKey != previous.sourceKey) {
+      await tasks.cancelResource(
+        previous,
+        SourceTaskStopReason.sourceChanged,
+        includeServiceTasks: false,
+      );
+    }
   }
 
   Future<void> replaceCatalog(List<SourceCatalogEntry> catalog) async {
     final enabled = catalog.map((source) => source.normalizedKey).toSet();
-    for (final old in _catalog) {
-      if (!enabled.contains(old.normalizedKey)) {
-        SourceUiService.instance.cancelPlugin(
-          old.normalizedKey,
-          'runtimeDisposed',
-        );
-      }
-    }
     await _coordinator.replaceCatalog(
       catalog,
       beforeReplace: (nextSourceKey) async {
@@ -174,6 +176,33 @@ class SourceRuntimeHost extends ChangeNotifier {
             rethrow;
           }
         }
+        for (final handle in existingHandles.toList()) {
+          final old = _catalog
+              .where((entry) => entry.normalizedKey == handle.sourceKey)
+              .firstOrNull;
+          final next = catalog
+              .where((entry) => entry.normalizedKey == handle.sourceKey)
+              .firstOrNull;
+          if (next == null ||
+              old?.pluginVersion != next.pluginVersion ||
+              old?.pluginDirectory != next.pluginDirectory) {
+            await tasks.cancelResource(
+              handle,
+              next == null
+                  ? SourceTaskStopReason.pluginDisabled
+                  : SourceTaskStopReason.pluginUpdated,
+            );
+          }
+        }
+        for (final old in _catalog) {
+          if (!enabled.contains(old.normalizedKey)) {
+            SourceUiService.instance.cancelPlugin(
+              old.normalizedKey,
+              'runtimeDisposed',
+            );
+          }
+        }
+
         _catalog = List.unmodifiable(catalog);
         runtimeRegistry.replaceCatalog(catalog, notify: false);
       },
@@ -187,6 +216,7 @@ class SourceRuntimeHost extends ChangeNotifier {
   SourceRuntimeHandle recreateSourceRuntime(
     String sourceKey, {
     SourceRuntimeHandle? expectedHandle,
+    String? completingTaskId,
   }) {
     final replacement = _coordinator.recreate(
       sourceKey,

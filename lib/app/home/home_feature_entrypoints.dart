@@ -72,6 +72,7 @@ HomeServices buildHazukiHomeServices() {
     announcementService: sl<AnnouncementController>(),
     downloadStatus: _MangaDownloadStatusAdapter(sl<MangaDownloadService>()),
     showAnnouncement: showAnnouncementDialog,
+    taskControl: sl<SourceTaskControlGateway>(),
   );
 }
 
@@ -103,6 +104,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
       onRequestTabFullscreen: onRequestTabFullscreen,
       debugOuterScrollStateBuilder: debugOuterScrollStateBuilder,
       interactionState: interactionState,
+      taskControl: sl<SourceTaskControlGateway>(),
     );
   }
 
@@ -114,6 +116,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     readingProgress: sl<ReadingProgressService>(),
     readHistory: sl<ReadHistoryService>(),
     imageGateway: sl<SourceImageGateway>(),
+    taskControl: sl<SourceTaskControlGateway>(),
   );
   final settingsCoreDependencies = SettingsCoreDependencies(
     sourcePlugins: sl<SourcePluginGateway>(),
@@ -213,6 +216,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
                       viewMoreUrl: viewMoreUrl,
                     ),
                     comicDetailPageBuilder: comicDetailPageBuilder,
+                    taskControl: sl<SourceTaskControlGateway>(),
                   );
                 },
             isDesktopPanel: isDesktopPanel,
@@ -281,6 +285,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             onSearchMorphProgressChanged: onSearchMorphProgressChanged,
             onSearchTap: onSearchTap,
             onRequestLogin: onRequestLogin,
+            taskControl: sl<SourceTaskControlGateway>(),
           );
         },
     buildFavoriteTab:
@@ -302,6 +307,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             onAppBarActionsChanged: onAppBarActionsChanged,
             onRequestLogin: onRequestLogin,
             onComicTap: onComicTap,
+            taskControl: sl<SourceTaskControlGateway>(),
           );
         },
     buildHistoryPage:
@@ -326,6 +332,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
               comicDetailPageBuilder: comicDetailPageBuilder,
             ),
             comicDetailPageBuilder: comicDetailPageBuilder,
+            taskControl: sl<SourceTaskControlGateway>(),
           );
         },
     buildRankingPage:
@@ -343,11 +350,13 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
                 viewMoreUrl: 'category:排行@ranking',
               ),
               comicDetailPageBuilder: comicDetailPageBuilder,
+              taskControl: sl<SourceTaskControlGateway>(),
             );
           }
           return RankingPage(
             sourceService: sl<SourceCategoryGateway>(),
             comicDetailPageBuilder: comicDetailPageBuilder,
+            taskControl: sl<SourceTaskControlGateway>(),
           );
         },
     buildDownloadsPage: ({required readerPageBuilder}) {

@@ -1,3 +1,6 @@
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:convert';
 
 import '../../../models/hazuki_models.dart';
@@ -8,7 +11,6 @@ import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_host.dart';
 import 'source_comic_details_cache.dart';
 import 'source_comic_details_parser.dart';
-import '../models/source_task.dart';
 import '../runtime/source_task_registry.dart';
 import '../runtime/source_shared_request.dart';
 import '../runtime/source_host_call_context.dart';
@@ -101,6 +103,7 @@ class SourceComicDetailsCapability {
     }
 
     final handle = _runtimeHost.handleFor(resolvedSourceKey);
+    task?.bindResource(handle);
     final facade = handle.facade;
 
     final inFlight = facade.cache.comicDetailsInFlight[scopedComicKey];
@@ -401,13 +404,34 @@ class SourceComicDetailsCapability {
     required String comicId,
     required bool isLike,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.handleFor(_resolveActiveSourceKey(sourceKey)),
+    'comic.like',
+    (operationContext) => _toggleComicLikeTask(
+      operationContext,
+      comicId: comicId,
+      isLike: isLike,
+      sourceKey: sourceKey,
+    ),
+    origin: taskOrigin,
+    serviceOwned: true,
+    sensitiveValues: [comicId],
+  );
+
+  Future<void> _toggleComicLikeTask(
+    SourceOperationContext operationContext, {
+    required String comicId,
+    required bool isLike,
+    String sourceKey = '',
   }) async {
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
       throw Exception('comic_id_empty');
     }
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
+    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
 
@@ -418,26 +442,30 @@ class SourceComicDetailsCapability {
           throw Exception('source_not_initialized');
         }
         if (!jsAsBool(
-          await engine.evaluate(
+          await operationContext.evaluate(
+            engine,
             'typeof this.__hazuki_source.comic?.likeComic === "function"',
           ),
         )) {
           throw Exception('comic_like_not_supported');
         }
 
-        final dynamic result = await engine.evaluate(
+        final dynamic result = await operationContext.evaluate(
+          engine,
           'this.__hazuki_source.comic.likeComic(${jsonEncode(normalizedComicId)}, $isLike)',
           name: 'source_comic_like.js',
         );
-        await facade.js.resolve(result);
+        await operationContext.resolve(facade.js.resolve(result));
       }
 
       await _reloginCoordinator.runWithReloginRetry(
         runToggle,
         context: SourceFacadeReloginContext(facade),
+        checkActive: operationContext.checkActive,
       );
 
-      if (!identical(facade.js.engine, originalEngine) ||
+      if (!operationContext.canCache() ||
+          !identical(facade.js.engine, originalEngine) ||
           !identical(
             _runtimeHost.handleFor(resolvedSourceKey).facade,
             facade,

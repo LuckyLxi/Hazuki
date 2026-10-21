@@ -1,3 +1,7 @@
+import 'runtime/source_runtime_handle.dart';
+import 'runtime/source_operation_context.dart';
+import 'runtime/source_operation_runner.dart';
+import 'models/source_task.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../models/hazuki_models.dart';
@@ -17,9 +21,28 @@ class SourceExploreCapability {
   final SourceRuntimeHost _runtimeHost;
   final SourceTextTranslator _translateSourceText;
 
-  Future<List<ExploreSection>> load({bool forceRefresh = false}) async {
+  Future<List<ExploreSection>> load({
+    bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     if (!_runtimeHost.hasActiveSource) return const [];
-    final handle = _runtimeHost.activeHandle;
+    return await runSourceOperation(
+      _runtimeHost,
+      _runtimeHost.activeHandle,
+      'discover.load',
+      (operationContext) =>
+          _loadTask(operationContext, forceRefresh: forceRefresh),
+      origin: taskOrigin,
+      serviceOwned: false,
+    );
+  }
+
+  Future<List<ExploreSection>> _loadTask(
+    SourceOperationContext operationContext, {
+    bool forceRefresh = false,
+  }) async {
+    if (!_runtimeHost.hasActiveSource) return const [];
+    final handle = operationContext.resource as SourceRuntimeHandle;
     final facade = handle.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
@@ -40,14 +63,20 @@ class SourceExploreCapability {
       }
 
       final hasExplore = facade.js.asBool(
-        await engine.evaluate('Array.isArray(this.__hazuki_source.explore)'),
+        await operationContext.evaluate(
+          engine,
+          'Array.isArray(this.__hazuki_source.explore)',
+        ),
       );
       if (!hasExplore) {
         return const [];
       }
 
       final exploreType =
-          (await engine.evaluate('this.__hazuki_source.explore?.[0]?.type') ??
+          (await operationContext.evaluate(
+                    engine,
+                    'this.__hazuki_source.explore?.[0]?.type',
+                  ) ??
                   '')
               .toString();
       if (exploreType != 'multiPartPage' &&
@@ -56,11 +85,13 @@ class SourceExploreCapability {
         throw Exception('explore_type_not_supported:$exploreType');
       }
 
-      final dynamic result = await engine.evaluate(switch (exploreType) {
-        'multiPartPage' => 'this.__hazuki_source.explore[0].load(null)',
-        'singlePageWithMultiPart' => 'this.__hazuki_source.explore[0].load()',
-        _ =>
-          '''
+      final dynamic result = await operationContext.evaluate(
+        engine,
+        switch (exploreType) {
+          'multiPartPage' => 'this.__hazuki_source.explore[0].load(null)',
+          'singlePageWithMultiPart' => 'this.__hazuki_source.explore[0].load()',
+          _ =>
+            '''
 Promise.all(
   this.__hazuki_source.explore
     .filter((section) => section?.type === "multiPageComicList")
@@ -70,15 +101,19 @@ Promise.all(
           title: section.title ?? "__untitled_section__",
           ...(await section.load(1))
         };
-      } catch (_) {
+      } catch (error) { rethrowSourceOperationStop(error);
         return null;
       }
     })
 ).then((sections) => sections.filter((section) => section != null))
 ''',
-      }, name: 'source_explore_load.js');
+        },
+        name: 'source_explore_load.js',
+      );
 
-      final dynamic resolved = await facade.js.resolve(result);
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
       final sections = switch (exploreType) {
         'multiPartPage' => _parseMultiPartExploreSections(resolved),
         'singlePageWithMultiPart' =>
@@ -86,7 +121,7 @@ Promise.all(
         _ => _parseMultiPageComicListExploreSections(resolved),
       };
 
-      if (identical(facade.js.engine, engine)) {
+      if (operationContext.canCache() && identical(facade.js.engine, engine)) {
         exploreCache.putSections(sections);
       }
       return List<ExploreSection>.unmodifiable(sections);

@@ -146,6 +146,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   void _initializeControllers() {
     _favoriteController = ComicDetailFavoriteController(
       repository: _repository,
+      taskControl: widget.dependencies.taskControl,
     );
     _themeController = ComicDetailThemeController(
       repository: _repository,
@@ -153,6 +154,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       detailsFutureGetter: () => _sessionController.future,
     );
     _actionsController = ComicDetailActionsController(
+      taskControl: widget.dependencies.taskControl,
       destinationRouteBuilder: (builder) =>
           buildComicDetailDestinationRoute(context, builder),
       expandedReaderRouteBuilder: (builder) => buildComicDetailDestinationRoute(

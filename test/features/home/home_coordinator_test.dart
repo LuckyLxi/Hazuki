@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -49,7 +50,10 @@ void main() {
         when(source.loadActiveSourcePreference).thenAnswer((_) async {});
         when(source.prewarmInBackground).thenAnswer((_) async {});
         when(source.warmUpFavoritesDebugInfo).thenAnswer((_) async {});
-        when(source.loadCurrentAvatarUrl).thenAnswer((_) async {
+        when(
+          () =>
+              source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+        ).thenAnswer((_) async {
           initialized = true;
           if (publishReady) sourceChanged();
           return 'https://example/new-avatar';
@@ -65,6 +69,7 @@ void main() {
           imageService: _Images(),
           dailyRecommendationService: recommendations,
           announcementService: _Announcements(),
+          taskControl: FakeSourceTaskControl(),
         );
         addTearDown(coordinator.dispose);
         late BuildContext context;
@@ -138,7 +143,9 @@ void main() {
       when(source.loadActiveSourcePreference).thenAnswer((_) async {});
       when(source.prewarmInBackground).thenAnswer((_) => prewarm.future);
       when(source.warmUpFavoritesDebugInfo).thenAnswer((_) async {});
-      when(source.loadCurrentAvatarUrl).thenAnswer((_) async => 'avatar');
+      when(
+        () => source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+      ).thenAnswer((_) async => 'avatar');
       when(recommendations.loadEnabled).thenAnswer((_) async => false);
       when(() => recommendations.ensurePrepared(enabled: false)).thenAnswer(
         (_) async => const DiscoverDailyRecommendationState.disabled(),
@@ -150,6 +157,7 @@ void main() {
         imageService: _Images(),
         dailyRecommendationService: recommendations,
         announcementService: _Announcements(),
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(coordinator.dispose);
       late BuildContext context;

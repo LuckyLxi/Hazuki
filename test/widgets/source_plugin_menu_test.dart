@@ -328,7 +328,11 @@ void main() {
     'menu actions use the declared content source instead of the active source',
     (tester) async {
       when(
-        () => plugins.runAction('other', 'refresh'),
+        () => plugins.runAction(
+          'other',
+          'refresh',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenAnswer((_) async => null);
       await mount(
         tester,
@@ -345,8 +349,20 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Refresh'));
       await tester.pumpAndSettle();
-      verify(() => plugins.runAction('other', 'refresh')).called(1);
-      verifyNever(() => plugins.runAction('custom', any()));
+      verify(
+        () => plugins.runAction(
+          'other',
+          'refresh',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      ).called(1);
+      verifyNever(
+        () => plugins.runAction(
+          'custom',
+          any(),
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -379,7 +395,13 @@ void main() {
   ) async {
     final result = Completer<dynamic>();
     SourceUiScope? scope;
-    when(() => plugins.runAction('custom', 'refresh')).thenAnswer((_) {
+    when(
+      () => plugins.runAction(
+        'custom',
+        'refresh',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
+    ).thenAnswer((_) {
       scope = SourceUiScope.current;
       return result.future;
     });

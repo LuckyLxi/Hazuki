@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'favorite_selection_result.dart';
 
 class FavoriteFoldersViewModel extends ChangeNotifier {
   FavoriteFoldersViewModel({
+    this.readTaskOrigin,
     required FavoriteFoldersRepository repository,
     required ComicDetailsData details,
     required bool? cloudFavoriteOverride,
@@ -22,6 +24,7 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
        _initialIsFavorite = initialIsFavorite,
        _singleFolderOnly = singleFolderOnly;
 
+  final SourceTaskOrigin? readTaskOrigin;
   final FavoriteFoldersRepository _repository;
   final ComicDetailsData _details;
   final bool? _cloudFavoriteOverride;
@@ -82,7 +85,10 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
       );
       final cloudResult = _canLoadCloudFolders
           ? await _sourceUi.run(
-              () => _repository.loadCloudFavoriteFolders(comicId: _details.id),
+              () => _repository.loadCloudFavoriteFolders(
+                comicId: _details.id,
+                taskOrigin: readTaskOrigin,
+              ),
             )
           : const FavoriteFoldersResult.success(
               folders: <FavoriteFolder>[],
@@ -262,6 +268,7 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    readTaskOrigin?.cancellation?.cancel(SourceTaskStopReason.ownerDisposed);
     _sourceUi.dispose();
     _disposed = true;
     super.dispose();

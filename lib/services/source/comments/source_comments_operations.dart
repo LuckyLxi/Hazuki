@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import '../../../models/hazuki_models.dart';
 import '../account/source_account_operations.dart';
 import '../plugins/source_sort_options.dart';
@@ -42,6 +43,7 @@ class SourceCommentsOperations {
     int pageSize = 16,
     String? replyTo,
     String order = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _comments.loadCommentsPage(
     comicId: comicId,
     subId: subId,
@@ -51,6 +53,7 @@ class SourceCommentsOperations {
     pageSize: pageSize,
     replyTo: replyTo,
     order: order,
+    taskOrigin: taskOrigin,
   );
 
   Future<void> sendComment({
@@ -60,6 +63,7 @@ class SourceCommentsOperations {
     String sourceKey = '',
     required String content,
     String? replyTo,
+    SourceTaskOrigin? taskOrigin,
   }) => _comments.sendComment(
     comicId: comicId,
     subId: subId,
@@ -67,6 +71,7 @@ class SourceCommentsOperations {
     sourceKey: sourceKey,
     content: content,
     replyTo: replyTo,
+    taskOrigin: taskOrigin,
   );
 
   Future<void> likeComment({
@@ -75,11 +80,13 @@ class SourceCommentsOperations {
     String sourceKey = '',
     required String commentId,
     required bool isLike,
+    SourceTaskOrigin? taskOrigin,
   }) => _comments.likeComment(
     comicId: comicId,
     subId: subId,
     sourceKey: sourceKey,
     commentId: commentId,
     isLike: isLike,
+    taskOrigin: taskOrigin,
   );
 }

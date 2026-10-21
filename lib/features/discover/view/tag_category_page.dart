@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_task_owner.dart';
 import 'dart:async';
 import 'dart:ui' show FrameTiming;
 
@@ -15,7 +16,9 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class TagCategoryPage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const TagCategoryPage({
+    required this.taskControl,
     super.key,
     required this.searchPageBuilder,
     required this.comicDetailPageBuilder,
@@ -78,6 +81,7 @@ class _TagCategoryGroupCard extends StatelessWidget {
 
 class _TagCategoryPageState extends State<TagCategoryPage> {
   final _sourceUi = SourceUiOwner();
+  late final _readTasks = SourceTaskOwner(widget.taskControl);
   static const _loadTimeout = Duration(seconds: 25);
 
   SourceCategoryGateway get _sourceService => widget.categorySource;
@@ -121,6 +125,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
 
   @override
   void dispose() {
+    _readTasks.dispose();
     _sourceUi.dispose();
     _logTagCategoryEvent('Tag category session ended');
     if (_frameTimingsCallbackAttached) {
@@ -186,7 +191,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
     final timeoutMessage = AppLocalizations.of(context)!.tagCategoryLoadTimeout;
     return _sourceUi.run(
       () => SourceUiScope.timeout(
-        _sourceService.loadCategoryTagGroups(),
+        _sourceService.loadCategoryTagGroups(taskOrigin: _readTasks.origin()),
         _loadTimeout,
         onTimeout: () => throw Exception(timeoutMessage),
       ),
@@ -194,6 +199,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
   }
 
   Future<void> _loadInitial() async {
+    _readTasks.restart();
     if (!mounted) {
       return;
     }
@@ -283,6 +289,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
             comicDetailPageBuilder: widget.comicDetailPageBuilder,
             sourceService: widget.discoverSource,
             scrollSortBarWithContent: true,
+            taskControl: widget.taskControl,
           ),
         ),
       );

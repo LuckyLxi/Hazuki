@@ -32,6 +32,18 @@ class SourceSharedRequest<T> {
   bool _started = false;
   bool _completed = false;
   Future<void>? _settled;
+  int _pendingCommits = 0;
+  Completer<void>? _commitsSettled;
+
+  Future<R> runCommit<R>(Future<R> Function() operation) async {
+    checkActive();
+    if (_pendingCommits++ == 0) _commitsSettled = Completer<void>();
+    try {
+      return await operation();
+    } finally {
+      if (--_pendingCommits == 0) _commitsSettled!.complete();
+    }
+  }
 
   bool get available => _stopReason == null && !_completed;
   bool get hasConsumers => _subscribers.isNotEmpty && _stopReason == null;
@@ -142,6 +154,7 @@ class SourceSharedRequest<T> {
         _result.complete(value);
       },
       onError: (Object error, StackTrace stack) {
+        if (error is SourceTaskCancelled) _stop(error.reason);
         _completed = true;
         _onUnavailable();
         _result.completeError(error, stack);
@@ -199,6 +212,7 @@ class SourceSharedRequest<T> {
     } finally {
       task?.removeStopHandler(detach);
       final receipt = await detach(SourceTaskStopReason.ownerDisposed);
+      task?.retainUntil(receipt.whenSettled);
       // Cancellation's receipt owns draining. A business result stays prompt.
       receipt.whenSettled.ignore();
     }
@@ -209,6 +223,7 @@ class SourceSharedRequest<T> {
     _stopReason = reason;
     _onUnavailable();
     final settled = Future.wait([
+      if (_pendingCommits != 0) _commitsSettled!.future,
       for (final engine in _engines)
         engine
             .cancelExecution(resourceId, reason.name)

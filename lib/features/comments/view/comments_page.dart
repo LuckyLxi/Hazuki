@@ -27,7 +27,9 @@ part 'comments_composer.dart';
 part 'comments_scroll_support.dart';
 
 class CommentsPage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const CommentsPage({
+    required this.taskControl,
     super.key,
     required this.sourceService,
     required this.filterService,
@@ -119,6 +121,7 @@ class _CommentsPageState extends State<CommentsPage>
       sourceKey: widget.sourceKey,
       logSource: widget.isTabView ? 'comic_detail_comments' : 'comments',
       logContext: {'viewMode': widget.isTabView ? 'detail_tab' : 'page'},
+      taskControl: widget.taskControl,
     );
     _commentFocusNode.addListener(_handleCommentFocusChanged);
     _controller.addListener(_onControllerChanged);

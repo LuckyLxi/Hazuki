@@ -1,3 +1,4 @@
+import '../runtime/source_operation_context.dart';
 import '../runtime/source_cookie_store.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../interaction/source_ui_scope.dart';
@@ -69,13 +70,17 @@ class SourceReloginCoordinator {
   Future<T> runWithReloginRetry<T>(
     Future<T> Function() action, {
     required SourceReloginContext context,
+    void Function()? checkActive,
   }) async {
     try {
       return await action();
     } catch (error) {
+      rethrowSourceOperationStop(error);
+      checkActive?.call();
       if (!isLoginExpiredError(error)) rethrow;
       await clearCookiesForFavoriteDomains(context);
       if (!await tryReloginFromStoredAccount(context, force: true)) rethrow;
+      checkActive?.call();
       return action();
     }
   }
@@ -118,7 +123,8 @@ class SourceReloginCoordinator {
       );
       context.lastReloginAt = DateTime.now();
       return true;
-    } catch (_) {
+    } catch (error) {
+      rethrowSourceOperationStop(error);
       return false;
     }
   }

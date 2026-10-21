@@ -157,12 +157,18 @@ class HazukiSourceDailyRecommendationAdapter
   @override
   bool get supportsDailyRecommendation => runtime.supportsDailyRecommendation;
   @override
+  String? get sourceRevision => runtime.sourceRevision;
+  @override
   DailyRecommendationConfig? dailyRecommendationForSource(String sourceKey) =>
       runtime.dailyRecommendationForSource(sourceKey);
   @override
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
     String sourceKey = '',
-  }) => _content.loadDailyRecommendations(sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _content.loadDailyRecommendations(
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
   SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
   @override

@@ -18,7 +18,9 @@ abstract class HomeDownloadStatusListenable implements Listenable {
 }
 
 class HomeServices {
+  final SourceTaskControlGateway taskControl;
   const HomeServices({
+    required this.taskControl,
     required this.sourceService,
     required this.sourceSwitchService,
     required this.imageService,

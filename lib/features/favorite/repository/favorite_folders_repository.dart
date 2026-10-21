@@ -37,7 +37,8 @@ class DefaultFavoriteFoldersRepository implements FavoriteFoldersRepository {
   @override
   Future<FavoriteFoldersResult> loadCloudFavoriteFolders({
     required String comicId,
-  }) => _source.loadFavoriteFolders(comicId: comicId);
+    SourceTaskOrigin? taskOrigin,
+  }) => _source.loadFavoriteFolders(comicId: comicId, taskOrigin: taskOrigin);
 
   @override
   Future<void> addCloudFavoriteFolder(String name) =>

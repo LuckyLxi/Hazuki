@@ -51,7 +51,12 @@ void main() {
             ],
           });
           when(
-            () => settings.updateSourceSetting('picacg', 'quality', 'high'),
+            () => settings.updateSourceSetting(
+              'picacg',
+              'quality',
+              'high',
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
           ).thenAnswer((_) async {});
           final titleBar = _TitleBar();
           addTearDown(titleBar.dispose);
@@ -111,11 +116,21 @@ void main() {
           );
           if (selectQuality) {
             verify(
-              () => settings.updateSourceSetting('picacg', 'quality', 'high'),
+              () => settings.updateSourceSetting(
+                'picacg',
+                'quality',
+                'high',
+                taskOrigin: any(named: 'taskOrigin'),
+              ),
             ).called(1);
           } else {
             verifyNever(
-              () => settings.updateSourceSetting('picacg', 'quality', 'high'),
+              () => settings.updateSourceSetting(
+                'picacg',
+                'quality',
+                'high',
+                taskOrigin: any(named: 'taskOrigin'),
+              ),
             );
           }
           expect(

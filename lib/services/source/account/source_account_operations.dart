@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import '../models/source_contract_models.dart';
 import 'account_session_capability.dart';
 import 'source_daily_check_in_capability.dart';
@@ -11,11 +12,17 @@ abstract interface class SourceAccountOperations {
 
   bool isLoggedForSource(String sourceKey);
   String? currentAccountForSource(String sourceKey);
-  Future<void> login({required String account, required String password});
-  Future<void> logout();
-  Future<String?> loadCurrentAvatarUrl();
-  Future<bool> isDailyCheckInCompletedToday();
-  Future<DailyCheckInResult> performDailyCheckIn();
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<void> logout({SourceTaskOrigin? taskOrigin});
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin});
+  Future<bool> isDailyCheckInCompletedToday({SourceTaskOrigin? taskOrigin});
+  Future<DailyCheckInResult> performDailyCheckIn({
+    SourceTaskOrigin? taskOrigin,
+  });
 }
 
 class SourceAccountOperationService
@@ -34,8 +41,11 @@ class SourceAccountOperationService
       _accountSession.interactive?.cancelPendingLogin();
 
   @override
-  Future<List<SourceLoginMethod>> loadLoginMethods() =>
-      _accountSession.interactive?.loadLoginMethods() ?? Future.value(const []);
+  Future<List<SourceLoginMethod>> loadLoginMethods({
+    SourceTaskOrigin? taskOrigin,
+  }) =>
+      _accountSession.interactive?.loadLoginMethods(taskOrigin: taskOrigin) ??
+      Future.value(const []);
   @override
   Future<void> loginInteractive({
     required String account,
@@ -43,12 +53,14 @@ class SourceAccountOperationService
     required String method,
     required SourceLoginPresenter present,
     required SourceLoginCancellation cancellation,
+    SourceTaskOrigin? taskOrigin,
   }) => _accountSession.interactive!.loginInteractive(
     account: account,
     password: password,
     method: method,
     present: present,
     cancellation: cancellation,
+    taskOrigin: taskOrigin,
   );
 
   @override
@@ -67,20 +79,30 @@ class SourceAccountOperationService
       _accountSession.currentAccountForSource(sourceKey);
 
   @override
-  Future<void> login({required String account, required String password}) =>
-      _accountSession.login(account: account, password: password);
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  }) => _accountSession.login(
+    account: account,
+    password: password,
+    taskOrigin: taskOrigin,
+  );
 
   @override
-  Future<void> logout() => _accountSession.logout();
+  Future<void> logout({SourceTaskOrigin? taskOrigin}) =>
+      _accountSession.logout(taskOrigin: taskOrigin);
 
   @override
-  Future<String?> loadCurrentAvatarUrl() =>
-      _accountSession.loadCurrentAvatarUrl();
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin}) =>
+      _accountSession.loadCurrentAvatarUrl(taskOrigin: taskOrigin);
 
   @override
-  Future<bool> isDailyCheckInCompletedToday() =>
-      _dailyCheckIn.isCompletedToday();
+  Future<bool> isDailyCheckInCompletedToday({SourceTaskOrigin? taskOrigin}) =>
+      _dailyCheckIn.isCompletedToday(taskOrigin: taskOrigin);
 
   @override
-  Future<DailyCheckInResult> performDailyCheckIn() => _dailyCheckIn.perform();
+  Future<DailyCheckInResult> performDailyCheckIn({
+    SourceTaskOrigin? taskOrigin,
+  }) => _dailyCheckIn.perform(taskOrigin: taskOrigin);
 }

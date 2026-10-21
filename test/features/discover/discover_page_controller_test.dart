@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
@@ -16,6 +17,7 @@ void main() {
   test('forwards source service changes until disposed', () {
     final controller = DiscoverPageController(
       sourceService: sl<SourceDiscoverGateway>(),
+      taskControl: FakeSourceTaskControl(),
     );
     var notifications = 0;
     controller.addListener(() {
@@ -50,7 +52,10 @@ void main() {
             2: CategoryComicsResult(comics: _comics(7, 7), maxPage: 2),
           },
         );
-        final controller = DiscoverPageController(sourceService: source);
+        final controller = DiscoverPageController(
+          sourceService: source,
+          taskControl: FakeSourceTaskControl(),
+        );
         addTearDown(controller.dispose);
         addTearDown(source.dispose);
         await _load(controller);
@@ -91,7 +96,10 @@ void main() {
           ),
         },
       );
-      final controller = DiscoverPageController(sourceService: source);
+      final controller = DiscoverPageController(
+        sourceService: source,
+        taskControl: FakeSourceTaskControl(),
+      );
       addTearDown(controller.dispose);
       addTearDown(source.dispose);
       await _load(controller);
@@ -120,7 +128,10 @@ void main() {
           2: CategoryComicsResult(comics: _comics(0, 7), maxPage: null),
         },
       );
-      final controller = DiscoverPageController(sourceService: source);
+      final controller = DiscoverPageController(
+        sourceService: source,
+        taskControl: FakeSourceTaskControl(),
+      );
       addTearDown(controller.dispose);
       addTearDown(source.dispose);
       await _load(controller);
@@ -170,10 +181,12 @@ class _DiscoverGateway extends ChangeNotifier implements SourceDiscoverGateway {
   @override
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) async => [section];
   @override
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
+    SourceTaskOrigin? taskOrigin,
   }) async => [];
   @override
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
@@ -181,6 +194,7 @@ class _DiscoverGateway extends ChangeNotifier implements SourceDiscoverGateway {
     required int page,
     String order = '',
     List<String>? orders,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     requestedPages.add(page);
     return pages[page]!;

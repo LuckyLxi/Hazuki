@@ -130,7 +130,13 @@ void main() {
       await tester.tap(find.text('Old to new'));
       await tester.pumpAndSettle();
       expect(selected, ['savedOldest']);
-      verifyNever(() => gateway.runAction(any(), any()));
+      verifyNever(
+        () => gateway.runAction(
+          any(),
+          any(),
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      );
     },
   );
 
@@ -150,7 +156,13 @@ void main() {
       await tester.tap(find.text('Old to new'));
       await tester.pumpAndSettle();
       expect(selected, ['da']);
-      verifyNever(() => gateway.runAction(any(), any()));
+      verifyNever(
+        () => gateway.runAction(
+          any(),
+          any(),
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -160,7 +172,13 @@ void main() {
     (tester) async {
       final done = Completer<dynamic>();
       SourceUiScope? scope;
-      when(() => gateway.runAction('custom', 'export')).thenAnswer((_) {
+      when(
+        () => gateway.runAction(
+          'custom',
+          'export',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      ).thenAnswer((_) {
         expect(find.byType(BackdropFilter), findsNothing);
         scope = SourceUiScope.current;
         return done.future;
@@ -176,7 +194,13 @@ void main() {
       );
       await tester.tap(find.byIcon(Icons.sort_rounded));
       await tester.pumpAndSettle();
-      verify(() => gateway.runAction('custom', 'export')).called(1);
+      verify(
+        () => gateway.runAction(
+          'custom',
+          'export',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      ).called(1);
       done.complete(null);
       await tester.pumpAndSettle();
       expect(
@@ -189,7 +213,11 @@ void main() {
 
   testWidgets('action errors are shown and restore the button', (tester) async {
     when(
-      () => gateway.runAction('custom', 'export'),
+      () => gateway.runAction(
+        'custom',
+        'export',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).thenAnswer((_) async => throw StateError('Export failed'));
     await _pumpMenu(tester, gateway: gateway);
     await _openSubmenu(tester);
@@ -210,7 +238,10 @@ void main() {
     await _openSubmenu(tester);
     await _pumpMenu(tester, gateway: gateway, sourceKey: 'other');
     expect(find.text('Export'), findsNothing);
-    verifyNever(() => gateway.runAction(any(), any()));
+    verifyNever(
+      () =>
+          gateway.runAction(any(), any(), taskOrigin: any(named: 'taskOrigin')),
+    );
     expect(tester.takeException(), isNull);
   });
 

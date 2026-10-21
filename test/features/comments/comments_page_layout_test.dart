@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 
@@ -111,6 +112,7 @@ void main() {
                   sourceKey: 'source',
                   interactionState: state,
                   isTabView: true,
+                  taskControl: FakeSourceTaskControl(),
                 ),
               ),
             ),
@@ -209,6 +211,7 @@ void main() {
                           scrollController: scrollController,
                           onRequestTabFullscreen: onRequestTabFullscreen,
                           interactionState: interactionState,
+                          taskControl: FakeSourceTaskControl(),
                         ),
                   ),
                 ),
@@ -290,6 +293,7 @@ void main() {
                     showAppBar: showAppBar,
                     interactionState: state,
                     isTabView: isTabView,
+                    taskControl: FakeSourceTaskControl(),
                   );
                   if (!isTabView) return page;
                   return NestedScrollView(
@@ -571,6 +575,7 @@ class _Source extends Fake
     int pageSize = 16,
     String? replyTo,
     String order = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     lastOrder = order;
     return ComicCommentsPageResult(
@@ -586,6 +591,7 @@ class _Source extends Fake
     String sourceKey = '',
     required String commentId,
     required bool isLike,
+    SourceTaskOrigin? taskOrigin,
   }) {
     likeCount++;
     return likeResult.future;
@@ -599,6 +605,7 @@ class _Source extends Fake
     String sourceKey = '',
     required String content,
     String? replyTo,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     sentContent = content;
     sentReplyTo = replyTo;

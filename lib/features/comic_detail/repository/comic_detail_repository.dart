@@ -66,8 +66,13 @@ class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
     forceRefresh: forceRefresh,
   );
 
-  Future<List<CategoryTagGroup>> loadCategoryTagGroups() {
-    return _source.loadCategoryTagGroups(sourceKey: _sourceKey);
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
+    SourceTaskOrigin? taskOrigin,
+  }) {
+    return _source.loadCategoryTagGroups(
+      sourceKey: _sourceKey,
+      taskOrigin: taskOrigin,
+    );
   }
 
   Future<Uint8List> downloadImageBytes(
@@ -109,7 +114,12 @@ class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
   @override
   Future<FavoriteFoldersResult> loadCloudFavoriteFolders({
     required String comicId,
-  }) => _source.loadFavoriteFolders(comicId: comicId, sourceKey: _sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _source.loadFavoriteFolders(
+    comicId: comicId,
+    sourceKey: _sourceKey,
+    taskOrigin: taskOrigin,
+  );
 
   @override
   Future<void> addCloudFavoriteFolder(String name) =>

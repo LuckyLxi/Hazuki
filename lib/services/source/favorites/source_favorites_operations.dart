@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import 'dart:async';
 
 import '../../../models/hazuki_models.dart';
@@ -24,17 +25,28 @@ abstract interface class SourceFavoritesOperations {
   Future<FavoriteComicsResult> loadFavoriteComics({
     required int page,
     required String folderId,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
-  Future<void> addFavoriteFolder(String name, {String sourceKey = ''});
-  Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''});
+  Future<void> addFavoriteFolder(
+    String name, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<void> deleteFavoriteFolder(
+    String folderId, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
   Future<void> renameFavoriteFolder(
     String folderId,
     String name, {
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<void> toggleFavorite({
     required String comicId,
@@ -42,6 +54,7 @@ abstract interface class SourceFavoritesOperations {
     String folderId = '0',
     String? favoriteId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<void> warmUpFavoritesDebugInfo();
   Future<Map<String, dynamic>> collectFavoritesDebugInfo({
@@ -107,24 +120,54 @@ class SourceFavoritesOperationService implements SourceFavoritesOperations {
   Future<FavoriteComicsResult> loadFavoriteComics({
     required int page,
     required String folderId,
-  }) => _favorites.loadFavoriteComics(page: page, folderId: folderId);
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.loadFavoriteComics(
+    page: page,
+    folderId: folderId,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,
     String sourceKey = '',
-  }) => _favorites.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.loadFavoriteFolders(
+    comicId: comicId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) =>
-      _favorites.addFavoriteFolder(name, sourceKey: sourceKey);
+  Future<void> addFavoriteFolder(
+    String name, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.addFavoriteFolder(
+    name,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''}) =>
-      _favorites.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
+  Future<void> deleteFavoriteFolder(
+    String folderId, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.deleteFavoriteFolder(
+    folderId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<void> renameFavoriteFolder(
     String folderId,
     String name, {
     String sourceKey = '',
-  }) => _favorites.renameFavoriteFolder(folderId, name, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _favorites.renameFavoriteFolder(
+    folderId,
+    name,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<void> toggleFavorite({
     required String comicId,
@@ -132,12 +175,14 @@ class SourceFavoritesOperationService implements SourceFavoritesOperations {
     String folderId = '0',
     String? favoriteId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _favorites.toggleFavorite(
     comicId: comicId,
     isAdding: isAdding,
     folderId: folderId,
     favoriteId: favoriteId,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<void> warmUpFavoritesDebugInfo() => _debug.warmUpFavoritesDebugInfo();

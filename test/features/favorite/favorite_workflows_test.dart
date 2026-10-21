@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -95,7 +96,9 @@ void main() {
     when(() => source.isLogged).thenReturn(true);
     when(() => source.supportFavoriteFolderRename).thenReturn(false);
     when(() => source.favoriteSortOrders).thenReturn(['mr', 'mp']);
-    when(source.loadFavoriteFolders).thenAnswer((_) async {
+    when(
+      () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer((_) async {
       events.add('cloud.load');
       return _result(cloudFolders);
     });
@@ -105,7 +108,10 @@ void main() {
       events.add('local.load');
       return _result(localFolders);
     });
-    when(() => source.addFavoriteFolder(any())).thenAnswer((call) async {
+    when(
+      () =>
+          source.addFavoriteFolder(any(), taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer((call) async {
       events.add('cloud.add:${call.positionalArguments.single}');
     });
     when(
@@ -126,7 +132,12 @@ void main() {
         'local.rename:${call.namedArguments[#folderId]}:${call.namedArguments[#name]}:${call.namedArguments[#sourceKey]}',
       );
     });
-    when(() => source.deleteFavoriteFolder(any())).thenAnswer((call) async {
+    when(
+      () => source.deleteFavoriteFolder(
+        any(),
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
+    ).thenAnswer((call) async {
       events.add('cloud.delete:${call.positionalArguments.single}');
     });
     when(
@@ -154,7 +165,7 @@ void main() {
     when(() => source.setFavoriteSortOrder(any())).thenAnswer((call) async {
       events.add('cloud.sort:${call.positionalArguments.single}');
     });
-    final cloudFlow = FavoriteCloudFlow(source);
+    final cloudFlow = FavoriteCloudFlow(source, FakeSourceTaskControl());
     final localFlow = FavoriteLocalFlow(
       repository: local,
       preferences: preferences,
@@ -217,7 +228,10 @@ void main() {
         await folders.reloadFolders();
         expect(state.folders, [defaultCloudFavoriteFolder]);
         expect(events, ['save:cloud:0:jm', 'notify:false:0']);
-        verifyNever(source.loadFavoriteFolders);
+        verifyNever(
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+        );
       },
     );
 
@@ -246,7 +260,10 @@ void main() {
     test(
       'cloud directory errors finish loading before the error callback',
       () async {
-        when(source.loadFavoriteFolders).thenAnswer(
+        when(
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+        ).thenAnswer(
           (_) async => const FavoriteFoldersResult.error('load failed'),
         );
         await folders.reloadFolders(
@@ -384,8 +401,12 @@ void main() {
       state.selectedCloudFolderId = 'cloud-1';
       state.folders = cloudFolders;
       when(
-        () =>
-            source.renameFavoriteFolder('cloud-1', 'renamed', sourceKey: 'jm'),
+        () => source.renameFavoriteFolder(
+          'cloud-1',
+          'renamed',
+          sourceKey: 'jm',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenAnswer((_) async {
         events.add('cloud.rename');
         cloudFolders = [
@@ -417,6 +438,7 @@ void main() {
             any(),
             any(),
             sourceKey: any(named: 'sourceKey'),
+            taskOrigin: any(named: 'taskOrigin'),
           ),
         );
         expect(events, isEmpty);
@@ -432,6 +454,7 @@ void main() {
             'cloud-1',
             'renamed',
             sourceKey: 'jm',
+            taskOrigin: any(named: 'taskOrigin'),
           ),
         ).thenThrow(StateError('rename failed'));
         expect(
@@ -445,11 +468,15 @@ void main() {
     test('cloud rename reports a failed folder refresh', () async {
       when(() => source.supportFavoriteFolderRename).thenReturn(true);
       when(
-        () =>
-            source.renameFavoriteFolder('cloud-1', 'renamed', sourceKey: 'jm'),
+        () => source.renameFavoriteFolder(
+          'cloud-1',
+          'renamed',
+          sourceKey: 'jm',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenAnswer((_) async {});
       when(
-        source.loadFavoriteFolders,
+        () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
       ).thenAnswer((_) async => FavoriteFoldersResult.error('refresh failed'));
       expect(
         await folders.renameFolder('cloud-1', 'renamed'),
@@ -467,6 +494,7 @@ void main() {
             'cloud-1',
             'renamed',
             sourceKey: 'jm',
+            taskOrigin: any(named: 'taskOrigin'),
           ),
         ).thenAnswer((_) => pending.future);
         final rename = folders.renameFolder('cloud-1', 'renamed');
@@ -599,7 +627,10 @@ void main() {
         state.selectedCloudFolderId = 'cloud-1';
         state.folders = cloudFolders;
         final pending = Completer<FavoriteFoldersResult>();
-        when(source.loadFavoriteFolders).thenAnswer((_) {
+        when(
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+        ).thenAnswer((_) {
           events.add('cloud.load');
           return pending.future;
         });
@@ -627,7 +658,10 @@ void main() {
     test('delete failure does not persist a fallback selection', () async {
       state.selectedCloudFolderId = 'cloud-1';
       when(
-        () => source.deleteFavoriteFolder('cloud-1'),
+        () => source.deleteFavoriteFolder(
+          'cloud-1',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenThrow(StateError('delete failed'));
       expect(
         await folders.deleteCurrentFolder(timeoutMessage: ''),
@@ -643,10 +677,16 @@ void main() {
         state.selectedCloudFolderId = 'cloud-1';
         state.folders = cloudFolders;
         final pending = Completer<FavoriteFoldersResult>();
-        when(source.loadFavoriteFolders).thenAnswer((_) => pending.future);
+        when(
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+        ).thenAnswer((_) => pending.future);
         final reload = folders.reloadFolders();
         when(
-          () => source.deleteFavoriteFolder('cloud-1'),
+          () => source.deleteFavoriteFolder(
+            'cloud-1',
+            taskOrigin: any(named: 'taskOrigin'),
+          ),
         ).thenThrow(StateError('delete failed'));
 
         expect(
@@ -674,7 +714,10 @@ void main() {
           state.folders = cloudFolders;
           final pending = Completer<void>();
           when(
-            () => source.deleteFavoriteFolder('cloud-1'),
+            () => source.deleteFavoriteFolder(
+              'cloud-1',
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
           ).thenAnswer((_) => pending.future);
 
           final deletion = folders.deleteCurrentFolder(
@@ -689,7 +732,11 @@ void main() {
           expect(await deletion, isNull);
           expect(state.folders, same(cloudFolders));
           expect(events, isEmpty);
-          verifyNever(source.loadFavoriteFolders);
+          verifyNever(
+            () => source.loadFavoriteFolders(
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
+          );
         },
       );
     }
@@ -698,7 +745,10 @@ void main() {
       test('late directory results are discarded after $transition', () async {
         final previous = state.folders;
         final pending = Completer<FavoriteFoldersResult>();
-        when(source.loadFavoriteFolders).thenAnswer((_) => pending.future);
+        when(
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+        ).thenAnswer((_) => pending.future);
         final reload = folders.reloadFolders();
         if (transition == 'source') sourceKey = 'other';
         if (transition == 'mode') state.mode = FavoritePageMode.local;

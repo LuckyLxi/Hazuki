@@ -1,3 +1,4 @@
+import '../source/runtime/source_operation_context.dart';
 import 'dart:math' as math;
 import '../source/source_capabilities.dart';
 import '../../models/hazuki_models.dart';
@@ -9,6 +10,7 @@ import 'discover_recommendation_authors.dart';
 abstract interface class DiscoverDailyRecommendationCandidateGenerator {
   Future<DiscoverDailyRecommendationSnapshot?> generate({
     required List<DiscoverDailyRecommendationEntry> previous,
+    SourceTaskOrigin? taskOrigin,
   });
 }
 
@@ -38,6 +40,7 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
   @override
   Future<DiscoverDailyRecommendationSnapshot?> generate({
     required List<DiscoverDailyRecommendationEntry> previous,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     if (!_supportsActiveSource) {
       return null;
@@ -46,6 +49,8 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
     final config = _source.dailyRecommendationForSource(sourceKey);
     if (config == null) return null;
     bool hasSameActiveSource() {
+      final reason = taskOrigin?.cancellation?.reason;
+      if (reason != null) throw SourceTaskCancelled('recommendation', reason);
       return _supportsActiveSource &&
           (_source.activeSourceKey ?? '').trim() == sourceKey &&
           _source.dailyRecommendationForSource(sourceKey)?.cacheKey ==
@@ -56,6 +61,7 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
       try {
         final items = await _source.loadDailyRecommendations(
           sourceKey: sourceKey,
+          taskOrigin: taskOrigin,
         );
         if (!hasSameActiveSource()) return null;
         return DiscoverDailyRecommendationSnapshot(
@@ -75,7 +81,8 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
           schemaVersion: DiscoverDailyRecommendationConfig.cacheSchemaVersion,
           configurationKey: config.cacheKey,
         );
-      } catch (_) {
+      } catch (error) {
+        rethrowSourceOperationStop(error);
         return null;
       }
     }
@@ -109,8 +116,10 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
           page: 1,
           order: config.searchOrder,
           sourceKey: sourceKey,
+          taskOrigin: taskOrigin,
         );
-      } catch (_) {
+      } catch (error) {
+        rethrowSourceOperationStop(error);
         if (!hasSameActiveSource()) {
           return null;
         }
@@ -165,6 +174,7 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
       final incoming = await _buildRecommendationEntries(
         sampledComics,
         fallbackAuthor: author,
+        taskOrigin: taskOrigin,
       );
       if (!hasSameActiveSource()) {
         return null;
@@ -205,10 +215,11 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
   Future<List<DiscoverDailyRecommendationEntry>> _buildRecommendationEntries(
     List<ExploreComic> comics, {
     required String fallbackAuthor,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     final entries = <DiscoverDailyRecommendationEntry>[];
     for (final comic in comics) {
-      final author = await _loadComicAuthor(comic);
+      final author = await _loadComicAuthor(comic, taskOrigin: taskOrigin);
       final resolvedAuthor = author.isEmpty ? fallbackAuthor : author;
       if (resolvedAuthor.isEmpty) {
         continue;
@@ -224,14 +235,19 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
     return entries;
   }
 
-  Future<String> _loadComicAuthor(ExploreComic comic) async {
+  Future<String> _loadComicAuthor(
+    ExploreComic comic, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     try {
       final details = await _source.loadComicDetails(
         comic.id,
         sourceKey: comic.sourceKey,
+        taskOrigin: taskOrigin,
       );
       return extractDiscoverRecommendationAuthor(details);
-    } catch (_) {
+    } catch (error) {
+      rethrowSourceOperationStop(error);
       return '';
     }
   }

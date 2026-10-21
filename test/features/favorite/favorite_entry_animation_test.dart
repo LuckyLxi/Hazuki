@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/favorite/view/favorite_page.dart';
@@ -89,13 +90,25 @@ Future<_Source> _pumpPage(
     () => source.cloudFavoritesChangedStream,
   ).thenAnswer((_) => const Stream<void>.empty());
   when(source.ensureInitialized).thenAnswer((_) async {});
-  when(() => source.loadFavoriteComics(page: 1, folderId: '0')).thenAnswer(
+  when(
+    () => source.loadFavoriteComics(
+      page: 1,
+      folderId: '0',
+      taskOrigin: any(named: 'taskOrigin'),
+    ),
+  ).thenAnswer(
     (_) async => FavoriteComicsResult.success(
       paginated ? _comics.take(12).toList() : _comics,
       maxPage: paginated ? 2 : 1,
     ),
   );
-  when(() => source.loadFavoriteComics(page: 2, folderId: '0')).thenAnswer(
+  when(
+    () => source.loadFavoriteComics(
+      page: 2,
+      folderId: '0',
+      taskOrigin: any(named: 'taskOrigin'),
+    ),
+  ).thenAnswer(
     (_) async =>
         FavoriteComicsResult.success(_comics.skip(12).toList(), maxPage: 2),
   );
@@ -117,6 +130,7 @@ Future<_Source> _pumpPage(
             imageGateway: _Images(),
             authVersion: 0,
             onComicTap: (_, _) async {},
+            taskControl: FakeSourceTaskControl(),
           ),
         ),
       ),
@@ -249,7 +263,13 @@ void main() {
           .controller!;
       scroll.jumpTo(scroll.position.maxScrollExtent);
       await tester.pumpAndSettle();
-      verify(() => source.loadFavoriteComics(page: 2, folderId: '0')).called(1);
+      verify(
+        () => source.loadFavoriteComics(
+          page: 2,
+          folderId: '0',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      ).called(1);
       expect(_progress(tester, 0), 1);
       await _expectAnimatedEntry(tester, 20);
       expect(tester.takeException(), isNull);

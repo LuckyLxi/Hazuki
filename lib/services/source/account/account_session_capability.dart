@@ -1,3 +1,7 @@
+import '../runtime/source_runtime_handle.dart';
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
 import 'source_login_operations.dart';
@@ -39,22 +43,43 @@ class SourceAccountSessionCapability {
       (facade.loadAccountDataSync() != null ||
           facade.loadSourceData(facade.sourceKey, 'login_session') is String);
 
-  Future<void> login({required String account, required String password}) =>
-      _loginOperations.login(account: account, password: password);
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  }) => _loginOperations.login(
+    account: account,
+    password: password,
+    taskOrigin: taskOrigin,
+  );
 
   Future<void> loginWithFacade(
     HazukiSourceFacade facade, {
     required String account,
     required String password,
+    SourceTaskOrigin? taskOrigin,
+    bool serviceOwned = false,
   }) => _loginOperations.loginWithFacade(
     facade,
     account: account,
     password: password,
+    taskOrigin: taskOrigin,
+    serviceOwned: serviceOwned,
   );
 
-  Future<void> logout() async {
+  Future<void> logout({SourceTaskOrigin? taskOrigin}) async =>
+      runSourceOperation(
+        _runtimeHost,
+        _runtimeHost.activeHandle,
+        'account.logout',
+        (operationContext) => _logoutTask(operationContext),
+        origin: taskOrigin,
+        serviceOwned: true,
+      );
+
+  Future<void> _logoutTask(SourceOperationContext operationContext) async {
     interactive?.cancelPendingLogin();
-    final facade = this.facade;
+    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
     return facade.handle.runOperation(() async {
       final engine = facade.js.engine;
       final sourceMeta = facade.sourceMeta;
@@ -62,31 +87,51 @@ class SourceAccountSessionCapability {
 
       if (engine != null && sourceMeta != null) {
         final hasLogout = facade.js.asBool(
-          await engine.evaluate('!!this.__hazuki_source.account?.logout'),
+          await operationContext.evaluate(
+            engine,
+            '!!this.__hazuki_source.account?.logout',
+          ),
         );
 
         if (hasLogout) {
           try {
-            final result = await engine.evaluate(
+            final result = await operationContext.evaluate(
+              engine,
               'this.__hazuki_source.account.logout()',
               name: 'source_logout.js',
             );
-            await facade.js.resolve(result);
-          } catch (_) {}
+            await operationContext.resolve(facade.js.resolve(result));
+          } catch (error) {
+            rethrowSourceOperationStop(error);
+          }
         }
       }
 
       if (sourceKey.isEmpty) return;
 
-      await facade.deleteSourceData(sourceKey, 'account');
-      await facade.deleteSourceData(sourceKey, 'avatar_url');
-      await facade.deleteSourceData(sourceKey, 'display_name');
-      await facade.saveCookieStore(const []);
+      await operationContext.commit(
+        () => facade.deleteSourceData(sourceKey, 'account'),
+      );
+      await operationContext.commit(
+        () => facade.deleteSourceData(sourceKey, 'avatar_url'),
+      );
+      await operationContext.commit(
+        () => facade.deleteSourceData(sourceKey, 'display_name'),
+      );
+      await operationContext.commit(() => facade.saveCookieStore(const []));
       facade.runtime.transientAvatarUrl = null;
-      await facade.deleteSourceData(sourceKey, 'token');
-      await facade.deleteSourceData(sourceKey, 'interactive_login');
-      await facade.deleteSourceData(sourceKey, 'login_method');
-      await facade.deleteSourceData(sourceKey, 'login_session');
+      await operationContext.commit(
+        () => facade.deleteSourceData(sourceKey, 'token'),
+      );
+      await operationContext.commit(
+        () => facade.deleteSourceData(sourceKey, 'interactive_login'),
+      );
+      await operationContext.commit(
+        () => facade.deleteSourceData(sourceKey, 'login_method'),
+      );
+      await operationContext.commit(
+        () => facade.deleteSourceData(sourceKey, 'login_session'),
+      );
       _runtimeHost.notifyActiveRuntimeChanged(sourceKey);
     });
   }
@@ -122,7 +167,8 @@ class SourceAccountSessionCapability {
             null;
   }
 
-  Future<String?> loadCurrentAvatarUrl() => _runtimeHost.hasActiveSource
-      ? _loginOperations.loadCurrentAvatarUrl()
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin}) =>
+      _runtimeHost.hasActiveSource
+      ? _loginOperations.loadCurrentAvatarUrl(taskOrigin: taskOrigin)
       : Future.value(null);
 }

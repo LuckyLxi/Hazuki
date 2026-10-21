@@ -399,8 +399,13 @@ class SourceScriptEngine {
     String code, {
     String? name,
     SourceScriptExecution? execution,
-  }) =>
-      _command('evaluate', {'code': code, 'name': name}, execution: execution);
+    bool retainAdmittedWork = false,
+  }) => _command(
+    'evaluate',
+    {'code': code, 'name': name},
+    execution: execution,
+    retainAdmittedWork: retainAdmittedWork,
+  );
 
   /// Runs declarations without adopting an intentionally discarded Promise.
   Future<void> execute(
@@ -418,10 +423,13 @@ class SourceScriptEngine {
     String code,
     List<dynamic> arguments, {
     SourceScriptExecution? execution,
-  }) => _command('invoke', {
-    'code': code,
-    'arguments': _codec.encode(arguments),
-  }, execution: execution);
+    bool retainAdmittedWork = false,
+  }) => _command(
+    'invoke',
+    {'code': code, 'arguments': _codec.encode(arguments)},
+    execution: execution,
+    retainAdmittedWork: retainAdmittedWork,
+  );
   Future<void> setGlobal(
     String name,
     dynamic value, {
@@ -437,9 +445,14 @@ class SourceScriptEngine {
     String kind,
     Map<String, dynamic> arguments, {
     SourceScriptExecution? execution,
+    bool retainAdmittedWork = false,
   }) {
-    Future<dynamic> action() =>
-        _sendCommand(kind, arguments, execution: execution);
+    Future<dynamic> action() => _sendCommand(
+      kind,
+      arguments,
+      execution: execution,
+      retainAdmittedWork: retainAdmittedWork,
+    );
     return operationGuard?.call(action) ?? action();
   }
 
@@ -447,6 +460,7 @@ class SourceScriptEngine {
     String kind,
     Map<String, dynamic> arguments, {
     SourceScriptExecution? execution,
+    bool retainAdmittedWork = false,
   }) async {
     if (_closing) throw StateError('source_script_engine_closed');
     // Callback cleanup must still run after its owner has cancelled.
@@ -475,7 +489,11 @@ class SourceScriptEngine {
       }
     }
     if (_closing) throw StateError('source_script_engine_closed');
-    if (scope?.reason case final reason?) throw SourceUiCancelled(reason);
+    final scopeReason = scope?.reason;
+    // Preserve admitted service work without renewing its UI authority.
+    if (!retainAdmittedWork && scopeReason != null) {
+      throw SourceUiCancelled(scopeReason);
+    }
     final id = ++_sequence;
     final completion = Completer<dynamic>();
     _pending[id] = completion;

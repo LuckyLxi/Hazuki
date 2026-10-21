@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_task_owner.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -32,6 +33,7 @@ class CommentsEffect {
 class CommentsPageController extends ChangeNotifier
     implements CommentsSortDelegate {
   CommentsPageController({
+    required SourceTaskControlGateway taskControl,
     required SourceCommentsGateway sourceService,
     required CommentFilterService filterService,
     required this.comicId,
@@ -41,7 +43,8 @@ class CommentsPageController extends ChangeNotifier
     this.logSource = 'comments',
     this.logContext = const {},
     CommentsInteractionState? state,
-  }) : _sourceService = sourceService,
+  }) : _readTasks = SourceTaskOwner(taskControl),
+       _sourceService = sourceService,
        _filterService = filterService,
        state = state ?? CommentsInteractionState() {
     _filterService.addListener(_onFilterChanged);
@@ -63,6 +66,7 @@ class CommentsPageController extends ChangeNotifier
   final _effects = StreamController<CommentsEffect>.broadcast(sync: true);
   bool _disposed = false;
   final _sourceUi = SourceUiOwner();
+  final SourceTaskOwner _readTasks;
 
   Stream<CommentsEffect> get effects => _effects.stream;
 
@@ -109,6 +113,7 @@ class CommentsPageController extends ChangeNotifier
           pageSize: pageSize,
           replyTo: replyTo,
           order: state.order,
+          taskOrigin: _readTasks.origin(),
         ),
         loadTimeout,
       ),
@@ -129,6 +134,8 @@ class CommentsPageController extends ChangeNotifier
 
   Future<void> loadInitial() async {
     if (_disposed) return;
+    _readTasks.restart();
+    _sourceUi.restart();
     _refreshCapabilities();
     final epoch = ++state.loadEpoch;
     _emit(CommentsEffectType.initialLoadStarted);
@@ -168,7 +175,9 @@ class CommentsPageController extends ChangeNotifier
       );
     } catch (error) {
       if (!_isCurrent(epoch)) return;
-      if (isSourceUiCancellation(error)) return;
+      if ((isSourceUiCancellation(error) || isSourceTaskCancellation(error))) {
+        return;
+      }
       _update(() => state.loadError = error);
       _logEvent(
         'Comments load failed',
@@ -309,7 +318,7 @@ class CommentsPageController extends ChangeNotifier
       if (_isCurrent(epoch)) {
         _update(() => _updateCommentById(id, (_) => comment));
       }
-      if (!isSourceUiCancellation(error)) {
+      if (!(isSourceUiCancellation(error) || isSourceTaskCancellation(error))) {
         _emit(CommentsEffectType.likeFailed, error: error);
       }
     } finally {
@@ -367,6 +376,13 @@ class CommentsPageController extends ChangeNotifier
           result.maxPage,
         );
       });
+    } catch (error) {
+      if (!_isCurrent(epoch) ||
+          isSourceUiCancellation(error) ||
+          isSourceTaskCancellation(error)) {
+        return;
+      }
+      rethrow;
     } finally {
       if (_isCurrent(epoch)) {
         _update(() => state.loadingReplyIds.remove(id));
@@ -410,7 +426,7 @@ class CommentsPageController extends ChangeNotifier
       _emit(CommentsEffectType.sendSucceeded);
       await loadInitial();
     } catch (error) {
-      if (!isSourceUiCancellation(error)) {
+      if (!(isSourceUiCancellation(error) || isSourceTaskCancellation(error))) {
         _emit(CommentsEffectType.sendFailed, error: error);
       }
     } finally {
@@ -526,6 +542,7 @@ class CommentsPageController extends ChangeNotifier
 
   @override
   void dispose() {
+    _readTasks.dispose();
     _sourceUi.dispose();
     _disposed = true;
     _filterService.removeListener(_onFilterChanged);

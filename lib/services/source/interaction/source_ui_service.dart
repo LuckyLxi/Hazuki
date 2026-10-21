@@ -18,6 +18,7 @@ class SourceUiOwner {
   SourceUiOwner();
   Object? _routeOwner;
   final Set<SourceUiScope> _scopes = {};
+  final Set<SourceUiScope> _serviceScopes = {};
   bool wasCancelled = false;
   bool _disposed = false;
 
@@ -50,6 +51,9 @@ class SourceUiOwner {
   void dispose() {
     _disposed = true;
     cancel('ownerGone');
+    for (final scope in _serviceScopes.toList()) {
+      scope.cancel('ownerGone');
+    }
   }
 }
 
@@ -237,9 +241,13 @@ class SourceUiService {
     SourceDialogPresenter? present,
     bool captureRouteOwner = true,
     bool abortOnScopeCancellation = true,
+    bool inheritCurrent = true,
+    Object? routeOwner,
+    SourceUiOwner? serviceLifetimeOwner,
   }) async {
     final current = SourceUiScope.current;
-    if (current?.available == true &&
+    if (inheritCurrent &&
+        current?.available == true &&
         present == null &&
         (owner == null || identical(current!.controllerOwner, owner))) {
       return operation();
@@ -248,6 +256,7 @@ class SourceUiService {
     final scope = SourceUiScope(
       waitingTimeout: interactionTimeout,
       owner:
+          routeOwner ??
           owner?._routeOwner ??
           (captureRouteOwner ? captureOwner?.call() : null),
       controllerOwner: owner,
@@ -259,6 +268,8 @@ class SourceUiService {
     _scopes[scope.id] = scope;
     if (present != null) _presenters[scope.id] = present;
     owner?._scopes.add(scope);
+    serviceLifetimeOwner?._serviceScopes.add(scope);
+    if (serviceLifetimeOwner?._disposed == true) scope.cancel('ownerGone');
     void changed() {
       if (scope.reason == null && !scope.finished) return;
       for (final dialog in _dialogs.values.toList()) {
@@ -303,6 +314,7 @@ class SourceUiService {
       _scopes.remove(scope.id);
       _presenters.remove(scope.id);
       owner?._scopes.remove(scope);
+      serviceLifetimeOwner?._serviceScopes.remove(scope);
       _dialogs.removeWhere((_, dialog) => identical(dialog.scope, scope));
       scope.dispose();
     }

@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_task_owner.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class HomeProfileFlow {
   const HomeProfileFlow({
+    required this.taskControl,
     required this.context,
     required this.isMounted,
     required this.profileController,
@@ -23,6 +25,7 @@ class HomeProfileFlow {
     required this.syncUserProfile,
   });
 
+  final SourceTaskControlGateway taskControl;
   final BuildContext context;
   final bool Function() isMounted;
   final HomeProfileController profileController;
@@ -35,7 +38,15 @@ class HomeProfileFlow {
     String account,
     String password, {
     SourceAccountLoginOperation? loginOverride,
+    SourceTaskOrigin? taskOrigin,
   }) async {
+    void checkLogin() {
+      if (taskOrigin?.cancellation?.reason != null) {
+        throw const SourceLoginCancelled();
+      }
+    }
+
+    checkLogin();
     final sourceKey = sourceService.activeSourceKey;
     final sourceRevision = sourceService.sourceRevision;
     final profile = await loginSourceAccountForDialog(
@@ -43,7 +54,9 @@ class HomeProfileFlow {
       account: account,
       password: password,
       loginOverride: loginOverride,
+      taskOrigin: taskOrigin,
       afterLogin: () async {
+        checkLogin();
         if (!isMounted()) {
           throw StateError('Home page disposed');
         }
@@ -65,6 +78,7 @@ class HomeProfileFlow {
         !sourceService.isLogged) {
       throw const SourceLoginCancelled();
     }
+    checkLogin();
     profileController.applyLoginProfile(
       username: profile.username,
       avatarUrl: profile.avatarUrl,
@@ -74,49 +88,70 @@ class HomeProfileFlow {
   }
 
   Future<void> showLoginDialog() async {
-    final service = sourceService;
-    final selectedSource = service.activeSourceKey;
-    final methods = service is SourceInteractiveAccountGateway
-        ? await (service as SourceInteractiveAccountGateway).loadLoginMethods()
-        : <SourceLoginMethod>[];
-    if (!isMounted() ||
-        !context.mounted ||
-        service.activeSourceKey != selectedSource) {
-      return;
+    final loginTasks = SourceTaskOwner(taskControl);
+    try {
+      final service = sourceService;
+      final selectedSource = service.activeSourceKey;
+      final methods = service is SourceInteractiveAccountGateway
+          ? await (service as SourceInteractiveAccountGateway).loadLoginMethods(
+              taskOrigin: loginTasks.origin(),
+            )
+          : <SourceLoginMethod>[];
+      if (!isMounted() ||
+          !context.mounted ||
+          service.activeSourceKey != selectedSource) {
+        return;
+      }
+      SourceLoginCancellation? attempt;
+      await showHomeLoginDialog(
+        context,
+        loginMethods: methods,
+        onDismissed: () {
+          attempt?.cancel();
+          loginTasks.restart(SourceTaskStopReason.user);
+        },
+        onLoginMethod: (account, password, method, present) {
+          if (service.activeSourceKey != selectedSource) {
+            throw const SourceLoginCancelled();
+          }
+          loginTasks.restart();
+          final taskOrigin = loginTasks.origin();
+          attempt?.cancel();
+          final cancellation = attempt = SourceLoginCancellation();
+          return handleLoginSubmit(
+            account,
+            password,
+            taskOrigin: taskOrigin,
+            loginOverride: ({required account, required password}) =>
+                (service as SourceInteractiveAccountGateway).loginInteractive(
+                  account: account,
+                  password: password,
+                  method: method,
+                  cancellation: cancellation,
+                  present: present,
+                  taskOrigin: taskOrigin,
+                ),
+          );
+        },
+        initialUsername: profileController.username,
+        initialAvatarUrl: (profileController.avatarUrl ?? '').trim(),
+        firstUseText: profileController.firstUseText,
+        onLogin: (account, password) {
+          loginTasks.restart();
+          return handleLoginSubmit(
+            account,
+            password,
+            taskOrigin: loginTasks.origin(),
+          );
+        },
+        onLogoutTap: () {
+          unawaited(logout());
+        },
+        onRequestSaveAvatar: promptSaveAvatar,
+      );
+    } finally {
+      loginTasks.dispose();
     }
-    SourceLoginCancellation? attempt;
-    await showHomeLoginDialog(
-      context,
-      loginMethods: methods,
-      onDismissed: () => attempt?.cancel(),
-      onLoginMethod: (account, password, method, present) {
-        if (service.activeSourceKey != selectedSource) {
-          throw const SourceLoginCancelled();
-        }
-        attempt?.cancel();
-        final cancellation = attempt = SourceLoginCancellation();
-        return handleLoginSubmit(
-          account,
-          password,
-          loginOverride: ({required account, required password}) =>
-              (service as SourceInteractiveAccountGateway).loginInteractive(
-                account: account,
-                password: password,
-                method: method,
-                cancellation: cancellation,
-                present: present,
-              ),
-        );
-      },
-      initialUsername: profileController.username,
-      initialAvatarUrl: (profileController.avatarUrl ?? '').trim(),
-      firstUseText: profileController.firstUseText,
-      onLogin: handleLoginSubmit,
-      onLogoutTap: () {
-        unawaited(logout());
-      },
-      onRequestSaveAvatar: promptSaveAvatar,
-    );
   }
 
   Future<void> logout() async {
@@ -132,7 +167,9 @@ class HomeProfileFlow {
     try {
       await SourceUiService.instance.run(sourceService.logout);
     } catch (error) {
-      if (isSourceUiCancellation(error)) return;
+      if (isSourceUiCancellation(error) || isSourceTaskCancellation(error)) {
+        return;
+      }
       rethrow;
     }
     if (!isMounted() || !context.mounted) {

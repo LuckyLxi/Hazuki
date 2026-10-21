@@ -62,6 +62,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       imageService: widget.services.imageService,
       dailyRecommendationService: widget.services.dailyRecommendationService,
       announcementService: widget.services.announcementService,
+      taskControl: widget.services.taskControl,
     );
     _announcementPopupCoordinator = AnnouncementPopupCoordinator(
       controller: _coordinator.announcementService,

@@ -126,13 +126,22 @@ class _Plugins extends ChangeNotifier implements SourcePluginGateway {
   @override
   Object? loadSetting(String id, String key) => values['$id/$key'];
   @override
-  Future<void> saveSetting(String id, String key, dynamic value) async {
+  Future<void> saveSetting(
+    String id,
+    String key,
+    dynamic value, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     if (settingError != null) throw settingError!;
     values['$id/$key'] = value;
   }
 
   @override
-  Future<dynamic> runAction(String id, String actionId) async {
+  Future<dynamic> runAction(
+    String id,
+    String actionId, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     calls.add((id, actionId));
     return action == null ? 'Done' : action!();
   }
@@ -719,7 +728,12 @@ void main() {
       ],
     });
     when(
-      () => settings.updateSourceSetting('fixture', 'quality', 'original'),
+      () => settings.updateSourceSetting(
+        'fixture',
+        'quality',
+        'original',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).thenAnswer((_) async {});
     await tester.pumpWidget(_app(ReadingSettingsPage(sourceService: settings)));
     await tester.pumpAndSettle();
@@ -739,7 +753,12 @@ void main() {
     await tester.tap(find.text('Original quality'));
     await tester.pumpAndSettle();
     verify(
-      () => settings.updateSourceSetting('fixture', 'quality', 'original'),
+      () => settings.updateSourceSetting(
+        'fixture',
+        'quality',
+        'original',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).called(1);
     expect(
       find.descendant(of: dropdown, matching: find.text('Original quality')),
@@ -766,7 +785,12 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     verifyNever(
-      () => settings.updateSourceSetting('fixture', 'quality', any()),
+      () => settings.updateSourceSetting(
+        'fixture',
+        'quality',
+        any(),
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     );
     expect(find.byType(ReadingSettingsPage), findsOneWidget);
     expect(tester.takeException(), isNull);

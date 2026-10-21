@@ -165,7 +165,12 @@ void main() {
         ],
       });
       when(
-        () => settings.updateSourceSetting('arbitrary', 'resolution', 'draft'),
+        () => settings.updateSourceSetting(
+          'arbitrary',
+          'resolution',
+          'draft',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenAnswer((_) async {});
       final snapshot = ReaderSourceImageQualitySettings.load(
         settings,
@@ -180,7 +185,12 @@ void main() {
         'draft',
       );
       verify(
-        () => settings.updateSourceSetting('arbitrary', 'resolution', 'draft'),
+        () => settings.updateSourceSetting(
+          'arbitrary',
+          'resolution',
+          'draft',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).called(1);
     },
   );

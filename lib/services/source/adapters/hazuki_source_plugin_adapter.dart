@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import 'package:flutter/foundation.dart';
 import '../../../models/source_meta.dart';
 import '../../../shared/preferences/software_update_source.dart';
@@ -16,8 +17,15 @@ class HazukiSourcePluginAdapter implements SourcePluginGateway {
   final SourcePluginManager manager;
   final Future<SourceMeta?> Function(String) metadataLoader;
   final Object? Function(String, String) settingLoader;
-  final Future<void> Function(String, String, dynamic) settingWriter;
-  final Future<dynamic> Function(String, String) actionRunner;
+  final Future<void> Function(
+    String,
+    String,
+    dynamic, {
+    SourceTaskOrigin? taskOrigin,
+  })
+  settingWriter;
+  final Future<dynamic> Function(String, String, {SourceTaskOrigin? taskOrigin})
+  actionRunner;
   @override
   List<InstalledSourcePlugin> get installed => manager.installed;
   @override
@@ -75,11 +83,18 @@ class HazukiSourcePluginAdapter implements SourcePluginGateway {
   @override
   Object? loadSetting(String id, String key) => settingLoader(id, key);
   @override
-  Future<void> saveSetting(String id, String key, dynamic value) =>
-      settingWriter(id, key, value);
+  Future<void> saveSetting(
+    String id,
+    String key,
+    dynamic value, {
+    SourceTaskOrigin? taskOrigin,
+  }) => settingWriter(id, key, value, taskOrigin: taskOrigin);
   @override
-  Future<dynamic> runAction(String id, String action) =>
-      actionRunner(id, action);
+  Future<dynamic> runAction(
+    String id,
+    String action, {
+    SourceTaskOrigin? taskOrigin,
+  }) => actionRunner(id, action, taskOrigin: taskOrigin);
   @override
   void addListener(VoidCallback listener) => manager.addListener(listener);
   @override

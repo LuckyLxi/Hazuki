@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -153,6 +154,7 @@ Widget _buildSubject({
           comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
           comicCoverHeroTagBuilder: (comic, {salt = ''}) => '${comic.id}-$salt',
           sourceService: _MockSourceDiscoverGateway(),
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     ),

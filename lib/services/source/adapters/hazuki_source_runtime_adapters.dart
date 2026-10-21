@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import '../account/source_login_interaction.dart';
 import 'package:flutter/foundation.dart';
 
@@ -147,18 +148,28 @@ class HazukiSourceHomeAdapter extends HazukiSourceListenableAdapter
   Future<void> warmUpFavoritesDebugInfo() =>
       _favorites.warmUpFavoritesDebugInfo();
   @override
-  Future<void> login({required String account, required String password}) =>
-      _account.login(account: account, password: password);
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  }) => _account.login(
+    account: account,
+    password: password,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> logout() => _account.logout();
+  Future<void> logout({SourceTaskOrigin? taskOrigin}) =>
+      _account.logout(taskOrigin: taskOrigin);
   @override
-  Future<String?> loadCurrentAvatarUrl() => _account.loadCurrentAvatarUrl();
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin}) =>
+      _account.loadCurrentAvatarUrl(taskOrigin: taskOrigin);
   @override
-  Future<bool> isDailyCheckInCompletedToday() =>
-      _account.isDailyCheckInCompletedToday();
+  Future<bool> isDailyCheckInCompletedToday({SourceTaskOrigin? taskOrigin}) =>
+      _account.isDailyCheckInCompletedToday(taskOrigin: taskOrigin);
   @override
-  Future<DailyCheckInResult> performDailyCheckIn() =>
-      _account.performDailyCheckIn();
+  Future<DailyCheckInResult> performDailyCheckIn({
+    SourceTaskOrigin? taskOrigin,
+  }) => _account.performDailyCheckIn(taskOrigin: taskOrigin);
 }
 
 class HazukiSourceAdvancedAdapter extends HazukiSourceListenableAdapter
@@ -219,18 +230,28 @@ class HazukiSourceAccountAdapter extends HazukiSourceListenableAdapter
   Future<void> loadActiveSourcePreference() =>
       runtime.loadActiveSourcePreference();
   @override
-  Future<void> login({required String account, required String password}) =>
-      _account.login(account: account, password: password);
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  }) => _account.login(
+    account: account,
+    password: password,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> logout() => _account.logout();
+  Future<void> logout({SourceTaskOrigin? taskOrigin}) =>
+      _account.logout(taskOrigin: taskOrigin);
   @override
-  Future<String?> loadCurrentAvatarUrl() => _account.loadCurrentAvatarUrl();
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin}) =>
+      _account.loadCurrentAvatarUrl(taskOrigin: taskOrigin);
   @override
-  Future<bool> isDailyCheckInCompletedToday() =>
-      _account.isDailyCheckInCompletedToday();
+  Future<bool> isDailyCheckInCompletedToday({SourceTaskOrigin? taskOrigin}) =>
+      _account.isDailyCheckInCompletedToday(taskOrigin: taskOrigin);
   @override
-  Future<DailyCheckInResult> performDailyCheckIn() =>
-      _account.performDailyCheckIn();
+  Future<DailyCheckInResult> performDailyCheckIn({
+    SourceTaskOrigin? taskOrigin,
+  }) => _account.performDailyCheckIn(taskOrigin: taskOrigin);
 }
 
 class HazukiSourceDebugAdapter implements SourceDebugGateway {
@@ -355,18 +376,28 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   Future<void> warmUpFavoritesDebugInfo() =>
       _favorites.warmUpFavoritesDebugInfo();
   @override
-  Future<void> login({required String account, required String password}) =>
-      _account.login(account: account, password: password);
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  }) => _account.login(
+    account: account,
+    password: password,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> logout() => _account.logout();
+  Future<void> logout({SourceTaskOrigin? taskOrigin}) =>
+      _account.logout(taskOrigin: taskOrigin);
   @override
-  Future<String?> loadCurrentAvatarUrl() => _account.loadCurrentAvatarUrl();
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin}) =>
+      _account.loadCurrentAvatarUrl(taskOrigin: taskOrigin);
   @override
-  Future<bool> isDailyCheckInCompletedToday() =>
-      _account.isDailyCheckInCompletedToday();
+  Future<bool> isDailyCheckInCompletedToday({SourceTaskOrigin? taskOrigin}) =>
+      _account.isDailyCheckInCompletedToday(taskOrigin: taskOrigin);
   @override
-  Future<DailyCheckInResult> performDailyCheckIn() =>
-      _account.performDailyCheckIn();
+  Future<DailyCheckInResult> performDailyCheckIn({
+    SourceTaskOrigin? taskOrigin,
+  }) => _account.performDailyCheckIn(taskOrigin: taskOrigin);
   @override
   Future<bool> hasLocalSourceFile(String sourceKey) =>
       _runtimeOperations.hasLocalSourceFile(sourceKey);
@@ -435,8 +466,14 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   Future<void> updateSourceSetting(
     String sourceKey,
     String key,
-    dynamic value,
-  ) => _settings.updateSourceSetting(sourceKey, key, value);
+    dynamic value, {
+    SourceTaskOrigin? taskOrigin,
+  }) => _settings.updateSourceSetting(
+    sourceKey,
+    key,
+    value,
+    taskOrigin: taskOrigin,
+  );
   @override
   Object? loadActiveSourceSetting(String key) =>
       _settings.loadActiveSourceSetting(key);
@@ -444,8 +481,9 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   Future<void> updateActiveSourceSetting(String key, dynamic value) =>
       _settings.updateActiveSourceSetting(key, value);
   @override
-  Future<Map<String, dynamic>> getLineSettingsSnapshot() =>
-      _settings.getLineSettingsSnapshot();
+  Future<Map<String, dynamic>> getLineSettingsSnapshot({
+    SourceTaskOrigin? taskOrigin,
+  }) => _settings.getLineSettingsSnapshot(taskOrigin: taskOrigin);
   @override
   Future<void> updateLineSetting(String key, dynamic value) =>
       _settings.updateLineSetting(key, value);
@@ -453,9 +491,11 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   Future<void> refreshLines({
     bool refreshApiDomains = true,
     bool refreshImageHost = true,
+    SourceTaskOrigin? taskOrigin,
   }) => _settings.refreshLines(
     refreshApiDomains: refreshApiDomains,
     refreshImageHost: refreshImageHost,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<Map<String, dynamic>> getImageCacheStatus() =>
@@ -477,10 +517,14 @@ mixin _InteractiveAccountAdapter implements SourceInteractiveAccountGateway {
       (interactiveAccountOperations as SourceInteractiveAccountGateway)
           .cancelPendingLogin();
   @override
-  Future<List<SourceLoginMethod>> loadLoginMethods() {
+  Future<List<SourceLoginMethod>> loadLoginMethods({
+    SourceTaskOrigin? taskOrigin,
+  }) {
     final account = interactiveAccountOperations;
     return account is SourceInteractiveAccountGateway
-        ? (account as SourceInteractiveAccountGateway).loadLoginMethods()
+        ? (account as SourceInteractiveAccountGateway).loadLoginMethods(
+            taskOrigin: taskOrigin,
+          )
         : Future.value(const []);
   }
 
@@ -491,6 +535,7 @@ mixin _InteractiveAccountAdapter implements SourceInteractiveAccountGateway {
     required String method,
     required SourceLoginPresenter present,
     required SourceLoginCancellation cancellation,
+    SourceTaskOrigin? taskOrigin,
   }) => (interactiveAccountOperations as SourceInteractiveAccountGateway)
       .loginInteractive(
         account: account,
@@ -498,5 +543,6 @@ mixin _InteractiveAccountAdapter implements SourceInteractiveAccountGateway {
         method: method,
         present: present,
         cancellation: cancellation,
+        taskOrigin: taskOrigin,
       );
 }

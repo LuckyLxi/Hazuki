@@ -1,3 +1,9 @@
+import '../models/source_task.dart';
+import '../runtime/source_shared_request.dart';
+import '../runtime/source_operation_runner.dart';
+import '../runtime/source_operation_context.dart';
+import '../debug/debug_log_internals.dart';
+import '../interaction/source_ui_scope.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_host.dart';
@@ -11,7 +17,10 @@ class SourceLoginSideDataOperations {
   final SourceRuntimeHost _runtimeHost;
   final Duration _profileLoadTimeout;
   final _profileLoads =
-      <SourceRuntimeHandle, ({String? identity, Future<String?> future})>{};
+      <
+        SourceRuntimeHandle,
+        ({String? identity, SourceSharedRequest<String?> request})
+      >{};
 
   String? get cachedAvatarUrl {
     final handle = _runtimeHost.optionalActiveHandle;
@@ -32,7 +41,10 @@ class SourceLoginSideDataOperations {
     HazukiSourceFacade facade, {
     required String sourceKey,
     required dynamic result,
+    void Function()? checkActive,
+    Future<void> Function(Future<void> Function())? commit,
   }) async {
+    checkActive?.call();
     if (result is! Map) return;
     if (result['avatarUrl'] is String) {
       facade.runtime.transientAvatarUrl = (result['avatarUrl'] as String)
@@ -53,63 +65,109 @@ class SourceLoginSideDataOperations {
     }
   }
 
-  Future<String?> loadCurrentAvatarUrl() async {
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin}) async {
     final handle = _runtimeHost.optionalActiveHandle;
     if (handle == null) return null;
-    final identity = handle.session.loginIdentity;
-    final pending = _profileLoads[handle];
-    if (pending != null && pending.identity == identity) return pending.future;
-    final future = _loadProfile(handle, identity);
-    _profileLoads[handle] = (identity: identity, future: future);
+    final requestIdentity = handle.session.loginIdentity;
     try {
-      return await future;
-    } finally {
-      if (identical(_profileLoads[handle]?.future, future)) {
-        _profileLoads.remove(handle);
-      }
+      return await runSourceOperation(_runtimeHost, handle, 'account.profile', (
+        context,
+      ) async {
+        final identity = handle.session.loginIdentity;
+        var request = _profileLoads[handle]?.identity == identity
+            ? _profileLoads[handle]?.request
+            : null;
+        if (request == null || !request.available) {
+          late final SourceSharedRequest<String?> created;
+          created = SourceSharedRequest<String?>(
+            pluginId: handle.sourceKey,
+            method: 'account.profile.producer',
+            onUnavailable: () {
+              if (identical(_profileLoads[handle]?.request, created)) {
+                _profileLoads.remove(handle);
+              }
+            },
+            operation: (request) => _loadProfile(handle, identity, request),
+          );
+          request = created;
+          _profileLoads[handle] = (identity: identity, request: request);
+        }
+        return request.subscribe(task: context.task);
+      }, origin: taskOrigin);
+    } on SourceTaskTimedOut {
+      return (_runtimeHost.isCurrentHandle(handle) &&
+              handle.session.loginIdentity == requestIdentity)
+          ? _cachedAvatarUrl(handle.facade)
+          : null;
     }
   }
 
   Future<String?> _loadProfile(
     SourceRuntimeHandle handle,
     String? identity,
-  ) async {
+    SourceSharedRequest<String?> request,
+  ) => handle.runOperation(() async {
     final facade = handle.facade;
-    return facade.handle.runOperation(() async {
-      try {
-        final result = await (() async {
+    try {
+      final result = await SourceUiScope.timeout(
+        (() async {
           await facade.ensureInitialized();
+          request.checkActive();
           final engine = handle.runtime.engine;
-          if (engine == null ||
-              await engine.evaluate(
-                    'typeof this.__hazuki_source.account?.loadProfile === "function"',
-                  ) !=
-                  true) {
+          if (engine == null) return null;
+          request.bindEngine(engine);
+          if (await engine.evaluate(
+                'typeof this.__hazuki_source.account?.loadProfile === "function"',
+                execution: request.execution,
+              ) !=
+              true) {
             return null;
           }
-          return facade.js.resolve(
-            engine.evaluate('this.__hazuki_source.account.loadProfile()'),
+          request.checkActive();
+          return awaitJsResult(
+            await engine.evaluate(
+              'this.__hazuki_source.account.loadProfile()',
+              execution: request.execution,
+            ),
           );
-        })().timeout(_profileLoadTimeout);
-        // A completed request must not restore a profile after logout or runtime
-        // replacement. Timed-out requests never reach this persistence step.
-        if (!_runtimeHost.isCurrentHandle(handle) ||
-            handle.session.loginIdentity != identity) {
-          return null;
-        }
-        await persistLoginSideData(
-          facade,
-          sourceKey: handle.sourceKey,
-          result: result,
-        );
-      } catch (_) {
-        // Profile refresh is optional; keep the last successfully saved profile.
-      }
+        })(),
+        _profileLoadTimeout,
+        onTimeout: () => throw SourceTaskTimedOut(
+          request.resourceId,
+          SourceTaskStopReason.deadlineExceeded,
+        ),
+      );
+      request.checkActive();
       if (!_runtimeHost.isCurrentHandle(handle) ||
-          handle.session.loginIdentity != identity) {
+          handle.session.loginIdentity != identity ||
+          !request.hasConsumers) {
         return null;
       }
-      return _cachedAvatarUrl(facade);
-    });
-  }
+      await persistLoginSideData(
+        facade,
+        sourceKey: handle.sourceKey,
+        result: result,
+        checkActive: () {
+          request.checkActive();
+          if (!_runtimeHost.isCurrentHandle(handle) ||
+              handle.session.loginIdentity != identity) {
+            throw SourceTaskCancelled(
+              request.resourceId,
+              SourceTaskStopReason.sourceChanged,
+            );
+          }
+        },
+        commit: (write) => request.runCommit(write),
+      );
+    } catch (error) {
+      rethrowSourceOperationStop(error);
+      // Optional profile data retains its existing ordinary-error fallback.
+    }
+    request.checkActive();
+    if (!_runtimeHost.isCurrentHandle(handle) ||
+        handle.session.loginIdentity != identity) {
+      return null;
+    }
+    return _cachedAvatarUrl(facade);
+  });
 }

@@ -1,3 +1,5 @@
+import 'package:hazuki/shared/source_task_owner.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
@@ -23,6 +25,7 @@ import 'comic_detail_download_conflict_dialog.dart';
 
 class ComicDetailActionsController extends ChangeNotifier {
   ComicDetailActionsController({
+    required SourceTaskControlGateway taskControl,
     required ComicDetailFeatureFacade repository,
     required ExploreComic comic,
     required String heroTag,
@@ -38,7 +41,8 @@ class ComicDetailActionsController extends ChangeNotifier {
     required MethodChannel mediaChannel,
     required Route<void> Function(WidgetBuilder) destinationRouteBuilder,
     required Route<void> Function(WidgetBuilder) expandedReaderRouteBuilder,
-  }) : _destinationRouteBuilder = destinationRouteBuilder,
+  }) : _readTasks = SourceTaskOwner(taskControl),
+       _destinationRouteBuilder = destinationRouteBuilder,
        _expandedReaderRouteBuilder = expandedReaderRouteBuilder,
        _repository = repository,
        _comic = comic,
@@ -70,6 +74,7 @@ class ComicDetailActionsController extends ChangeNotifier {
   final ComicDetailCategoryPageBuilder? _categoryPageBuilder;
   final MethodChannel _mediaChannel;
 
+  final SourceTaskOwner _readTasks;
   bool _disposed = false;
   int _readerOpenRequest = 0;
 
@@ -354,8 +359,13 @@ class ComicDetailActionsController extends ChangeNotifier {
     final trimmedValue = value.trim();
     if (trimmedValue.isEmpty) return;
 
+    _readTasks.restart();
+    final generation = _readTasks.generation;
     try {
-      final groups = await _repository.loadCategoryTagGroups();
+      final groups = await _repository.loadCategoryTagGroups(
+        taskOrigin: _readTasks.origin(),
+      );
+      if (generation != _readTasks.generation) return;
       if (_disposed) {
         return;
       }
@@ -372,7 +382,12 @@ class ComicDetailActionsController extends ChangeNotifier {
         );
         return;
       }
-    } catch (_) {
+    } catch (error) {
+      if (_disposed ||
+          generation != _readTasks.generation ||
+          isSourceTaskCancellation(error)) {
+        return;
+      }
       // Fall back to the legacy search behavior when category metadata is not
       // available for the current source.
     }
@@ -633,6 +648,7 @@ class ComicDetailActionsController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _readTasks.dispose();
     _disposed = true;
     super.dispose();
   }

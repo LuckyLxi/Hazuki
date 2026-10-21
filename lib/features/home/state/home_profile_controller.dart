@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_task_owner.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,13 +10,17 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class HomeProfileController extends ChangeNotifier {
-  HomeProfileController({required SourceHomeGateway sourceService})
-    : _sourceService = sourceService;
+  HomeProfileController({
+    required SourceTaskControlGateway taskControl,
+    required SourceHomeGateway sourceService,
+  }) : _readTasks = SourceTaskOwner(taskControl),
+       _sourceService = sourceService;
 
   final SourceHomeGateway _sourceService;
 
   bool _disposed = false;
   final _sourceUi = SourceUiOwner();
+  final SourceTaskOwner _readTasks;
   String _username = '';
   String? _avatarUrl;
   String _firstUseText = '';
@@ -40,6 +45,7 @@ class HomeProfileController extends ChangeNotifier {
   bool get isCheckInAvailable => _sourceService.isActiveDailyCheckInSource;
 
   Future<void> syncUserProfile(BuildContext context) async {
+    _readTasks.restart();
     final revision = ++_profileSyncRevision;
     _profileLoading = true;
     _notify();
@@ -91,7 +97,9 @@ class HomeProfileController extends ChangeNotifier {
     String? avatar = _avatarUrl;
     if (isLogged) {
       try {
-        avatar = await _sourceService.loadCurrentAvatarUrl();
+        avatar = await _sourceService.loadCurrentAvatarUrl(
+          taskOrigin: _readTasks.origin(),
+        );
       } catch (_) {
         avatar = _avatarUrl;
       }
@@ -115,7 +123,9 @@ class HomeProfileController extends ChangeNotifier {
       isLogged = _sourceService.isLogged;
       if (isLogged) {
         try {
-          avatar = await _sourceService.loadCurrentAvatarUrl();
+          avatar = await _sourceService.loadCurrentAvatarUrl(
+            taskOrigin: _readTasks.origin(),
+          );
         } catch (_) {
           avatar = _avatarUrl;
         }
@@ -179,7 +189,9 @@ class HomeProfileController extends ChangeNotifier {
     }
 
     try {
-      final checked = await _sourceService.isDailyCheckInCompletedToday();
+      final checked = await _sourceService.isDailyCheckInCompletedToday(
+        taskOrigin: _readTasks.origin(),
+      );
       if (!context.mounted) {
         return;
       }
@@ -257,7 +269,9 @@ class HomeProfileController extends ChangeNotifier {
           : l10n(context).homeCheckInAlreadyDone;
       await showHazukiPrompt(context, promptMessage);
     } catch (error) {
-      if (isSourceUiCancellation(error)) return;
+      if ((isSourceUiCancellation(error) || isSourceTaskCancellation(error))) {
+        return;
+      }
       if (!context.mounted || _disposed || interaction?.available == false) {
         return;
       }
@@ -273,6 +287,7 @@ class HomeProfileController extends ChangeNotifier {
   }
 
   void markAuthChanged() {
+    _readTasks.restart();
     _profileSyncRevision++;
     _authVersion++;
     _profileLoading = true;
@@ -295,6 +310,7 @@ class HomeProfileController extends ChangeNotifier {
   }
 
   void markLoggedOut() {
+    _readTasks.restart();
     _profileSyncRevision++;
     _authVersion++;
     _checkedInToday = false;
@@ -309,6 +325,7 @@ class HomeProfileController extends ChangeNotifier {
   }
 
   void markSourceChanged() {
+    _readTasks.restart(SourceTaskStopReason.sourceChanged);
     _profileSyncRevision++;
     _authVersion++;
     _profileLoading = true;
@@ -325,6 +342,7 @@ class HomeProfileController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _readTasks.dispose();
     _sourceUi.dispose();
     _disposed = true;
     _profileSyncRevision++;

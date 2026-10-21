@@ -233,6 +233,7 @@ class _FakeFavoritesOperations implements SourceFavoritesOperations {
     String folderId,
     String name, {
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     renameCalls.add((folderId, name, sourceKey));
   }

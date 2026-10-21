@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
@@ -79,6 +80,7 @@ ComicDetailDependencies _comicDetailDependencies() {
     readingProgress: sl<ReadingProgressService>(),
     readHistory: sl<ReadHistoryService>(),
     imageGateway: sl<SourceImageGateway>(),
+    taskControl: FakeSourceTaskControl(),
   );
 }
 
@@ -2053,7 +2055,9 @@ class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
 
 class _NavigationDetailFacade extends _DesktopDetailFacade {
   @override
-  Future<List<CategoryTagGroup>> loadCategoryTagGroups() async => [];
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
+    SourceTaskOrigin? taskOrigin,
+  }) async => [];
 }
 
 class _ReadingProgressDetailFacade extends _NavigationDetailFacade {

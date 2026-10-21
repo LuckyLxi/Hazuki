@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -45,7 +46,9 @@ void main() {
       () => source.cloudFavoritesChangedStream,
     ).thenAnswer((_) => const Stream<void>.empty());
     when(source.ensureInitialized).thenAnswer((_) async {});
-    when(source.loadFavoriteFolders).thenAnswer(
+    when(
+      () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer(
       (_) async => FavoriteFoldersResult.success(
         folders: [
           const FavoriteFolder(id: '0', name: '__favorite_all__'),
@@ -55,13 +58,21 @@ void main() {
       ),
     );
     when(
-      () =>
-          source.loadFavoriteComics(page: 1, folderId: any(named: 'folderId')),
+      () => source.loadFavoriteComics(
+        page: 1,
+        folderId: any(named: 'folderId'),
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).thenAnswer(
       (_) async => FavoriteComicsResult.success(const [], maxPage: 1),
     );
     when(
-      () => source.renameFavoriteFolder('shelf', any(), sourceKey: 'test'),
+      () => source.renameFavoriteFolder(
+        'shelf',
+        any(),
+        sourceKey: 'test',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).thenAnswer((call) async {
       folderName = call.positionalArguments[1] as String;
     });
@@ -83,6 +94,7 @@ void main() {
             imageGateway: _Images(),
             authVersion: 0,
             onComicTap: (_, _) async {},
+            taskControl: FakeSourceTaskControl(),
           ),
         ),
       ),
@@ -111,6 +123,7 @@ void main() {
           'shelf',
           'Renamed shelf',
           sourceKey: 'test',
+          taskOrigin: any(named: 'taskOrigin'),
         ),
       ).called(1);
       expect(find.text('Renamed shelf'), findsOneWidget);
@@ -161,6 +174,7 @@ void main() {
           any(),
           any(),
           sourceKey: any(named: 'sourceKey'),
+          taskOrigin: any(named: 'taskOrigin'),
         ),
       );
     },

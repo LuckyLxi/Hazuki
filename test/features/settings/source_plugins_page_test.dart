@@ -90,8 +90,8 @@ void main() {
             manager,
             metadataLoader: (_) async => null,
             settingLoader: (_, _) => null,
-            settingWriter: (_, _, _) async {},
-            actionRunner: (_, _) async => null,
+            settingWriter: (_, _, _, {taskOrigin}) async {},
+            actionRunner: (_, _, {taskOrigin}) async => null,
           );
           await tester.runAsync(() async {
             await tester.pumpWidget(
@@ -209,8 +209,8 @@ void main() {
       manager,
       metadataLoader: (_) async => null,
       settingLoader: (_, _) => null,
-      settingWriter: (_, _, _) async {},
-      actionRunner: (_, _) async => null,
+      settingWriter: (_, _, _, {taskOrigin}) async {},
+      actionRunner: (_, _, {taskOrigin}) async => null,
     );
     await tester.runAsync(() async {
       await tester.pumpWidget(

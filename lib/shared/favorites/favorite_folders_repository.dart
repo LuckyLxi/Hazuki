@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 /// Feature-neutral contract for editing cloud and local favorite folders.
@@ -11,6 +12,7 @@ abstract interface class FavoriteFoldersRepository {
 
   Future<FavoriteFoldersResult> loadCloudFavoriteFolders({
     required String comicId,
+    SourceTaskOrigin? taskOrigin,
   });
 
   Future<void> addCloudFavoriteFolder(String name);

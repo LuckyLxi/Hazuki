@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 import 'package:hazuki/features/favorite/support/favorite_list_loader.dart';
 import 'package:hazuki/features/favorite/support/favorite_local_flow.dart';
@@ -240,7 +241,7 @@ void main() {
         ),
       ).thenAnswer((_) async => const FavoriteComicsResult.success([]));
       final loader = FavoriteListLoader(
-        cloud: FavoriteCloudFlow(_Source()),
+        cloud: FavoriteCloudFlow(_Source(), FakeSourceTaskControl()),
         local: FavoriteLocalFlow(
           repository: local,
           preferences: _Preferences(),

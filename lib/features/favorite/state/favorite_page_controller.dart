@@ -24,6 +24,7 @@ import '../support/favorite_local_flow.dart';
 
 class FavoritePageController extends ChangeNotifier {
   FavoritePageController({
+    required SourceTaskControlGateway taskControl,
     required SourceFavoriteGateway sourceService,
     SourceReaderGateway? readerService,
     SourcePresentationReader presentationFor = emptySourcePresentation,
@@ -38,7 +39,7 @@ class FavoritePageController extends ChangeNotifier {
        ),
        _selectionStore = FavoriteSelectionStore(localFavoritesPreferences),
        _localFavoritesRepository = localFavoritesRepository,
-       _cloudFlow = FavoriteCloudFlow(sourceService),
+       _cloudFlow = FavoriteCloudFlow(sourceService, taskControl),
        _localFlow = FavoriteLocalFlow(
          repository: localFavoritesRepository,
          preferences: localFavoritesPreferences,

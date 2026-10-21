@@ -1,3 +1,4 @@
+import '../support/fake_source_task_control.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -220,7 +221,10 @@ void main() {
         () => source.dailyRecommendationForSource('books'),
       ).thenReturn(const DailyRecommendationConfig(searchOrder: 'recent'));
       when(() => source.isInitialized).thenReturn(false);
-      final service = DiscoverDailyRecommendationService(source: source);
+      final service = DiscoverDailyRecommendationService(
+        source: source,
+        taskControl: FakeSourceTaskControl(),
+      );
       addTearDown(service.dispose);
 
       final state = await service.ensurePrepared(enabled: true);

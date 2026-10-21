@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
@@ -314,6 +315,7 @@ class _RecordingFavoriteFoldersRepository implements FavoriteFoldersRepository {
   @override
   Future<FavoriteFoldersResult> loadCloudFavoriteFolders({
     required String comicId,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     return const FavoriteFoldersResult.success(
       folders: <FavoriteFolder>[],

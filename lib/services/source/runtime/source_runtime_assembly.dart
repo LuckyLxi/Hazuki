@@ -1,3 +1,5 @@
+import 'source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -122,7 +124,7 @@ class SourceRuntimeAssembly {
     _accountCapability.interactive = SourceInteractiveLoginOperations(
       host: _runtimeHost,
       loadRuntime: _runtimeCapability.loadLoginRuntime,
-      readLoginMethods: (key) => _runtimeCapability.localRuntime.run(
+      readLoginMethods: (key, context) => _runtimeCapability.localRuntime.run(
         key,
         (handle) async => SourceLoginMethod.parse(
           await handle.runtime.engine!.evaluate(
@@ -308,15 +310,30 @@ class SourceRuntimeAssembly {
       _runtimeOperations.ensureSourceInitialized(id);
   SourceMeta? sourceMetadata(String id) =>
       _runtimeHost.handleFor(id).runtime.sourceMeta;
-  Future<dynamic> runPluginAction(String id, String action) async {
-    await ensureSourceInitialized(id);
+  Future<dynamic> runPluginAction(
+    String id,
+    String action, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     final handle = _runtimeHost.handleFor(id);
-    return handle.runOperation(
-      () async => handle.facade.js.resolve(
-        handle.runtime.engine!.evaluate(
-          'this.__hazuki_source.actions?.[${jsonEncode(action)}]?.()',
-        ),
-      ),
+    return runSourceOperation(
+      _runtimeHost,
+      handle,
+      'plugin.action',
+      (context) async {
+        await ensureSourceInitialized(id);
+        context.checkActive();
+        return context.resolve(
+          handle.facade.js.resolve(
+            context.evaluate(
+              handle.runtime.engine!,
+              'this.__hazuki_source.actions?.[${jsonEncode(action)}]?.()',
+            ),
+          ),
+        );
+      },
+      origin: taskOrigin,
+      serviceOwned: true,
     );
   }
 

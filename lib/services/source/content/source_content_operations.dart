@@ -1,3 +1,6 @@
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:convert';
 import 'source_cloud_reading.dart';
 
@@ -15,14 +18,17 @@ import '../runtime/source_script_engine.dart';
 import '../models/source_script_execution.dart';
 import '../debug/debug_log_internals.dart';
 import '../debug/source_task_log_recorder.dart';
-import '../models/source_task.dart';
 import '../gateways/source_content_gateways.dart';
 
 abstract interface class SourceContentOperations {
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
-  Future<List<ExploreSection>> loadExploreSections({bool forceRefresh = false});
+  Future<List<ExploreSection>> loadExploreSections({
+    bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  });
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
@@ -39,24 +45,31 @@ abstract interface class SourceContentOperations {
     required String comicId,
     required bool isLike,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
-  Future<List<CategoryRankingOption>> loadCategoryRankingOptions();
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
+    SourceTaskOrigin? taskOrigin,
+  });
   Future<CategoryComicsResult> loadCategoryRankingComics({
     required String rankingOption,
     required int page,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
     String order = '',
     List<String>? orders,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<SearchComicsResult> searchComics({
     required String keyword,
@@ -171,6 +184,26 @@ class SourceContentOperationService
   @override
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.handleFor(
+      sourceKey.isEmpty ? _runtimeHost.activeSourceKey : sourceKey,
+    ),
+    'discover.recommendations',
+    (operationContext) => _loadDailyRecommendationsTask(
+      operationContext,
+      sourceKey: sourceKey,
+      taskOrigin: taskOrigin,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<List<SourceDailyRecommendationItem>> _loadDailyRecommendationsTask(
+    SourceOperationContext operationContext, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     final key = sourceKey.trim().isEmpty
         ? _runtimeHost.activeSourceKey
@@ -180,9 +213,12 @@ class SourceContentOperationService
     return facade.handle.runOperation(() async {
       final engine = facade.js.engine;
       if (engine == null) throw StateError('source_not_initialized');
-      final raw = await facade.js.resolve(
-        engine.evaluate(
-          'globalThis.__hazuki_source.dailyRecommendation.load()',
+      final raw = await operationContext.resolve(
+        facade.js.resolve(
+          operationContext.evaluate(
+            engine,
+            'globalThis.__hazuki_source.dailyRecommendation.load()',
+          ),
         ),
       );
       if (raw is! List) {
@@ -236,7 +272,8 @@ class SourceContentOperationService
   @override
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
-  }) => _explore.load(forceRefresh: forceRefresh);
+    SourceTaskOrigin? taskOrigin,
+  }) => _explore.load(forceRefresh: forceRefresh, taskOrigin: taskOrigin);
   @override
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
@@ -267,40 +304,58 @@ class SourceContentOperationService
     required String comicId,
     required bool isLike,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _comicDetails.toggleComicLike(
     comicId: comicId,
     isLike: isLike,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
-  }) =>
-      _category.loadTagGroups(forceRefresh: forceRefresh, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _category.loadTagGroups(
+    forceRefresh: forceRefresh,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<List<CategoryRankingOption>> loadCategoryRankingOptions() =>
-      _category.loadRankingOptions();
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
+    SourceTaskOrigin? taskOrigin,
+  }) => _category.loadRankingOptions(taskOrigin: taskOrigin);
   @override
   Future<CategoryComicsResult> loadCategoryRankingComics({
     required String rankingOption,
     required int page,
-  }) => _category.loadRankingComics(rankingOption: rankingOption, page: page);
+    SourceTaskOrigin? taskOrigin,
+  }) => _category.loadRankingComics(
+    rankingOption: rankingOption,
+    page: page,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
-  }) => _category.loadOptionGroupsByViewMore(viewMoreUrl: viewMoreUrl);
+    SourceTaskOrigin? taskOrigin,
+  }) => _category.loadOptionGroupsByViewMore(
+    viewMoreUrl: viewMoreUrl,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
     String order = '',
     List<String>? orders,
+    SourceTaskOrigin? taskOrigin,
   }) => _category.loadComicsByViewMore(
     viewMoreUrl: viewMoreUrl,
     page: page,
     order: order,
     orders: orders,
+    taskOrigin: taskOrigin,
   );
 
   @override
@@ -314,6 +369,7 @@ class SourceContentOperationService
     final resolvedSourceKey = sourceKey.trim().isEmpty
         ? _runtimeHost.activeSourceKey
         : _runtimeHost.normalize(sourceKey);
+    final capturedHandle = _runtimeHost.handleFor(resolvedSourceKey);
     final normalizedKeyword = keyword.trim();
     final recorder = SourceTaskLogRecorder(_runtimeHost.logStore);
     return _runtimeHost.tasks.run(
@@ -333,10 +389,11 @@ class SourceContentOperationService
         sensitiveValues: [keyword, normalizedKeyword],
       ),
       operation: (task) async {
+        task.bindResource(capturedHandle);
         task.checkActive();
         await _runtimeOperations.ensureSourceInitialized(resolvedSourceKey);
         task.checkActive();
-        final handle = _runtimeHost.handleFor(resolvedSourceKey);
+        final handle = capturedHandle;
         // Acquire before any script execution, including synchronous checks.
         return handle.runOperation(() async {
           final facade = handle.facade;

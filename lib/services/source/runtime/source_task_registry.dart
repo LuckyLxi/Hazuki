@@ -35,6 +35,7 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
     String? pluginVersion,
     SourceTaskOrigin? origin,
     SourceTaskObserver? observe,
+    bool linkUiCancellation = true,
     required FutureOr<T> Function(SourceTask task) operation,
   }) async {
     if (_disposed) throw StateError('source_task_registry_disposed');
@@ -73,7 +74,9 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
     }
 
     // Only explicitly owned calls opt into the page's interaction lifetime.
-    if (cancellation != null) scope?.addListener(scopeStopped);
+    if (cancellation != null && linkUiCancellation) {
+      scope?.addListener(scopeStopped);
+    }
     Object? failure;
     StackTrace? failureStack;
     try {
@@ -98,6 +101,9 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
       task._finish(SourceTaskState.succeeded);
       return result;
     } catch (error, stack) {
+      if (error is SourceTaskCancelled && task._stopReason == null) {
+        task._requestStop(error.reason);
+      }
       if (error is SourceScriptStopped && task._stopReason == null) {
         final reason = error.timedOut
             ? (error.reason == 'deadlineExceeded'
@@ -120,7 +126,9 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
       Error.throwWithStackTrace(failure, stack);
     } finally {
       cancellation?.removeListener(stopped);
-      if (cancellation != null) scope?.removeListener(scopeStopped);
+      if (cancellation != null && linkUiCancellation) {
+        scope?.removeListener(scopeStopped);
+      }
       task._notify(
         SourceTaskEvent.stateChanged,
         error: failure,
@@ -148,6 +156,7 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
     for (final task in _tasks.values.toList()) {
       if (task._endedAt == null ||
           !task._finished.isCompleted ||
+          task._pendingCommits != 0 ||
           task._engines.any((engine) => engine.hasExecutionWork(task.taskId)) ||
           task._settling) {
         continue;
@@ -223,6 +232,22 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
     SourceTaskStopReason reason,
   ) => _cancel((task) => task.ownerId == ownerId, reason);
 
+  Future<SourceTaskCancelReceipt> cancelResource(
+    Object resource,
+    SourceTaskStopReason reason, {
+    bool includeServiceTasks = true,
+  }) {
+    final ids = _tasks.values
+        .where(
+          (task) =>
+              identical(task._resource, resource) &&
+              (includeServiceTasks || !task._serviceOwned),
+        )
+        .map((task) => task.taskId)
+        .toSet();
+    return _cancel((task) => ids.contains(task.taskId), reason);
+  }
+
   void dispose() {
     if (_disposed) return;
     _disposed = true;
@@ -262,6 +287,10 @@ class SourceTask {
   SourceTaskCancelReceipt? _stopReceipt;
   SourceTaskStopReason? _stopReason;
   bool _settling = false;
+  Object? _resource;
+  bool _serviceOwned = false;
+  int _pendingCommits = 0;
+  Completer<void>? _commitsSettled;
   String? _pluginVersion;
   String? _runtimeId;
   SourceTaskState _state = SourceTaskState.created;
@@ -270,6 +299,31 @@ class SourceTask {
   DateTime? _cancelRequestedAt;
   DateTime? _settledAt;
   Future<void> get whenStopped => _stopped.future;
+
+  void bindResource(Object resource, {bool serviceOwned = false}) {
+    checkActive();
+    _resource = resource;
+    _serviceOwned = serviceOwned;
+  }
+
+  Future<T> runCommit<T>(Future<T> Function() operation) async {
+    checkActive();
+    if (_pendingCommits++ == 0) _commitsSettled = Completer<void>();
+    try {
+      return await operation();
+    } finally {
+      if (--_pendingCommits == 0) _commitsSettled!.complete();
+      _onResourcesChanged();
+    }
+  }
+
+  void retainUntil(Future<void> drain) {
+    if (_pendingCommits++ == 0) _commitsSettled = Completer<void>();
+    drain.whenComplete(() {
+      if (--_pendingCommits == 0) _commitsSettled!.complete();
+      _onResourcesChanged();
+    }).ignore();
+  }
 
   SourceTaskCancelReceipt requestStop(SourceTaskStopReason reason) =>
       _requestStop(reason);
@@ -353,7 +407,11 @@ class SourceTask {
           return receipt.whenSettled;
         }),
     ];
-    Future.wait<void>([...requests, _finished.future]).then<void>(
+    Future.wait<void>([
+      ...requests,
+      _finished.future,
+      if (_pendingCommits != 0) _commitsSettled!.future,
+    ]).then<void>(
       (_) {
         _settling = false;
         _onResourcesChanged();

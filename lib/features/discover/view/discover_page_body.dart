@@ -12,6 +12,7 @@ import 'discover_page_sections.dart';
 
 class DiscoverPageBody extends StatelessWidget {
   const DiscoverPageBody({
+    required this.taskControl,
     super.key,
     required this.controller,
     required this.scrollController,
@@ -27,6 +28,7 @@ class DiscoverPageBody extends StatelessWidget {
     required this.sourceService,
   });
 
+  final SourceTaskControlGateway taskControl;
   final DiscoverPageController controller;
   final ScrollController scrollController;
   final int headerItemCount;
@@ -93,6 +95,7 @@ class DiscoverPageBody extends StatelessWidget {
                 comicDetailPageBuilder: comicDetailPageBuilder,
                 comicCoverHeroTagBuilder: comicCoverHeroTagBuilder,
                 sourceService: sourceService,
+                taskControl: taskControl,
               );
             },
           ),

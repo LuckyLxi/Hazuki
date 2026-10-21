@@ -15,18 +15,23 @@ import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
 
 class HomeCoordinator extends ChangeNotifier {
   HomeCoordinator({
+    required SourceTaskControlGateway taskControl,
     required int initialTabIndex,
     required SourceHomeGateway sourceService,
     required SourceSwitchGateway sourceSwitchService,
     required SourceImageGateway imageService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
     required AnnouncementController announcementService,
-  }) : _sourceService = sourceService,
+  }) : _taskControl = taskControl,
+       _sourceService = sourceService,
        _sourceSwitchService = sourceSwitchService,
        _imageService = imageService,
        _dailyRecommendationService = dailyRecommendationService,
        _announcementService = announcementService,
-       _profileController = HomeProfileController(sourceService: sourceService),
+       _profileController = HomeProfileController(
+         sourceService: sourceService,
+         taskControl: taskControl,
+       ),
        _shellController = HomeShellController(initialTabIndex: initialTabIndex),
        scaffoldKey = GlobalKey<ScaffoldState>(),
        favoriteActionsBinding = FavoritePageActionsBinding() {
@@ -45,6 +50,7 @@ class HomeCoordinator extends ChangeNotifier {
     'hazuki.comics/media',
   );
 
+  final SourceTaskControlGateway _taskControl;
   final SourceHomeGateway _sourceService;
   final SourceSwitchGateway _sourceSwitchService;
   final SourceImageGateway _imageService;
@@ -182,6 +188,7 @@ class HomeCoordinator extends ChangeNotifier {
     required bool Function() isMounted,
   }) {
     return HomeProfileFlow(
+      taskControl: _taskControl,
       context: context,
       isMounted: isMounted,
       profileController: _profileController,

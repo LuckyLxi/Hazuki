@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_task_owner.dart';
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 
@@ -17,7 +18,9 @@ import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 enum _RankingComicLayout { list, grid3 }
 
 class RankingPage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const RankingPage({
+    required this.taskControl,
     super.key,
     required this.comicDetailPageBuilder,
     required this.sourceService,
@@ -34,6 +37,7 @@ class RankingPage extends StatefulWidget {
 
 class _RankingPageState extends State<RankingPage> {
   final _sourceUi = SourceUiOwner();
+  late final _readTasks = SourceTaskOwner(widget.taskControl);
   static const _loadTimeout = Duration(seconds: 25);
   static const _comicLayoutPreferenceKey = 'ranking_comic_layout';
 
@@ -103,6 +107,7 @@ class _RankingPageState extends State<RankingPage> {
 
   @override
   void dispose() {
+    _readTasks.dispose();
     _sourceUi.dispose();
     _scrollController
       ..removeListener(_onScroll)
@@ -156,7 +161,9 @@ class _RankingPageState extends State<RankingPage> {
     )!.rankingLoadOptionsTimeout;
     return _sourceUi.run(
       () => SourceUiScope.timeout(
-        _sourceService.loadCategoryRankingOptions(),
+        _sourceService.loadCategoryRankingOptions(
+          taskOrigin: _readTasks.origin(),
+        ),
         _loadTimeout,
         onTimeout: () => throw Exception(timeoutMessage),
       ),
@@ -173,6 +180,7 @@ class _RankingPageState extends State<RankingPage> {
         _sourceService.loadCategoryRankingComics(
           rankingOption: rankingOption,
           page: page,
+          taskOrigin: _readTasks.origin(),
         ),
         _loadTimeout,
         onTimeout: () => throw Exception(timeoutMessage),
@@ -186,6 +194,7 @@ class _RankingPageState extends State<RankingPage> {
     }
     _sourceUi.restart();
 
+    _readTasks.restart();
     if (forceRefresh) {
       setState(() {
         _refreshing = true;
@@ -249,6 +258,7 @@ class _RankingPageState extends State<RankingPage> {
       return;
     }
 
+    if (reset) _readTasks.restart();
     final targetPage = reset ? 1 : (append ? _rankingPage + 1 : _rankingPage);
     final requestToken = ++_rankingRequestToken;
     _sourceUi.restart();

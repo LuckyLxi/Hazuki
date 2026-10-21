@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -39,7 +40,11 @@ class _Plugins extends ChangeNotifier implements SourcePluginGateway {
         );
 
   @override
-  Future<dynamic> runAction(String id, String actionId) async {
+  Future<dynamic> runAction(
+    String id,
+    String actionId, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     calls.add((id, actionId));
     return action == null ? null : action!();
   }

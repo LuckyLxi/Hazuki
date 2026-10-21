@@ -1,3 +1,7 @@
+import '../runtime/source_runtime_handle.dart';
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import '../debug/debug_log_internals.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
@@ -17,10 +21,40 @@ class SourceLoginOperations {
 
   HazukiSourceFacade get facade => _runtimeHost.activeHandle.facade;
 
-  Future<void> login({required String account, required String password}) =>
-      loginWithFacade(facade, account: account, password: password);
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  }) => loginWithFacade(
+    facade,
+    account: account,
+    password: password,
+    taskOrigin: taskOrigin,
+  );
 
   Future<void> loginWithFacade(
+    HazukiSourceFacade facade, {
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+    bool serviceOwned = false,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    facade.handle as SourceRuntimeHandle,
+    'account.login',
+    (operationContext) => _loginWithFacadeTask(
+      operationContext,
+      facade,
+      account: account,
+      password: password,
+    ),
+    origin: taskOrigin,
+    sensitiveValues: [account, password],
+    serviceOwned: serviceOwned,
+  );
+
+  Future<void> _loginWithFacadeTask(
+    SourceOperationContext operationContext,
     HazukiSourceFacade facade, {
     required String account,
     required String password,
@@ -39,7 +73,10 @@ class SourceLoginOperations {
       }
 
       final supportsAccount = facade.js.asBool(
-        await engine.evaluate('!!this.__hazuki_source.account?.login'),
+        await operationContext.evaluate(
+          engine,
+          '!!this.__hazuki_source.account?.login',
+        ),
       );
       if (!supportsAccount) {
         throw Exception('account_login_not_supported');
@@ -53,12 +90,20 @@ class SourceLoginOperations {
       dynamic resolvedResult;
 
       try {
-        final result = await engine.evaluate(script.code, name: script.name);
-        resolvedResult = await facade.js.resolve(result);
+        final result = await operationContext.evaluate(
+          engine,
+          script.code,
+          name: script.name,
+        );
+        resolvedResult = await operationContext.resolve(
+          facade.js.resolve(result),
+        );
         await _sideData.persistLoginSideData(
           facade,
           sourceKey: sourceMeta.key,
           result: resolvedResult,
+          checkActive: operationContext.checkActive,
+          commit: (write) => operationContext.commit(write),
         );
         _recordLoginDebugInfo(
           facade,
@@ -72,16 +117,21 @@ class SourceLoginOperations {
           startedAt: startedAt,
           result: resolvedResult,
         );
-        await facade.saveSourceData(sourceMeta.key, 'account', [
-          account,
-          password,
-        ]);
-        await facade.saveSourceData(
-          sourceMeta.key,
-          'login_session',
-          DateTime.now().microsecondsSinceEpoch.toString(),
+        await operationContext.commit(
+          () => facade.saveSourceData(sourceMeta.key, 'account', [
+            account,
+            password,
+          ]),
+        );
+        await operationContext.commit(
+          () => facade.saveSourceData(
+            sourceMeta.key,
+            'login_session',
+            DateTime.now().microsecondsSinceEpoch.toString(),
+          ),
         );
       } catch (error) {
+        rethrowSourceOperationStop(error);
         _recordLoginDebugInfo(
           facade,
           account: account,
@@ -139,5 +189,6 @@ class SourceLoginOperations {
     );
   }
 
-  Future<String?> loadCurrentAvatarUrl() => _sideData.loadCurrentAvatarUrl();
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin}) =>
+      _sideData.loadCurrentAvatarUrl(taskOrigin: taskOrigin);
 }

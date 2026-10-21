@@ -1,3 +1,5 @@
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/shared/source_task_owner.dart';
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
@@ -21,12 +23,16 @@ typedef ComicDetailFavoriteDialogBuilder =
     Widget Function(FavoriteFoldersViewModel viewModel);
 
 class ComicDetailFavoriteController extends ChangeNotifier {
-  ComicDetailFavoriteController({required ComicDetailFeatureFacade repository})
-    : _repository = repository;
+  ComicDetailFavoriteController({
+    required SourceTaskControlGateway taskControl,
+    required ComicDetailFeatureFacade repository,
+  }) : _readTasks = SourceTaskOwner(taskControl),
+       _repository = repository;
 
   final ComicDetailFeatureFacade _repository;
   bool _disposed = false;
   final _sourceUi = SourceUiOwner();
+  final SourceTaskOwner _readTasks;
 
   bool _busy = false;
   bool _likeBusy = false;
@@ -117,7 +123,9 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     FocusManager.instance.primaryFocus?.unfocus();
 
     final singleFolderOnly = _repository.favoriteSingleFolderForSingleComic;
+    _readTasks.restart();
     final viewModel = FavoriteFoldersViewModel(
+      readTaskOrigin: _readTasks.origin(),
       repository: _repository,
       details: details,
       cloudFavoriteOverride: _cloudFavoriteOverride,
@@ -266,6 +274,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _readTasks.dispose();
     _sourceUi.dispose();
     _disposed = true;
     super.dispose();

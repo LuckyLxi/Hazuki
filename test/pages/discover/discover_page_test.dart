@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -318,6 +319,7 @@ Widget _buildDiscoverPage(
         allowInitialLoad: false,
         hideLoadingUntilInitialLoadAllowed: true,
         onRequestLogin: onRequestLogin,
+        taskControl: FakeSourceTaskControl(),
       ),
     ),
   );

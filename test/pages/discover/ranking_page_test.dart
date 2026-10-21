@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/discover/view/ranking_page.dart';
@@ -29,6 +30,7 @@ void main() {
         home: RankingPage(
           sourceService: _FakeRankingSource(),
           comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -61,6 +63,7 @@ void main() {
         home: RankingPage(
           sourceService: _FakeRankingSource(),
           comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -116,6 +119,7 @@ void main() {
         home: RankingPage(
           sourceService: _FakeRankingSource(),
           comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -136,13 +140,15 @@ class _FakeRankingSource implements SourceCategoryGateway {
   bool get softwareLogCaptureEnabled => false;
 
   @override
-  Future<List<CategoryRankingOption>> loadCategoryRankingOptions() async =>
-      const [CategoryRankingOption(value: 'all', label: 'All')];
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
+    SourceTaskOrigin? taskOrigin,
+  }) async => const [CategoryRankingOption(value: 'all', label: 'All')];
 
   @override
   Future<CategoryComicsResult> loadCategoryRankingComics({
     required String rankingOption,
     required int page,
+    SourceTaskOrigin? taskOrigin,
   }) async => CategoryComicsResult(
     maxPage: 1,
     comics: List.generate(
@@ -160,6 +166,7 @@ class _FakeRankingSource implements SourceCategoryGateway {
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async => const [];
 
   @override

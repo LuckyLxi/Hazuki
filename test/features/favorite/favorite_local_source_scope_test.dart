@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -76,6 +77,7 @@ void main() {
         sourceService: source,
         localFavoritesRepository: local,
         localFavoritesPreferences: preferences,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(controller.dispose);
 

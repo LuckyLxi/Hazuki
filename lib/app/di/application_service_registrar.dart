@@ -152,6 +152,7 @@ void registerApplicationServices(GetIt services) {
     services.registerLazySingleton<DiscoverDailyRecommendationService>(
       () => DiscoverDailyRecommendationService(
         source: services<SourceDailyRecommendationGateway>(),
+        taskControl: services<SourceTaskControlGateway>(),
       ),
     );
   }

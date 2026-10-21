@@ -1,3 +1,4 @@
+import '../support/fake_source_task_control.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:hazuki/app/service_locator.dart';
@@ -148,6 +149,7 @@ void main() {
           image: source.testing.image,
           content: source.testContent,
         ),
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
@@ -166,6 +168,7 @@ void main() {
           image: source.testing.image,
           content: source.testContent,
         ),
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
@@ -184,6 +187,7 @@ void main() {
           image: source.testing.image,
           content: source.testContent,
         ),
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(source.dispose);
       addTearDown(service.dispose);

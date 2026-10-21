@@ -7,7 +7,9 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import '../repository/comic_detail_repository.dart';
 
 class ComicDetailDependencies {
+  final SourceTaskControlGateway taskControl;
   const ComicDetailDependencies({
+    required this.taskControl,
     required this.source,
     required this.localFavorites,
     required this.downloader,

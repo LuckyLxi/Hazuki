@@ -15,7 +15,9 @@ import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 import 'discover_section_page.dart';
 
 class DiscoverSectionBlock extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const DiscoverSectionBlock({
+    required this.taskControl,
     super.key,
     required this.section,
     required this.sectionIndex,
@@ -98,6 +100,7 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
                       comicDetailPageBuilder: widget.comicDetailPageBuilder,
                       comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
                       sourceService: widget.sourceService,
+                      taskControl: widget.taskControl,
                     );
                     Navigator.of(context).push(
                       useWindowsLayout

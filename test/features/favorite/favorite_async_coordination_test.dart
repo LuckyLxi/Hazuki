@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -51,7 +52,9 @@ void main() {
     when(() => source.supportFavoriteSortOrder).thenReturn(true);
     when(() => source.supportFavoriteFolderLoad).thenReturn(true);
     when(() => source.ensureInitialized()).thenAnswer((_) async {});
-    when(() => source.loadFavoriteFolders()).thenAnswer(
+    when(
+      () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer(
       (_) async => FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
         folders: const [
@@ -67,6 +70,7 @@ void main() {
       () => source.loadFavoriteComics(
         page: any(named: 'page'),
         folderId: any(named: 'folderId'),
+        taskOrigin: any(named: 'taskOrigin'),
       ),
     ).thenAnswer(
       (_) async => FavoriteComicsResult.success([_comic('current')]),
@@ -128,6 +132,7 @@ void main() {
       sourceService: source,
       localFavoritesRepository: local,
       localFavoritesPreferences: preferences,
+      taskControl: FakeSourceTaskControl(),
     );
   });
 
@@ -209,7 +214,9 @@ void main() {
   test(
     'initial load replaces the saved all ID with the plugin shelf ID',
     () async {
-      when(source.loadFavoriteFolders).thenAnswer(
+      when(
+        () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+      ).thenAnswer(
         (_) async => const FavoriteFoldersResult.success(
           folders: [FavoriteFolder(id: 'shelf', name: '書架')],
           favoritedFolderIds: {},
@@ -236,9 +243,19 @@ void main() {
         ),
       ).called(1);
       verify(
-        () => source.loadFavoriteComics(page: 1, folderId: 'shelf'),
+        () => source.loadFavoriteComics(
+          page: 1,
+          folderId: 'shelf',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).called(1);
-      verifyNever(() => source.loadFavoriteComics(page: 1, folderId: '0'));
+      verifyNever(
+        () => source.loadFavoriteComics(
+          page: 1,
+          folderId: '0',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      );
     },
   );
 
@@ -257,7 +274,10 @@ void main() {
             sourceKey: 'jm',
           ),
         ).thenAnswer((_) async => 'deleted');
-        when(source.loadFavoriteFolders).thenAnswer(
+        when(
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+        ).thenAnswer(
           (_) async => FavoriteFoldersResult.success(
             folders: [deletedFolder, ...remainingFolders],
             favoritedFolderIds: const {},
@@ -274,13 +294,17 @@ void main() {
           () => source.loadFavoriteComics(
             page: any(named: 'page'),
             folderId: any(named: 'folderId'),
+            taskOrigin: any(named: 'taskOrigin'),
           ),
         ).thenAnswer((call) async {
           final id = call.namedArguments[#folderId] as String;
           return FavoriteComicsResult.success([_comic(id)]);
         });
         when(
-          () => source.deleteFavoriteFolder('deleted'),
+          () => source.deleteFavoriteFolder(
+            'deleted',
+            taskOrigin: any(named: 'taskOrigin'),
+          ),
         ).thenAnswer((_) async {});
         await controller.loadInitial(timeoutMessage: 'timeout');
         expect(controller.selectedFolderId, 'deleted');
@@ -288,7 +312,8 @@ void main() {
 
         final pendingFolders = Completer<FavoriteFoldersResult>();
         when(
-          source.loadFavoriteFolders,
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
         ).thenAnswer((_) => pendingFolders.future);
 
         expect(
@@ -299,7 +324,11 @@ void main() {
         expect(controller.selectedFolderId, targetId);
         expect(controller.comics.single.id, targetId);
         verify(
-          () => source.loadFavoriteComics(page: 1, folderId: targetId),
+          () => source.loadFavoriteComics(
+            page: 1,
+            folderId: targetId,
+            taskOrigin: any(named: 'taskOrigin'),
+          ),
         ).called(1);
         verify(
           () => preferences.saveSelectedFavoriteFolderId(
@@ -351,12 +380,15 @@ void main() {
             ),
           ).thenAnswer((_) async {});
           when(
-            source.loadFavoriteFolders,
+            () => source.loadFavoriteFolders(
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
           ).thenAnswer((_) async => originalFolders);
           when(
             () => source.loadFavoriteComics(
               page: any(named: 'page'),
               folderId: any(named: 'folderId'),
+              taskOrigin: any(named: 'taskOrigin'),
             ),
           ).thenAnswer((call) async {
             final id = call.namedArguments[#folderId] as String;
@@ -366,7 +398,10 @@ void main() {
 
           final pendingDelete = Completer<void>();
           when(
-            () => source.deleteFavoriteFolder('deleted'),
+            () => source.deleteFavoriteFolder(
+              'deleted',
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
           ).thenAnswer((_) => pendingDelete.future);
           final deletion = controller.deleteCurrentFolder(
             timeoutMessage: 'timeout',
@@ -376,11 +411,17 @@ void main() {
           final pendingComics = Completer<FavoriteComicsResult>();
           if (refreshStage == 'folders') {
             when(
-              source.loadFavoriteFolders,
+              () => source.loadFavoriteFolders(
+                taskOrigin: any(named: 'taskOrigin'),
+              ),
             ).thenAnswer((_) => pendingFolders.future);
           } else if (refreshStage == 'comics') {
             when(
-              () => source.loadFavoriteComics(page: 1, folderId: 'deleted'),
+              () => source.loadFavoriteComics(
+                page: 1,
+                folderId: 'deleted',
+                taskOrigin: any(named: 'taskOrigin'),
+              ),
             ).thenAnswer((_) => pendingComics.future);
           }
           final refresh = controller.refresh(timeoutMessage: 'timeout');
@@ -391,7 +432,11 @@ void main() {
             expect(controller.refreshing, isTrue);
           }
 
-          when(source.loadFavoriteFolders).thenAnswer(
+          when(
+            () => source.loadFavoriteFolders(
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
+          ).thenAnswer(
             (_) async => FavoriteFoldersResult.success(
               folders: [remainingFolder],
               favoritedFolderIds: const {},
@@ -421,7 +466,11 @@ void main() {
           await refresh;
           expectRemainingFolder();
           verify(
-            () => source.loadFavoriteComics(page: 1, folderId: remainingId),
+            () => source.loadFavoriteComics(
+              page: 1,
+              folderId: remainingId,
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
           ).called(1);
           verify(
             () => preferences.saveSelectedFavoriteFolderId(
@@ -597,6 +646,7 @@ void main() {
           () => source.loadFavoriteComics(
             page: any(named: 'page'),
             folderId: any(named: 'folderId'),
+            taskOrigin: any(named: 'taskOrigin'),
           ),
         ).thenAnswer((call) async {
           final page = call.namedArguments[#page] as int;
@@ -653,9 +703,13 @@ void main() {
   test('older folder refresh cannot overwrite the latest folders', () async {
     await controller.loadInitial(timeoutMessage: 'timeout');
     final pending = Completer<FavoriteFoldersResult>();
-    when(() => source.loadFavoriteFolders()).thenAnswer((_) => pending.future);
+    when(
+      () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer((_) => pending.future);
     final oldReload = controller.reloadFolders();
-    when(() => source.loadFavoriteFolders()).thenAnswer(
+    when(
+      () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer(
       (_) async => FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
         folders: const [
@@ -690,7 +744,7 @@ void main() {
       await controller.loadInitial(timeoutMessage: 'timeout');
       final pending = Completer<FavoriteFoldersResult>();
       when(
-        () => source.loadFavoriteFolders(),
+        () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
       ).thenAnswer((_) => pending.future);
       final reload = controller.reloadFolders();
       if (transition == 'logout') {
@@ -699,7 +753,10 @@ void main() {
         await controller.toggleMode(timeoutMessage: 'timeout');
       } else {
         activeSource = 'picacg';
-        when(() => source.loadFavoriteFolders()).thenAnswer(
+        when(
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+        ).thenAnswer(
           (_) async => FavoriteFoldersResult.success(
             favoritedFolderIds: const {},
             folders: const [
@@ -738,7 +795,11 @@ void main() {
     () async {
       final pending = Completer<FavoriteComicsResult>();
       when(
-        () => source.loadFavoriteComics(page: 1, folderId: '0'),
+        () => source.loadFavoriteComics(
+          page: 1,
+          folderId: '0',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenAnswer((_) => pending.future);
       final initial = controller.loadInitial(timeoutMessage: 'timeout');
       await _settle();
@@ -754,7 +815,11 @@ void main() {
   test('logout invalidates a pending first-page result', () async {
     final pending = Completer<FavoriteComicsResult>();
     when(
-      () => source.loadFavoriteComics(page: 1, folderId: '0'),
+      () => source.loadFavoriteComics(
+        page: 1,
+        folderId: '0',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).thenAnswer((_) => pending.future);
     final initial = controller.loadInitial(timeoutMessage: 'timeout');
     await _settle();
@@ -783,7 +848,11 @@ void main() {
     expect(controller.selectedFolderId, '0');
     expect(controller.comics.single.id, 'current');
     verifyNever(
-      () => source.loadFavoriteComics(page: 1, folderId: 'old-source-folder'),
+      () => source.loadFavoriteComics(
+        page: 1,
+        folderId: 'old-source-folder',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     );
   });
 

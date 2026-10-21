@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import 'package:flutter/foundation.dart';
 import '../../../models/source_meta.dart';
 import '../../../shared/preferences/software_update_source.dart';
@@ -33,6 +34,15 @@ abstract interface class SourcePluginGateway implements Listenable {
   Future<SourcePluginIndexEntry?> checkUpdate(String id);
   Future<SourceMeta?> loadMetadata(String id);
   Object? loadSetting(String id, String key);
-  Future<void> saveSetting(String id, String key, dynamic value);
-  Future<dynamic> runAction(String id, String action);
+  Future<void> saveSetting(
+    String id,
+    String key,
+    dynamic value, {
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<dynamic> runAction(
+    String id,
+    String action, {
+    SourceTaskOrigin? taskOrigin,
+  });
 }

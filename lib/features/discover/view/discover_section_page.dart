@@ -15,7 +15,9 @@ import 'package:hazuki/shared/navigation_tags.dart';
 /// 涓撴爮婕敾鍒楄〃锟?/// 锟?[section.viewMoreUrl] 涓嶄负绌猴紝鍒欒繘鍏ラ〉鍚庡姞杞借椤甸潰鑷繁鐨勭涓€椤垫暟鎹紱
 /// 鑻ヤ负绌猴紝鍒欑洿鎺ュ睍锟?[section.comics]
 class DiscoverSectionPage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const DiscoverSectionPage({
+    required this.taskControl,
     super.key,
     required this.section,
     required this.comicDetailPageBuilder,
@@ -48,6 +50,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
       initialComics: widget.section.comics,
       initiallyOffersInitialComicsFilter:
           widget.section.offersInitialComicsFilter,
+      taskControl: widget.taskControl,
     );
     _scrollController.addListener(_onScroll);
     _scheduleInitialBootstrap();

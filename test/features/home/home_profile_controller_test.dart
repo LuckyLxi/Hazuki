@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -25,7 +26,10 @@ void main() {
     when(() => source.cachedAvatarUrl).thenReturn('https://example/cached');
     when(() => source.isActiveDailyCheckInSource).thenReturn(false);
     when(source.loadActiveSourcePreference).thenAnswer((_) async {});
-    controller = HomeProfileController(sourceService: source);
+    controller = HomeProfileController(
+      sourceService: source,
+      taskControl: FakeSourceTaskControl(),
+    );
     addTearDown(controller.dispose);
   });
 
@@ -156,7 +160,9 @@ void main() {
     tester,
   ) async {
     final refresh = Completer<String?>();
-    when(source.loadCurrentAvatarUrl).thenAnswer((_) => refresh.future);
+    when(
+      () => source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer((_) => refresh.future);
     await mount(tester);
     final sync = controller.syncUserProfile(context);
     await tester.pump();
@@ -175,7 +181,9 @@ void main() {
   testWidgets('failed refresh retains the cached avatar and usable account', (
     tester,
   ) async {
-    when(source.loadCurrentAvatarUrl).thenAnswer((_) async {
+    when(
+      () => source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer((_) async {
       throw StateError('offline');
     });
     await mount(tester);
@@ -190,7 +198,9 @@ void main() {
     tester,
   ) async {
     final oldRefresh = Completer<String?>();
-    when(source.loadCurrentAvatarUrl).thenAnswer((_) => oldRefresh.future);
+    when(
+      () => source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer((_) => oldRefresh.future);
     await mount(tester);
     final oldSync = controller.syncUserProfile(context);
     await tester.pump();
@@ -198,7 +208,9 @@ void main() {
     controller.markSourceChanged();
     when(() => source.activeSourceKey).thenReturn('other');
     when(() => source.currentAccount).thenReturn('Other user');
-    when(source.loadCurrentAvatarUrl).thenAnswer((_) async => 'other-avatar');
+    when(
+      () => source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer((_) async => 'other-avatar');
     await controller.syncUserProfile(context);
     oldRefresh.complete('old-avatar');
     await oldSync;
@@ -210,7 +222,9 @@ void main() {
 
   testWidgets('logout discards an unfinished avatar refresh', (tester) async {
     final refresh = Completer<String?>();
-    when(source.loadCurrentAvatarUrl).thenAnswer((_) => refresh.future);
+    when(
+      () => source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer((_) => refresh.future);
     await mount(tester);
     final sync = controller.syncUserProfile(context);
     await tester.pump();
@@ -228,7 +242,9 @@ void main() {
     'resolved login profile replaces loading and supersedes old sync',
     (tester) async {
       final refresh = Completer<String?>();
-      when(source.loadCurrentAvatarUrl).thenAnswer((_) => refresh.future);
+      when(
+        () => source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+      ).thenAnswer((_) => refresh.future);
       await mount(tester);
       final sync = controller.syncUserProfile(context);
       await tester.pump();

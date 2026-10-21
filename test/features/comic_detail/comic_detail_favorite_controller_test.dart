@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -65,7 +66,10 @@ void main() {
         saveCalls++;
         return saved.future;
       });
-      final controller = ComicDetailFavoriteController(repository: repository);
+      final controller = ComicDetailFavoriteController(
+        repository: repository,
+        taskControl: FakeSourceTaskControl(),
+      );
       var disposed = false;
       addTearDown(() {
         if (!disposed) controller.dispose();

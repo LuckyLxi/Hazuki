@@ -1,3 +1,7 @@
+import '../runtime/source_runtime_handle.dart';
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import '../../../models/hazuki_models.dart';
 import '../account/source_relogin_coordinator.dart';
 import '../runtime/source_runtime_facade.dart';
@@ -26,25 +30,50 @@ class SourceFavoriteComicsLoader {
   Future<FavoriteComicsResult> load({
     required int page,
     required String folderId,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     try {
-      final facade = _runtimeHost.activeHandle.facade;
-      final context = SourceFacadeReloginContext(facade);
-      final sessionReady = await _reloginCoordinator.ensureFavoriteSessionReady(
-        context,
+      return await runSourceOperation(
+        _runtimeHost,
+        _runtimeHost.activeHandle,
+        'favorites.load',
+        (operationContext) =>
+            _loadTask(operationContext, page: page, folderId: folderId),
+        origin: taskOrigin,
+        serviceOwned: false,
       );
-      if (!sessionReady) throw Exception('login_expired');
-      final result = await _reloginCoordinator.runWithReloginRetry(
-        () => _loadWithFacade(facade: facade, page: page, folderId: folderId),
-        context: context,
-      );
-      return FavoriteComicsResult.success(result.$1, maxPage: result.$2);
     } catch (error) {
+      rethrowSourceOperationStop(error);
       return FavoriteComicsResult.error(error.toString());
     }
   }
 
-  Future<(List<ExploreComic>, int?)> _loadWithFacade({
+  Future<FavoriteComicsResult> _loadTask(
+    SourceOperationContext operationContext, {
+    required int page,
+    required String folderId,
+  }) async {
+    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final context = SourceFacadeReloginContext(facade);
+    final sessionReady = await _reloginCoordinator.ensureFavoriteSessionReady(
+      context,
+    );
+    if (!sessionReady) throw Exception('login_expired');
+    final result = await _reloginCoordinator.runWithReloginRetry(
+      () => _loadWithFacade(
+        operationContext,
+        facade: facade,
+        page: page,
+        folderId: folderId,
+      ),
+      context: context,
+      checkActive: operationContext.checkActive,
+    );
+    return FavoriteComicsResult.success(result.$1, maxPage: result.$2);
+  }
+
+  Future<(List<ExploreComic>, int?)> _loadWithFacade(
+    SourceOperationContext operationContext, {
     required HazukiSourceFacade facade,
     required int page,
     required String folderId,
@@ -53,14 +82,23 @@ class SourceFavoriteComicsLoader {
       final engine = facade.js.engine;
       if (engine == null) throw Exception('source_not_initialized');
       final hasFavorites = facade.js.asBool(
-        await engine.evaluate('!!this.__hazuki_source.favorites'),
+        await operationContext.evaluate(
+          engine,
+          '!!this.__hazuki_source.favorites',
+        ),
       );
       if (!hasFavorites) throw Exception('favorites_not_supported');
       final hasLoadComics = facade.js.asBool(
-        await engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
+        await operationContext.evaluate(
+          engine,
+          '!!this.__hazuki_source.favorites?.loadComics',
+        ),
       );
       final hasLoadNext = facade.js.asBool(
-        await engine.evaluate('!!this.__hazuki_source.favorites?.loadNext'),
+        await operationContext.evaluate(
+          engine,
+          '!!this.__hazuki_source.favorites?.loadNext',
+        ),
       );
       if (!hasLoadComics && !hasLoadNext) {
         throw Exception('favorite_comics_loading_not_supported');
@@ -68,11 +106,16 @@ class SourceFavoriteComicsLoader {
       final normalizedFolderId =
           SourceFavoritesResponseParser.normalizeFolderId(folderId);
       if (!hasLoadComics) {
-        final comics = await _loadNext(facade, normalizedFolderId);
+        final comics = await _loadNext(
+          operationContext,
+          facade,
+          normalizedFolderId,
+        );
         return (SourceFavoritesResponseParser.mergeComics(comics), null);
       }
       if (normalizedFolderId != '0') {
         final loaded = await _loadComics(
+          operationContext,
           facade: facade,
           page: page,
           folderId: normalizedFolderId,
@@ -83,35 +126,40 @@ class SourceFavoriteComicsLoader {
           loaded.$2,
         );
       }
-      return _loadAllComics(facade: facade, page: page);
+      return _loadAllComics(operationContext, facade: facade, page: page);
     });
   }
 
   Future<List<ExploreComic>> _loadNext(
+    SourceOperationContext operationContext,
     HazukiSourceFacade facade,
     String folderId,
   ) async {
-    final raw = await facade.js.engine!.evaluate(
+    final raw = await operationContext.evaluate(
+      facade.js.engine!,
       _scriptFactory.loadNext(cursor: null, folderId: folderId),
       name: 'source_favorite_next.js',
     );
-    final resolved = await facade.js.resolve(raw);
+    final resolved = await operationContext.resolve(facade.js.resolve(raw));
     return _responseParser.parseComicsPage(resolved).comics;
   }
 
-  Future<(List<ExploreComic>, int?)> _loadAllComics({
+  Future<(List<ExploreComic>, int?)> _loadAllComics(
+    SourceOperationContext operationContext, {
     required HazukiSourceFacade facade,
     required int page,
   }) async {
     final allComics = <ExploreComic>[];
     int? maxPage;
     final loadedNull = await _tryLoadComics(
+      operationContext,
       facade: facade,
       page: page,
       folderId: null,
       scriptName: 'source_favorite_comics_all_null.js',
     );
     final loadedZero = await _tryLoadComics(
+      operationContext,
       facade: facade,
       page: page,
       folderId: '0',
@@ -128,9 +176,10 @@ class SourceFavoriteComicsLoader {
       allComics.addAll(loadedZero.$1);
       maxPage = loadedZero.$2;
     } else {
-      final folders = await _loadFallbackFolderIds(facade);
+      final folders = await _loadFallbackFolderIds(operationContext, facade);
       for (final folderId in folders) {
         final loaded = await _loadComics(
+          operationContext,
           facade: facade,
           page: page,
           folderId: folderId,
@@ -143,20 +192,30 @@ class SourceFavoriteComicsLoader {
     return (SourceFavoritesResponseParser.mergeComics(allComics), maxPage);
   }
 
-  Future<List<String>> _loadFallbackFolderIds(HazukiSourceFacade facade) async {
+  Future<List<String>> _loadFallbackFolderIds(
+    SourceOperationContext operationContext,
+    HazukiSourceFacade facade,
+  ) async {
     final engine = facade.js.engine!;
     final hasLoadFolders = facade.js.asBool(
-      await engine.evaluate('!!this.__hazuki_source.favorites?.loadFolders'),
+      await operationContext.evaluate(
+        engine,
+        '!!this.__hazuki_source.favorites?.loadFolders',
+      ),
     );
     if (!hasLoadFolders) return const [];
-    final raw = await engine.evaluate(
+    final raw = await operationContext.evaluate(
+      engine,
       _scriptFactory.loadFolders(null),
       name: 'source_favorite_folders_for_all.js',
     );
-    return _responseParser.extractFolderIds(await facade.js.resolve(raw));
+    return _responseParser.extractFolderIds(
+      await operationContext.resolve(facade.js.resolve(raw)),
+    );
   }
 
-  Future<(List<ExploreComic>, int?)?> _tryLoadComics({
+  Future<(List<ExploreComic>, int?)?> _tryLoadComics(
+    SourceOperationContext operationContext, {
     required HazukiSourceFacade facade,
     required int page,
     required String? folderId,
@@ -164,28 +223,32 @@ class SourceFavoriteComicsLoader {
   }) async {
     try {
       return await _loadComics(
+        operationContext,
         facade: facade,
         page: page,
         folderId: folderId,
         scriptName: scriptName,
       );
     } catch (error) {
+      rethrowSourceOperationStop(error);
       if (SourceReloginCoordinator.isLoginExpiredError(error)) rethrow;
       return null;
     }
   }
 
-  Future<(List<ExploreComic>, int?)> _loadComics({
+  Future<(List<ExploreComic>, int?)> _loadComics(
+    SourceOperationContext operationContext, {
     required HazukiSourceFacade facade,
     required int page,
     required String? folderId,
     required String scriptName,
   }) async {
-    final raw = await facade.js.engine!.evaluate(
+    final raw = await operationContext.evaluate(
+      facade.js.engine!,
       _scriptFactory.loadComics(page: page, folderId: folderId),
       name: scriptName,
     );
-    final resolved = await facade.js.resolve(raw);
+    final resolved = await operationContext.resolve(facade.js.resolve(raw));
     final parsed = _responseParser.parseComicsPage(resolved);
     return (parsed.comics, parsed.maxPage);
   }

@@ -1,3 +1,4 @@
+import '../support/fake_source_task_control.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -49,7 +50,12 @@ void main() {
         when(() => source.dailyRecommendationForSource('jm')).thenReturn(
           const DailyRecommendationConfig(mode: DailyRecommendationMode.plugin),
         );
-        when(() => source.loadDailyRecommendations(sourceKey: 'jm')).thenAnswer(
+        when(
+          () => source.loadDailyRecommendations(
+            sourceKey: 'jm',
+            taskOrigin: any(named: 'taskOrigin'),
+          ),
+        ).thenAnswer(
           (_) async => List.generate(
             count,
             (index) => SourceDailyRecommendationItem(
@@ -125,7 +131,10 @@ void main() {
       );
       final pending = Completer<List<SourceDailyRecommendationItem>>();
       when(
-        () => source.loadDailyRecommendations(sourceKey: 'jm'),
+        () => source.loadDailyRecommendations(
+          sourceKey: 'jm',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenAnswer((_) => pending.future);
       final generator = SourceDiscoverDailyRecommendationCandidateGenerator(
         source: source,
@@ -160,13 +169,17 @@ void main() {
       ).thenAnswer((_) async => old);
       final refreshed = Completer<List<SourceDailyRecommendationItem>>();
       when(
-        () => source.loadDailyRecommendations(sourceKey: 'jm'),
+        () => source.loadDailyRecommendations(
+          sourceKey: 'jm',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenAnswer((_) => refreshed.future);
       registerFallbackValue(old);
       when(() => cache.persistSnapshot(any())).thenAnswer((_) async {});
       final service = DiscoverDailyRecommendationService(
         source: source,
         cacheStore: cache,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(service.dispose);
       await service.ensurePrepared(enabled: true);
@@ -201,7 +214,10 @@ void main() {
       const DailyRecommendationConfig(mode: DailyRecommendationMode.plugin),
     );
     when(
-      () => source.loadDailyRecommendations(sourceKey: 'jm'),
+      () => source.loadDailyRecommendations(
+        sourceKey: 'jm',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).thenThrow(StateError('site unavailable'));
     final cache = _Cache();
     when(() => cache.readSnapshot(activeSourceKey: 'jm')).thenAnswer(
@@ -217,6 +233,7 @@ void main() {
     final service = DiscoverDailyRecommendationService(
       source: source,
       cacheStore: cache,
+      taskControl: FakeSourceTaskControl(),
     );
     addTearDown(service.dispose);
     await service.ensurePrepared(enabled: true);
@@ -245,6 +262,7 @@ void main() {
       final service = DiscoverDailyRecommendationService(
         source: source,
         cacheStore: cache,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(service.dispose);
       expect(
@@ -332,20 +350,32 @@ void main() {
       ),
     );
     when(
-      () => generator.generate(previous: any(named: 'previous')),
+      () => generator.generate(
+        previous: any(named: 'previous'),
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).thenAnswer((_) => pending.future);
     final service = DiscoverDailyRecommendationService(
       source: source,
       cacheStore: cache,
       candidateGenerator: generator,
       now: () => now,
+      taskControl: FakeSourceTaskControl(),
     );
     await service.ensurePrepared(enabled: true);
-    verifyNever(() => generator.generate(previous: any(named: 'previous')));
+    verifyNever(
+      () => generator.generate(
+        previous: any(named: 'previous'),
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
+    );
     now = now.add(const Duration(milliseconds: 1));
     await service.ensurePrepared(enabled: true);
     verify(
-      () => generator.generate(previous: any(named: 'previous')),
+      () => generator.generate(
+        previous: any(named: 'previous'),
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).called(1);
     expect(service.state.isRefreshing, isTrue);
     pending.complete(null);
@@ -418,6 +448,7 @@ void main() {
       final service = DiscoverDailyRecommendationService(
         source: source,
         cacheStore: cache,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(service.dispose);
       final state = await service.ensurePrepared(enabled: true);
@@ -442,6 +473,7 @@ void main() {
       final service = DiscoverDailyRecommendationService(
         source: source,
         cacheStore: cache,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(service.dispose);
       final prepared = service.ensurePrepared(enabled: true);
@@ -492,6 +524,7 @@ void main() {
       final service = DiscoverDailyRecommendationService(
         source: source,
         cacheStore: cache,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(service.dispose);
       final prepared = service.ensurePrepared(enabled: true);
@@ -531,12 +564,16 @@ void main() {
       ).thenAnswer((_) async => null);
       when(() => cache.setEnabled(false)).thenAnswer((_) async {});
       when(
-        () => generator.generate(previous: any(named: 'previous')),
+        () => generator.generate(
+          previous: any(named: 'previous'),
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenAnswer((_) => pending.future);
       final service = DiscoverDailyRecommendationService(
         source: source,
         cacheStore: cache,
         candidateGenerator: generator,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(service.dispose);
       final prepared = service.ensurePrepared(enabled: true);
@@ -574,6 +611,7 @@ void main() {
       final service = DiscoverDailyRecommendationService(
         source: source,
         cacheStore: cache,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(service.dispose);
 

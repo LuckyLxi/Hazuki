@@ -1,3 +1,7 @@
+import '../runtime/source_runtime_handle.dart';
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -28,11 +32,31 @@ class SourceCategoryCapability {
   Future<List<CategoryTagGroup>> loadTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.handleFor(
+      sourceKey.isEmpty ? _runtimeHost.activeSourceKey : sourceKey,
+    ),
+    'category.tags',
+    (operationContext) => _loadTagGroupsTask(
+      operationContext,
+      forceRefresh: forceRefresh,
+      sourceKey: sourceKey,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<List<CategoryTagGroup>> _loadTagGroupsTask(
+    SourceOperationContext operationContext, {
+    bool forceRefresh = false,
+    String sourceKey = '',
   }) async {
     final resolvedSourceKey = sourceKey.trim().isEmpty
         ? _runtimeHost.activeSourceKey
         : _runtimeHost.normalize(sourceKey);
-    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
+    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final startedAt = DateTime.now();
@@ -74,7 +98,10 @@ class SourceCategoryCapability {
 
       final hasCategoryEvaluateStartedAt = DateTime.now();
       final hasCategory = facade.js.asBool(
-        await engine.evaluate('!!this.__hazuki_source.category'),
+        await operationContext.evaluate(
+          engine,
+          '!!this.__hazuki_source.category',
+        ),
       );
       _logTagTiming(
         'Source category tags availability evaluate finished',
@@ -93,7 +120,7 @@ class SourceCategoryCapability {
       }
 
       final evaluateStartedAt = DateTime.now();
-      final dynamic result = await engine.evaluate('''(() => {
+      final dynamic result = await operationContext.evaluate(engine, '''(() => {
         const category = this.__hazuki_source.category;
         const parts = Array.isArray(category?.parts) ? category.parts : [];
         const groups = [];
@@ -123,7 +150,9 @@ class SourceCategoryCapability {
         targetFacade: facade,
       );
 
-      final dynamic resolved = await facade.js.resolve(result);
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
       if (resolved is! List) {
         _logTagTiming(
           'Source category tags loaded',
@@ -180,7 +209,7 @@ class SourceCategoryCapability {
           ),
         ),
       );
-      if (identical(facade.js.engine, engine)) {
+      if (operationContext.canCache() && identical(facade.js.engine, engine)) {
         facade.cache.putCategoryTagGroupsInMemoryCache(cached);
       }
       _logTagTiming(
@@ -199,14 +228,27 @@ class SourceCategoryCapability {
     });
   }
 
-  Future<List<CategoryRankingOption>> loadRankingOptions() async {
-    final facade = _runtimeHost.activeHandle.facade;
+  Future<List<CategoryRankingOption>> loadRankingOptions({
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.rankingOptions',
+    (operationContext) => _loadRankingOptionsTask(operationContext),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<List<CategoryRankingOption>> _loadRankingOptionsTask(
+    SourceOperationContext operationContext,
+  ) async {
+    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final engine = facade.js.engine;
       if (engine == null) throw Exception('source_not_initialized');
 
-      final dynamic result = await engine.evaluate('''(() => {
+      final dynamic result = await operationContext.evaluate(engine, '''(() => {
         const rawOptions = this.__hazuki_source.categoryComics?.ranking?.options;
         if (!Array.isArray(rawOptions)) return [];
         return rawOptions.map((item) => {
@@ -217,7 +259,9 @@ class SourceCategoryCapability {
           return { value: text.slice(0, idx), label: text.slice(idx + 1) };
         }).filter(Boolean);
       })()''', name: 'source_category_ranking_options.js');
-      final dynamic resolved = await facade.js.resolve(result);
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
       if (resolved is! List) return const [];
 
       final options = <CategoryRankingOption>[];
@@ -241,8 +285,26 @@ class SourceCategoryCapability {
   Future<CategoryComicsResult> loadRankingComics({
     required String rankingOption,
     required int page,
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.ranking',
+    (operationContext) => _loadRankingComicsTask(
+      operationContext,
+      rankingOption: rankingOption,
+      page: page,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<CategoryComicsResult> _loadRankingComicsTask(
+    SourceOperationContext operationContext, {
+    required String rankingOption,
+    required int page,
   }) async {
-    final facade = _runtimeHost.activeHandle.facade;
+    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final engine = facade.js.engine;
@@ -254,11 +316,14 @@ class SourceCategoryCapability {
       if (option.isEmpty) {
         throw Exception('鎺掕姒滃弬鏁颁笉鑳戒负绌?');
       }
-      final dynamic result = await engine.evaluate(
+      final dynamic result = await operationContext.evaluate(
+        engine,
         'this.__hazuki_source.categoryComics.ranking.load(${jsonEncode(option)}, ${_normalizePage(page)})',
         name: 'source_category_ranking_load.js',
       );
-      final dynamic resolved = await facade.js.resolve(result);
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
       if (resolved is! Map) {
         return const CategoryComicsResult(comics: [], maxPage: null);
       }
@@ -268,15 +333,50 @@ class SourceCategoryCapability {
 
   Future<List<CategoryRankingOption>> loadRankingOptionsByViewMore({
     required String viewMoreUrl,
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.viewMoreOptions',
+    (operationContext) => _loadRankingOptionsByViewMoreTask(
+      operationContext,
+      viewMoreUrl: viewMoreUrl,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<List<CategoryRankingOption>> _loadRankingOptionsByViewMoreTask(
+    SourceOperationContext operationContext, {
+    required String viewMoreUrl,
   }) async {
-    final groups = await loadOptionGroupsByViewMore(viewMoreUrl: viewMoreUrl);
+    final groups = await _loadOptionGroupsByViewMoreTask(
+      operationContext,
+      viewMoreUrl: viewMoreUrl,
+    );
     return groups.isEmpty ? const [] : groups.first;
   }
 
   Future<List<List<CategoryRankingOption>>> loadOptionGroupsByViewMore({
     required String viewMoreUrl,
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.viewMoreGroups',
+    (operationContext) => _loadOptionGroupsByViewMoreTask(
+      operationContext,
+      viewMoreUrl: viewMoreUrl,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<List<List<CategoryRankingOption>>> _loadOptionGroupsByViewMoreTask(
+    SourceOperationContext operationContext, {
+    required String viewMoreUrl,
   }) async {
-    final facade = _runtimeHost.activeHandle.facade;
+    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final engine = facade.js.engine;
@@ -289,16 +389,18 @@ class SourceCategoryCapability {
           ? 'null'
           : jsonEncode(parsed.param);
       final hasOptionLoader = facade.js.asBool(
-        await engine.evaluate(
+        await operationContext.evaluate(
+          engine,
           '!!this.__hazuki_source.categoryComics?.optionLoader',
         ),
       );
       final dynamic result = hasOptionLoader
-          ? await engine.evaluate(
+          ? await operationContext.evaluate(
+              engine,
               'this.__hazuki_source.categoryComics.optionLoader($categoryJson, $paramJson)',
               name: 'source_category_view_more_options.js',
             )
-          : await engine.evaluate('''(() => {
+          : await operationContext.evaluate(engine, '''(() => {
             const category = $categoryJson;
             const param = $paramJson;
             const raw = this.__hazuki_source.categoryComics?.optionList;
@@ -313,7 +415,9 @@ class SourceCategoryCapability {
               return showMatch && !hideMatch;
             });
           })()''', name: 'source_category_view_more_option_list.js');
-      final dynamic resolved = await facade.js.resolve(result);
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
       if (resolved is! List) return const [];
 
       final groups = <List<CategoryRankingOption>>[];
@@ -333,8 +437,30 @@ class SourceCategoryCapability {
     required int page,
     String order = '',
     List<String>? orders,
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.viewMore',
+    (operationContext) => _loadComicsByViewMoreTask(
+      operationContext,
+      viewMoreUrl: viewMoreUrl,
+      page: page,
+      order: order,
+      orders: orders,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<CategoryComicsResult> _loadComicsByViewMoreTask(
+    SourceOperationContext operationContext, {
+    required String viewMoreUrl,
+    required int page,
+    String order = '',
+    List<String>? orders,
   }) async {
-    final facade = _runtimeHost.activeHandle.facade;
+    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final engine = facade.js.engine;
@@ -352,7 +478,7 @@ class SourceCategoryCapability {
       final exploreIndex = parseExploreViewMoreIndex(viewMoreUrl);
       final dynamic result;
       if (exploreIndex != null) {
-        result = await engine.evaluate('''(() => {
+        result = await operationContext.evaluate(engine, '''(() => {
           const section = this.__hazuki_source.explore?.[$exploreIndex];
           if (!section || section.type !== "multiPageComicList" || typeof section.load !== "function") return null;
           return Promise.resolve(section.load($normalizedPage)).then((value) => ({ title: section.title ?? "__untitled_section__", ...(value ?? {}) }));
@@ -363,12 +489,15 @@ class SourceCategoryCapability {
         final paramJson = parsed.param == null
             ? 'null'
             : jsonEncode(parsed.param);
-        result = await engine.evaluate(
+        result = await operationContext.evaluate(
+          engine,
           'this.__hazuki_source.categoryComics.load($categoryJson, $paramJson, $optionsJson, $normalizedPage)',
           name: 'source_category_view_more_load.js',
         );
       }
-      final dynamic resolved = await facade.js.resolve(result);
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
       if (resolved is! Map) {
         return const CategoryComicsResult(comics: [], maxPage: null);
       }

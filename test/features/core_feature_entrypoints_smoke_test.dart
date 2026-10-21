@@ -72,6 +72,7 @@ ComicDetailDependencies _comicDetailDependencies() {
     readingProgress: sl<ReadingProgressService>(),
     readHistory: sl<ReadHistoryService>(),
     imageGateway: sl<SourceImageGateway>(),
+    taskControl: FakeSourceTaskControl(),
   );
 }
 
@@ -179,11 +180,13 @@ void main() {
       imageGateway: sl<SourceImageGateway>(),
       authVersion: 1,
       onComicTap: (comic, heroTag) async {},
+      taskControl: FakeSourceTaskControl(),
     );
     final comments = CommentsPage(
       sourceService: sl<SourceCommentsGateway>(),
       filterService: sl<CommentFilterService>(),
       comicId: 'comic-id',
+      taskControl: FakeSourceTaskControl(),
     );
     final downloads = DownloadsPage(
       downloadService: sl<MangaDownloadService>(),

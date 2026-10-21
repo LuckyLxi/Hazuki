@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -13,11 +14,17 @@ abstract interface class SourceAccountGateway implements Listenable {
 
   Future<void> ensureInitialized({String? sourceKey});
   Future<void> loadActiveSourcePreference();
-  Future<void> login({required String account, required String password});
-  Future<void> logout();
-  Future<String?> loadCurrentAvatarUrl();
-  Future<bool> isDailyCheckInCompletedToday();
-  Future<DailyCheckInResult> performDailyCheckIn();
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<void> logout({SourceTaskOrigin? taskOrigin});
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin});
+  Future<bool> isDailyCheckInCompletedToday({SourceTaskOrigin? taskOrigin});
+  Future<DailyCheckInResult> performDailyCheckIn({
+    SourceTaskOrigin? taskOrigin,
+  });
 }
 
 abstract interface class SourceBootstrapGateway {
@@ -159,14 +166,22 @@ abstract interface class SourceSettingsGateway {
   int get imageCacheMaxBytes;
 
   Object? loadSourceSetting(String sourceKey, String key);
-  Future<void> updateSourceSetting(String sourceKey, String key, dynamic value);
+  Future<void> updateSourceSetting(
+    String sourceKey,
+    String key,
+    dynamic value, {
+    SourceTaskOrigin? taskOrigin,
+  });
   Object? loadActiveSourceSetting(String key);
   Future<void> updateActiveSourceSetting(String key, dynamic value);
-  Future<Map<String, dynamic>> getLineSettingsSnapshot();
+  Future<Map<String, dynamic>> getLineSettingsSnapshot({
+    SourceTaskOrigin? taskOrigin,
+  });
   Future<void> updateLineSetting(String key, dynamic value);
   Future<void> refreshLines({
     bool refreshApiDomains = true,
     bool refreshImageHost = true,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<Map<String, dynamic>> getImageCacheStatus();
   Future<void> setImageCacheMaxBytes(int value);

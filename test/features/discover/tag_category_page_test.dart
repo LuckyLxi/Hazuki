@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -22,7 +23,11 @@ void main() {
     categorySource = _MockCategoryGateway();
     discoverSource = _MockDiscoverGateway();
     when(() => categorySource.softwareLogCaptureEnabled).thenReturn(false);
-    when(() => categorySource.loadCategoryTagGroups()).thenAnswer(
+    when(
+      () => categorySource.loadCategoryTagGroups(
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
+    ).thenAnswer(
       (_) async => const [
         CategoryTagGroup(
           name: 'Tags',
@@ -34,6 +39,7 @@ void main() {
     when(
       () => discoverSource.loadCategoryOptionGroupsByViewMore(
         viewMoreUrl: any(named: 'viewMoreUrl'),
+        taskOrigin: any(named: 'taskOrigin'),
       ),
     ).thenAnswer(
       (_) async => const [
@@ -60,6 +66,7 @@ void main() {
           comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
           categorySource: categorySource,
           discoverSource: discoverSource,
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -79,6 +86,7 @@ void main() {
           page: any(named: 'page'),
           order: any(named: 'order'),
           orders: any(named: 'orders'),
+          taskOrigin: any(named: 'taskOrigin'),
         ),
       ).thenAnswer((invocation) async {
         final page = invocation.namedArguments[#page] as int;
@@ -133,6 +141,7 @@ void main() {
           page: 2,
           order: 'latest',
           orders: ['latest', 'all'],
+          taskOrigin: any(named: 'taskOrigin'),
         ),
       ).called(1);
 
@@ -148,6 +157,7 @@ void main() {
           page: 1,
           order: 'popular',
           orders: ['popular', 'all'],
+          taskOrigin: any(named: 'taskOrigin'),
         ),
       ).called(1);
       expect(tester.takeException(), isNull);
@@ -160,6 +170,7 @@ void main() {
     when(
       () => discoverSource.loadCategoryOptionGroupsByViewMore(
         viewMoreUrl: any(named: 'viewMoreUrl'),
+        taskOrigin: any(named: 'taskOrigin'),
       ),
     ).thenAnswer(
       (_) async => [
@@ -178,6 +189,7 @@ void main() {
         page: any(named: 'page'),
         order: any(named: 'order'),
         orders: any(named: 'orders'),
+        taskOrigin: any(named: 'taskOrigin'),
       ),
     ).thenAnswer(
       (_) async => CategoryComicsResult(
@@ -229,6 +241,7 @@ void main() {
         page: any(named: 'page'),
         order: any(named: 'order'),
         orders: any(named: 'orders'),
+        taskOrigin: any(named: 'taskOrigin'),
       ),
     ).thenAnswer((_) => result.future);
 
@@ -246,6 +259,7 @@ void main() {
           comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
           sourceService: discoverSource,
           scrollSortBarWithContent: true,
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -265,6 +279,7 @@ void main() {
         page: 1,
         order: 'popular',
         orders: ['popular', 'all'],
+        taskOrigin: any(named: 'taskOrigin'),
       ),
     ).called(1);
     expect(tester.takeException(), isNull);

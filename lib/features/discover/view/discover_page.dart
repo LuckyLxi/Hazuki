@@ -21,7 +21,9 @@ import 'discover_page_sections.dart';
 import 'discover_section_page_widgets.dart';
 
 class DiscoverPage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const DiscoverPage({
+    required this.taskControl,
     super.key,
     required this.sourceService,
     required this.recommendationSource,
@@ -110,6 +112,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
           unawaited(_triggerRefresh());
         }
       },
+      taskControl: widget.taskControl,
     );
     _scrollController.addListener(_handleScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -330,6 +333,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
     return Stack(
       children: [
         DiscoverPageBody(
+          taskControl: widget.taskControl,
           controller: _controller,
           scrollController: _scrollController,
           headerItemCount: _headerItemCount,

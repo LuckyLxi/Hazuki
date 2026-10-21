@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/discover/view/discover_page.dart';
@@ -61,6 +62,7 @@ void main() {
           allowInitialLoad: false,
           comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
           pluginPageBuilder: (_) => const Scaffold(body: Text('plugin-page')),
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -106,6 +108,7 @@ void main() {
           authVersion: 0,
           onComicTap: (_, _) async {},
           onRequestLogin: () async => fail('Login must not be offered'),
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -122,7 +125,10 @@ void main() {
       tester,
     ) async {
       when(() => source.activeSourceKey).thenReturn(sourceKey);
-      final controller = HomeProfileController(sourceService: source);
+      final controller = HomeProfileController(
+        sourceService: source,
+        taskControl: FakeSourceTaskControl(),
+      );
       addTearDown(controller.dispose);
       late BuildContext profileContext;
       await tester.pumpWidget(
@@ -165,7 +171,9 @@ void main() {
             .loading,
         hasSource,
       );
-      verifyNever(source.loadCurrentAvatarUrl);
+      verifyNever(
+        () => source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+      );
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
