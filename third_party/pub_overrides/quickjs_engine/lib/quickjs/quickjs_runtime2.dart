@@ -11,7 +11,13 @@ import 'package:quickjs_engine/quickjs_engine.dart';
 
 import 'ffi.dart';
 
-export 'ffi.dart' show JSEvalFlag, JSRef, QuickJsHostReply;
+export 'ffi.dart'
+    show
+        JSEvalFlag,
+        JSRef,
+        QuickJsHostReply,
+        QuickJsMailboxStopped,
+        QuickJsMailboxTimeout;
 
 part './isolate.dart';
 part './object.dart';
@@ -236,6 +242,33 @@ class QuickJsRuntime2 extends JavascriptRuntime {
   }
 
   int get taskContext => _rt == null ? 0 : jsGetTaskContext(_rt!);
+  QuickJsWorkContext captureWorkContext() {
+    _ensureEngine();
+    return QuickJsWorkContext._(
+      _rt!,
+      jsGetTaskContext(_rt!),
+      jsGetWorkContext(_rt!),
+    );
+  }
+
+  QuickJsWorkContext createWorkContext() {
+    _ensureEngine();
+    final work = jsCreateWorkContext(_rt!);
+    final context = QuickJsWorkContext._(_rt!, jsGetTaskContext(_rt!), work);
+    jsReleaseWorkContext(_rt!, work);
+    return context;
+  }
+
+  T withWorkContext<T>(QuickJsWorkContext context, T Function() action) {
+    if (context._released || _rt != context._runtime || !context._alive) {
+      throw StateError('QuickJS work context is released');
+    }
+    return withTaskContext(context.taskToken, () {
+      jsSetWorkContext(_rt!, context.workId);
+      return action();
+    });
+  }
+
   static int get registeredRuntimeCount => runtimeOpaques.length;
   int get remainingExecutionMilliseconds =>
       _rt == null ? (timeout ?? 5000) : jsRemainingExecutionMilliseconds(_rt!);

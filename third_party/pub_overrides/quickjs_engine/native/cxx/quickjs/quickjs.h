@@ -1219,6 +1219,7 @@ JS_EXTERN uint64_t JS_GetHostWorkContext(JSRuntime *rt);
 JS_EXTERN void JS_SetHostWorkContext(JSRuntime *rt, uint64_t work);
 JS_EXTERN void JS_SetHostStopReason(JSRuntime *rt, int reason);
 JS_EXTERN int JS_GetHostStopError(JSValueConst error, uint64_t *task);
+JS_EXTERN void JS_MarkHostStopError(JSValueConst error, uint64_t task, int reason);
 JS_EXTERN int JS_CheckHostTask(JSContext *ctx);
 JS_EXTERN void JS_SetHostObserver(JSRuntime *rt, bool enabled);
 JS_EXTERN uint64_t JS_GetLastJobTask(JSRuntime *rt);

@@ -58,9 +58,28 @@ Pointer<JSValue> _dartToJs(
   dynamic val, {
   Map<dynamic, Pointer<JSValue>>? cache,
 }) {
+  if (val is QuickJsWorkResult) {
+    final work = val.context;
+    if (work._released || !work._alive)
+      throw StateError('QuickJS work context is released');
+    final rt = jsGetRuntime(ctx);
+    final previous = jsGetTaskContext(rt);
+    final previousWork = jsGetWorkContext(rt);
+    jsSetTaskContext(rt, work.taskToken);
+    jsSetWorkContext(rt, work.workId);
+    try {
+      return _dartToJs(ctx, val.value, cache: cache);
+    } finally {
+      jsSetTaskContext(rt, previous);
+      jsSetWorkContext(rt, previousWork);
+    }
+  }
   if (val == null) return jsUNDEFINED();
   if (val is Error) return _dartToJs(ctx, JSError(val, val.stackTrace));
   if (val is Exception) return _dartToJs(ctx, JSError(val));
+  if (val is QuickJsTaskStoppedError) {
+    return jsNewStoppedError(ctx, val.taskToken, val.reason.index + 1);
+  }
   if (val is JSError) {
     final ret = jsNewError(ctx);
     _definePropertyValue(ctx, ret, "name", "");

@@ -10,6 +10,7 @@ part of './quickjs_runtime2.dart';
 /// js invokable
 abstract class JSInvokable extends JSRef {
   dynamic invoke(List args, [dynamic thisVal]);
+  QuickJsWorkContext? captureWorkContext() => null;
 
   static dynamic _wrap(dynamic func) {
     return func is JSInvokable
@@ -151,6 +152,10 @@ class _JSObject extends JSRef {
 class _JSFunction extends _JSObject implements JSInvokable, _IsolateEncodable {
   int _capturedTask = 0;
   int _capturedWork = 0;
+  @override
+  QuickJsWorkContext? captureWorkContext() => _ctx == null || _capturedWork == 0
+      ? null
+      : QuickJsWorkContext._(jsGetRuntime(_ctx!), _capturedTask, _capturedWork);
   _JSFunction(Pointer<JSContext> ctx, Pointer<JSValue> val) : super(ctx, val) {
     final rt = jsGetRuntime(ctx);
     if (runtimeOpaques[rt]?.taskControlEnabled == true) {

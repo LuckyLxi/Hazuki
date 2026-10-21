@@ -886,6 +886,13 @@ final jsRemainingExecutionMilliseconds = _qjsLib
 
 /// A thread-safe byte mailbox. It never accesses a QuickJS runtime.
 class QuickJsHostReply {
+  static final _createForWork = _qjsLib
+      .lookupFunction<
+        Uint64 Function(Uint64, Uint64, Uint64),
+        int Function(int, int, int)
+      >('jsHostReplyCreateForWork');
+  static int createForWork(int controlId, int task, int work) =>
+      _createForWork(controlId, task, work);
   static final _create = _qjsLib
       .lookupFunction<Uint64 Function(), int Function()>('jsHostReplyCreate');
   static final _complete = _qjsLib
@@ -935,9 +942,9 @@ class QuickJsHostReply {
     try {
       final size = _wait(id, milliseconds, output);
       if (size < 0) {
-        throw StateError(
-          size == -2 ? 'host_bridge_timeout' : 'host_bridge_closed',
-        );
+        if (size == -4 || size == -5) throw QuickJsMailboxStopped(size == -5);
+        if (size == -2) throw QuickJsMailboxTimeout();
+        throw StateError('host_bridge_closed');
       }
       return Uint8List.fromList(output.value.asTypedList(size));
     } finally {
@@ -946,6 +953,44 @@ class QuickJsHostReply {
     }
   }
 }
+
+/// Keeps the legacy StateError contract while exposing the native wait status.
+class QuickJsMailboxTimeout extends StateError {
+  QuickJsMailboxTimeout() : super('host_bridge_timeout');
+}
+
+class QuickJsMailboxStopped implements Exception {
+  const QuickJsMailboxStopped(this.timedOut);
+  final bool timedOut;
+}
+
+final jsTaskStopRetained = _qjsLib
+    .lookupFunction<
+      Int32 Function(Uint64, Uint64, Int32),
+      int Function(int, int, int)
+    >('jsTaskStopRetained');
+final jsCreateWorkContext = _qjsLib
+    .lookupFunction<
+      Uint64 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsCreateWorkContext');
+final jsWorkState = _qjsLib
+    .lookupFunction<Int32 Function(Uint64, Uint64), int Function(int, int)>(
+      'jsWorkState',
+    );
+final jsWorkClaimStop = _qjsLib
+    .lookupFunction<Int32 Function(Uint64, Uint64), int Function(int, int)>(
+      'jsWorkClaimStop',
+    );
+final jsTaskShutdown = _qjsLib
+    .lookupFunction<Void Function(Uint64), void Function(int)>(
+      'jsTaskShutdown',
+    );
+final jsNewStoppedError = _qjsLib
+    .lookupFunction<
+      Pointer<JSValue> Function(Pointer<JSContext>, Uint64, Int32),
+      Pointer<JSValue> Function(Pointer<JSContext>, int, int)
+    >('jsNewStoppedError');
 
 final jsEnableTaskControl = _qjsLib
     .lookupFunction<

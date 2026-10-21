@@ -1,4 +1,5 @@
 import 'source_local_script_bridge.dart';
+import 'source_host_call_context.dart';
 import '../../../models/source_meta.dart';
 import '../models/source_script_execution.dart';
 
@@ -46,12 +47,25 @@ class SourceJsBridgeCookieCapability {
     dynamic message, {
     SourceHtmlBridge? htmlBridge,
     SourceScriptExecution? execution,
+    SourceHostCallContext? hostContext,
     String? runtimeId,
     SourceMeta? Function()? sourceMeta,
   }) {
+    hostContext?.checkActive();
     if (message is! Map) return null;
     final map = Map<String, dynamic>.from(message);
     final method = map['method']?.toString();
+    if (hostContext != null &&
+        const {
+          'save_data',
+          'delete_data',
+          'save_setting',
+          'secret_set',
+          'secret_delete',
+          'cookie',
+        }.contains(method)) {
+      hostContext.requiresDrain = true;
+    }
     if (method != null && method.startsWith('ui_')) {
       if (execution == null ||
           runtimeId == null ||
@@ -97,6 +111,7 @@ class SourceJsBridgeCookieCapability {
                   handle.loginCancellation?.check();
                   SourceUiService.instance.checkExecution(execution, runtimeId);
                 },
+                hostContext: hostContext,
               ),
             );
       }
@@ -176,6 +191,7 @@ class SourceJsBridgeCookieCapability {
             SourceBrowserAuthorizationOptions.parse(request),
             value,
             cancellation.check,
+            hostContext: hostContext,
           );
         });
         break;
@@ -211,6 +227,7 @@ class SourceJsBridgeCookieCapability {
           map,
           execution: execution,
           runtimeId: runtimeId,
+          hostContext: hostContext,
           checkActive: () {
             handle.loginCancellation?.check();
             if (execution != null && runtimeId != null) {
@@ -298,9 +315,17 @@ class SourceJsBridgeCookieCapability {
     SourceRuntimeHandle handle,
     SourceBrowserAuthorizationOptions options,
     Map value,
-    void Function() checkActive,
-  ) async {
-    checkActive();
+    void Function() checkActive, {
+    SourceHostCallContext? hostContext,
+  }) async {
+    void check() {
+      hostContext?.checkActive();
+      checkActive();
+    }
+
+    Future<void> commit(Future<void> Function() action) =>
+        hostContext?.runCommit(action) ?? action();
+    check();
     final response = Map<String, dynamic>.from(value);
     final cookies = response.remove('_cookies');
     final userAgent = response.remove('_userAgent');
@@ -333,12 +358,12 @@ class SourceJsBridgeCookieCapability {
         if (scope.names.any((n) => !selected.any((c) => c.name == n))) {
           throw StateError('login_browser_cookie_missing');
         }
-        await handle.cookieStore.set(scope.url, selected);
+        await commit(() => handle.cookieStore.set(scope.url, selected));
         userAgents[Uri.parse(scope.url).origin] = userAgent;
-        checkActive();
+        check();
       }
-      await handle.session.saveBrowserUserAgents(userAgents);
-      checkActive();
+      await commit(() => handle.session.saveBrowserUserAgents(userAgents));
+      check();
     }
     return response;
   }

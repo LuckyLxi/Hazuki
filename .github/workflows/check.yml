@@ -116,7 +116,7 @@ jobs:
         run: flutter test --reporter expanded
 
       - name: Run source runtime tests
-        run: flutter test test/services/source --reporter expanded
+        run: flutter test test/services/source test/services/network_client_test.dart --reporter expanded
 
   android-smoke-build:
     name: Android debug smoke build

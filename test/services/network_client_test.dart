@@ -10,6 +10,42 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test(
+    'cancelling during retry delay cancels the wait without sending another request',
+    () async {
+      final first = Completer<void>();
+      final adapter = _FakeAdapter((options, count) {
+        if (!first.isCompleted) first.complete();
+        return ResponseBody.fromString('retry', 503);
+      });
+      final dio = Dio(BaseOptions(validateStatus: (_) => true))
+        ..httpClientAdapter = adapter;
+      final client = HazukiNetworkClient(
+        dio: dio,
+        sourceKey: 'fixture',
+        retryDelay: const Duration(seconds: 30),
+      );
+      final token = CancelToken();
+      final request = client.request<String>(
+        'https://fixture.test/retry',
+        cancelToken: token,
+      );
+      final assertion = expectLater(
+        request,
+        throwsA(
+          isA<DioException>().having(CancelToken.isCancel, 'cancel', true),
+        ),
+      );
+      await first.future;
+      await Future<void>.delayed(Duration.zero);
+      final elapsed = Stopwatch()..start();
+      token.cancel('fixture');
+      await assertion;
+      expect(elapsed.elapsed, lessThan(const Duration(seconds: 2)));
+      expect(adapter.callCount, 1);
+      dio.close(force: true);
+    },
+  );
   group('Hazuki network URL normalization', () {
     test('preserves explicit ports regardless of source identity', () {
       expect(

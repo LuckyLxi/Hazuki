@@ -2159,6 +2159,12 @@ int JS_GetHostStopError(JSValueConst error, uint64_t *task) {
     if (task) *task = object->host_stop_task;
     return object->host_stop_reason;
 }
+void JS_MarkHostStopError(JSValueConst error, uint64_t task, int reason) {
+    if (JS_IsObject(error)) {
+        JS_VALUE_GET_OBJ(error)->host_stop_task = task;
+        JS_VALUE_GET_OBJ(error)->host_stop_reason = reason;
+    }
+}
 void JS_RetainHostTaskContext(JSRuntime *rt, uint64_t token)
 {
     if (token && rt->host_task_reference)
@@ -52963,6 +52969,13 @@ static JSValue promise_reaction_job(JSContext *ctx, int argc,
        functions */
     if (!JS_IsUndefined(func)) {
         bool stopped = JS_GetHostStopError(res, NULL) != 0;
+        // A custom Promise species may supply user JS as a capability resolver.
+        // Never run it with interrupts suppressed during cancellation cleanup.
+        if (stopped && (!JS_IsObject(func) ||
+            (JS_VALUE_GET_OBJ(func)->class_id != JS_CLASS_PROMISE_RESOLVE_FUNCTION &&
+             JS_VALUE_GET_OBJ(func)->class_id != JS_CLASS_PROMISE_REJECT_FUNCTION))) {
+            return JS_Throw(ctx, res);
+        }
         if (stopped) ctx->rt->host_cleanup_depth++;
         res2 = JS_Call(ctx, func, JS_UNDEFINED, 1, vc(&res));
         if (stopped) ctx->rt->host_cleanup_depth--;

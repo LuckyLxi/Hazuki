@@ -4,6 +4,7 @@ import '../../network/hazuki_network.dart';
 import '../debug/source_network_log_sink.dart';
 import '../runtime/source_cookie_store.dart';
 import '../models/source_script_execution.dart';
+import '../runtime/source_host_call_context.dart';
 
 class SourceHttpGateway {
   SourceHttpGateway({
@@ -20,6 +21,7 @@ class SourceHttpGateway {
        _client = HazukiNetworkClient(dio: dio, sourceKey: sourceKey);
 
   final SourceCookieStore _cookieStore;
+  static const _hostContextKey = 'hazukiSourceHostCallContext';
   static Map<String, String> _noUserAgents() => const {};
   final Map<String, String> Function() _browserUserAgents;
   final SourceNetworkLogSink _networkLogSink;
@@ -44,6 +46,7 @@ class SourceHttpGateway {
         HazukiNetworkRetryPolicy.conservative,
     bool withCookies = true,
     void Function()? checkActive,
+    CancelToken? cancelToken,
   }) async {
     // Native redirects would carry the pinned UA to a different origin without
     // passing through Dio interceptors. Rebuild each hop from caller headers.
@@ -71,7 +74,9 @@ class SourceHttpGateway {
         options: currentOptions,
         onReceiveProgress: onReceiveProgress,
         retryPolicy: retryPolicy,
+        cancelToken: cancelToken,
       );
+      checkActive?.call();
       final status = response.statusCode;
       final location = response.headers.value('location');
       final redirect =
@@ -123,6 +128,7 @@ class SourceHttpGateway {
     String? category,
     HazukiNetworkRetryPolicy retryPolicy =
         HazukiNetworkRetryPolicy.conservative,
+    CancelToken? cancelToken,
   }) {
     return request<List<int>>(
       url,
@@ -132,6 +138,7 @@ class SourceHttpGateway {
         extra: category == null ? const {} : {'hazukiLogCategory': category},
       ),
       retryPolicy: retryPolicy,
+      cancelToken: cancelToken,
     );
   }
 
@@ -140,6 +147,7 @@ class SourceHttpGateway {
     SourceScriptExecution? execution,
     String? runtimeId,
     void Function()? checkActive,
+    SourceHostCallContext? hostContext,
   }) async {
     Response<dynamic>? response;
     String? error;
@@ -151,28 +159,48 @@ class SourceHttpGateway {
     final headers = Map<String, dynamic>.from(request['headers'] as Map? ?? {});
     final bytes = request['bytes'] == true;
     final data = request['data'];
+    final cancelToken = hostContext == null ? null : CancelToken();
+    var finished = false;
+    if (hostContext != null) {
+      hostContext.whenStopped.then((_) {
+        if (!finished) cancelToken!.cancel('source_work_stopped');
+      });
+    }
+    void checkResource() {
+      hostContext?.checkActive();
+      checkActive?.call();
+    }
 
     try {
+      checkResource();
       response = await this.request<dynamic>(
         requestUrl,
         method: method,
         data: data,
-        checkActive: checkActive,
+        checkActive: checkResource,
+        cancelToken: cancelToken,
         options: Options(
           responseType: bytes ? ResponseType.bytes : ResponseType.plain,
           headers: headers,
           extra: {
             'skipNetworkDebugLog': true,
+            _hostContextKey: ?hostContext,
             if (bytes) 'hazukiLogCategory': 'image_download',
           },
         ),
       );
     } catch (e) {
+      error = e.toString();
+      hostContext?.checkActive();
+      if (e is SourceScriptStopped ||
+          e is DioException && CancelToken.isCancel(e)) {
+        rethrow;
+      }
       if (e is DioException) {
         response = e.response;
       }
-      error = e.toString();
     } finally {
+      finished = true;
       final statusCode = response?.statusCode;
       if (statusCode != null) {
         _onResponseStatus?.call(statusCode);
@@ -193,7 +221,16 @@ class SourceHttpGateway {
         responseBody: response?.data,
         taskContext: execution == null
             ? null
-            : {...execution.toMap(), 'runtimeId': runtimeId},
+            : {
+                ...execution.toMap(),
+                'runtimeId': runtimeId,
+                if (hostContext != null) ...{
+                  'nativeToken': hostContext.nativeToken,
+                  'workId': hostContext.workId,
+                  'resourceId': hostContext.resourceId,
+                  'resourceStopped': hostContext.isStopped,
+                },
+              },
       );
     }
 
@@ -245,7 +282,37 @@ class SourceHttpGateway {
         },
         onResponse: (response, handler) async {
           final requestUrl = response.requestOptions.uri.toString();
-          await _cookieStore.saveFromHeaders(requestUrl, response.headers.map);
+          final context =
+              response.requestOptions.extra[_hostContextKey]
+                  as SourceHostCallContext?;
+          try {
+            if (context == null) {
+              await _cookieStore.saveFromHeaders(
+                requestUrl,
+                response.headers.map,
+              );
+            } else {
+              await context.runCommit(
+                () => _cookieStore.saveFromHeaders(
+                  requestUrl,
+                  response.headers.map,
+                ),
+              );
+            }
+          } catch (error, stack) {
+            handler.reject(
+              DioException(
+                requestOptions: response.requestOptions,
+                response: response,
+                type: context?.isStopped == true
+                    ? DioExceptionType.cancel
+                    : DioExceptionType.unknown,
+                error: error,
+                stackTrace: stack,
+              ),
+            );
+            return;
+          }
 
           final skipLog =
               response.requestOptions.extra['skipNetworkDebugLog'] == true;

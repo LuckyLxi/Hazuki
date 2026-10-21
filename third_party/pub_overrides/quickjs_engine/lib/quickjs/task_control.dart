@@ -6,6 +6,8 @@ enum QuickJsStopRequest { invalid, accepted, alreadyRequested, completed }
 
 enum QuickJsJobStatus { idle, executed, failed, stopped }
 
+enum QuickJsWorkState { invalid, active, retained, stoppable, stopped }
+
 /// An opaque ID is safe to send to another isolate. No JS pointer is exposed.
 class QuickJsTaskControl {
   final int controlId;
@@ -23,10 +25,57 @@ class QuickJsTaskControl {
   }) =>
       QuickJsStopRequest.values[jsTaskStop(controlId, token, reason.index + 1)];
   bool complete(int token) => jsTaskComplete(controlId, token) != 0;
+  QuickJsStopRequest stopRetained(
+    int token, {
+    QuickJsStopReason reason = QuickJsStopReason.cancelled,
+  }) =>
+      QuickJsStopRequest.values[jsTaskStopRetained(
+        controlId,
+        token,
+        reason.index + 1,
+      )];
+  QuickJsWorkState workState(int workId) =>
+      QuickJsWorkState.values[jsWorkState(controlId, workId)];
+  QuickJsStopReason? claimStop(int workId) {
+    final reason = jsWorkClaimStop(controlId, workId);
+    return reason == 0 ? null : QuickJsStopReason.values[reason - 1];
+  }
+
+  void shutdown() => jsTaskShutdown(controlId);
   int get taskCount => jsTaskCount(controlId, 1);
   int get workCount => jsTaskCount(controlId, 2);
   int get sharedRetainedWorkCount => jsTaskCount(controlId, 3);
   static int get activeControlCount => jsTaskCount(0, 0);
+}
+
+/// Worker-local lease. Only its integer IDs may be sent across an isolate port.
+class QuickJsWorkContext {
+  QuickJsWorkContext._(this._runtime, this.taskToken, this.workId)
+    : _epoch = runtimeOpaques[_runtime] {
+    jsRetainTaskContext(_runtime, taskToken);
+    jsRetainWorkContext(_runtime, workId);
+  }
+  final Pointer<JSRuntime> _runtime;
+  final Object? _epoch;
+  final int taskToken;
+  final int workId;
+  bool _released = false;
+  bool get _alive =>
+      _epoch != null && identical(runtimeOpaques[_runtime], _epoch);
+  void release() {
+    if (_released) return;
+    _released = true;
+    if (!_alive) return;
+    jsReleaseTaskContext(_runtime, taskToken);
+    jsReleaseWorkContext(_runtime, workId);
+  }
+}
+
+/// Lets a host Future's JS promise depend on its own resource production work.
+class QuickJsWorkResult {
+  const QuickJsWorkResult(this.value, this.context);
+  final dynamic value;
+  final QuickJsWorkContext context;
 }
 
 class QuickJsTaskStoppedError extends JSError {

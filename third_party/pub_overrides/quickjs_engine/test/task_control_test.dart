@@ -181,6 +181,118 @@ Matcher _stopped(int token, [String reason = 'cancelled']) => isA<Map>()
     .having((e) => e['token'], 'token', token);
 
 void main() {
+  test(
+    'a claimed producer rejects late consumers even without a host completion',
+    () async {
+      final result = await Isolate.run(() async {
+        final runtime = _Runtime(true, 5000);
+        runtime.evaluate('null');
+        final control = runtime.taskControl!;
+        final a = control.register();
+        final b = control.register();
+        final work = runtime.withTaskContext(a, () {
+          runtime.evaluate('globalThis.p=new Promise(()=>{});null');
+          return runtime.captureWorkContext();
+        });
+        try {
+          control.requestStop(a);
+          control.claimStop(work.workId);
+          final result = runtime.withTaskContext(
+            b,
+            () => runtime.evaluate('p.then(()=>42)').rawResult as Future,
+          );
+          runtime.executePendingJob();
+          var rejected = false;
+          try {
+            await result.timeout(const Duration(milliseconds: 300));
+          } on QuickJsTaskStoppedError catch (error) {
+            rejected = error.taskToken == a;
+          }
+          return [
+            rejected,
+            runtime.withTaskContext(b, () => runtime.evaluate('42').rawResult),
+          ];
+        } finally {
+          work.release();
+          runtime.dispose();
+        }
+      });
+      expect(result, [true, 42]);
+    },
+  );
+  test(
+    'completed callers retain stoppable work and stop claims cannot be revived',
+    () async {
+      final result = await Isolate.run(() {
+        final runtime = _Runtime(true, 5000);
+        runtime.evaluate('null');
+        final control = runtime.taskControl!;
+        final token = control.register();
+        final work = runtime.withTaskContext(token, runtime.captureWorkContext);
+        try {
+          control.complete(token);
+          final completed = control.requestStop(token).name;
+          control.stopRetained(token);
+          final before = control.workState(work.workId).name;
+          final claimed = control.claimStop(work.workId)?.name;
+          final after = control.workState(work.workId).name;
+          work.release();
+          work.release();
+          return [
+            completed,
+            before,
+            claimed,
+            after,
+            control.taskCount,
+            control.workCount,
+          ];
+        } finally {
+          work.release();
+          runtime.dispose();
+        }
+      });
+      expect(result, ['completed', 'stoppable', 'cancelled', 'stopped', 0, 0]);
+    },
+  );
+
+  for (final reason in QuickJsStopReason.values) {
+    test('a work-bound mailbox wakes safely on ${reason.name}', () async {
+      final ready = ReceivePort();
+      final port = ready.sendPort;
+      final waiting = Isolate.run(() {
+        final runtime = _Runtime(true, 5000);
+        runtime.evaluate('null');
+        final control = runtime.taskControl!;
+        final token = control.register();
+        final work = runtime.withTaskContext(token, runtime.captureWorkContext);
+        final mailbox = QuickJsHostReply.createForWork(
+          control.controlId,
+          token,
+          work.workId,
+        );
+        port.send([control.controlId, token, mailbox]);
+        try {
+          QuickJsHostReply.wait(mailbox, 5000);
+          return 'unexpected';
+        } on QuickJsMailboxStopped catch (error) {
+          return error.timedOut ? 'timedOut' : 'cancelled';
+        } finally {
+          QuickJsHostReply.close(mailbox);
+          work.release();
+          runtime.dispose();
+        }
+      });
+      final ids = await ready.first as List;
+      ready.close();
+      final elapsed = Stopwatch()..start();
+      QuickJsTaskControl.fromId(
+        ids[0] as int,
+      ).requestStop(ids[1] as int, reason: reason);
+      expect(await waiting, reason.name);
+      expect(elapsed.elapsed, lessThan(const Duration(seconds: 2)));
+      expect(QuickJsHostReply.active(ids[2] as int), false);
+    });
+  }
   var controlsBeforeTest = 0;
   setUp(() {
     controlsBeforeTest = QuickJsTaskControl.activeControlCount;

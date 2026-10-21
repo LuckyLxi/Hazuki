@@ -129,7 +129,7 @@ class HazukiNetworkClient {
           return response;
         }
         attempt++;
-        await _delayBeforeRetry();
+        await _delayBeforeRetry(cancelToken);
       } catch (error) {
         if (!_shouldRetry(
           method: normalizedMethod,
@@ -140,7 +140,7 @@ class HazukiNetworkClient {
           rethrow;
         }
         attempt++;
-        await _delayBeforeRetry();
+        await _delayBeforeRetry(cancelToken);
       }
     }
   }
@@ -212,7 +212,7 @@ class HazukiNetworkClient {
           return response;
         }
         attempt++;
-        await _delayBeforeRetry();
+        await _delayBeforeRetry(cancelToken);
       } catch (error) {
         if (!_shouldRetry(
           method: 'GET',
@@ -223,7 +223,7 @@ class HazukiNetworkClient {
           rethrow;
         }
         attempt++;
-        await _delayBeforeRetry();
+        await _delayBeforeRetry(cancelToken);
       }
     }
   }
@@ -265,10 +265,18 @@ class HazukiNetworkClient {
     return isHazukiTransientStatusCode(statusCode);
   }
 
-  Future<void> _delayBeforeRetry() {
+  Future<void> _delayBeforeRetry(CancelToken? cancelToken) {
+    if (cancelToken?.cancelError case final error?) throw error;
     if (_retryDelay == Duration.zero) {
       return Future<void>.value();
     }
-    return Future<void>.delayed(_retryDelay);
+    if (cancelToken == null) return Future<void>.delayed(_retryDelay);
+    final completion = Completer<void>();
+    final timer = Timer(_retryDelay, completion.complete);
+    cancelToken.whenCancel.then((error) {
+      timer.cancel();
+      if (!completion.isCompleted) completion.completeError(error);
+    });
+    return completion.future.whenComplete(timer.cancel);
   }
 }

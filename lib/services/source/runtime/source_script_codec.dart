@@ -2,7 +2,10 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:isolate';
 import 'dart:typed_data';
-import 'package:quickjs_engine/quickjs_engine.dart' show JSError;
+import 'package:quickjs_engine/quickjs_engine.dart'
+    show JSError, QuickJsTaskStoppedError, QuickJsStopReason;
+import 'source_host_call_context.dart';
+import '../models/source_script_execution.dart';
 
 /// Graph encoding supports cycles and aliasing on ports and native byte mailboxes.
 class SourceScriptCodec {
@@ -42,6 +45,23 @@ class SourceScriptCodec {
           value.entries
               .map((entry) => [visit(entry.key), visit(entry.value)])
               .toList(),
+        ];
+      } else if (value is SourceScriptStopped) {
+        nodes[id] = [
+          'stopped',
+          value.execution.toMap(),
+          value.runtimeId,
+          value.nativeToken,
+          value.reason,
+          value.timedOut,
+          value.stack,
+        ];
+      } else if (value is QuickJsTaskStoppedError) {
+        nodes[id] = [
+          'nativeStopped',
+          value.taskToken,
+          value.reason.index,
+          value.stack,
         ];
       } else if (value is JSError || value is Error || value is Exception) {
         final error = value is JSError ? value : JSError(value);
@@ -87,6 +107,21 @@ class SourceScriptCodec {
           decoded[id] = base64Decode(node[1] as String);
         case 'error':
           decoded[id] = JSError(node[1], node[2]);
+        case 'stopped':
+          decoded[id] = SourceScriptStopped(
+            execution: SourceScriptExecution.fromMap(node[1] as Map),
+            runtimeId: node[2] as String,
+            nativeToken: node[3] as int,
+            reason: node[4] as String,
+            timedOut: node[5] as bool,
+            stack: node[6] as String,
+          );
+        case 'nativeStopped':
+          decoded[id] = QuickJsTaskStoppedError(
+            node[1] as int,
+            QuickJsStopReason.values[node[2] as int],
+            node[3] as String,
+          );
         case 'callback':
           decoded[id] = decodeCallback(node[1] as int);
         default:

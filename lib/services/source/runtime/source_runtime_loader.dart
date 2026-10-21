@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import '../../logging/app_log_event.dart';
 
 import 'package:flutter/services.dart';
 import 'source_script_engine.dart';
@@ -164,12 +165,21 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
     cancellation?.addListener(cancelCandidate);
     handle.loadingRuntimeIds.add(engine.runtimeId);
     try {
-      engine.setContextMessageHandler(
-        (dynamic message, execution) => _jsBridge.handleJsMessageForHandle(
+      engine.onDiagnostic = (data) => handle.appLogStore.add(
+        level: 'info',
+        area: AppLogArea.source,
+        source: handle.sourceKey,
+        event: 'source_execution_${data['phase']}',
+        title: 'Source script execution',
+        data: data,
+      );
+      engine.setOperationMessageHandler(
+        (dynamic message, context) => _jsBridge.handleJsMessageForHandle(
           handle,
           message,
           htmlBridge: htmlBridge,
-          execution: execution,
+          execution: context.execution,
+          hostContext: context,
           runtimeId: engine.runtimeId,
           sourceMeta: () => identical(handle.runtime.engine, engine)
               ? handle.runtime.sourceMeta
