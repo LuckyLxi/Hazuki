@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
+import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
 
 import 'favorite_app_bar_actions.dart';
 
@@ -11,6 +12,7 @@ class HomeAppBarActions extends StatelessWidget {
     required this.discoverSearchMorphProgress,
     required this.forceDiscoverSearchInAppBar,
     required this.favoriteAppBarActions,
+    this.sourcePlugins,
     required this.onOpenSearch,
     required this.onFavoriteSortSelected,
     required this.onFavoriteCreateFolderPressed,
@@ -21,6 +23,7 @@ class HomeAppBarActions extends StatelessWidget {
   final double discoverSearchMorphProgress;
   final bool forceDiscoverSearchInAppBar;
   final FavoriteAppBarActionsState favoriteAppBarActions;
+  final SourcePluginGateway? sourcePlugins;
   final VoidCallback onOpenSearch;
   final ValueChanged<String> onFavoriteSortSelected;
   final VoidCallback onFavoriteCreateFolderPressed;
@@ -31,6 +34,7 @@ class HomeAppBarActions extends StatelessWidget {
     if (currentIndex == 1) {
       return FavoriteAppBarActions(
         state: favoriteAppBarActions,
+        sourcePlugins: sourcePlugins,
         onSortSelected: onFavoriteSortSelected,
         onCreateFolderPressed: onFavoriteCreateFolderPressed,
         onModeTogglePressed: onFavoriteModeTogglePressed,

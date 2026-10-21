@@ -65,6 +65,7 @@ class _MangaDownloadStatusAdapter implements HomeDownloadStatusListenable {
 HomeServices buildHazukiHomeServices() {
   return HomeServices(
     sourceService: sl<SourceHomeGateway>(),
+    sourcePlugins: sl<SourcePluginGateway>(),
     sourceSwitchService: sl<SourceSwitchGateway>(),
     imageService: sl<SourceImageGateway>(),
     dailyRecommendationService: sl<DiscoverDailyRecommendationService>(),

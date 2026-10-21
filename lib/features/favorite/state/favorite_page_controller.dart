@@ -1,5 +1,6 @@
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 import 'dart:async';
+import 'package:hazuki/services/source/plugins/source_favorite_menu.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -165,6 +166,10 @@ class FavoritePageController extends ChangeNotifier {
         supportFavoriteSortOrder: _cloudFlow.supportsSortOrder,
         supportFavoriteFolderAdd: _cloudFlow.supportsFolderAdd,
         favoriteSortOrders: _favoriteSortOrders,
+        sourceKey: _activeSourceKey,
+        favoriteMenu: SourceFavoriteMenuEntry.parseList(
+          _presentationFor(_activeSourceKey)['favoriteMenu'],
+        ),
         favoriteSortLabels:
             _presentationFor(_activeSourceKey)['favoriteOrderLabels'] is Map
             ? Map<String, dynamic>.from(

@@ -29,6 +29,7 @@ void main() {
   late FavoritePageController controller;
   late VoidCallback sourceChanged;
   late String activeSource;
+  Object? favoriteMenu;
 
   setUp(() {
     source = _Source();
@@ -36,6 +37,7 @@ void main() {
     preferences = _Preferences();
     cloudChanges = StreamController<void>.broadcast();
     activeSource = 'jm';
+    favoriteMenu = null;
     when(() => source.activeSourceKey).thenAnswer((_) => activeSource);
     when(
       () => source.cloudFavoritesChangedStream,
@@ -120,6 +122,7 @@ void main() {
       presentationFor: (key) => {
         'refreshCloudFavorites': true,
         'favoriteDefaultOrder': 'mr',
+        'favoriteMenu': favoriteMenu,
         'localFavoriteOrders': {'mr': 'savedNewest', 'mp': 'updatedNewest'},
       },
       sourceService: source,
@@ -132,6 +135,37 @@ void main() {
     controller.dispose();
     await cloudChanges.close();
   });
+
+  test(
+    'app bar state follows menu declaration changes and source identity',
+    () {
+      when(() => source.supportFavoriteFolderAdd).thenReturn(false);
+      favoriteMenu = [
+        {
+          'id': 'saved',
+          'title': 'Saved',
+          'children': [
+            {'order': 'mr'},
+            {'order': 'mp'},
+          ],
+        },
+      ];
+      final first = controller.appBarActionsState;
+      expect(first.sourceKey, 'jm');
+      expect(first.menu.single.children.map((e) => e.order), ['mr', 'mp']);
+      expect(controller.appBarActionsState, first);
+      expect(controller.appBarActionsState.hashCode, first.hashCode);
+      favoriteMenu = [
+        {'action': 'export', 'title': 'Export'},
+      ];
+      expect(controller.appBarActionsState, isNot(first));
+      expect(controller.appBarActionsState.menu.single.action, 'export');
+      activeSource = 'picacg';
+      expect(controller.appBarActionsState.sourceKey, 'picacg');
+      favoriteMenu = [];
+      expect(controller.appBarActionsState.menu, isEmpty);
+    },
+  );
 
   test(
     'cloud favorites require a source before login or initialization',
@@ -542,6 +576,79 @@ void main() {
       expect(controller.appBarActionsState.currentSortOrder, 'score');
     },
   );
+
+  for (final initialOrder in ['mr', 'mr_reverse']) {
+    test(
+      'changing $initialOrder direction clears data and restarts paging',
+      () async {
+        final nextOrder = initialOrder == 'mr' ? 'mr_reverse' : 'mr';
+        var order = initialOrder;
+        final requests = <(String, int)>[];
+        final oldPage = Completer<FavoriteComicsResult>();
+        final newPage = Completer<FavoriteComicsResult>();
+        when(() => source.favoriteSortOrders).thenReturn(['mr', 'mr_reverse']);
+        when(() => source.favoriteSortOrder).thenAnswer((_) => order);
+        when(() => source.setFavoriteSortOrder(nextOrder)).thenAnswer((
+          _,
+        ) async {
+          order = nextOrder;
+        });
+        when(
+          () => source.loadFavoriteComics(
+            page: any(named: 'page'),
+            folderId: any(named: 'folderId'),
+          ),
+        ).thenAnswer((call) async {
+          final page = call.namedArguments[#page] as int;
+          requests.add((order, page));
+          if (order == initialOrder && page == 3) return oldPage.future;
+          if (order == nextOrder && page == 1) return newPage.future;
+          return FavoriteComicsResult.success([
+            _comic('$order-$page'),
+          ], maxPage: 4);
+        });
+        await controller.loadInitial(timeoutMessage: 'timeout');
+        await controller.loadMore(timeoutMessage: 'timeout');
+        expect(controller.comics.map((c) => c.id), [
+          '$initialOrder-1',
+          '$initialOrder-2',
+        ]);
+        final pendingOld = controller.loadMore(timeoutMessage: 'timeout');
+        final change = controller.changeSortOrder(
+          nextOrder,
+          timeoutMessage: 'timeout',
+        );
+        await _settle();
+        expect(controller.comics, isEmpty);
+        expect(controller.initialLoading, isTrue);
+        expect(controller.loadingMore, isFalse);
+        expect(requests.last, (nextOrder, 1));
+
+        oldPage.complete(
+          FavoriteComicsResult.success([_comic('stale')], maxPage: 4),
+        );
+        await pendingOld;
+        expect(controller.comics, isEmpty);
+        newPage.complete(
+          FavoriteComicsResult.success([_comic('$nextOrder-1')], maxPage: 4),
+        );
+        expect(await change, isNull);
+        expect(controller.comics.single.id, '$nextOrder-1');
+        await controller.loadMore(timeoutMessage: 'timeout');
+        expect(requests, [
+          (initialOrder, 1),
+          (initialOrder, 2),
+          (initialOrder, 3),
+          (nextOrder, 1),
+          (nextOrder, 2),
+        ]);
+        expect(controller.comics.map((c) => c.id), [
+          '$nextOrder-1',
+          '$nextOrder-2',
+        ]);
+      },
+    );
+  }
 
   test('older folder refresh cannot overwrite the latest folders', () async {
     await controller.loadInitial(timeoutMessage: 'timeout');

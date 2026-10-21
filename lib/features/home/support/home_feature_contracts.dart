@@ -26,9 +26,11 @@ class HomeServices {
     required this.announcementService,
     required this.downloadStatus,
     required this.showAnnouncement,
+    this.sourcePlugins,
   });
 
   final SourceHomeGateway sourceService;
+  final SourcePluginGateway? sourcePlugins;
   final SourceSwitchGateway sourceSwitchService;
   final SourceImageGateway imageService;
   final DiscoverDailyRecommendationService dailyRecommendationService;

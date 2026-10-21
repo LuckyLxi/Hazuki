@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/plugins/source_favorite_menu.dart';
 
 class FavoriteAppBarActionsState {
   const FavoriteAppBarActionsState({
@@ -9,6 +10,8 @@ class FavoriteAppBarActionsState {
     required this.currentSortOrder,
     this.sortOrders = const [],
     this.sortLabels = const {},
+    this.menu = const [],
+    this.sourceKey = '',
     required this.showModeToggle,
     required this.currentMode,
   });
@@ -18,6 +21,8 @@ class FavoriteAppBarActionsState {
   final String currentSortOrder;
   final List<String> sortOrders;
   final Map<String, dynamic> sortLabels;
+  final List<SourceFavoriteMenuEntry> menu;
+  final String sourceKey;
   final bool showModeToggle;
   final FavoritePageMode currentMode;
 
@@ -32,6 +37,8 @@ class FavoriteAppBarActionsState {
         other.currentSortOrder == currentSortOrder &&
         listEquals(other.sortOrders, sortOrders) &&
         mapEquals(other.sortLabels, sortLabels) &&
+        listEquals(other.menu, menu) &&
+        other.sourceKey == sourceKey &&
         other.showModeToggle == showModeToggle &&
         other.currentMode == currentMode;
   }
@@ -45,6 +52,8 @@ class FavoriteAppBarActionsState {
     Object.hashAllUnordered(
       sortLabels.entries.map((entry) => Object.hash(entry.key, entry.value)),
     ),
+    Object.hashAll(menu),
+    sourceKey,
     showModeToggle,
     currentMode,
   );

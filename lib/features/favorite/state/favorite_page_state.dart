@@ -1,5 +1,6 @@
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/local_favorites/local_favorite_sort.dart';
+import 'package:hazuki/services/source/plugins/source_favorite_menu.dart';
 
 import 'favorite_app_bar_actions_state.dart';
 import 'favorite_folder_state.dart';
@@ -62,6 +63,8 @@ class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
     required bool supportFavoriteFolderAdd,
     required List<String> favoriteSortOrders,
     Map<String, dynamic> favoriteSortLabels = const {},
+    List<SourceFavoriteMenuEntry> favoriteMenu = const [],
+    String sourceKey = '',
   }) {
     if (mode == FavoritePageMode.local) {
       return FavoriteAppBarActionsState(
@@ -75,11 +78,14 @@ class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
     }
 
     return FavoriteAppBarActionsState(
-      showSort: isLogged && supportFavoriteSortOrder,
+      showSort:
+          isLogged && (supportFavoriteSortOrder || favoriteMenu.isNotEmpty),
       showCreateFolder: isLogged && supportFavoriteFolderAdd,
       currentSortOrder: favoriteSortOrder,
       sortOrders: favoriteSortOrders,
       sortLabels: favoriteSortLabels,
+      menu: favoriteMenu,
+      sourceKey: sourceKey,
       showModeToggle: true,
       currentMode: mode,
     );

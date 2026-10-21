@@ -9,11 +9,22 @@ class HazukiFrostedMenuOption<T> {
     required this.value,
     required this.label,
     this.key,
-  });
+  }) : children = const [];
 
-  final T value;
+  const HazukiFrostedMenuOption.submenu({
+    required this.label,
+    required this.children,
+    this.key,
+  }) : value = null;
+
+  final T? value;
   final String label;
   final Key? key;
+  final List<HazukiFrostedMenuOption<T>> children;
+
+  bool containsValue(T? selected) => children.isEmpty
+      ? value == selected
+      : selected != null && children.any((e) => e.containsValue(selected));
 }
 
 Future<T?> showHazukiFrostedMenu<T>({
@@ -23,45 +34,102 @@ Future<T?> showHazukiFrostedMenu<T>({
   T? selected,
   String? label,
   String keyPrefix = 'hazuki-frosted-menu',
+  Listenable? dismissOn,
+  bool waitForDismissal = false,
 }) async {
   if (options.isEmpty || anchorKey.currentContext == null) return null;
+  final anchor = anchorKey.currentContext!.findRenderObject() as RenderBox?;
+  if (anchor == null || !anchor.attached) return null;
   final navigator = Navigator.of(context, rootNavigator: true);
   final strings = MaterialLocalizations.of(context);
-  return navigator.push<T>(
-    _HazukiFrostedMenuRoute<T>(
-      anchorKey: anchorKey,
-      options: options,
-      selected: selected,
-      label: label ?? strings.popupMenuLabel,
-      keyPrefix: keyPrefix,
-      closeLabel: strings.modalBarrierDismissLabel,
-      themes: InheritedTheme.capture(from: context, to: navigator.context),
-    ),
+  final route = _HazukiFrostedMenuRoute<T>(
+    anchor: anchor,
+    options: options,
+    selected: selected,
+    label: label ?? strings.popupMenuLabel,
+    keyPrefix: keyPrefix,
+    closeLabel: strings.modalBarrierDismissLabel,
+    themes: InheritedTheme.capture(from: context, to: navigator.context),
   );
+  void dismiss() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => route.dismiss());
+  }
+
+  dismissOn?.addListener(dismiss);
+  try {
+    final result = await navigator.push<T>(route);
+    if (waitForDismissal) await route.completed;
+    return result;
+  } finally {
+    dismissOn?.removeListener(dismiss);
+  }
 }
 
 class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
   _HazukiFrostedMenuRoute({
-    required this.anchorKey,
+    required this.anchor,
     required this.selected,
     required this.options,
     required this.label,
     required this.keyPrefix,
     required String closeLabel,
     required this.themes,
+    this.header,
   }) : barrierLabel = closeLabel;
 
-  final GlobalKey anchorKey;
+  final RenderBox anchor;
   final T? selected;
   final List<HazukiFrostedMenuOption<T>> options;
   final String label;
   final String keyPrefix;
   final CapturedThemes themes;
+  final String? header;
   CurvedAnimation? _progress;
+  CurvedAnimation? _depthProgress;
+  bool _openingSubmenu = false;
+  _HazukiFrostedMenuRoute<T>? _submenu;
+
+  void dismiss() {
+    _submenu?.dismiss();
+    if (isActive) navigator?.removeRoute(this);
+  }
+
+  Future<void> _select(HazukiFrostedMenuOption<T> option, GlobalKey key) async {
+    if (!isCurrent ||
+        _openingSubmenu ||
+        animation!.status == AnimationStatus.reverse) {
+      return;
+    }
+    if (option.children.isEmpty) {
+      navigator!.pop(option.value);
+      return;
+    }
+    final submenuAnchor = key.currentContext?.findRenderObject() as RenderBox?;
+    if (submenuAnchor == null || !submenuAnchor.attached) return;
+    _openingSubmenu = true;
+    final routeNavigator = navigator!;
+    final submenu = _submenu = _HazukiFrostedMenuRoute<T>(
+      anchor: submenuAnchor,
+      selected: selected,
+      options: option.children,
+      label: option.label,
+      header: option.label,
+      keyPrefix: '$keyPrefix-submenu',
+      closeLabel: barrierLabel,
+      themes: themes,
+    );
+    final value = await routeNavigator.push<T>(submenu);
+    // Keep the parent dimmed until the child has finished closing.
+    await submenu.completed;
+    _submenu = null;
+    _openingSubmenu = false;
+    if (value != null && isCurrent) routeNavigator.pop(value);
+  }
 
   @override
   void dispose() {
     _progress?.dispose();
+    _depthProgress?.dispose();
     super.dispose();
   }
 
@@ -91,14 +159,17 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
+    final depthAnimation = _depthProgress ??= CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
     return themes.wrap(
       LayoutBuilder(
         builder: (context, constraints) {
-          final anchor =
-              anchorKey.currentContext?.findRenderObject() as RenderBox?;
           final overlay =
               navigator?.overlay?.context.findRenderObject() as RenderBox?;
-          if (anchor == null || !anchor.attached || overlay == null) {
+          if (!anchor.attached || overlay == null) {
             return const SizedBox.shrink();
           }
           final anchorRect =
@@ -122,19 +193,29 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
             ),
             child: AnimatedBuilder(
               animation: progressAnimation,
-              child: IntrinsicWidth(
-                child: _FrostedMenuSurface<T>(
-                  animation: progressAnimation,
-                  selected: selected,
-                  options: options,
-                  label: label,
-                  keyPrefix: keyPrefix,
-                  onSelected: (mode) {
-                    if (isCurrent &&
-                        animation.status != AnimationStatus.reverse) {
-                      navigator!.pop(mode);
-                    }
-                  },
+              child: ScaleTransition(
+                key: ValueKey('$keyPrefix-depth-scale'),
+                scale: Tween<double>(
+                  begin: 1,
+                  end: 0.96,
+                ).animate(depthAnimation),
+                child: IntrinsicWidth(
+                  child: _FrostedMenuSurface<T>(
+                    animation: progressAnimation,
+                    dimAnimation: depthAnimation,
+                    selected: selected,
+                    options: options,
+                    label: label,
+                    header: header,
+                    keyPrefix: keyPrefix,
+                    onSelected: _select,
+                    onBack: () {
+                      if (isCurrent &&
+                          animation.status != AnimationStatus.reverse) {
+                        navigator!.pop();
+                      }
+                    },
+                  ),
                 ),
               ),
               builder: (context, child) {
@@ -200,19 +281,25 @@ class _FrostedMenuLayout extends SingleChildLayoutDelegate {
 class _FrostedMenuSurface<T> extends StatelessWidget {
   const _FrostedMenuSurface({
     required this.animation,
+    required this.dimAnimation,
     required this.selected,
     required this.options,
     required this.label,
     required this.keyPrefix,
     required this.onSelected,
+    required this.onBack,
+    this.header,
   });
 
   final T? selected;
   final List<HazukiFrostedMenuOption<T>> options;
   final String label;
+  final String? header;
   final String keyPrefix;
   final Animation<double> animation;
-  final ValueChanged<T> onSelected;
+  final Animation<double> dimAnimation;
+  final void Function(HazukiFrostedMenuOption<T>, GlobalKey) onSelected;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -220,6 +307,7 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
     final radius = BorderRadius.circular(28);
     return _AnimatedMenuGlass(
       animation: animation,
+      dimAnimation: dimAnimation,
       keyPrefix: keyPrefix,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -249,57 +337,100 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final option in options)
-                    Semantics(
-                      selected: option.value == selected,
-                      child: InkWell(
-                        key: option.key ?? ValueKey((keyPrefix, option.value)),
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () => onSelected(option.value),
-                        child: Ink(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: option.value == selected
-                                ? scheme.primaryContainer.withValues(alpha: 0.5)
-                                : Colors.transparent,
-                          ),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 48),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
+                  if (header != null) ...[
+                    InkWell(
+                      key: ValueKey('$keyPrefix-back'),
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: onBack,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                header!,
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
-                              child: Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      option.label,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            color: option.value == selected
-                                                ? scheme.primary
-                                                : scheme.onSurface,
-                                            fontWeight: option.value == selected
-                                                ? FontWeight.w600
-                                                : FontWeight.w400,
-                                          ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.expand_less_rounded, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 16, indent: 16, endIndent: 16),
+                  ],
+                  for (final option in options)
+                    _FrostedMenuItemAnchor<T>(
+                      builder: (anchorKey) => Semantics(
+                        selected: option.containsValue(selected),
+                        expanded: option.children.isEmpty ? null : false,
+                        child: InkWell(
+                          key:
+                              option.key ??
+                              (option.children.isEmpty
+                                  ? ValueKey((keyPrefix, option.value as T))
+                                  : ValueKey((keyPrefix, option.label))),
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => onSelected(option, anchorKey),
+                          child: Ink(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              color: option.containsValue(selected)
+                                  ? scheme.primaryContainer.withValues(
+                                      alpha: 0.5,
+                                    )
+                                  : Colors.transparent,
+                            ),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 48),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        option.label,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.copyWith(
+                                              color:
+                                                  option.containsValue(selected)
+                                                  ? scheme.primary
+                                                  : scheme.onSurface,
+                                              fontWeight:
+                                                  option.containsValue(selected)
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w400,
+                                            ),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 20,
-                                    child: option.value == selected
-                                        ? Icon(
-                                            Icons.check_rounded,
-                                            size: 20,
-                                            color: scheme.primary,
-                                          )
-                                        : null,
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    SizedBox(
+                                      width: 20,
+                                      child: option.children.isNotEmpty
+                                          ? const Icon(
+                                              Icons.expand_more_rounded,
+                                              size: 20,
+                                            )
+                                          : option.containsValue(selected)
+                                          ? Icon(
+                                              Icons.check_rounded,
+                                              size: 20,
+                                              color: scheme.primary,
+                                            )
+                                          : null,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -316,9 +447,26 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
   }
 }
 
+class _FrostedMenuItemAnchor<T> extends StatefulWidget {
+  const _FrostedMenuItemAnchor({required this.builder});
+  final Widget Function(GlobalKey) builder;
+
+  @override
+  State<_FrostedMenuItemAnchor<T>> createState() =>
+      _FrostedMenuItemAnchorState<T>();
+}
+
+class _FrostedMenuItemAnchorState<T> extends State<_FrostedMenuItemAnchor<T>> {
+  final _key = GlobalKey();
+  @override
+  Widget build(BuildContext context) =>
+      KeyedSubtree(key: _key, child: widget.builder(_key));
+}
+
 class _AnimatedMenuGlass extends StatelessWidget {
   const _AnimatedMenuGlass({
     required this.animation,
+    required this.dimAnimation,
     required this.child,
     required this.keyPrefix,
   });
@@ -326,6 +474,7 @@ class _AnimatedMenuGlass extends StatelessWidget {
   final String keyPrefix;
 
   final Animation<double> animation;
+  final Animation<double> dimAnimation;
   final Widget child;
 
   @override
@@ -360,7 +509,20 @@ class _AnimatedMenuGlass extends StatelessWidget {
               child: Opacity(
                 key: ValueKey('$keyPrefix-opacity'),
                 opacity: progress,
-                child: foreground,
+                child: AnimatedBuilder(
+                  animation: dimAnimation,
+                  child: foreground,
+                  builder: (context, child) => DecoratedBox(
+                    key: ValueKey('$keyPrefix-dim'),
+                    position: DecorationPosition.foreground,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(
+                        alpha: 0.45 * dimAnimation.value,
+                      ),
+                    ),
+                    child: child,
+                  ),
+                ),
               ),
             ),
           ),

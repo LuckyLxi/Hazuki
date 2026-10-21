@@ -220,6 +220,7 @@ class HomeScaffoldShell extends StatefulWidget {
     required this.discoverChild,
     required this.favoriteChild,
     required this.favoriteAppBarActions,
+    this.sourcePlugins,
     required this.showFavoriteBackToTop,
     required this.isLogged,
     required this.profileLoading,
@@ -264,6 +265,7 @@ class HomeScaffoldShell extends StatefulWidget {
   final Widget discoverChild;
   final Widget favoriteChild;
   final FavoriteAppBarActionsState favoriteAppBarActions;
+  final SourcePluginGateway? sourcePlugins;
   final bool showFavoriteBackToTop;
   final bool isLogged;
   final bool profileLoading;
@@ -563,6 +565,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                               discoverSearchMorphProgress,
                           forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
                           favoriteAppBarActions: favoriteAppBarActions,
+                          sourcePlugins: widget.sourcePlugins,
                           onOpenSearch: onOpenSearch,
                           onFavoriteSortSelected: onFavoriteSortSelected,
                           onFavoriteCreateFolderPressed:

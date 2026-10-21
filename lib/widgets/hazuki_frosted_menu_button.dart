@@ -13,6 +13,7 @@ class HazukiFrostedMenuButton<T> extends StatefulWidget {
     this.child,
     this.icon = const Icon(Icons.more_vert),
     this.enabled = true,
+    this.waitForDismissal = false,
   });
 
   final List<HazukiFrostedMenuOption<T>> options;
@@ -24,6 +25,9 @@ class HazukiFrostedMenuButton<T> extends StatefulWidget {
   final Widget icon;
   final bool enabled;
 
+  /// Wait for the closing animation before an action can present another route.
+  final bool waitForDismissal;
+
   @override
   State<HazukiFrostedMenuButton<T>> createState() =>
       _HazukiFrostedMenuButtonState<T>();
@@ -32,7 +36,15 @@ class HazukiFrostedMenuButton<T> extends StatefulWidget {
 class _HazukiFrostedMenuButtonState<T>
     extends State<HazukiFrostedMenuButton<T>> {
   final _anchorKey = GlobalKey();
+  final _dismissSignal = ValueNotifier(false);
   bool _open = false;
+
+  @override
+  void dispose() {
+    _dismissSignal.value = true;
+    _dismissSignal.dispose();
+    super.dispose();
+  }
 
   Future<void> _showMenu() async {
     if (_open || !widget.enabled || widget.options.isEmpty) return;
@@ -45,6 +57,8 @@ class _HazukiFrostedMenuButtonState<T>
         options: widget.options,
         selected: widget.selected,
         label: widget.tooltip,
+        dismissOn: _dismissSignal,
+        waitForDismissal: widget.waitForDismissal,
       );
       if (mounted && widget.enabled && value != null) widget.onSelected(value);
     } finally {

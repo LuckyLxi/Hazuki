@@ -217,6 +217,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           discoverChild: discoverChild,
           favoriteChild: favoriteChild,
           favoriteAppBarActions: _coordinator.favoriteAppBarActions,
+          sourcePlugins: widget.services.sourcePlugins,
           showFavoriteBackToTop: _coordinator.favoriteBackToTopVisible,
           isLogged: isLogged,
           profileLoading: profileLoading,
