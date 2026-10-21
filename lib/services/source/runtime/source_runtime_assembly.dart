@@ -279,6 +279,7 @@ class SourceRuntimeAssembly {
         changedStream: _cloudFavoritesChangedController.stream,
       );
   late final SourceGatewaySet gateways = SourceGatewaySet(
+    taskControl: _runtimeHost.tasks,
     runtime: _runtimeView,
     runtimeOperations: _runtimeOperations,
     localization: _localizationOperations,

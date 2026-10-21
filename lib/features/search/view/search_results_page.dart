@@ -26,6 +26,7 @@ class SearchResultsPage extends StatefulWidget {
   const SearchResultsPage({
     super.key,
     required this.sourceService,
+    required this.taskControl,
     required this.historyService,
     required this.initialKeyword,
     this.initialOrder = '',
@@ -39,6 +40,7 @@ class SearchResultsPage extends StatefulWidget {
   });
 
   final SourceSearchGateway sourceService;
+  final SourceTaskControlGateway taskControl;
   final SearchHistoryService historyService;
   final String initialKeyword;
   final String initialOrder;
@@ -191,12 +193,14 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _aggregateSearchEnabled = widget.aggregateSearchEnabled ?? false;
     _comicLayout = widget.comicLayout ?? SearchComicLayout.list;
     _resultsController = SearchResultsController(
+      taskControl: widget.taskControl,
       initialOrder: widget.initialOrder,
       sourceService: widget.sourceService,
       searchPageLoader: widget.searchPageLoader,
       comicDetailsLoader: widget.comicDetailsLoader,
     );
     _aggregateResultsController = AggregateSearchResultsController(
+      taskControl: widget.taskControl,
       sourceService: _sourceService,
     );
     _scrollController.addListener(_onScroll);

@@ -6,6 +6,7 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 
 import '../support/search_contracts.dart';
+import '../support/search_task_lifetime.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
@@ -15,6 +16,7 @@ class SearchResultsController extends ChangeNotifier {
   SearchResultsController({
     required String initialOrder,
     required SourceSearchGateway sourceService,
+    required this.taskControl,
     SearchPageLoader? searchPageLoader,
     SearchComicDetailsLoader? comicDetailsLoader,
   }) : _searchPageLoader = searchPageLoader,
@@ -23,15 +25,32 @@ class SearchResultsController extends ChangeNotifier {
        _searchOrder = initialOrder.trim() {
     _searchOrder = _normalizeSearchOrder(_searchOrder);
     _lastSourceEpoch = _sourceEpoch;
+    _lastSourceKey = _sourceService.activeSourceKey;
     _sourceService.addListener(_onSourceChanged);
   }
 
   final SearchPageLoader? _searchPageLoader;
   final SearchComicDetailsLoader? _comicDetailsLoader;
   final SourceSearchGateway _sourceService;
+  final SourceTaskControlGateway taskControl;
+  SourceTaskCancellation _requestLifetime = SourceTaskCancellation();
   final String _taskOwnerId = createSourceTaskId();
   final SourceUiOwner _sourceUi = SourceUiOwner();
   String? _taskGroupId;
+
+  void stopPending(SourceTaskStopReason reason) {
+    _searchRequestToken++;
+    _requestLifetime.cancel(reason);
+    _sourceUi.cancel(
+      reason == SourceTaskStopReason.ownerDisposed ? 'ownerGone' : reason.name,
+    );
+    _searchLoading = false;
+    _searchLoadingMore = false;
+    taskControl
+        .cancelOwner(_taskOwnerId, reason)
+        .then<void>((receipt) => receipt.whenSettled.ignore())
+        .ignore();
+  }
 
   String _searchKeyword = '';
   SearchMessages? _lastSearchMessages;
@@ -46,6 +65,7 @@ class SearchResultsController extends ChangeNotifier {
   String _searchOrder;
   bool _disposed = false;
   late String _lastSourceEpoch;
+  String? _lastSourceKey;
   String get _sourceEpoch {
     final id = _sourceService.activeSourceKey;
     final source = _sourceService.allowedSources
@@ -83,7 +103,17 @@ class SearchResultsController extends ChangeNotifier {
   void _onSourceChanged() {
     final sourceChanged = _sourceEpoch != _lastSourceEpoch;
     if (sourceChanged) {
-      _sourceUi.cancel('sourceChanged');
+      final oldSourceRemoved = !_sourceService.allowedSources.any(
+        (source) => source.key == _lastSourceKey,
+      );
+      stopPending(
+        oldSourceRemoved
+            ? SourceTaskStopReason.pluginDisabled
+            : _lastSourceKey == _sourceService.activeSourceKey
+            ? SourceTaskStopReason.pluginUpdated
+            : SourceTaskStopReason.sourceChanged,
+      );
+      _lastSourceKey = _sourceService.activeSourceKey;
       _lastSourceEpoch = _sourceEpoch;
       _lastSearchMessages = null;
       _searchRequestToken++;
@@ -105,6 +135,7 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   void clearSearchData() {
+    stopPending(SourceTaskStopReason.superseded);
     _sourceUi.restart();
     _searchRequestToken++;
     _searchKeyword = '';
@@ -129,6 +160,9 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   int prepareDirectIdLookup(String keyword) {
+    stopPending(SourceTaskStopReason.superseded);
+    _requestLifetime = SourceTaskCancellation();
+    _taskGroupId = createSourceTaskId();
     _sourceUi.restart();
     final requestToken = ++_searchRequestToken;
     _lastSearchMessages = null;
@@ -150,19 +184,31 @@ class SearchResultsController extends ChangeNotifier {
     String comicId, {
     String sourceKey = '',
   }) {
-    final overrideLoader = _comicDetailsLoader;
-    if (overrideLoader != null) {
-      return _sourceUi.run(
-        () => SourceUiScope.timeout(
-          overrideLoader(comicId, sourceKey: sourceKey),
-          searchLoadTimeout,
-        ),
-      );
-    }
+    final lifetime = _requestLifetime;
+    final token = _searchRequestToken;
+    final origin = SourceTaskOrigin(
+      ownerId: _taskOwnerId,
+      groupId: _taskGroupId ??= createSourceTaskId(),
+      requestSequence: token,
+      cancellation: lifetime,
+      resultDisposition: () => _disposed
+          ? SourceTaskResultDisposition.disposed
+          : lifetime.reason == SourceTaskStopReason.deadlineExceeded
+          ? SourceTaskResultDisposition.timedOut
+          : isCurrentRequest(token)
+          ? SourceTaskResultDisposition.current
+          : SourceTaskResultDisposition.superseded,
+    );
     return _sourceUi.run(
-      () => SourceUiScope.timeout(
-        _sourceService.loadComicDetails(comicId, sourceKey: sourceKey),
-        searchLoadTimeout,
+      () => runSearchOperation(
+        () =>
+            _comicDetailsLoader?.call(comicId, sourceKey: sourceKey) ??
+            _sourceService.loadComicDetails(
+              comicId,
+              sourceKey: sourceKey,
+              taskOrigin: origin,
+            ),
+        lifetime,
       ),
     );
   }
@@ -185,34 +231,35 @@ class SearchResultsController extends ChangeNotifier {
   }) {
     final overrideLoader = _searchPageLoader;
     if (overrideLoader != null) {
-      return overrideLoader(keyword: keyword, page: page, order: order);
+      return runSearchOperation(
+        () => overrideLoader(keyword: keyword, page: page, order: order),
+        _requestLifetime,
+      );
     }
-    final timeoutMessage = messages.timeout;
-    var timedOut = false;
+    final lifetime = _requestLifetime;
     final taskOrigin = SourceTaskOrigin(
       ownerId: _taskOwnerId,
       groupId: groupId,
       requestSequence: requestToken,
+      cancellation: lifetime,
       resultDisposition: () {
         if (_disposed) return SourceTaskResultDisposition.disposed;
-        if (timedOut) return SourceTaskResultDisposition.timedOut;
+        if (lifetime.reason == SourceTaskStopReason.deadlineExceeded) {
+          return SourceTaskResultDisposition.timedOut;
+        }
         return isCurrentRequest(requestToken)
             ? SourceTaskResultDisposition.current
             : SourceTaskResultDisposition.superseded;
       },
     );
-    return SourceUiScope.timeout(
-      _sourceService.searchComics(
+    return runSearchOperation(
+      () => _sourceService.searchComics(
         keyword: keyword,
         page: page,
         order: order,
         taskOrigin: taskOrigin,
       ),
-      searchLoadTimeout,
-      onTimeout: () {
-        timedOut = true;
-        throw Exception(timeoutMessage);
-      },
+      lifetime,
     );
   }
 
@@ -232,6 +279,12 @@ class SearchResultsController extends ChangeNotifier {
     bool silentRefresh = false,
   }) async {
     if (keyword.trim().isEmpty || _disposed) return;
+    if (!append) {
+      stopPending(SourceTaskStopReason.superseded);
+    } else {
+      _requestLifetime.cancel(SourceTaskStopReason.superseded);
+    }
+    _requestLifetime = SourceTaskCancellation();
     _sourceUi.restart();
     final nextRequestToken = _searchRequestToken + 1;
     Future<void> work() => _search(
@@ -251,9 +304,9 @@ class SearchResultsController extends ChangeNotifier {
       if (!_disposed && isCurrentRequest(nextRequestToken)) {
         _searchLoading = false;
         _searchLoadingMore = false;
-        _searchErrorMessage = isSourceUiCancellation(error)
+        _searchErrorMessage = isSilentSearchStop(error)
             ? null
-            : messages.failed('$error');
+            : searchFailureMessage(error, messages);
         _notify();
       }
     }
@@ -272,6 +325,7 @@ class SearchResultsController extends ChangeNotifier {
     }
 
     final requestToken = ++_searchRequestToken;
+    final lifetime = _requestLifetime;
     final isLoadMore = append;
     if (!append || _taskGroupId == null) _taskGroupId = createSourceTaskId();
     final groupId = _taskGroupId!;
@@ -322,17 +376,21 @@ class SearchResultsController extends ChangeNotifier {
               _sourceUi.wasCancelled) {
             break;
           }
-          await Future<void>.delayed(_initialSearchRetryDelay);
+          await waitForSearchRetry(_initialSearchRetryDelay, lifetime);
           if (!isCurrentRequest(requestToken)) {
             return;
           }
         } catch (error) {
-          if (isSourceUiCancellation(error) || _sourceUi.wasCancelled) rethrow;
+          if (isSilentSearchStop(error) ||
+              _sourceUi.wasCancelled ||
+              lifetime.reason != null) {
+            rethrow;
+          }
           final hasRemainingAttempt = attempt + 1 < maxAttempts;
           if (!hasRemainingAttempt) {
             rethrow;
           }
-          await Future<void>.delayed(_initialSearchRetryDelay);
+          await waitForSearchRetry(_initialSearchRetryDelay, lifetime);
           if (!isCurrentRequest(requestToken)) {
             return;
           }
@@ -369,9 +427,9 @@ class SearchResultsController extends ChangeNotifier {
       if (!isCurrentRequest(requestToken)) {
         return;
       }
-      _searchErrorMessage = isSourceUiCancellation(e)
+      _searchErrorMessage = isSilentSearchStop(e)
           ? null
-          : messages.failed('$e');
+          : searchFailureMessage(e, messages);
     } finally {
       if (isCurrentRequest(requestToken)) {
         if (isLoadMore) {
@@ -413,8 +471,9 @@ class SearchResultsController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _sourceUi.dispose();
     _disposed = true;
+    stopPending(SourceTaskStopReason.ownerDisposed);
+    _sourceUi.dispose();
     _searchRequestToken++;
     _sourceService.removeListener(_onSourceChanged);
     super.dispose();

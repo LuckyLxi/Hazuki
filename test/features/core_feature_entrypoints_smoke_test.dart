@@ -1,3 +1,4 @@
+import '../support/fake_source_task_control.dart';
 import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
 import 'package:flutter/material.dart';
@@ -165,6 +166,7 @@ void main() {
       commentsWidgetBuilder: _buildComments,
     );
     final search = SearchPage(
+      taskControl: FakeSourceTaskControl(),
       sourceService: sl<SourceSearchGateway>(),
       historyService: sl<SearchHistoryService>(),
       initialKeyword: comic.title,

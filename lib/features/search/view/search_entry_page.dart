@@ -21,6 +21,7 @@ class SearchEntryPage extends StatefulWidget {
   const SearchEntryPage({
     super.key,
     required this.sourceService,
+    required this.taskControl,
     required this.historyService,
     this.autoFocusOnOpen = false,
     required this.comicDetailPageBuilder,
@@ -29,6 +30,7 @@ class SearchEntryPage extends StatefulWidget {
   });
 
   final SourceSearchGateway sourceService;
+  final SourceTaskControlGateway taskControl;
   final SearchHistoryService historyService;
   final bool autoFocusOnOpen;
   final ComicDetailPageBuilder comicDetailPageBuilder;
@@ -283,6 +285,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SearchResultsPage(
+          taskControl: widget.taskControl,
           sourceService: widget.sourceService,
           historyService: widget.historyService,
           initialKeyword: keyword,

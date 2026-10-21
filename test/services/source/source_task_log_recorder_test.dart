@@ -41,11 +41,20 @@ void main() {
         'source_task_created',
         'source_task_running',
         'source_task_failed',
+        'source_task_resources_settled',
       ]);
-      final data = store.events.last.data as Map;
+      final data =
+          store.events
+                  .singleWhere((event) => event.event == 'source_task_failed')
+                  .data
+              as Map;
       expect(data['error'], '[hidden] [hidden] [hidden] token=[hidden]');
       expect(data['scriptStack'], contains('source_search.js:12:3'));
       expect(data['taskId'], (store.events.first.data as Map)['taskId']);
+      final settled = store.events.last.data as Map;
+      expect(settled['settledAt'], isNotNull);
+      expect(settled['taskId'], data['taskId']);
+      expect(settled['sharedResourceCount'], 0);
       final exported = jsonEncode(
         store.events.map((event) => event.toJson()).toList(),
       );
@@ -79,7 +88,7 @@ void main() {
       expect(store.events, isEmpty);
       await store.setCaptureEnabled(true);
       await run();
-      expect(store.events, hasLength(3));
+      expect(store.events, hasLength(4));
       expect((store.events.last.data as Map)['pluginId'], 'a-plugin');
       expect((store.events.last.data as Map)['state'], 'succeeded');
       await store.setCaptureEnabled(false);

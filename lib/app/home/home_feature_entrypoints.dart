@@ -232,6 +232,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           required comicDetailPageBuilder,
         }) {
           return SearchPage(
+            taskControl: sl<SourceTaskControlGateway>(),
             sourceService: sl<SourceSearchGateway>(),
             historyService: sl<SearchHistoryService>(),
             initialKeyword: initialKeyword,

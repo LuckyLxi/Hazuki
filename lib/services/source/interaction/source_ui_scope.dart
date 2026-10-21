@@ -41,6 +41,8 @@ class SourceUiScope extends ChangeNotifier {
   Timer? _waitingLimit;
   bool _foreground = true;
   bool waiting = false;
+  bool _localWaiting = false;
+  final Set<Object> _externalWaiters = {};
   String? reason;
   Object? failure;
   bool finished = false;
@@ -64,7 +66,24 @@ class SourceUiScope extends ChangeNotifier {
       _SourceUiTimer(current, duration, callback);
 
   void setWaiting(bool value) {
-    if (waiting == value || finished) return;
+    _localWaiting = value;
+    _updateWaiting();
+  }
+
+  /// Shared producers contribute waiting without taking ownership of a scope.
+  void setExternalWaiting(Object producer, bool value) {
+    if (finished || reason != null) return;
+    if (value) {
+      _externalWaiters.add(producer);
+    } else {
+      _externalWaiters.remove(producer);
+    }
+    _updateWaiting();
+  }
+
+  void _updateWaiting({bool restart = false}) {
+    final value = _localWaiting || _externalWaiters.isNotEmpty;
+    if (waiting == value && !restart || finished) return;
     waiting = value;
     _waitingLimit?.cancel();
     if (value && _foreground) {
@@ -85,8 +104,7 @@ class SourceUiScope extends ChangeNotifier {
     if (_foreground == value) return;
     _foreground = value;
     if (!waiting || finished) return;
-    waiting = false;
-    setWaiting(true);
+    _updateWaiting(restart: true);
   }
 
   void cancel(String value, {Object? error}) {
@@ -98,6 +116,8 @@ class SourceUiScope extends ChangeNotifier {
     _waitingLimit?.cancel();
     _waitingClock.stop();
     waiting = false;
+    _localWaiting = false;
+    _externalWaiters.clear();
     if (!_cancelled.isCompleted) {
       _cancelled.complete();
     }

@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -75,6 +76,7 @@ void main() {
                       buildComicDetailDestinationRoute(
                         context,
                         (_) => SearchPage(
+                          taskControl: FakeSourceTaskControl(),
                           sourceService: source,
                           historyService: history,
                           initialKeyword: 'Action',
@@ -146,6 +148,7 @@ void main() {
               buildComicDetailDestinationRoute(
                 context,
                 (_) => SearchPage(
+                  taskControl: FakeSourceTaskControl(),
                   sourceService: source,
                   historyService: history,
                   initialKeyword: 'Action',
@@ -216,6 +219,7 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: SearchPage(
+              taskControl: FakeSourceTaskControl(),
               sourceService: source,
               historyService: history,
               initialKeyword: '  Action  ',

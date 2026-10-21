@@ -16,7 +16,6 @@ import '../models/source_script_execution.dart';
 import '../debug/debug_log_internals.dart';
 import '../debug/source_task_log_recorder.dart';
 import '../models/source_task.dart';
-import '../runtime/source_task_registry.dart';
 import '../gateways/source_content_gateways.dart';
 
 abstract interface class SourceContentOperations {
@@ -28,6 +27,7 @@ abstract interface class SourceContentOperations {
     String comicId, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<List<String>> loadChapterImages({
     required String comicId,
@@ -94,8 +94,11 @@ class SourceContentOperationService
   final SourceCategoryCapability _category;
   final SourceComicDetailsCapability _comicDetails;
   final Map<String, Future<void>> _progressQueues = {};
-  final SourceTaskRegistry _searchTasks = SourceTaskRegistry();
-  List<SourceTaskSnapshot> get activeSearchTasks => _searchTasks.activeTasks;
+  List<SourceTaskSnapshot> get activeSearchTasks => _runtimeHost
+      .tasks
+      .activeTasks
+      .where((task) => task.method == 'search.load')
+      .toList(growable: false);
   final Future<void> Function(SourceRuntimeHandle)? loadCloudReadRuntime;
   late final _cloud = SourceCloudReadingCapability(
     _runtimeHost,
@@ -239,10 +242,12 @@ class SourceContentOperationService
     String comicId, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) => _comicDetails.loadComicDetails(
     comicId,
     sourceKey: sourceKey,
     forceRefresh: forceRefresh,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<List<String>> loadChapterImages({
@@ -311,7 +316,7 @@ class SourceContentOperationService
         : _runtimeHost.normalize(sourceKey);
     final normalizedKeyword = keyword.trim();
     final recorder = SourceTaskLogRecorder(_runtimeHost.logStore);
-    return _searchTasks.run(
+    return _runtimeHost.tasks.run(
       pluginId: resolvedSourceKey,
       pluginVersion: _runtimeHost.catalog
           .where((source) => source.normalizedKey == resolvedSourceKey)
@@ -328,7 +333,9 @@ class SourceContentOperationService
         sensitiveValues: [keyword, normalizedKeyword],
       ),
       operation: (task) async {
+        task.checkActive();
         await _runtimeOperations.ensureSourceInitialized(resolvedSourceKey);
+        task.checkActive();
         final handle = _runtimeHost.handleFor(resolvedSourceKey);
         // Acquire before any script execution, including synchronous checks.
         return handle.runOperation(() async {
@@ -338,6 +345,7 @@ class SourceContentOperationService
           task.bindRuntime(
             runtimeId: engine.runtimeId,
             pluginVersion: facade.sourceMeta?.version,
+            engine: engine,
           );
           return _searchWithEngine(
             engine,

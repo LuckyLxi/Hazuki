@@ -235,6 +235,8 @@ class SourceUiService {
     Future<T> Function() operation, {
     SourceUiOwner? owner,
     SourceDialogPresenter? present,
+    bool captureRouteOwner = true,
+    bool abortOnScopeCancellation = true,
   }) async {
     final current = SourceUiScope.current;
     if (current?.available == true &&
@@ -245,7 +247,9 @@ class SourceUiService {
     if (owner != null) owner._routeOwner ??= captureOwner?.call();
     final scope = SourceUiScope(
       waitingTimeout: interactionTimeout,
-      owner: owner?._routeOwner ?? captureOwner?.call(),
+      owner:
+          owner?._routeOwner ??
+          (captureRouteOwner ? captureOwner?.call() : null),
       controllerOwner: owner,
       onCancelled: () {
         owner?.wasCancelled = true;
@@ -276,15 +280,19 @@ class SourceUiService {
       }
     }
 
-    scope.addListener(abort);
+    if (abortOnScopeCancellation) scope.addListener(abort);
     try {
-      final value = await Future.any([scope.enter(operation), aborted.future]);
-      if (scope.reason != null && scope.reason != 'user') {
+      final value = await (abortOnScopeCancellation
+          ? Future.any([scope.enter(operation), aborted.future])
+          : scope.enter(operation));
+      if (abortOnScopeCancellation &&
+          scope.reason != null &&
+          scope.reason != 'user') {
         throw scope.failure ?? SourceUiCancelled(scope.reason!);
       }
       return value;
     } catch (error) {
-      if (scope.reason != null) {
+      if (abortOnScopeCancellation && scope.reason != null) {
         throw scope.failure ?? SourceUiCancelled(scope.reason!);
       }
       rethrow;

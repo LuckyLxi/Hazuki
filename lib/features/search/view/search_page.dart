@@ -12,6 +12,7 @@ class SearchPage extends StatelessWidget {
   const SearchPage({
     super.key,
     required this.sourceService,
+    required this.taskControl,
     required this.historyService,
     this.initialKeyword,
     this.autoFocusOnOpen = false,
@@ -21,6 +22,7 @@ class SearchPage extends StatelessWidget {
   });
 
   final SourceSearchGateway sourceService;
+  final SourceTaskControlGateway taskControl;
   final SearchHistoryService historyService;
   final String? initialKeyword;
   final bool autoFocusOnOpen;
@@ -33,6 +35,7 @@ class SearchPage extends StatelessWidget {
     final keyword = initialKeyword?.trim() ?? '';
     if (keyword.isNotEmpty) {
       return SearchResultsPage(
+        taskControl: taskControl,
         sourceService: sourceService,
         historyService: historyService,
         initialKeyword: keyword,
@@ -43,6 +46,7 @@ class SearchPage extends StatelessWidget {
       );
     }
     return SearchEntryPage(
+      taskControl: taskControl,
       sourceService: sourceService,
       historyService: historyService,
       autoFocusOnOpen: autoFocusOnOpen,

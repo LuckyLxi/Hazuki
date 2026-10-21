@@ -32,6 +32,10 @@ void registerSourceServices(GetIt services) {
   }
 
   _registerGateway<SourceSearchGateway>(services, (a) => a.gateways.search);
+  _registerGateway<SourceTaskControlGateway>(
+    services,
+    (a) => a.gateways.taskControl,
+  );
   _registerGateway<SourceDiscoverGateway>(services, (a) => a.gateways.discover);
   _registerGateway<SourceFavoriteGateway>(services, (a) => a.gateways.favorite);
   _registerGateway<SourceReaderGateway>(services, (a) => a.gateways.reader);

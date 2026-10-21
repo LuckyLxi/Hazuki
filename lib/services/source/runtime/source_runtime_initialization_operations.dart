@@ -6,6 +6,7 @@ import 'source_runtime_host.dart';
 import 'source_runtime_loader.dart';
 import 'source_runtime_state_controller.dart';
 import '../interaction/source_ui_scope.dart';
+import 'source_shared_request.dart';
 
 /// Coordinates source activation and the runtime initialization state machine.
 class SourceRuntimeInitializationOperations {
@@ -23,6 +24,13 @@ class SourceRuntimeInitializationOperations {
   final SourceRuntimeLoadClient _runtimeLoader;
   final SourceJsBridgeCookieCapability _jsBridgeCookieCapability;
   final SourceRuntimeStateController _runtimeStateController;
+  final Map<SourceRuntimeHandle, SourceSharedRequest<void>> _initializations =
+      {};
+
+  Future<void> _joinInitialization(
+    SourceRuntimeHandle handle,
+    Future<void> future,
+  ) => _initializations[handle]?.subscribe() ?? future;
 
   Future<void> activateSource(String sourceKey) =>
       _runtimeHost.activateSource(sourceKey);
@@ -38,7 +46,7 @@ class SourceRuntimeInitializationOperations {
     }
     final pending = handle.facade.initFuture;
     if (pending != null) {
-      await pending;
+      await _joinInitialization(handle, pending);
       return;
     }
     await _initHandle(handle, prewarm: true);
@@ -72,17 +80,31 @@ class SourceRuntimeInitializationOperations {
     final facade = handle.facade;
     final inFlight = facade.initFuture;
     if (inFlight != null) {
-      await inFlight;
+      await _joinInitialization(handle, inFlight);
       return;
     }
 
-    final future = handle.runOperation(
-      () => _initInternal(
-        handle,
-        onSourceDownloadProgress: onSourceDownloadProgress,
-        prewarm: prewarm,
+    // Initialization is shared by all callers; its UI/operation lifetime must
+    // not inherit the first search's cancellation or 25-second budget.
+    late final SourceSharedRequest<void> request;
+    request = SourceSharedRequest<void>(
+      pluginId: handle.sourceKey,
+      method: 'runtime.initialize',
+      operation: (_) => handle.runOperation(
+        () => _initInternal(
+          handle,
+          onSourceDownloadProgress: onSourceDownloadProgress,
+          prewarm: prewarm,
+        ),
       ),
+      onUnavailable: () {
+        if (identical(_initializations[handle], request)) {
+          _initializations.remove(handle);
+        }
+      },
     );
+    _initializations[handle] = request;
+    final future = request.subscribe();
     facade.initFuture = future;
     try {
       await future;
@@ -103,7 +125,7 @@ class SourceRuntimeInitializationOperations {
     if (inFlight == null) {
       await _initHandle(handle, prewarm: false);
     } else {
-      await inFlight;
+      await _joinInitialization(handle, inFlight);
     }
 
     if (handle.facade.initFuture == null && _isHandleInitialized(handle)) {
@@ -111,6 +133,9 @@ class SourceRuntimeInitializationOperations {
     }
 
     final scope = SourceUiScope.current;
+    if (handle.isDisposalRequested) {
+      throw const SourceUiCancelled('runtimeDisposed');
+    }
     if (scope?.reason != null) {
       throw scope!.failure ?? SourceUiCancelled(scope.reason!);
     }

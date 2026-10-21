@@ -8,6 +8,12 @@ import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_host.dart';
 import 'source_comic_details_cache.dart';
 import 'source_comic_details_parser.dart';
+import '../models/source_task.dart';
+import '../runtime/source_task_registry.dart';
+import '../runtime/source_shared_request.dart';
+import '../runtime/source_host_call_context.dart';
+import '../debug/source_task_log_recorder.dart';
+import '../interaction/source_ui_scope.dart';
 
 class SourceComicDetailsCapability {
   SourceComicDetailsCapability({
@@ -36,7 +42,44 @@ class SourceComicDetailsCapability {
     String comicId, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  }) {
+    if (taskOrigin == null) {
+      return _loadComicDetails(
+        comicId,
+        sourceKey: sourceKey,
+        forceRefresh: forceRefresh,
+      );
+    }
+    final recorder = SourceTaskLogRecorder(_runtimeHost.logStore);
+    return _runtimeHost.tasks.run(
+      pluginId: _resolveActiveSourceKey(sourceKey),
+      method: 'search.directId',
+      origin: taskOrigin,
+      observe: (task, event, disposition, error, stack) => recorder.record(
+        task,
+        event,
+        disposition,
+        error,
+        stack,
+        sensitiveValues: [comicId],
+      ),
+      operation: (task) => _loadComicDetails(
+        comicId,
+        sourceKey: sourceKey,
+        forceRefresh: forceRefresh,
+        task: task,
+      ),
+    );
+  }
+
+  Future<ComicDetailsData> _loadComicDetails(
+    String comicId, {
+    required String sourceKey,
+    required bool forceRefresh,
+    SourceTask? task,
   }) async {
+    task?.checkActive();
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
       throw Exception('comic_id_empty');
@@ -61,30 +104,36 @@ class SourceComicDetailsCapability {
     final facade = handle.facade;
 
     final inFlight = facade.cache.comicDetailsInFlight[scopedComicKey];
-    if (!forceRefresh && inFlight != null) {
-      return inFlight;
+    if (!forceRefresh && inFlight != null && inFlight.available) {
+      return inFlight.subscribe(task: task);
     }
 
     final requestToken = _requestTracker.begin(scopedComicKey);
-    final future = _loadComicDetailsWithRuntimeRecovery(
-      normalizedComicId,
-      handle,
-      sourceKey: resolvedSourceKey,
-      shouldCacheResult: () =>
-          _requestTracker.isCurrent(scopedComicKey, requestToken),
+    late final SourceSharedRequest<ComicDetailsData> request;
+    request = SourceSharedRequest<ComicDetailsData>(
+      pluginId: resolvedSourceKey,
+      method: 'comic.loadInfo',
+      operation: (_) => _loadComicDetailsWithRuntimeRecovery(
+        normalizedComicId,
+        handle,
+        sourceKey: resolvedSourceKey,
+        request: request,
+        shouldCacheResult: () =>
+            request.hasConsumers &&
+            _requestTracker.isCurrent(scopedComicKey, requestToken),
+      ),
+      onUnavailable: () {
+        if (identical(
+          facade.cache.comicDetailsInFlight[scopedComicKey],
+          request,
+        )) {
+          facade.cache.comicDetailsInFlight.remove(scopedComicKey);
+        }
+        _requestTracker.complete(scopedComicKey, requestToken);
+      },
     );
-    facade.cache.comicDetailsInFlight[scopedComicKey] = future;
-    try {
-      return await future;
-    } finally {
-      if (identical(
-        facade.cache.comicDetailsInFlight[scopedComicKey],
-        future,
-      )) {
-        facade.cache.comicDetailsInFlight.remove(scopedComicKey);
-      }
-      _requestTracker.complete(scopedComicKey, requestToken);
-    }
+    facade.cache.comicDetailsInFlight[scopedComicKey] = request;
+    return request.subscribe(task: task);
   }
 
   Future<ComicDetailsData> _loadComicDetailsWithRuntimeRecovery(
@@ -92,10 +141,12 @@ class SourceComicDetailsCapability {
     SourceRuntimeHandle initialHandle, {
     required String sourceKey,
     required bool Function() shouldCacheResult,
+    required SourceSharedRequest<ComicDetailsData> request,
   }) async {
     var handle = initialHandle;
     var recoveringRuntime = false;
     for (var attempt = 0; attempt < 2; attempt++) {
+      request.checkActive();
       final facade = handle.facade;
       try {
         final details = await _loadComicDetailsFromSource(
@@ -103,11 +154,19 @@ class SourceComicDetailsCapability {
           facade,
           sourceKey: sourceKey,
           shouldCacheResult: shouldCacheResult,
+          request: request,
         );
+        request.checkActive();
         if (!handle.recreationRequested) {
           return details;
         }
       } catch (error) {
+        request.checkActive();
+        if (error is SourceTaskCancelled ||
+            error is SourceScriptStopped ||
+            isSourceUiCancellation(error)) {
+          rethrow;
+        }
         if (!handle.recreationRequested || attempt == 1) {
           if (attempt == 1 && recoveringRuntime) {
             throw Exception('source_runtime_recovery_failed:$error');
@@ -139,16 +198,21 @@ class SourceComicDetailsCapability {
     HazukiSourceFacade facade, {
     required String sourceKey,
     required bool Function() shouldCacheResult,
+    required SourceSharedRequest<ComicDetailsData> request,
   }) async {
-    return facade.handle.runOperation(() async {
-      await facade.ensureInitialized();
+    return request.withUiScope(
+      () => facade.handle.runOperation(() async {
+        await facade.ensureInitialized();
+        request.checkActive();
 
-      final engine = facade.js.engine;
-      if (engine == null) {
-        throw Exception('source_not_initialized');
-      }
+        final engine = facade.js.engine;
+        if (engine == null) {
+          throw Exception('source_not_initialized');
+        }
+        request.bindEngine(engine);
 
-      final dynamic result = await engine.evaluate('''(async () => {
+        final dynamic result = await engine.evaluate(
+          '''(async () => {
         const data = await this.__hazuki_source.comic.loadInfo(${jsonEncode(normalizedComicId)});
         const chapterEntries = [];
         const chapters = data?.chapters;
@@ -178,40 +242,45 @@ class SourceComicDetailsCapability {
           ...data,
           __chapterEntries: chapterEntries,
         };
-      })()''', name: 'source_comic_detail.js');
-      final dynamic resolved = await facade.js.resolve(result);
-      if (resolved is! Map) {
-        throw Exception('comic_details_invalid_response');
-      }
+      })()''',
+          name: 'source_comic_detail.js',
+          execution: request.execution,
+        );
+        final dynamic resolved = await facade.js.resolve(result);
+        request.checkActive();
+        if (resolved is! Map) {
+          throw Exception('comic_details_invalid_response');
+        }
 
-      final details = _parser.parse(
-        map: Map<String, dynamic>.from(resolved),
-        fallbackComicId: normalizedComicId,
-        sourceKey: sourceKey,
-      );
-
-      if (shouldCacheResult() &&
-          identical(facade.js.engine, engine) &&
-          !facade.handle.isDisposed &&
-          identical(_runtimeHost.handleFor(sourceKey).facade, facade)) {
-        _cache.put(
-          SourceScopedComicId(
-            sourceKey: details.sourceKey,
-            comicId: normalizedComicId,
-          ).storageKey,
-          details,
+        final details = _parser.parse(
+          map: Map<String, dynamic>.from(resolved),
+          fallbackComicId: normalizedComicId,
           sourceKey: sourceKey,
         );
-        if (details.id != normalizedComicId) {
+
+        if (shouldCacheResult() &&
+            identical(facade.js.engine, engine) &&
+            !facade.handle.isDisposed &&
+            identical(_runtimeHost.handleFor(sourceKey).facade, facade)) {
           _cache.put(
-            details.scopedId.storageKey,
+            SourceScopedComicId(
+              sourceKey: details.sourceKey,
+              comicId: normalizedComicId,
+            ).storageKey,
             details,
             sourceKey: sourceKey,
           );
+          if (details.id != normalizedComicId) {
+            _cache.put(
+              details.scopedId.storageKey,
+              details,
+              sourceKey: sourceKey,
+            );
+          }
         }
-      }
-      return details;
-    });
+        return details;
+      }),
+    );
   }
 
   Future<List<String>> loadChapterImages({

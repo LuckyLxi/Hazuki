@@ -17,6 +17,7 @@ import 'source_content_gateways.dart';
 import 'source_image_gateways.dart';
 import 'source_runtime_gateways.dart';
 import 'source_sync_gateway.dart';
+import 'source_task_control_gateway.dart';
 
 /// Complete set of focused gateways created by the source composition root.
 ///
@@ -24,6 +25,7 @@ import 'source_sync_gateway.dart';
 /// constructors or runtime implementation details.
 class SourceGatewaySet {
   SourceGatewaySet({
+    required this.taskControl,
     required SourceRuntimeView runtime,
     required SourceRuntimeOperations runtimeOperations,
     required SourceLocalizationOperations localization,
@@ -122,6 +124,7 @@ class SourceGatewaySet {
   }
 
   late final SourceSearchGateway search;
+  final SourceTaskControlGateway taskControl;
   late final SourceDiscoverGateway discover;
   late final SourceFavoriteGateway favorite;
   late final SourceReaderGateway reader;

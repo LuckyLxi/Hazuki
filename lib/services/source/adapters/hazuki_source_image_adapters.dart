@@ -189,7 +189,12 @@ class HazukiSourceDailyRecommendationAdapter
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
-  }) => _content.loadComicDetails(comicId, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _content.loadComicDetails(
+    comicId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
   Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) =>
       _image.peekImageBytesFromMemory(url, sourceKey: sourceKey);

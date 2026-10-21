@@ -42,7 +42,11 @@ void main() {
       );
       for (final id in active.map((task) => task.taskId)) {
         final history = events
-            .where((event) => event.$1.taskId == id)
+            .where(
+              (event) =>
+                  event.$1.taskId == id &&
+                  event.$2 == SourceTaskEvent.stateChanged,
+            )
             .map((e) => e.$1)
             .toList();
         expect(history.map((task) => task.state), [
@@ -56,6 +60,12 @@ void main() {
         expect(history.last.startedAt, isNotNull);
         expect(history.last.endedAt, isNotNull);
         expect(history.last.duration, greaterThanOrEqualTo(Duration.zero));
+        final settled = events.singleWhere(
+          (event) =>
+              event.$1.taskId == id &&
+              event.$2 == SourceTaskEvent.resourcesSettled,
+        );
+        expect(settled.$1.settledAt, isNotNull);
       }
     },
   );
@@ -74,8 +84,8 @@ void main() {
           registry.run<int>(
             pluginId: 'plugin',
             method: 'search.load',
-            observe: (task, _, _, error, stack) {
-              events.add(task);
+            observe: (task, event, _, error, stack) {
+              if (event == SourceTaskEvent.stateChanged) events.add(task);
               if (error != null) {
                 observedError = error;
                 observedStack = stack;
@@ -143,11 +153,16 @@ void main() {
         ),
         42,
       );
-      expect(events.last, (
-        SourceTaskEvent.resultDiscarded,
-        SourceTaskState.succeeded,
-        disposition,
-      ));
+      expect(
+        events
+            .where((event) => event.$1 != SourceTaskEvent.resourcesSettled)
+            .last,
+        (
+          SourceTaskEvent.resultDiscarded,
+          SourceTaskState.succeeded,
+          disposition,
+        ),
+      );
       expect(
         events.where((event) => event.$1 == SourceTaskEvent.stateChanged),
         hasLength(3),

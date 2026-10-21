@@ -132,6 +132,29 @@ class SourceScriptEngine {
       Map.unmodifiable(_shutdownDiagnostics);
   void Function()? onSnapshotChanged;
   void Function(Map<String, Object?>)? onDiagnostic;
+  final Set<void Function()> _executionListeners = {};
+
+  void addExecutionListener(void Function() listener) =>
+      _executionListeners.add(listener);
+  void removeExecutionListener(void Function() listener) =>
+      _executionListeners.remove(listener);
+
+  bool hasExecutionWork(String taskId) =>
+      _waitingTaskIds.containsKey(taskId) ||
+      _callExecutions.values.any((e) => e.taskId == taskId) ||
+      _tokenExecutions.values.any((e) => e.taskId == taskId) ||
+      _hostResources.values.any((e) => e.execution.taskId == taskId);
+
+  void _notifyExecutionListeners() {
+    for (final listener in _executionListeners.toList()) {
+      try {
+        listener();
+      } catch (_) {
+        // A subscriber must not interfere with native resource cleanup.
+      }
+    }
+  }
+
   void _diagnose(
     SourceScriptExecution execution,
     String phase, [
@@ -330,6 +353,7 @@ class SourceScriptEngine {
         entry.value.complete();
       }
     }
+    _notifyExecutionListeners();
   }
 
   void _finishClose() {
@@ -352,6 +376,8 @@ class SourceScriptEngine {
     operationGuard = null;
     onSnapshotChanged = null;
     onDiagnostic = null;
+    _notifyExecutionListeners();
+    _executionListeners.clear();
     if (_workerFailure case final error?) {
       _closed.completeError(error, _workerFailureStack);
     } else {
@@ -366,6 +392,7 @@ class SourceScriptEngine {
         )) {
       SourceUiService.instance.releaseExecution(execution, runtimeId);
     }
+    _notifyExecutionListeners();
   }
 
   Future<dynamic> evaluate(

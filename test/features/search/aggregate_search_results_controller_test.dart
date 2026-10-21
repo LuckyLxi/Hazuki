@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/source_catalog_fixtures.dart';
@@ -35,6 +36,7 @@ void main() {
 
     final requestedOrders = <String, String>{};
     final controller = AggregateSearchResultsController.withLoader(
+      taskControl: FakeSourceTaskControl(),
       sourceService: (() {
         final source = SourceRuntimeAssembly(
           initialCatalog: hazukiAllowedSourceCatalog,
@@ -165,6 +167,7 @@ void main() {
     );
     final requestedOrders = <String>[];
     final controller = AggregateSearchResultsController.withLoader(
+      taskControl: FakeSourceTaskControl(),
       sourceService: (() {
         final source = SourceRuntimeAssembly(
           initialCatalog: hazukiAllowedSourceCatalog,
@@ -223,6 +226,7 @@ void main() {
       initialCatalog: hazukiAllowedSourceCatalog,
     );
     final controller = AggregateSearchResultsController.withLoader(
+      taskControl: FakeSourceTaskControl(),
       sourceService: HazukiSourceSearchAdapter(
         runtime: source.testing.runtime,
         content: source.testing.content,
@@ -278,6 +282,7 @@ void main() {
       initialCatalog: hazukiAllowedSourceCatalog,
     );
     final controller = AggregateSearchResultsController.withLoader(
+      taskControl: FakeSourceTaskControl(),
       sourceService: HazukiSourceSearchAdapter(
         runtime: source.testing.runtime,
         content: source.testing.content,

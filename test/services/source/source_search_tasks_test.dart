@@ -342,6 +342,7 @@ void main() {
       final engine = _Engine();
       when(() => engine.close()).thenAnswer((_) async {});
       when(() => engine.runtimeId).thenReturn('malformed-engine');
+      when(() => engine.hasExecutionWork(any())).thenReturn(false);
       when(
         () => engine.evaluate(
           any(),

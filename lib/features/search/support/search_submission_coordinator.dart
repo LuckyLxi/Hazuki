@@ -1,4 +1,5 @@
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import '../state/aggregate_search_results_controller.dart';
@@ -33,6 +34,8 @@ class SearchSubmissionCoordinator {
     required SearchMessages messages,
   }) async {
     final generation = ++_generation;
+    results.stopPending(SourceTaskStopReason.superseded);
+    aggregateResults.stopPending(SourceTaskStopReason.superseded);
     final matches = <({String sourceKey, String comicId})>[];
     final candidates = aggregate
         ? aggregateResults.sections.map((section) => section.source.key)
@@ -72,7 +75,11 @@ class SearchSubmissionCoordinator {
         await openComic(comic);
         if (current()) results.finishDirectIdLookup(token!);
         return;
-      } catch (_) {
+      } catch (error) {
+        if (isSourceTaskCancellation(error) || isSourceUiCancellation(error)) {
+          results.finishDirectIdLookup(token!);
+          return;
+        }
         // Preserve keyword search fallback when direct lookup cannot be opened.
       }
     }

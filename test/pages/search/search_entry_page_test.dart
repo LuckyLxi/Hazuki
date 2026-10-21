@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
@@ -40,6 +41,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -116,6 +118,7 @@ void main() {
           );
         },
         home: SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -152,6 +155,7 @@ void main() {
                     Navigator.of(context).push<void>(
                       buildSearchEntryPageRoute<void>(
                         builder: (_) => SearchEntryPage(
+                          taskControl: FakeSourceTaskControl(),
                           sourceService: sl<SourceSearchGateway>(),
                           historyService: sl<SearchHistoryService>(),
                           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -252,6 +256,7 @@ void main() {
               Navigator.of(context).push<void>(
                 buildSearchEntryPageRoute<void>(
                   builder: (_) => SearchEntryPage(
+                    taskControl: FakeSourceTaskControl(),
                     sourceService: sl<SourceSearchGateway>(),
                     historyService: sl<SearchHistoryService>(),
                     comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -294,6 +299,7 @@ void main() {
                 Navigator.of(context).push<void>(
                   buildSearchEntryPageRoute<void>(
                     builder: (_) => SearchEntryPage(
+                      taskControl: FakeSourceTaskControl(),
                       sourceService: sl<SourceSearchGateway>(),
                       historyService: historyService,
                       autoFocusOnOpen: true,
@@ -359,6 +365,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -401,6 +408,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           initialKeyword: 'grid-results',
@@ -424,6 +432,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -452,6 +461,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -496,6 +506,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -544,6 +555,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -574,6 +586,7 @@ void main() {
       await tester.pumpWidget(
         _buildTestApp(
           SearchEntryPage(
+            taskControl: FakeSourceTaskControl(),
             sourceService: sl<SourceSearchGateway>(),
             historyService: sl<SearchHistoryService>(),
             comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -615,6 +628,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -669,6 +683,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -706,6 +721,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           initialKeyword: 'hazuki',
@@ -750,6 +766,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -780,6 +797,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           initialKeyword: 'external-tag',
@@ -803,6 +821,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           initialKeyword: 'keep-results',
@@ -840,6 +859,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchResultsPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           initialKeyword: '12345',
@@ -894,6 +914,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          taskControl: FakeSourceTaskControl(),
           sourceService: sl<SourceSearchGateway>(),
           historyService: sl<SearchHistoryService>(),
           initialKeyword: 'hazuki',

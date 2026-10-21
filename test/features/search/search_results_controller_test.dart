@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mocktail/mocktail.dart';
@@ -19,6 +20,7 @@ void main() {
 
   test('forwards source service changes until disposed', () {
     final controller = SearchResultsController(
+      taskControl: FakeSourceTaskControl(),
       initialOrder: 'mr',
       sourceService: sl<SourceSearchGateway>(),
     );
@@ -71,6 +73,7 @@ void main() {
       });
       final requests = <String>[];
       final controller = SearchResultsController(
+        taskControl: FakeSourceTaskControl(),
         initialOrder: 'mr',
         sourceService: source,
         searchPageLoader:

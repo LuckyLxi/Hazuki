@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -74,6 +75,7 @@ void main() {
     'page choices and labels share runtime declarations without losing installed fields',
     () async {
       final controller = SearchResultsController(
+        taskControl: FakeSourceTaskControl(),
         initialOrder: '',
         sourceService: source,
       );
@@ -104,6 +106,7 @@ void main() {
         final newResult = Completer<SearchComicsResult>();
         final requests = <(String, int)>[];
         final controller = SearchResultsController(
+          taskControl: FakeSourceTaskControl(),
           initialOrder: '',
           sourceService: source,
           searchPageLoader:
@@ -164,6 +167,7 @@ void main() {
   test('runtime sort changes preserve an active direct ID lookup', () async {
     final requests = <String>[];
     final controller = SearchResultsController(
+      taskControl: FakeSourceTaskControl(),
       initialOrder: '',
       sourceService: source,
       searchPageLoader:
@@ -211,6 +215,7 @@ void main() {
         final requests = <(String, String)>[];
         final targetSourceKey = sourceKey;
         final controller = AggregateSearchResultsController.withLoader(
+          taskControl: FakeSourceTaskControl(),
           sourceService: source,
           loader:
               ({

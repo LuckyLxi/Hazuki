@@ -23,6 +23,7 @@ class SourceTaskLogRecorder {
   }) {
     if (!store.captureEnabled) return;
     final discarded = event == SourceTaskEvent.resultDiscarded;
+    final settled = event == SourceTaskEvent.resourcesSettled;
     // Task capture excludes search text even when exports keep all other data.
     String redact(String value) {
       var text = value;
@@ -53,16 +54,20 @@ class SourceTaskLogRecorder {
     };
 
     store.add(
-      level: !discarded && task.state == SourceTaskState.failed
+      level: !discarded && !settled && task.state == SourceTaskState.failed
           ? 'error'
           : 'debug',
       area: AppLogArea.source,
       source: 'source_task',
       event: discarded
           ? 'source_task_result_discarded'
+          : settled
+          ? 'source_task_resources_settled'
           : 'source_task_${task.state.name}',
       title: discarded
           ? 'Source task result discarded'
+          : settled
+          ? 'Source task resources settled'
           : 'Source task ${task.state.name}',
       data: const AppLogSanitizer().sanitize(
         data,

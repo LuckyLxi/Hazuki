@@ -24,6 +24,7 @@ abstract interface class SourceSearchGateway implements Listenable {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
 }
 

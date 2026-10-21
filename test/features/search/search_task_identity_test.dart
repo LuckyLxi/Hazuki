@@ -1,3 +1,4 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -78,6 +79,7 @@ void main() {
   late _Source source;
   SearchResultsController single() {
     final controller = SearchResultsController(
+      taskControl: FakeSourceTaskControl(),
       initialOrder: '',
       sourceService: source,
     );
@@ -86,7 +88,10 @@ void main() {
   }
 
   AggregateSearchResultsController aggregate() {
-    final controller = AggregateSearchResultsController(sourceService: source);
+    final controller = AggregateSearchResultsController(
+      taskControl: FakeSourceTaskControl(),
+      sourceService: source,
+    );
     addTearDown(controller.dispose);
     return controller;
   }
@@ -153,6 +158,7 @@ void main() {
       'single ${dispose ? 'disposal' : 'plugin replacement'} invalidates pending results',
       () async {
         final controller = SearchResultsController(
+          taskControl: FakeSourceTaskControl(),
           initialOrder: '',
           sourceService: source,
         );
@@ -171,6 +177,12 @@ void main() {
           dispose
               ? SourceTaskResultDisposition.disposed
               : SourceTaskResultDisposition.superseded,
+        );
+        expect(
+          origin.cancellation!.reason,
+          dispose
+              ? SourceTaskStopReason.ownerDisposed
+              : SourceTaskStopReason.pluginUpdated,
         );
         response.complete(_result('obsolete'));
         await pending;
@@ -227,6 +239,7 @@ void main() {
       'aggregate ${dispose ? 'disposal' : 'plugin replacement'} rejects late sections',
       () async {
         final controller = AggregateSearchResultsController(
+          taskControl: FakeSourceTaskControl(),
           sourceService: source,
         );
         final response = Completer<SearchComicsResult>();
@@ -273,6 +286,10 @@ void main() {
       await pending;
       expect(origin.resultDisposition!(), SourceTaskResultDisposition.timedOut);
       expect(controller.searchErrorMessage, contains('timeout'));
+      expect(
+        origin.cancellation!.reason,
+        SourceTaskStopReason.deadlineExceeded,
+      );
       response.complete(_result('late'));
       await tester.pump();
       expect(controller.searchComics, isEmpty);
@@ -409,5 +426,57 @@ void main() {
       isTrue,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  for (final throwsError in [false, true]) {
+    testWidgets(
+      'disposal cancels the retry gap after ${throwsError ? 'failure' : 'empty results'}',
+      (tester) async {
+        final control = FakeSourceTaskControl();
+        final controller = SearchResultsController(
+          initialOrder: '',
+          sourceService: source,
+          taskControl: control,
+        );
+        source.respond = (_) => throwsError
+            ? Future.error(StateError('unavailable'))
+            : Future.value(const SearchComicsResult(comics: [], maxPage: null));
+        final pending = controller.search(_messages, keyword: 'query', page: 1);
+        await tester.pump();
+        expect(source.requests, hasLength(1));
+        controller.dispose();
+        await pending;
+        await tester.pump(const Duration(seconds: 1));
+        expect(source.requests, hasLength(1));
+        expect(
+          source.requests.single.origin.cancellation!.reason,
+          SourceTaskStopReason.ownerDisposed,
+        );
+        expect(
+          control.requests.last.reason,
+          SourceTaskStopReason.ownerDisposed,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  test('aggregate retry cancels only its own source branch', () async {
+    final control = FakeSourceTaskControl();
+    final controller = AggregateSearchResultsController(
+      sourceService: source,
+      taskControl: control,
+    );
+    addTearDown(controller.dispose);
+    await controller.search(_messages, 'query');
+    final first = source.requests[0].origin;
+    final other = source.requests[1].origin;
+    control.requests.clear();
+    await controller.retry(_messages, controller.sections.first);
+    expect(control.requests.single.kind, 'group');
+    expect(control.requests.single.pluginId, 'one');
+    expect(first.cancellation!.reason, SourceTaskStopReason.superseded);
+    expect(other.cancellation!.reason, isNull);
+    expect(controller.sections.last.comics.single.id, 'two-1');
   });
 }

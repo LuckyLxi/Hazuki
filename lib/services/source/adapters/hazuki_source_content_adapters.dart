@@ -68,7 +68,12 @@ class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
-  }) => _content.loadComicDetails(comicId, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _content.loadComicDetails(
+    comicId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
 }
 
 class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter

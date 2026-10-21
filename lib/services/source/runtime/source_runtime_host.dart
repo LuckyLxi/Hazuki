@@ -10,6 +10,7 @@ import 'source_runtime_registry.dart';
 import 'source_secure_session_storage.dart';
 import '../../logging/app_log_store.dart';
 import '../interaction/source_ui_service.dart';
+import 'source_task_registry.dart';
 
 /// Owns source selection and the lifetime of per-source runtime handles.
 ///
@@ -60,6 +61,7 @@ class SourceRuntimeHost extends ChangeNotifier {
   final String? Function(String sourceKey) _currentAccountForSource;
   final bool Function(String sourceKey) _isLoggedForSource;
   final AppLogStore logStore;
+  final SourceTaskRegistry tasks = SourceTaskRegistry();
   final void Function(String, SourceRuntimeState)? onRuntimeState;
 
   late final SourceRuntimeCoordinator<SourceRuntimeHandle> _coordinator;
@@ -221,6 +223,7 @@ class SourceRuntimeHost extends ChangeNotifier {
 
   @override
   void dispose() {
+    tasks.dispose();
     for (final source in _catalog) {
       _coordinator.remove(source.key);
     }

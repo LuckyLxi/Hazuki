@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
+import 'source_shared_request.dart';
 
 class SourceCacheStore {
   final LinkedHashMap<String, Uint8List> imageBytesCache =
@@ -11,7 +12,8 @@ class SourceCacheStore {
   final Map<String, Future<Uint8List>> imageDownloadInFlight = {};
   final LinkedHashMap<String, ComicDetailsData> comicDetailsMemoryCache =
       LinkedHashMap<String, ComicDetailsData>();
-  final Map<String, Future<ComicDetailsData>> comicDetailsInFlight = {};
+  final Map<String, SourceSharedRequest<ComicDetailsData>>
+  comicDetailsInFlight = {};
   List<ExploreSection>? exploreSectionsMemoryCache;
   DateTime? exploreSectionsMemoryCachedAt;
   List<CategoryTagGroup>? categoryTagGroupsMemoryCache;
