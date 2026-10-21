@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'hazuki_frosted_menu.dart';
+import 'source_plugin_interaction.dart';
+export 'source_plugin_menu.dart' show SourcePluginMenuBinding;
 
-class HazukiFrostedMenuButton<T> extends StatefulWidget {
+class HazukiFrostedMenuButton<T> extends StatelessWidget {
   const HazukiFrostedMenuButton({
     super.key,
     required this.options,
@@ -14,6 +16,7 @@ class HazukiFrostedMenuButton<T> extends StatefulWidget {
     this.icon = const Icon(Icons.more_vert),
     this.enabled = true,
     this.waitForDismissal = false,
+    this.pluginMenu,
   });
 
   final List<HazukiFrostedMenuOption<T>> options;
@@ -27,68 +30,32 @@ class HazukiFrostedMenuButton<T> extends StatefulWidget {
 
   /// Wait for the closing animation before an action can present another route.
   final bool waitForDismissal;
+  final SourcePluginMenuBinding<T>? pluginMenu;
 
   @override
-  State<HazukiFrostedMenuButton<T>> createState() =>
-      _HazukiFrostedMenuButtonState<T>();
-}
-
-class _HazukiFrostedMenuButtonState<T>
-    extends State<HazukiFrostedMenuButton<T>> {
-  final _anchorKey = GlobalKey();
-  final _dismissSignal = ValueNotifier(false);
-  bool _open = false;
-
-  @override
-  void dispose() {
-    _dismissSignal.value = true;
-    _dismissSignal.dispose();
-    super.dispose();
-  }
-
-  Future<void> _showMenu() async {
-    if (_open || !widget.enabled || widget.options.isEmpty) return;
-    _open = true;
-    try {
-      widget.onOpened?.call();
-      final value = await showHazukiFrostedMenu<T>(
-        context: context,
-        anchorKey: _anchorKey,
-        options: widget.options,
-        selected: widget.selected,
-        label: widget.tooltip,
-        dismissOn: _dismissSignal,
-        waitForDismissal: widget.waitForDismissal,
+  Widget build(BuildContext context) => SourcePluginInteraction<T>(
+    binding: pluginMenu,
+    options: options,
+    selected: selected,
+    onSelected: onSelected,
+    label: tooltip,
+    enabled: enabled,
+    onOpened: onOpened,
+    waitForDismissal: waitForDismissal,
+    builder: (context, activate) {
+      if (child == null) {
+        return IconButton(tooltip: tooltip, onPressed: activate, icon: icon);
+      }
+      final button = InkWell(
+        onTap: activate,
+        borderRadius: BorderRadius.circular(20),
+        child: child,
       );
-      if (mounted && widget.enabled && value != null) widget.onSelected(value);
-    } finally {
-      _open = false;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final onTap = widget.enabled && widget.options.isNotEmpty
-        ? _showMenu
-        : null;
-    if (widget.child == null) {
-      return IconButton(
-        key: _anchorKey,
-        tooltip: widget.tooltip,
-        onPressed: onTap,
-        icon: widget.icon,
-      );
-    }
-    final button = InkWell(
-      key: _anchorKey,
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: widget.child,
-    );
-    return widget.tooltip == null
-        ? button
-        : Tooltip(message: widget.tooltip!, child: button);
-  }
+      return tooltip == null
+          ? button
+          : Tooltip(message: tooltip!, child: button);
+    },
+  );
 }
 
 class HazukiFrostedDropdown<T> extends StatelessWidget {
@@ -98,26 +65,36 @@ class HazukiFrostedDropdown<T> extends StatelessWidget {
     required this.onSelected,
     this.selected,
     this.tooltip,
+    this.pluginMenu,
   });
 
   final List<HazukiFrostedMenuOption<T>> options;
   final T? selected;
   final ValueChanged<T> onSelected;
   final String? tooltip;
+  final SourcePluginMenuBinding<T>? pluginMenu;
 
   @override
   Widget build(BuildContext context) {
-    final label =
-        options
-            .where((option) => option.value == selected)
-            .firstOrNull
-            ?.label ??
-        '';
+    String? selectedLabel(List<HazukiFrostedMenuOption<T>> entries) {
+      for (final option in entries) {
+        if (option.children.isEmpty) {
+          if (option.value == selected) return option.label;
+        } else {
+          final label = selectedLabel(option.children);
+          if (label != null) return label;
+        }
+      }
+      return null;
+    }
+
+    final label = selectedLabel(options) ?? '';
     return HazukiFrostedMenuButton<T>(
       options: options,
       selected: selected,
       onSelected: onSelected,
       tooltip: tooltip,
+      pluginMenu: pluginMenu,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.sizeOf(context).width * 0.5,

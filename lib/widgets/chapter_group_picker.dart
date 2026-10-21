@@ -26,6 +26,10 @@ class ChapterGroupPicker extends StatelessWidget {
         details.groupForChapter(initialChapterId ?? '') ??
         details.chapterGroups.first;
     return HazukiFrostedDropdown<String>(
+      pluginMenu: SourcePluginMenuBinding(
+        menuId: 'comic.chapterGroup',
+        sourceKey: details.sourceKey.isEmpty ? null : details.sourceKey,
+      ),
       selected: group.id,
       options: [
         for (final item in details.chapterGroups)

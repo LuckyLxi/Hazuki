@@ -265,14 +265,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
               unawaited(profileFlow.showLoginDialog());
             }
           },
-          onCheckInPressed: () {
-            unawaited(
-              _coordinator.performCheckIn(
-                context,
-                triggeredAutomatically: false,
-              ),
-            );
-          },
+          onCheckInPressed: () => _coordinator.performCheckIn(
+            context,
+            triggeredAutomatically: false,
+          ),
           onSwitchSourcePressed: () {
             unawaited(() async {
               await showHomeSourceSwitchDialog(

@@ -602,6 +602,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   PreferredSizeWidget _buildSearchResultsAppBar() {
     return SearchResultsAppBar(
+      sourceKey: _sourceService.activeSourceKey,
       title: _buildSearchResultsAppBarTitle(),
       orderLabels: searchOrderLabels(
         context,
@@ -618,10 +619,15 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       },
       showOrderControl:
           !_aggregateSearchEnabled &&
-          searchOrderLabels(
-            context,
-            sourceKey: (_sourceService.activeSourceKey ?? ''),
-          ).isNotEmpty,
+              searchOrderLabels(
+                context,
+                sourceKey: (_sourceService.activeSourceKey ?? ''),
+              ).isNotEmpty ||
+          (!_aggregateSearchEnabled &&
+              SourcePluginMenuBinding<String>(
+                menuId: 'search.sort',
+                sourceKey: _sourceService.activeSourceKey,
+              ).resolve(context).entries.isNotEmpty),
     );
   }
 

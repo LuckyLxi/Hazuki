@@ -224,14 +224,24 @@ class HomeProfileController extends ChangeNotifier {
 
     _checkInBusy = true;
     _notify();
+    final interaction = SourceUiScope.current;
     try {
       _sourceUi.restart();
       final result = triggeredAutomatically
           ? await SourceUiScope.withoutInteraction(
               _sourceService.performDailyCheckIn,
             )
+          : interaction?.available == true
+          ? await Future.any<DailyCheckInResult>([
+              _sourceService.performDailyCheckIn(),
+              interaction!.whenCancelled.then<DailyCheckInResult>(
+                (_) =>
+                    throw interaction.failure ??
+                        SourceUiCancelled(interaction.reason ?? 'ownerGone'),
+              ),
+            ])
           : await _sourceUi.run(_sourceService.performDailyCheckIn);
-      if (!context.mounted) {
+      if (!context.mounted || _disposed || interaction?.available == false) {
         return;
       }
       if (result.isSuccess || result.isAlreadyCheckedIn) {
@@ -248,7 +258,7 @@ class HomeProfileController extends ChangeNotifier {
       await showHazukiPrompt(context, promptMessage);
     } catch (error) {
       if (isSourceUiCancellation(error)) return;
-      if (!context.mounted) {
+      if (!context.mounted || _disposed || interaction?.available == false) {
         return;
       }
       await showHazukiPrompt(

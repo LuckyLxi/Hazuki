@@ -448,6 +448,7 @@ class _HazukiAppState extends State<HazukiApp>
                     sourceListenable: sl<SourceSelectionGateway>(),
                     child: SourcePresentationScope(
                       registry: sl<SourceRuntimeRegistry>(),
+                      sourcePlugins: sl<SourcePluginGateway>(),
                       child: WindowsComicDetailPresentationScope(
                         panelBuilder:
                             (

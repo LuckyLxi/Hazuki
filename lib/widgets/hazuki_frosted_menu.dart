@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'source_plugin_menu.dart';
+export 'source_plugin_menu.dart' show SourcePluginMenuBinding;
 
 @immutable
 class HazukiFrostedMenuOption<T> {
@@ -36,7 +38,21 @@ Future<T?> showHazukiFrostedMenu<T>({
   String keyPrefix = 'hazuki-frosted-menu',
   Listenable? dismissOn,
   bool waitForDismissal = false,
+  SourcePluginMenuBinding<T>? pluginMenu,
 }) async {
+  if (pluginMenu != null) {
+    return showSourcePluginMenu<T>(
+      context: context,
+      anchorKey: anchorKey,
+      options: options,
+      binding: pluginMenu,
+      selected: selected,
+      label: label,
+      keyPrefix: keyPrefix,
+      dismissOn: dismissOn,
+      waitForDismissal: waitForDismissal,
+    );
+  }
   if (options.isEmpty || anchorKey.currentContext == null) return null;
   final anchor = anchorKey.currentContext!.findRenderObject() as RenderBox?;
   if (anchor == null || !anchor.attached) return null;

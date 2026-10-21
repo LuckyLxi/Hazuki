@@ -498,7 +498,14 @@ class _CommentsPageState extends State<CommentsPage>
 
   Widget? _buildSortControl() {
     final options = _controller.sortOptions;
-    if (options.orders.isEmpty) return null;
+    final menuBinding = SourcePluginMenuBinding<String>(
+      menuId: 'comments.sort',
+      sourceKey: widget.sourceKey.isEmpty ? null : widget.sourceKey,
+    );
+    if (options.orders.isEmpty &&
+        menuBinding.resolve(context).entries.isEmpty) {
+      return null;
+    }
     final language = Localizations.localeOf(context).languageCode;
     final labels = options.orders.map(
       (key, label) => MapEntry(key, sourceOrderLabel(label, language, key)),
@@ -508,6 +515,7 @@ class _CommentsPageState extends State<CommentsPage>
       child: Align(
         alignment: Alignment.centerRight,
         child: HazukiFrostedMenuButton<String>(
+          pluginMenu: menuBinding,
           tooltip: l10n(context).searchSortTooltip,
           selected: _interaction.order,
           options: [

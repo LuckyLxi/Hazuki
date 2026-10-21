@@ -134,9 +134,19 @@ class HomeDrawerProfileHeader extends StatelessWidget {
                       !profile.profileLoading &&
                       !profile.autoCheckInEnabled) ...[
                     const SizedBox(height: 16),
-                    _HomeDrawerCheckInButton(
-                      profile: profile,
-                      onPressed: actions.onCheckInPressed,
+                    SourcePluginButtonInteraction(
+                      id: 'checkIn',
+                      sourceKey: activeSourceKey,
+                      title: l10n(context).homeCheckInAction,
+                      enabled:
+                          actions.onCheckInPressed != null &&
+                          !profile.checkInBusy &&
+                          !profile.checkedInToday,
+                      onInvoke: () => actions.onCheckInPressed?.call(),
+                      builder: (context, activate) => _HomeDrawerCheckInButton(
+                        profile: profile,
+                        onPressed: activate,
+                      ),
                     ),
                   ],
                 ],

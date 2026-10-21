@@ -53,6 +53,7 @@ class CommentsPageController extends ChangeNotifier
   final String comicId;
   final String? subId;
   final String? chapterId;
+  @override
   final String sourceKey;
   final String logSource;
   final Map<String, Object?> logContext;

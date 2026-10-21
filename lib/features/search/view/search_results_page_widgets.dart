@@ -20,6 +20,7 @@ class SearchResultsAppBar extends StatelessWidget
     required this.onOrderMenuOpened,
     required this.onOrderSelected,
     this.showOrderControl = true,
+    this.sourceKey,
   });
 
   final Widget title;
@@ -29,6 +30,7 @@ class SearchResultsAppBar extends StatelessWidget
   final VoidCallback onOrderMenuOpened;
   final ValueChanged<String> onOrderSelected;
   final bool showOrderControl;
+  final String? sourceKey;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -42,6 +44,10 @@ class SearchResultsAppBar extends StatelessWidget
       actions: [
         if (showOrderControl)
           HazukiFrostedMenuButton<String>(
+            pluginMenu: SourcePluginMenuBinding(
+              menuId: 'search.sort',
+              sourceKey: sourceKey,
+            ),
             tooltip: currentOrderLabel,
             onOpened: onOrderMenuOpened,
             onSelected: onOrderSelected,

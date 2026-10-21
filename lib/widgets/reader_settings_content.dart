@@ -569,6 +569,12 @@ class ReaderSettingsContent extends StatelessWidget {
               isDense: true,
             ),
             child: HazukiFrostedDropdown<String>(
+              pluginMenu: SourcePluginMenuBinding(
+                menuId: 'reader.imageQuality',
+                sourceKey: sourceImageQuality.sourceKey.isEmpty
+                    ? null
+                    : sourceImageQuality.sourceKey,
+              ),
               selected: sourceImageQuality.value,
               tooltip: sourceImageQuality.title,
               options: sourceImageQuality.options.entries

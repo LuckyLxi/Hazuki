@@ -65,7 +65,14 @@ class CommentsSortButton extends StatelessWidget {
           listenable: delegate,
           builder: (context, _) {
             final options = delegate.sortOptions;
-            if (options.orders.isEmpty) return const SizedBox.shrink();
+            final menuBinding = SourcePluginMenuBinding<String>(
+              menuId: 'comments.sort',
+              sourceKey: delegate.sourceKey.isEmpty ? null : delegate.sourceKey,
+            );
+            if (options.orders.isEmpty &&
+                menuBinding.resolve(context).entries.isEmpty) {
+              return const SizedBox.shrink();
+            }
             final language = Localizations.localeOf(context).languageCode;
             final labels = options.orders.map(
               (key, label) =>
@@ -76,6 +83,7 @@ class CommentsSortButton extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 160),
                 child: HazukiFrostedMenuButton<String>(
+                  pluginMenu: menuBinding,
                   tooltip: l10n(context).searchSortTooltip,
                   selected: delegate.selectedOrder,
                   options: [

@@ -167,8 +167,13 @@ class FavoritePageController extends ChangeNotifier {
         supportFavoriteFolderAdd: _cloudFlow.supportsFolderAdd,
         favoriteSortOrders: _favoriteSortOrders,
         sourceKey: _activeSourceKey,
-        favoriteMenu: SourceFavoriteMenuEntry.parseList(
-          _presentationFor(_activeSourceKey)['favoriteMenu'],
+        favoriteMenu: SourceFavoriteMenuEntry.forLocation(
+          _presentationFor(_activeSourceKey),
+          'favorites.cloud.sort',
+        ),
+        localFavoriteMenu: SourceFavoriteMenuEntry.forLocation(
+          _presentationFor(_activeSourceKey),
+          'favorites.local.sort',
         ),
         favoriteSortLabels:
             _presentationFor(_activeSourceKey)['favoriteOrderLabels'] is Map

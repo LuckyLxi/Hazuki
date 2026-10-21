@@ -283,7 +283,7 @@ class HomeScaffoldShell extends StatefulWidget {
   final VoidCallback onFavoriteModeTogglePressed;
   final VoidCallback onFavoriteBackToTopPressed;
   final VoidCallback? onProfileTap;
-  final VoidCallback? onCheckInPressed;
+  final FutureOr<void> Function()? onCheckInPressed;
   final VoidCallback? onSwitchSourcePressed;
   final SourceSwitchGateway? sourceSwitchService;
   final Future<void> Function()? onSourceSwitched;
@@ -366,7 +366,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
   VoidCallback get onFavoriteModeTogglePressed =>
       widget.onFavoriteModeTogglePressed;
   VoidCallback? get onProfileTap => widget.onProfileTap;
-  VoidCallback? get onCheckInPressed => widget.onCheckInPressed;
+  FutureOr<void> Function()? get onCheckInPressed => widget.onCheckInPressed;
   VoidCallback? get onSwitchSourcePressed => widget.onSwitchSourcePressed;
   VoidCallback get onOpenHistory => widget.onOpenHistory;
   VoidCallback get onOpenCategories => widget.onOpenCategories;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -57,7 +59,7 @@ class HomeSidebarActions {
   });
 
   final VoidCallback? onProfileTap;
-  final VoidCallback? onCheckInPressed;
+  final FutureOr<void> Function()? onCheckInPressed;
   final VoidCallback? onSwitchSourcePressed;
   final Future<void> Function(FavoriteFoldersMorphOrigin)?
   onSwitchSourceWithMorph;

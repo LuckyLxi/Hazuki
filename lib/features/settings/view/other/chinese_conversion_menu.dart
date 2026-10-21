@@ -15,6 +15,10 @@ Future<ChineseConversionMode?> showChineseConversionMenu({
     selected: selected,
     label: strings.otherChineseConversionTitle,
     keyPrefix: 'chinese-conversion-menu',
+    pluginMenu: SourcePluginMenuBinding(
+      menuId: 'settings.chineseConversion',
+      valueId: (mode) => mode.name,
+    ),
     options: [
       for (final mode in ChineseConversionMode.values)
         HazukiFrostedMenuOption(

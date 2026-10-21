@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _Source extends Mock implements SourceHomeGateway {}
@@ -40,6 +42,115 @@ void main() {
       ),
     ),
   );
+
+  testWidgets(
+    'manual check-in inherits its button scope and discards cancelled results',
+    (tester) async {
+      await mount(tester);
+      when(() => source.isActiveDailyCheckInSource).thenReturn(true);
+      final pending = Completer<DailyCheckInResult>();
+      SourceUiScope? requestScope;
+      when(source.performDailyCheckIn).thenAnswer((_) {
+        requestScope = SourceUiScope.current;
+        return pending.future;
+      });
+      final owner = SourceUiOwner();
+      addTearDown(owner.dispose);
+      SourceUiScope? buttonScope;
+      final operation = owner.run(() {
+        buttonScope = SourceUiScope.current;
+        return controller.performCheckIn(
+          context,
+          triggeredAutomatically: false,
+        );
+      });
+      await tester.pump();
+      expect(requestScope, same(buttonScope));
+      expect(requestScope?.available, isTrue);
+      expect(controller.checkInBusy, isTrue);
+      final cancelled = expectLater(
+        operation,
+        throwsA(isA<SourceUiCancelled>()),
+      );
+      owner.cancel('sourceChanged');
+      await cancelled;
+      await tester.pump();
+      expect(controller.checkInBusy, isFalse);
+      pending.complete(const DailyCheckInResult.success());
+      await tester.pumpAndSettle();
+      expect(controller.checkedInToday, isFalse);
+      expect(
+        find.text(AppLocalizations.of(context)!.homeCheckInSuccess),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final lateFailure in [false, true]) {
+    testWidgets(
+      'cancelled check-in permits retry and ignores late ${lateFailure ? 'errors' : 'results'}',
+      (tester) async {
+        await mount(tester);
+        when(() => source.isActiveDailyCheckInSource).thenReturn(true);
+        final pending = Completer<DailyCheckInResult>();
+        final retryPending = Completer<DailyCheckInResult>();
+        when(source.performDailyCheckIn).thenAnswer((_) => pending.future);
+        final owner = SourceUiOwner();
+        final retryOwner = SourceUiOwner();
+        addTearDown(owner.dispose);
+        addTearDown(retryOwner.dispose);
+
+        final operation = owner.run(
+          () =>
+              controller.performCheckIn(context, triggeredAutomatically: false),
+        );
+        await tester.pump();
+        final cancelled = expectLater(
+          operation,
+          throwsA(isA<SourceUiCancelled>()),
+        );
+        owner.cancel('sourceChanged');
+        await cancelled;
+        await tester.pump();
+        expect(controller.checkInBusy, isFalse);
+
+        when(() => source.activeSourceKey).thenReturn('other');
+        when(source.performDailyCheckIn).thenAnswer((_) => retryPending.future);
+        final retry = retryOwner.run(
+          () =>
+              controller.performCheckIn(context, triggeredAutomatically: false),
+        );
+        await tester.pump();
+        verify(source.performDailyCheckIn).called(2);
+        expect(controller.checkInBusy, isTrue);
+
+        if (lateFailure) {
+          pending.completeError(StateError('late check-in failure'));
+        } else {
+          pending.complete(const DailyCheckInResult.success());
+        }
+        await tester.pumpAndSettle();
+        expect(controller.checkInBusy, isTrue);
+        expect(controller.checkedInToday, isFalse);
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(tester.takeException(), isNull);
+
+        final retryCancelled = expectLater(
+          retry,
+          throwsA(isA<SourceUiCancelled>()),
+        );
+        retryOwner.cancel('sourceChanged');
+        await retryCancelled;
+        await tester.pump();
+        expect(controller.checkInBusy, isFalse);
+        retryPending.complete(const DailyCheckInResult.success());
+        await tester.pumpAndSettle();
+        expect(controller.checkedInToday, isFalse);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('publishes cached profile before remote refresh finishes', (
     tester,

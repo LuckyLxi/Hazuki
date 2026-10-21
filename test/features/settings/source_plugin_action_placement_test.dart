@@ -299,64 +299,89 @@ void main() {
     );
   }
 
-  testWidgets(
-    'advanced device button uses its declared owner and action in the original slot',
-    (tester) async {
-      final advanced = _MockAdvanced();
-      when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
-      when(
-        advanced.loadSoftwareLogCaptureEnabled,
-      ).thenAnswer((_) async => false);
-      final softwareUpdate = _MockSoftwareUpdate();
-      when(
-        softwareUpdate.loadUpdateSource,
-      ).thenAnswer((_) async => SoftwareUpdateSource.jsDelivr);
-      const button = {
-        'id': 'resetDeviceInfo',
-        'location': 'advanced',
-        'action': 'resetSession',
-        'title': {'en': 'Reset declared device', 'zh': '重置声明的设备'},
-        'subtitle': {'en': 'Plugin device identifiers', 'zh': '插件设备标识'},
-        'successMessage': {'en': 'Reset complete', 'zh': '重置完成'},
-      };
-      await tester.pumpWidget(
-        _app(
-          withTestSourcePresentation(
-            AdvancedSettingsPage(
-              sourceService: advanced,
-              sourcePlugins: plugins,
-              softwareUpdateService: softwareUpdate,
-              logsPageBuilder: (_) => const SizedBox.shrink(),
-              comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
-              restoreComicSource: (_) async => false,
-            ),
-            activeSourceKey: 'fixture',
-            catalog: const [
-              SourceCatalogEntry(
-                key: 'fixture',
-                name: 'Fixture',
-                fileName: 'fixture.js',
-                presentation: {
-                  'buttons': [button],
-                },
+  for (final declared in [false, true]) {
+    testWidgets(
+      'advanced device uses its owner and original action (menu: $declared)',
+      (tester) async {
+        final advanced = _MockAdvanced();
+        when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
+        when(
+          advanced.loadSoftwareLogCaptureEnabled,
+        ).thenAnswer((_) async => false);
+        final softwareUpdate = _MockSoftwareUpdate();
+        when(
+          softwareUpdate.loadUpdateSource,
+        ).thenAnswer((_) async => SoftwareUpdateSource.jsDelivr);
+        const button = {
+          'id': 'resetDeviceInfo',
+          'location': 'advanced',
+          'action': 'resetSession',
+          'title': {'en': 'Reset declared device', 'zh': '重置声明的设备'},
+          'subtitle': {'en': 'Plugin device identifiers', 'zh': '插件设备标识'},
+          'successMessage': {'en': 'Reset complete', 'zh': '重置完成'},
+        };
+        await tester.pumpWidget(
+          _app(
+            withTestSourcePresentation(
+              AdvancedSettingsPage(
+                sourceService: advanced,
+                sourcePlugins: plugins,
+                softwareUpdateService: softwareUpdate,
+                logsPageBuilder: (_) => const SizedBox.shrink(),
+                comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
+                restoreComicSource: (_) async => false,
               ),
-            ],
+              activeSourceKey: 'fixture',
+              catalog: [
+                SourceCatalogEntry(
+                  key: 'fixture',
+                  name: 'Fixture',
+                  fileName: 'fixture.js',
+                  presentation: {
+                    'buttons': [button],
+                    if (declared)
+                      'menus': {
+                        'plugin.buttons.resetDeviceInfo': [
+                          {
+                            'id': 'device',
+                            'title': 'Device actions',
+                            'children': [
+                              {'value': 'default', 'title': 'Run original'},
+                              {'action': 'inspect', 'title': 'Inspect device'},
+                            ],
+                          },
+                        ],
+                      },
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('Reset declared device'), 300);
-      expect(find.byIcon(Icons.phonelink_erase_outlined), findsOneWidget);
-      expect(find.text('Reset declared device'), findsOneWidget);
-      await tester.tap(find.text('Reset declared device'));
-      await tester.pumpAndSettle();
-      expect(plugins.calls, [('fixture', 'resetSession')]);
-      expect(find.text('Reset complete'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      await tester.pump(const Duration(seconds: 4));
-      await tester.pumpAndSettle();
-    },
-  );
+        );
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('Reset declared device'),
+          300,
+        );
+        expect(find.byIcon(Icons.phonelink_erase_outlined), findsOneWidget);
+        expect(find.text('Reset declared device'), findsOneWidget);
+        await tester.tap(find.text('Reset declared device'));
+        await tester.pumpAndSettle();
+        if (declared) {
+          expect(plugins.calls, isEmpty);
+          await tester.tap(find.text('Device actions'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Run original'));
+          await tester.pumpAndSettle();
+        }
+        expect(plugins.calls, [('fixture', 'resetSession')]);
+        expect(find.text('Reset complete'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+      },
+    );
+  }
 
   testWidgets(
     'advanced update route menu retains choices and saves selection',
@@ -571,85 +596,109 @@ void main() {
   });
 
   for (final location in SourcePluginActionLocation.values) {
-    testWidgets('actions are placed and run in the ${location.name} page', (
-      tester,
-    ) async {
-      final settings = _MockSettings();
-      when(() => settings.activeSourceKey).thenReturn('fixture');
-      when(() => settings.presentationForSource('fixture')).thenReturn({});
-      final selection = _MockSelection();
-      when(() => selection.supportsDirectComicId).thenReturn(false);
-      when(() => selection.supportsDailyRecommendation).thenReturn(false);
-      when(() => selection.isActiveDailyCheckInSource).thenReturn(false);
-      final dependencies = _MockDependencies();
-      when(() => dependencies.sourceSelection).thenReturn(selection);
-      when(() => dependencies.sourcePlugins).thenReturn(plugins);
-      final advanced = _MockAdvanced();
-      when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
-      when(
-        advanced.loadSoftwareLogCaptureEnabled,
-      ).thenAnswer((_) async => false);
-      final softwareUpdate = _MockSoftwareUpdate();
-      when(
-        softwareUpdate.loadUpdateSource,
-      ).thenAnswer((_) async => SoftwareUpdateSource.jsDelivr);
-      final page = switch (location) {
-        SourcePluginActionLocation.plugin => SourcePluginSettingsPage(
-          id: 'fixture',
-          gateway: plugins,
-        ),
-        SourcePluginActionLocation.reading => ReadingSettingsPage(
-          sourceService: settings,
-          sourcePlugins: plugins,
-        ),
-        SourcePluginActionLocation.other => OtherSettingsPage(
-          dependencies: dependencies,
-        ),
-        SourcePluginActionLocation.lab => LabSettingsPage(
-          sourcePlugins: plugins,
-        ),
-        SourcePluginActionLocation.advanced => AdvancedSettingsPage(
-          sourceService: advanced,
-          sourcePlugins: plugins,
-          softwareUpdateService: softwareUpdate,
-          logsPageBuilder: (_) => const SizedBox.shrink(),
-          comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
-          restoreComicSource: (_) async => false,
-        ),
-        SourcePluginActionLocation.lines => LineSettingsPage(
-          sourceService: settings,
-          sourcePlugins: plugins,
-        ),
-      };
-      await tester.pumpWidget(_app(page));
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('Action ${location.name}'),
-        300,
+    for (final declared in [false, true]) {
+      testWidgets(
+        'actions run in the ${location.name} page (menu: $declared)',
+        (tester) async {
+          if (declared) {
+            plugins.installed.first.manifest.presentation['menus'] = {
+              'plugin.actions.${location.name}': [
+                {
+                  'id': 'choices',
+                  'title': 'Action choices',
+                  'children': [
+                    {'value': 'default', 'title': 'Run original'},
+                    {'action': 'extra', 'title': 'Extra operation'},
+                  ],
+                },
+              ],
+            };
+          }
+          final settings = _MockSettings();
+          when(() => settings.activeSourceKey).thenReturn('fixture');
+          when(() => settings.presentationForSource('fixture')).thenReturn({});
+          final selection = _MockSelection();
+          when(() => selection.supportsDirectComicId).thenReturn(false);
+          when(() => selection.supportsDailyRecommendation).thenReturn(false);
+          when(() => selection.isActiveDailyCheckInSource).thenReturn(false);
+          final dependencies = _MockDependencies();
+          when(() => dependencies.sourceSelection).thenReturn(selection);
+          when(() => dependencies.sourcePlugins).thenReturn(plugins);
+          final advanced = _MockAdvanced();
+          when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
+          when(
+            advanced.loadSoftwareLogCaptureEnabled,
+          ).thenAnswer((_) async => false);
+          final softwareUpdate = _MockSoftwareUpdate();
+          when(
+            softwareUpdate.loadUpdateSource,
+          ).thenAnswer((_) async => SoftwareUpdateSource.jsDelivr);
+          final page = switch (location) {
+            SourcePluginActionLocation.plugin => SourcePluginSettingsPage(
+              id: 'fixture',
+              gateway: plugins,
+            ),
+            SourcePluginActionLocation.reading => ReadingSettingsPage(
+              sourceService: settings,
+              sourcePlugins: plugins,
+            ),
+            SourcePluginActionLocation.other => OtherSettingsPage(
+              dependencies: dependencies,
+            ),
+            SourcePluginActionLocation.lab => LabSettingsPage(
+              sourcePlugins: plugins,
+            ),
+            SourcePluginActionLocation.advanced => AdvancedSettingsPage(
+              sourceService: advanced,
+              sourcePlugins: plugins,
+              softwareUpdateService: softwareUpdate,
+              logsPageBuilder: (_) => const SizedBox.shrink(),
+              comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
+              restoreComicSource: (_) async => false,
+            ),
+            SourcePluginActionLocation.lines => LineSettingsPage(
+              sourceService: settings,
+              sourcePlugins: plugins,
+            ),
+          };
+          await tester.pumpWidget(_app(page));
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.text('Action ${location.name}'),
+            300,
+          );
+          expect(find.text('Action ${location.name}'), findsOneWidget);
+          expect(find.text('Ignored action'), findsNothing);
+          if (location == SourcePluginActionLocation.lines) {
+            final strings = AppLocalizations.of(
+              tester.element(find.byType(LineSettingsPage)),
+            )!;
+            expect(find.text(strings.lineSettingsTitle), findsOneWidget);
+            expect(find.byType(SourcePluginSettingsPage), findsNothing);
+            expect(find.text('Default option'), findsNothing);
+          }
+          if (location != SourcePluginActionLocation.plugin &&
+              location != SourcePluginActionLocation.lines) {
+            expect(plugins.metadataLoads, isEmpty);
+          }
+          await tester.tap(find.text('Action ${location.name}'));
+          await tester.pumpAndSettle();
+          if (declared) {
+            expect(plugins.calls, isEmpty);
+            await tester.tap(find.text('Action choices'));
+            await tester.pumpAndSettle();
+            await tester.tap(find.text('Run original'));
+            await tester.pumpAndSettle();
+          }
+          expect(plugins.calls, [('fixture', location.name)]);
+          expect(find.text('Done'), findsOneWidget);
+          expect(find.byIcon(Icons.tips_and_updates_rounded), findsOneWidget);
+          expect(find.byType(SnackBar), findsNothing);
+          expect(tester.takeException(), isNull);
+          await _finishPrompt(tester);
+        },
       );
-      expect(find.text('Action ${location.name}'), findsOneWidget);
-      expect(find.text('Ignored action'), findsNothing);
-      if (location == SourcePluginActionLocation.lines) {
-        final strings = AppLocalizations.of(
-          tester.element(find.byType(LineSettingsPage)),
-        )!;
-        expect(find.text(strings.lineSettingsTitle), findsOneWidget);
-        expect(find.byType(SourcePluginSettingsPage), findsNothing);
-        expect(find.text('Default option'), findsNothing);
-      }
-      if (location != SourcePluginActionLocation.plugin &&
-          location != SourcePluginActionLocation.lines) {
-        expect(plugins.metadataLoads, isEmpty);
-      }
-      await tester.tap(find.text('Action ${location.name}'));
-      await tester.pumpAndSettle();
-      expect(plugins.calls, [('fixture', location.name)]);
-      expect(find.text('Done'), findsOneWidget);
-      expect(find.byIcon(Icons.tips_and_updates_rounded), findsOneWidget);
-      expect(find.byType(SnackBar), findsNothing);
-      expect(tester.takeException(), isNull);
-      await _finishPrompt(tester);
-    });
+    }
   }
 
   testWidgets('reading quality uses the frosted menu and saves the selection', (

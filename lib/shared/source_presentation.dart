@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_registry.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
+import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
 
 export 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
 
@@ -9,8 +10,28 @@ class SourcePresentationScope extends InheritedNotifier<SourceRuntimeRegistry> {
   const SourcePresentationScope({
     super.key,
     required SourceRuntimeRegistry registry,
+    this.sourcePlugins,
     required super.child,
   }) : super(notifier: registry);
+  final SourcePluginGateway? sourcePlugins;
+
+  static SourcePluginGateway? pluginsOf(
+    BuildContext context, {
+    bool listen = true,
+  }) =>
+      (listen
+              ? context
+                    .dependOnInheritedWidgetOfExactType<
+                      SourcePresentationScope
+                    >()
+              : context
+                    .getInheritedWidgetOfExactType<SourcePresentationScope>())
+          ?.sourcePlugins;
+
+  @override
+  bool updateShouldNotify(covariant SourcePresentationScope oldWidget) =>
+      super.updateShouldNotify(oldWidget) ||
+      sourcePlugins != oldWidget.sourcePlugins;
   static SourceRuntimeRegistry? maybeOf(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<SourcePresentationScope>()
       ?.notifier;

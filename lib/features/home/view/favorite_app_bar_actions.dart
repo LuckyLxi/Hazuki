@@ -6,7 +6,6 @@ import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
-import 'favorite_plugin_menu_button.dart';
 
 class FavoriteAppBarActions extends StatelessWidget {
   const FavoriteAppBarActions({
@@ -97,29 +96,29 @@ class FavoriteAppBarActions extends StatelessWidget {
             ),
           ),
         if (state.showSort)
-          if (!isLocalMode && state.menu.isNotEmpty)
-            FavoritePluginMenuButton(
-              key: ValueKey(state.sourceKey),
-              state: state,
+          HazukiFrostedMenuButton<String>(
+            key: ValueKey((state.sourceKey, state.currentMode)),
+            pluginMenu: SourcePluginMenuBinding(
+              menuId: isLocalMode
+                  ? 'favorites.local.sort'
+                  : 'favorites.cloud.sort',
+              sourceKey: state.sourceKey.isEmpty ? null : state.sourceKey,
               gateway: sourcePlugins,
-              sortLabel: (order) => _sortLabel(context, order),
-              onSortSelected: onSortSelected,
-            )
-          else
-            HazukiFrostedMenuButton<String>(
-              tooltip: l10n(context).homeSortTooltip,
-              selected: state.currentSortOrder,
-              onSelected: onSortSelected,
-              options: state.sortOrders
-                  .map(
-                    (order) => HazukiFrostedMenuOption<String>(
-                      value: order,
-                      label: _sortLabel(context, order),
-                    ),
-                  )
-                  .toList(),
-              icon: const Icon(Icons.sort_rounded),
+              entries: state.menu.isEmpty ? null : state.menu,
             ),
+            tooltip: l10n(context).homeSortTooltip,
+            selected: state.currentSortOrder,
+            onSelected: onSortSelected,
+            options: state.sortOrders
+                .map(
+                  (order) => HazukiFrostedMenuOption<String>(
+                    value: order,
+                    label: _sortLabel(context, order),
+                  ),
+                )
+                .toList(),
+            icon: const Icon(Icons.sort_rounded),
+          ),
         if (state.showCreateFolder)
           IconButton(
             tooltip: l10n(context).homeCreateFavoriteFolder,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -57,7 +58,7 @@ class HomeDrawer extends StatelessWidget {
   final bool checkInBusy;
   final bool checkedInToday;
   final VoidCallback? onProfileTap;
-  final VoidCallback? onCheckInPressed;
+  final FutureOr<void> Function()? onCheckInPressed;
   final VoidCallback? onSwitchSourcePressed;
   final VoidCallback onOpenHistory;
   final VoidCallback onOpenCategories;

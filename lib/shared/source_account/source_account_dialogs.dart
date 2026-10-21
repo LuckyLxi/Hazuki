@@ -316,6 +316,10 @@ Future<void> showHomeLoginDialog(
                                         IgnorePointer(
                                           ignoring: loading,
                                           child: HazukiFrostedDropdown<String>(
+                                            pluginMenu:
+                                                const SourcePluginMenuBinding(
+                                                  menuId: 'account.loginMethod',
+                                                ),
                                             selected: selectedMethod!.id,
                                             options: [
                                               for (final method in loginMethods)

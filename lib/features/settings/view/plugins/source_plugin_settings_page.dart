@@ -48,6 +48,7 @@ class _SourcePluginSettingsContentState
     extends State<SourcePluginSettingsContent> {
   Map<String, dynamic> _settings = {};
   Map<String, dynamic> _translation = {};
+  Map<String, dynamic> _presentation = {};
   List<SourcePluginAction> _actions = [];
   int _loadRevision = 0;
   final _sourceUi = SourceUiOwner();
@@ -70,6 +71,7 @@ class _SourcePluginSettingsContentState
       _sourceUi.restart();
       _settings = {};
       _translation = {};
+      _presentation = {};
       _actions = [];
       unawaited(_load());
     }
@@ -91,6 +93,7 @@ class _SourcePluginSettingsContentState
         setState(() {
           _settings = settings;
           _translation = meta?.translation ?? {};
+          _presentation = meta?.presentation ?? {};
           _actions = actions;
         });
       }
@@ -176,6 +179,15 @@ class _SourcePluginSettingsContentState
       return ListTile(
         title: Text(title),
         trailing: HazukiFrostedDropdown<String>(
+          pluginMenu: SourcePluginMenuBinding(
+            menuId: 'plugin.settings.$key',
+            sourceKey: widget.id,
+            gateway: widget.gateway,
+            entries: SourceMenuEntry.forLocation(
+              _presentation,
+              'plugin.settings.$key',
+            ),
+          ),
           selected: selected,
           options: options,
           tooltip: title,

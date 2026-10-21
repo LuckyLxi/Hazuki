@@ -3,6 +3,7 @@ import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -164,12 +165,13 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
     SourcePluginButton button,
   ) async {
     final strings = AppLocalizations.of(context)!;
+    final scope = SourceUiScope.current;
     try {
       final result = await widget.sourcePlugins!.runAction(
         sourceKey,
         button.action!,
       );
-      if (!mounted) {
+      if (!mounted || scope?.available == false) {
         return;
       }
       await showHazukiPrompt(
@@ -186,7 +188,9 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
         ),
       );
     } catch (error) {
-      if (!mounted) {
+      if (!mounted ||
+          scope?.available == false ||
+          isSourceUiCancellation(error)) {
         return;
       }
       await showHazukiPrompt(
@@ -242,15 +246,23 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           sourceDeviceAction:
               deviceAction == null || widget.sourcePlugins == null
               ? null
-              : ListTile(
-                  leading: const Icon(Icons.phonelink_erase_outlined),
-                  title: Text(
-                    buttonText(deviceAction.title ?? deviceAction.id),
+              : SourcePluginButtonInteraction(
+                  id: deviceAction.id,
+                  sourceKey: sourceKey,
+                  gateway: widget.sourcePlugins,
+                  title: buttonText(deviceAction.title ?? deviceAction.id),
+                  onInvoke: () =>
+                      _runSourceDeviceAction(sourceKey, deviceAction),
+                  builder: (context, activate) => ListTile(
+                    leading: const Icon(Icons.phonelink_erase_outlined),
+                    title: Text(
+                      buttonText(deviceAction.title ?? deviceAction.id),
+                    ),
+                    subtitle: deviceAction.subtitle == null
+                        ? null
+                        : Text(buttonText(deviceAction.subtitle)),
+                    onTap: activate,
                   ),
-                  subtitle: deviceAction.subtitle == null
-                      ? null
-                      : Text(buttonText(deviceAction.subtitle)),
-                  onTap: () => _runSourceDeviceAction(sourceKey, deviceAction),
                 ),
           logsPageBuilder: widget.logsPageBuilder,
           onToggleNoImageMode: _toggleNoImageMode,
