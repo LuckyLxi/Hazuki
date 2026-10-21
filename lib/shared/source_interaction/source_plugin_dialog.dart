@@ -11,8 +11,7 @@ import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 
 import '../source_account/source_account_dialog_support.dart';
 import '../source_account/source_login_dialog_controller.dart';
-import '../source_account/source_login_interaction_dialog.dart'
-    show captchaImagePoint;
+import 'captcha_image_point.dart';
 
 class SourcePluginDialog extends StatefulWidget {
   const SourcePluginDialog({

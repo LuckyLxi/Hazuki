@@ -8,7 +8,7 @@ import 'package:hazuki/services/source/plugins/source_menu.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 
-import 'hazuki_frosted_menu.dart';
+import 'hazuki_frosted_menu_core.dart';
 import 'hazuki_prompt.dart';
 
 export 'package:hazuki/services/source/plugins/source_menu.dart';
@@ -180,7 +180,7 @@ Future<T?> showSourcePluginMenu<T>({
 }) async {
   final menu = binding.resolve(context, listen: false);
   if (menu.entries.isEmpty) {
-    return showHazukiFrostedMenu(
+    return showHazukiFrostedMenuCore(
       context: context,
       anchorKey: anchorKey,
       options: options,
@@ -207,7 +207,7 @@ Future<T?> showSourcePluginMenu<T>({
 
   dismissOn?.addListener(cancel);
   try {
-    final entry = await showHazukiFrostedMenu<SourceMenuEntry>(
+    final entry = await showHazukiFrostedMenuCore<SourceMenuEntry>(
       context: context,
       anchorKey: anchorKey,
       options: layout.options,

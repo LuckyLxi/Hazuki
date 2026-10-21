@@ -85,7 +85,8 @@ void main() {
       expect(route.animation!.value, 1);
       final menuRect = tester.getRect(surface);
       expect(menuRect.right, closeTo(buttonRect.right, 0.1));
-      expect(menuRect.top, closeTo(buttonRect.bottom + 8, 0.1));
+      expect(menuRect.top, closeTo(buttonRect.top, 0.1));
+      expect(menuRect.overlaps(buttonRect), isTrue);
       expect(
         tester.widget<ClipRRect>(surface).borderRadius,
         BorderRadius.circular(28),

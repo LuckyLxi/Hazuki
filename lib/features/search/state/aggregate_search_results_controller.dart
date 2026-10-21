@@ -183,6 +183,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
     required int page,
     required bool append,
   }) async {
+    final token = section.requestToken;
     try {
       await section.sourceUi.run(
         () => _loadSectionPageWithUi(
@@ -193,7 +194,14 @@ class AggregateSearchResultsController extends ChangeNotifier {
         ),
       );
     } catch (error) {
-      if (!isSourceUiCancellation(error)) rethrow;
+      if (!_isCurrent(section, token)) return;
+      section
+        ..errorMessage = isSourceUiCancellation(error)
+            ? null
+            : messages.failed('$error')
+        ..loading = false
+        ..loadingMore = false;
+      _notify();
     }
   }
 

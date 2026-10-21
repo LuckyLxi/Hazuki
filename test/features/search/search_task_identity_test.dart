@@ -288,6 +288,11 @@ void main() {
     final pending = controller.search(_messages, 'query');
     await tester.pump(searchLoadTimeout);
     await pending;
+    for (final section in controller.sections) {
+      expect(section.errorMessage, contains('timeout'));
+      expect(section.loading, isFalse);
+      expect(section.loadingMore, isFalse);
+    }
     expect(
       source.requests.every(
         (request) =>
@@ -302,5 +307,107 @@ void main() {
       controller.sections.every((section) => section.comics.isEmpty),
       isTrue,
     );
+  });
+
+  testWidgets('aggregate timeout preserves other sources and permits retry', (
+    tester,
+  ) async {
+    final controller = aggregate();
+    final response = Completer<SearchComicsResult>();
+    source.respond = (request) => request.sourceKey == 'one'
+        ? Future.value(_result('successful'))
+        : response.future;
+    final pending = controller.search(_messages, 'query');
+    await tester.pump(searchLoadTimeout);
+    await pending;
+
+    final successful = controller.sections.first;
+    final timedOut = controller.sections.last;
+    expect(successful.comics.single.id, 'successful');
+    expect(successful.errorMessage, isNull);
+    expect(timedOut.errorMessage, contains('timeout'));
+    expect(timedOut.loading, isFalse);
+    expect(timedOut.loadingMore, isFalse);
+    final timedOutOrigin = source.requests.last.origin;
+    expect(
+      timedOutOrigin.resultDisposition!(),
+      SourceTaskResultDisposition.timedOut,
+    );
+
+    source.respond = (_) => Future.value(_result('retried'));
+    await controller.retry(_messages, timedOut);
+    response.complete(_result('late'));
+    await tester.pump();
+    expect(successful.comics.single.id, 'successful');
+    expect(timedOut.comics.single.id, 'retried');
+    expect(timedOut.errorMessage, isNull);
+    expect(timedOut.loading, isFalse);
+    expect(timedOut.loadingMore, isFalse);
+    expect(
+      timedOutOrigin.resultDisposition!(),
+      SourceTaskResultDisposition.timedOut,
+    );
+    expect(
+      source.requests.last.origin.resultDisposition!(),
+      SourceTaskResultDisposition.current,
+    );
+  });
+
+  testWidgets('aggregate pagination timeout retains loaded comics', (
+    tester,
+  ) async {
+    final controller = aggregate();
+    await controller.search(_messages, 'query');
+    final section = controller.sections.first;
+    final response = Completer<SearchComicsResult>();
+    source.respond = (_) => response.future;
+    final pending = controller.loadMore(_messages, section);
+    expect(section.loadingMore, isTrue);
+    await tester.pump(searchLoadTimeout);
+    await pending;
+
+    expect(section.comics.single.id, 'one-1');
+    expect(section.page, 1);
+    expect(section.errorMessage, contains('timeout'));
+    expect(section.loading, isFalse);
+    expect(section.loadingMore, isFalse);
+    response.complete(_result('late-page'));
+    await tester.pump();
+    expect(section.comics.single.id, 'one-1');
+    expect(section.page, 1);
+  });
+
+  testWidgets('obsolete aggregate errors cannot overwrite a newer search', (
+    tester,
+  ) async {
+    final controller = aggregate();
+    final response = Completer<SearchComicsResult>();
+    source.respond = (_) => response.future;
+    final oldSearch = controller.search(_messages, 'old');
+    final oldOrigins = source.requests
+        .map((request) => request.origin)
+        .toList();
+    source.respond = (request) =>
+        Future.value(_result('new-${request.sourceKey}'));
+    await controller.search(_messages, 'new');
+    await oldSearch;
+    response.completeError(StateError('late failure'));
+    await tester.pump(searchLoadTimeout);
+
+    for (final section in controller.sections) {
+      expect(section.comics.single.id, 'new-${section.source.key}');
+      expect(section.errorMessage, isNull);
+      expect(section.loading, isFalse);
+      expect(section.loadingMore, isFalse);
+    }
+    expect(
+      oldOrigins.every(
+        (origin) =>
+            origin.resultDisposition!() ==
+            SourceTaskResultDisposition.superseded,
+      ),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
   });
 }

@@ -22,6 +22,15 @@ set(BRIDGE_SOURCES
 set(BRIDGE_NAME quickjs_c_bridge_plugin)
 
 add_library(${BRIDGE_NAME} SHARED ${BRIDGE_SOURCES} ${QJS_SOURCES})
+
+if(MSVC)
+  # Keep upstream QuickJS conversion/sign and void-return warnings out of logs.
+  # Apply only to the vendored C sources so bridge diagnostics stay enabled.
+  set_property(SOURCE ${QJS_SOURCES} APPEND PROPERTY COMPILE_OPTIONS
+    /wd4018 /wd4098 /wd4146 /wd4244 /wd4267 /wd4334
+  )
+endif()
+
 find_package(Threads REQUIRED)
 target_link_libraries(${BRIDGE_NAME} PRIVATE Threads::Threads)
 
