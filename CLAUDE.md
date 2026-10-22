@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+Toolchain: Flutter `>=3.47.0`, Dart `^3.11.1`, JDK 21.
+
 ```bash
+# Setup
+flutter pub get
+flutter gen-l10n
+
+# Build the native QuickJS library that tests load (needs cmake; output goes to
+# packages/quickjs_engine/native/build). Required before running test/services/source.
+dart run tool/build_quickjs_test_library.dart
+
 # Run on device/emulator
 flutter run
 
@@ -44,6 +54,10 @@ The source service is a decomposed subsystem under `lib/services/source/`, layer
 - **`HazukiSourceFacade`** ([source_runtime_facade.dart](lib/services/source/runtime/source_runtime_facade.dart)) — the per-source contract capabilities depend on (JS bridge, session, cache, debug log, http gateway).
 - **Capabilities** live under domain subdirs (`account/`, `comic/`, `comments/`, `favorites/`, `image/`, `debug/`, `content/`, `category/`, `runtime/`); state stores and shared helpers live in `runtime/` and `common/`.
 
+Source scripts are managed as installable plugins by `SourcePluginManager` ([lib/services/source/plugins/](lib/services/source/plugins/)), which fetches an index from a GitHub repo or HTTPS JSON URL and commits installs atomically. Plugin authoring docs live outside this repo at `D:\Project\HazukiSources\docs`.
+
+**Task control / cancellation.** Every source operation runs under an explicit `SourceOperationContext` via `SourceOperationRunner` ([runtime/](lib/services/source/runtime/)), registered in `SourceTaskRegistry` and bound to the QuickJS engine's `task_control`. UI pages own requests through `SourceTaskOwner` ([lib/shared/source_task_owner.dart](lib/shared/source_task_owner.dart)); leaving a page cancels its reads, while already-admitted non-interactive writes may finish (`retainAdmittedWork`) without regaining UI scope. Cancellation must be recognized before fallback, auth retry, or generic error wrapping. Stopping tasks on source disable/uninstall/update belongs to the catalog paths — do not add blanket stops to generic `remove` / `recreateSourceRuntime`. The ongoing staged rollout is documented in the root `QUICKJS_*.md` files (`QUICKJS_HANDOFF.md` is the entry point; read it before touching this area).
+
 The app-level **`SourceRuntimeCoordinator`** ([lib/app/source_runtime/source_runtime_coordinator.dart](lib/app/source_runtime/source_runtime_coordinator.dart)) is a separate UI orchestrator: bootstrap overlay, connectivity recovery, and source-update checks. Do not confuse it with the generic handle-lifecycle coordinator above.
 
 ### Dependency injection
@@ -74,6 +88,8 @@ The bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`) hosts features und
 | `downloads/` | Download queue/history |
 | `history/` | Read history |
 | `comments/` | Chapter comments |
+| `announcements/` | Remote announcements (`announcement.json`) |
+| `password_lock/` | App lock screen |
 
 `support/` holds controllers, async action flows, and utilities factored out of views (the reader feature alone has ~7 support controllers). Cross-feature helpers live in `lib/shared/` (e.g. `navigation_tags.dart`, `reading/`, `favorites/`, `source_account/`, `preferences/`); shared UI widgets live in `lib/widgets/`; shared models in `lib/models/`.
 
@@ -92,6 +108,8 @@ ARB files in `lib/l10n/`. Use `l10n(context)` from `lib/l10n/l10n.dart` to get `
 ### Tests
 
 Tests mirror the `lib/` structure under `test/`. Two patterns: **smoke tests** (instantiate controllers/pages to verify construction) and **controller unit tests** (drive state transitions directly on the `ChangeNotifier`). Use `mocktail` for fakes and `HazukiDatabase.memory()` for isolated storage.
+
+The full suite currently has one known baseline failure (a navigation-bar thickness assertion: expected 10, actual 72.0). Report it as a pre-existing failure; do not change the UI or loosen the assertion without approval.
 
 ## Conventions
 

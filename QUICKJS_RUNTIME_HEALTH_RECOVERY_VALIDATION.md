@@ -1,6 +1,6 @@
 # 第八批验收：运行时健康判定与单次自动恢复
 
-更新时间：2026-10-22。基线 `dev / f7181f4b`。范围依据 [第八批计划](QUICKJS_RUNTIME_HEALTH_RECOVERY_PLAN.md)。本批尚未提交。
+更新时间：2026-10-22。基线 `dev / f7181f4b`。范围依据 [第八批计划](QUICKJS_RUNTIME_HEALTH_RECOVERY_PLAN.md)。本批已提交为 `5cd27539`。
 
 ## 实现结论
 
@@ -82,7 +82,7 @@ flutter build apk --debug --no-pub
 
 ## 提交范围
 
-尚未提交。建议作为一个 Conventional Commit（如 `feat(source): detect runtime failures and recover once`），排除用户既有的 `CLAUDE.md`、`lib/features/search/view/search_bar_shell.dart`、`test/features/search/search_bar_shell_test.dart`。本批文件：
+已作为一个 Conventional Commit 提交：`5cd27539 feat(source): detect runtime failures and recover once`，共 30 个文件；排除用户既有的 `CLAUDE.md`、`lib/features/search/view/search_bar_shell.dart`、`test/features/search/search_bar_shell_test.dart` 及 `QUICKJS_HANDOFF.md`。下列为本批实施文件清单，其中交接文档按用户后续要求另行提交：
 
 ```text
 QUICKJS_RUNTIME_HEALTH_RECOVERY_PLAN.md
@@ -118,4 +118,4 @@ test/services/source/source_runtime_health_test.dart
 test/services/source/source_script_worker_failure_test.dart
 ```
 
-注意：`QUICKJS_HANDOFF.md` 在本批开始前已有未提交的交接更新，提交时一并纳入需用户确认。
+`QUICKJS_HANDOFF.md` 在本批开始前已有未提交的交接更新，未纳入 `5cd27539`；用户随后要求提交剩余改动，交接文档另行提交。

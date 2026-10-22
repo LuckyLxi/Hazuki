@@ -2,9 +2,80 @@
 
 更新时间：2026-10-22。项目：`D:\Project\Hazuki`，Windows / PowerShell。
 
+## 新对话接手入口（第八批，优先）
+
+第八批 **运行时健康判定与单次自动恢复** 已提交为 `5cd27539 feat(source): detect runtime failures and recover once`，实施前基线为 `dev / f7181f4b`。计划见 [第八批计划](QUICKJS_RUNTIME_HEALTH_RECOVERY_PLAN.md)，结果、场景映射、提交文件清单和第九批设备验收清单见 [第八批验收](QUICKJS_RUNTIME_HEALTH_RECOVERY_VALIDATION.md)。
+
+`CLAUDE.md`、搜索栏、阅读器章节面板、作者列表及本交接文档的既有修改未纳入第八批提交；用户随后要求提交剩余改动，按内容分别提交。
+
+提交前复验：格式 889 文件零变化、静态分析通过；第八批 72 项针对性回归通过，剩余 UI 改动及架构检查共 149 项通过。本次未重跑完整套件或平台构建，下方完整验收结果为第八批实施时记录。
+
+最新验证：格式 889 文件零变化、静态分析通过、1279 项针对性回归通过；完整覆盖率 **2111 项通过、1 项基线失败**（`home_bottom_navigation_test.dart`，期望 10、实际 72.0）；Windows debug 138.2 秒、Android debug 21.3 秒构建通过。**完整应用验收尚未全绿**；未做真机交互，未改原生包。
+
+第八批关键入口：
+
+- `lib/services/source/models/source_task.dart`：`SourceRuntimeFailed` / `SourceRuntimeFailureKind`。
+- `lib/services/source/runtime/source_script_engine.dart`、`source_script_worker.dart`：故障区分、`whenFailed`、`failed` 的 `kind`、中断后合并探针、release 中忽略的 `debugInjectFault`。
+- `lib/services/source/runtime/source_runtime_handle.dart`、`source_runtime_health.dart`、`source_runtime_loader.dart`、`source_runtime_assembly.dart`：发布后监听、单次额度、锁存与恢复调度。
+- `source_task_registry.dart`、`source_operation_runner.dart`、`interaction/source_ui_service.dart`：`runtimeFailed` 不映射为取消。
+
+第八批不要改回的边界：
+
+- 故障不是取消：`runtimeFailed` scope 原因不得转成 `requestStop`；故障先于插件请求重建、搜索自动重试、下载瞬态重试识别。`rethrowSourceOperationStop` 刻意未加入故障，以保留普通错误回退。
+- 故障监听必须与实例处于同一错误 zone（不要改用 `Zone.root`），否则 `whenClosed` 的错误会成为未捕获错误。
+- 恢复只在原 handle、经现有共享初始化进行；不调用 `recreateSourceRuntime`，不给 catalog/通用 `remove` 加全量停止；旧实例迟到故障按身份忽略。
+- 锁存只由状态卡重试、本地重新加载、手动下载解除；网络恢复是自动入口，不能绕过。
+- 探针不使用原生 task/work 总数比较（含主 isolate 预注册与内部 Promise work）。
+
+下一步：第九批按验收清单做设备验收与总收尾。
+
+## 第七批交接核对（历史）
+
+第七批已经提交，当前 HEAD 为 **`dev / f7181f4b feat(source): control cloud reading sessions and progress uploads`**，实施前基线是 `5265b54e`。不能因代码不在工作区 diff 中就判断第七批尚未实现；完整改动可用 `git show --stat f7181f4b` 或 `git diff 5265b54e f7181f4b -- lib test` 查看。第七批为一个提交，包含 39 个文件，没有创建 PR 或推送。
+
+本次交接重新核对了 git 状态、提交和验收记录，**只更新本交接文档，没有重新执行格式、静态分析、测试或构建**。下方测试数字均为第七批实现完成时的实际结果，不能算成本次复验。
+
+交接时须保留的未提交改动：
+
+```text
+CLAUDE.md
+lib/features/search/view/search_bar_shell.dart
+test/features/search/search_bar_shell_test.dart
+QUICKJS_HANDOFF.md                       # 本次交接更新
+```
+
+前三份是用户既有修改，未纳入第七批提交；不得覆盖、回退或顺带提交。本次文档更新也尚未另行提交。用户没有授权修改现有 UI 设计或动画，不得通过调整导航 UI 或放宽断言消除基线失败。
+
+建议新对话按以下顺序接手：
+
+1. 读 `AGENTS.md`、本节、第七批修订计划和验收记录，再核对 `git status --short`、`git log -3 --oneline`，识别用户是否有新的改动。
+2. 对照 `QUICKJS_CLOUD_READING_TASK_CONTROL_PLAN.md` 与 `QUICKJS_CLOUD_READING_TASK_CONTROL_VALIDATION.md` 核对已实现范围；验收记录的“重点场景与具体测试”表列出每项对应测试，末尾明确列出本批 39 个文件。
+3. 当前未完成范围是**运行时健康判定、自动恢复及最终设备验收**。下一批先结合 `QUICKJS_CANCELLATION_RECOVERY_PLAN.md` 核对代码，再形成可审阅计划；本次交接请求没有授权直接新增自动恢复或自动重放。
+4. 验证按改动影响范围选择针对性测试；必要时再执行完整覆盖率和顺序平台构建。若修改 `third_party/pub_overrides/quickjs_engine`，须补齐独立包构建、格式、分析和测试；第七批没有改原生包，也没有重跑独立包检查或真机交互验收。
+
+第七批关键代码入口：
+
+- `lib/services/source/content/source_cloud_reading.dart`：会话键、读取任务、共享历史、后台刷新及展示缓存降级。
+- `lib/services/source/content/source_cloud_reading_session.dart`：共享私有初始化、候选发布、实际私有 engine、暂存事务丢弃及可等待关闭。
+- `lib/services/source/content/source_reading_progress_uploads.dart`：同步接纳、深冻结、原 handle FIFO、执行预算、账号核验和租约释放。
+- `lib/services/source/runtime/source_runtime_host.dart`、`source_task_registry.dart`、`source_operation_context.dart`：三类租约、实际资源绑定、结构化停止与执行阶段超时。
+- `lib/services/source/runtime/source_runtime_load_control.dart`、`source_runtime_loader.dart`、`source_host_call_context.dart`、`source_js_bridge_cookie_capability.dart`：候选脚本身份、宿主写入前账号核验及资源收尾。
+- `lib/features/history/state/history_page_controller.dart`、`lib/features/comic_detail/support/comic_detail_session_controller.dart`、`comic_detail_actions_controller.dart`、`lib/features/reader/view/reader_page.dart`：页面读取寿命；最终进度 flush 仍由服务持有。
+
+不要改回的边界：
+
+- 上传必须在首个异步间隙前完成登录检查、冻结、实际 handle 捕获、租约和任务登记；**默认 30 秒仅从轮到执行开始计时**，排队仍可取消。不能把预算重新挂到已撤销的页面交互 scope，否则切源会误停已接纳上传。
+- FIFO 后继要等待前序屏障及当前项收尾；取消中间排队项不能让后项越过仍执行的前项。超时和普通失败都不重放，结构化停止不得吞掉。
+- `_ready()` 不为旧账号凭据临时生成登录标记，不因同键并发读取退役；真实登录事务保留其登录标记职责。
+- 云读取切源立即停止；阅读、下载及已接纳上传各有独立租约。正常取消不重建主 runtime，不直接关闭其他消费者仍使用的 engine/Dio；通用 `remove` / `recreateSourceRuntime` 不新增全量停止。
+- 详情进度监听的能力检查与单次进度加载使用不同取消分组；替换和销毁先隔离旧结果再取消。
+- 账号变更检查涵盖非活动来源及宿主提交前的通知空窗；旧 owner 不得影响替代实例。私有暂存永不提交主账号，已开始的权威写入等待收尾，不承诺回滚服务器结果。
+
+最新验证结论：格式 886 文件零变化、静态分析通过、1205 项针对性回归通过；完整覆盖率 **2090 项通过、1 项基线失败**。Windows debug 30.8 秒、Android debug 25.9 秒构建通过。唯一失败仍为 `test/features/home/home_bottom_navigation_test.dart:237`，厚度期望 10、实际 72.0，**完整应用验收尚未全绿**。完整命令、日志名称、产物和未验证边界见第七批验收记录。
+
 ## 第七批最新状态（优先）
 
-第七批 **云阅读私有会话与进度上传任务化** 按 Claude 修订版计划实施，基线为 `dev / 5265b54e`。第六批已提交为 `c97aad1f`，此前“尚未提交”的描述已更正。第七批最终结果和重点场景测试映射见 [第七批验收记录](QUICKJS_CLOUD_READING_TASK_CONTROL_VALIDATION.md)，范围依据见 [修订计划](QUICKJS_CLOUD_READING_TASK_CONTROL_PLAN.md)。
+第七批 **云阅读私有会话与进度上传任务化** 按 Claude 修订版计划实施，已提交为 `f7181f4b`，基线为 `dev / 5265b54e`。第六批已提交为 `c97aad1f`，此前“尚未提交”的描述已更正。第七批最终结果和重点场景测试映射见 [第七批验收记录](QUICKJS_CLOUD_READING_TASK_CONTROL_VALIDATION.md)，范围依据见 [修订计划](QUICKJS_CLOUD_READING_TASK_CONTROL_PLAN.md)。
 
 - 私有初始化和云历史按独立生产者/逐消费者共享，单个读取取消不关闭主 engine 或共享 Dio；私有实例关闭可等待。`_ready()` 只在 source、账号或实际主 handle 变化时退役；普通错误保留同会话历史缓存降级，结构化停止优先。
 - 历史页、详情进度、打开阅读器前的云位置和阅读器能力检查接入生命周期。详情监听与单次读取使用不同分组。切源立即停止云读取，私有暂存存储始终丢弃；云位置不写本地进度库或 WebDAV。

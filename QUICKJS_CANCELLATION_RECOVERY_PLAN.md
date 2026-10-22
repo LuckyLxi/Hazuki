@@ -1,6 +1,6 @@
 # 第三阶段实施方案：任务取消、精确中断与运行时恢复
 
-状态：原生取消、代理/宿主资源、搜索及第四批其他服务接线已实现；第五批已提交并接入图片共享订阅、阅读生命周期、封面及封面预取。生产 worker 显式启用控制，独立包默认仍关闭。第六批已提交为 `c97aad1f`，接入下载取消、运行租约、暂停/恢复、删除与文件收尾；第七批接入云阅读私有会话、共享历史、页面取消与上传服务租约/FIFO。第八批（未提交）实现健康判定与单次自动恢复，见 [第八批验收](QUICKJS_RUNTIME_HEALTH_RECOVERY_VALIDATION.md)；最终设备验收留第九批。最新结果及测试场景映射见 [第七批云阅读验收](QUICKJS_CLOUD_READING_TASK_CONTROL_VALIDATION.md)；第六批结果见 [第六批下载验收](QUICKJS_DOWNLOAD_TASK_CONTROL_VALIDATION.md)；第五批结果见 [第五批图片与阅读验收](QUICKJS_IMAGE_READER_TASK_CONTROL_VALIDATION.md)；历史结果见 [第四批服务接线](QUICKJS_SERVICE_TASK_CONTROL_VALIDATION.md)、[搜索接线](QUICKJS_SEARCH_TASK_CANCELLATION_VALIDATION.md)、[第一批](QUICKJS_TASK_CONTROL_VALIDATION.md) 和 [第二批](QUICKJS_HOST_TASK_CONTROL_VALIDATION.md)。
+状态：原生取消、代理/宿主资源、搜索及第四批其他服务接线已实现；第五批已提交并接入图片共享订阅、阅读生命周期、封面及封面预取。生产 worker 显式启用控制，独立包默认仍关闭。第六批已提交为 `c97aad1f`，接入下载取消、运行租约、暂停/恢复、删除与文件收尾；第七批接入云阅读私有会话、共享历史、页面取消与上传服务租约/FIFO。第八批已提交为 `5cd27539`，实现健康判定与单次自动恢复，见 [第八批验收](QUICKJS_RUNTIME_HEALTH_RECOVERY_VALIDATION.md)；最终设备验收留第九批。最新结果及测试场景映射见 [第七批云阅读验收](QUICKJS_CLOUD_READING_TASK_CONTROL_VALIDATION.md)；第六批结果见 [第六批下载验收](QUICKJS_DOWNLOAD_TASK_CONTROL_VALIDATION.md)；第五批结果见 [第五批图片与阅读验收](QUICKJS_IMAGE_READER_TASK_CONTROL_VALIDATION.md)；历史结果见 [第四批服务接线](QUICKJS_SERVICE_TASK_CONTROL_VALIDATION.md)、[搜索接线](QUICKJS_SEARCH_TASK_CANCELLATION_VALIDATION.md)、[第一批](QUICKJS_TASK_CONTROL_VALIDATION.md) 和 [第二批](QUICKJS_HOST_TASK_CONTROL_VALIDATION.md)。
 
 第三批历史验证（2026-10-21）：627 项针对性测试、1986 项完整覆盖率测试、格式检查及静态分析全部通过，随后完成 Windows 和 Android debug 构建。
 
