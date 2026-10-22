@@ -27,7 +27,7 @@ void main() {
           addTearDown(tester.view.reset);
           final image = (await tester.runAsync(
             () => File(
-              'assets/images/downloaded_cover_placeholder.png',
+              'assets/images/downloaded_cover_placeholder.webp',
             ).readAsBytes(),
           ))!;
           final host = await _mount(tester, locale: locale);
@@ -115,7 +115,7 @@ void main() {
       addTearDown(tester.view.reset);
       final image = (await tester.runAsync(
         () => File(
-          'assets/images/downloaded_cover_placeholder.png',
+          'assets/images/downloaded_cover_placeholder.webp',
         ).readAsBytes(),
       ))!;
       final host = await _mount(tester);
@@ -196,7 +196,7 @@ void main() {
   ) async {
     final image = (await tester.runAsync(
       () =>
-          File('assets/images/downloaded_cover_placeholder.png').readAsBytes(),
+          File('assets/images/downloaded_cover_placeholder.webp').readAsBytes(),
     ))!;
     final host = await _mount(tester);
     final token = SourceLoginCancellation();

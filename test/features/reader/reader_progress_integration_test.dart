@@ -87,7 +87,7 @@ void main() {
             for (var i = 0; i < 6; i++) {
               images.add(
                 (await File(
-                  'assets/images/downloaded_cover_placeholder.png',
+                  'assets/images/downloaded_cover_placeholder.webp',
                 ).copy('${directory.path}/$i.png')).path,
               );
             }

@@ -98,7 +98,7 @@ void main() {
     (tester) async {
       final bytes = (await tester.runAsync(
         () => File(
-          'assets/images/downloaded_cover_placeholder.png',
+          'assets/images/downloaded_cover_placeholder.webp',
         ).readAsBytes(),
       ))!;
       final original = await tester.runAsync(() async {

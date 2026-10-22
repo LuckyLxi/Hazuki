@@ -19,7 +19,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final bytes = (await tester.runAsync(
         () => File(
-          'assets/images/downloaded_cover_placeholder.png',
+          'assets/images/downloaded_cover_placeholder.webp',
         ).readAsBytes(),
       ))!;
       final key = GlobalKey<NavigatorState>();
