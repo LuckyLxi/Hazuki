@@ -137,8 +137,8 @@
   "otherAutoSoftwareUpdateTitle": "自动检查软件更新",
   "otherAutoSoftwareUpdateSubtitle": "每次启动软件时检查一次软件新版本",
   "otherAutoSoftwareUpdateUpdated": "已更新软件检查更新设置",
-  "otherDiscoverDailyRecommendationTitle": "发现页每日推荐",
-  "otherDiscoverDailyRecommendationSubtitle": "发现页将以轮播图形式随机推荐 7 部漫画",
+  "otherDiscoverDailyRecommendationTitle": "漫画推荐",
+  "otherDiscoverDailyRecommendationSubtitle": "发现页以轮播图形式展示漫画",
   "otherUseSystemTitleBarTitle": "使用系统标题栏",
   "otherUseSystemTitleBarSubtitle": "开启后恢复 Windows 原生标题栏，关闭时使用应用自定义标题栏",
   "otherMangaDownloadPathTitle": "漫画下载保存路径",
@@ -337,6 +337,7 @@
     }
   },
   "discoverEmpty": "当前漫画源暂无发现页内容",
+  "discoverDailyRecommendationEmpty": "暂无推荐",
   "discoverLoginRequired": "请先登录账号",
   "discoverMore": "查看更多",
   "aboutThirdPartyLicensesTitle": "第三方库许可",

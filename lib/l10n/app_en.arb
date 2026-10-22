@@ -137,8 +137,8 @@
   "otherAutoSoftwareUpdateTitle": "Auto-check app updates",
   "otherAutoSoftwareUpdateSubtitle": "Check for software updates once each time the app starts",
   "otherAutoSoftwareUpdateUpdated": "Software update check setting updated",
-  "otherDiscoverDailyRecommendationTitle": "Discover daily recommendations",
-  "otherDiscoverDailyRecommendationSubtitle": "Discover shows 7 randomly selected comics in a carousel.",
+  "otherDiscoverDailyRecommendationTitle": "Comic recommendations",
+  "otherDiscoverDailyRecommendationSubtitle": "Discover shows comics in a carousel.",
   "otherUseSystemTitleBarTitle": "Use system title bar",
   "otherUseSystemTitleBarSubtitle": "Use the native Windows title bar",
   "otherMangaDownloadPathTitle": "Manga download save path",
@@ -337,6 +337,7 @@
     }
   },
   "discoverEmpty": "No discover content is available for the current source",
+  "discoverDailyRecommendationEmpty": "No recommendations",
   "discoverLoginRequired": "Please sign in to your account first",
   "discoverMore": "See more",
   "aboutThirdPartyLicensesTitle": "Third-party licenses",

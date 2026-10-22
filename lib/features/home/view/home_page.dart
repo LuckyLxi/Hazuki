@@ -210,7 +210,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           currentIndex: _coordinator.currentIndex,
           discoverSearchMorphProgress: _coordinator.discoverSearchMorphProgress,
           usePinnedDiscoverSearch:
-              _coordinator.dailyRecommendationState.hasRecommendations,
+              _coordinator.dailyRecommendationState.enabled,
           downloadStatus: widget.services.downloadStatus,
           activeSourceKey: (_coordinator.sourceService.activeSourceKey ?? ''),
           supportsSourceAccount:

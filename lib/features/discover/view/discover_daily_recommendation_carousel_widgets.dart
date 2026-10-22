@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:flutter/material.dart';
 
@@ -139,6 +142,101 @@ class DiscoverDailyRecommendationCarouselCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 推荐数据就绪前的轮播占位：加载中显示闪烁骨架屏，无结果时显示“暂无推荐”。
+///
+/// 尺寸与真实轮播保持一致，数据到达后切换时不引起布局跳变。
+class DiscoverDailyRecommendationCarouselPlaceholder extends StatelessWidget {
+  const DiscoverDailyRecommendationCarouselPlaceholder({
+    super.key,
+    required this.loading,
+  });
+
+  static const _heroCardMaxWidth = 300.0;
+  static const _heroCardHeight = 213.0;
+  static const _itemSpacing = 8.0;
+  static const _radius = BorderRadius.all(Radius.circular(28));
+
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: _heroCardHeight,
+          child: loading
+              ? LayoutBuilder(
+                  builder: (context, constraints) {
+                    final heroCardWidth = math
+                        .min(
+                          _heroCardMaxWidth,
+                          math.max(constraints.maxWidth - 56, 220),
+                        )
+                        .toDouble();
+                    return ClipRect(
+                      child: OverflowBox(
+                        alignment: Alignment.centerLeft,
+                        maxWidth: double.infinity,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SizedBox(
+                              width: heroCardWidth,
+                              child: const ClipRRect(
+                                borderRadius: _radius,
+                                child: HazukiShimmerLoading(),
+                              ),
+                            ),
+                            const SizedBox(width: _itemSpacing),
+                            SizedBox(
+                              width: heroCardWidth,
+                              child: const ClipRRect(
+                                borderRadius: _radius,
+                                child: HazukiShimmerLoading(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                )
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: _radius,
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.auto_awesome_outlined,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n(context).discoverDailyRecommendationEmpty,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+        const SizedBox(height: 12),
+        // 与指示器同高，保持整体高度一致
+        const SizedBox(height: 8),
+      ],
     );
   }
 }

@@ -16,6 +16,7 @@ import 'package:hazuki/shared/liquid_glass_support.dart';
 import '../state/discover_page_controller.dart';
 import 'discover_announcement_card.dart';
 import 'discover_daily_recommendation_carousel.dart';
+import 'discover_daily_recommendation_carousel_widgets.dart';
 import 'discover_page_body.dart';
 import 'discover_page_sections.dart';
 import 'discover_section_page_widgets.dart';
@@ -232,9 +233,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
     }
   }
 
+  // 开启推荐即占住轮播区域，数据未就绪时由占位组件填充
   bool get _showRecommendationCarousel =>
-      widget.usePinnedSearchInAppBar &&
-      widget.dailyRecommendationState.displayedRecommendations.isNotEmpty;
+      widget.usePinnedSearchInAppBar && widget.dailyRecommendationState.enabled;
 
   int get _headerItemCount =>
       (widget.usePinnedSearchInAppBar ? 0 : 1) +
@@ -242,22 +243,32 @@ class _DiscoverPageState extends State<DiscoverPage> {
       (widget.announcementService == null ? 0 : 1);
 
   Widget _buildDailyRecommendationCarousel() {
+    final state = widget.dailyRecommendationState;
     return AnimatedPadding(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(
         bottom: widget.announcementService?.latestDiscoverCard == null ? 20 : 8,
       ),
-      child: DiscoverDailyRecommendationCarousel(
-        displayedRecommendations:
-            widget.dailyRecommendationState.displayedRecommendations,
-        pendingRecommendations:
-            widget.dailyRecommendationState.pendingRecommendations,
-        isPendingReady: widget.dailyRecommendationState.isPendingReady,
-        comicDetailPageBuilder: widget.comicDetailPageBuilder,
-        comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-        sourceService: widget.recommendationSource,
-        recommendationService: widget.recommendationService,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: state.displayedRecommendations.isEmpty
+            ? DiscoverDailyRecommendationCarouselPlaceholder(
+                key: ValueKey(
+                  'discover_daily_recommendation_placeholder_${state.isLoading}',
+                ),
+                loading: state.isLoading,
+              )
+            : DiscoverDailyRecommendationCarousel(
+                key: const ValueKey('discover_daily_recommendation_carousel'),
+                displayedRecommendations: state.displayedRecommendations,
+                pendingRecommendations: state.pendingRecommendations,
+                isPendingReady: state.isPendingReady,
+                comicDetailPageBuilder: widget.comicDetailPageBuilder,
+                comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+                sourceService: widget.recommendationSource,
+                recommendationService: widget.recommendationService,
+              ),
       ),
     );
   }

@@ -92,7 +92,12 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       _setState(const DiscoverDailyRecommendationState.disabled());
       return;
     }
-    _setState(_state.copyWith(enabled: true));
+    _setState(
+      _state.copyWith(
+        enabled: true,
+        isLoading: _state.displayedRecommendations.isEmpty,
+      ),
+    );
   }
 
   Future<bool> loadEnabled() async {
@@ -114,7 +119,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     if (_stateSourceKey != sourceKey) {
       _stateSourceRevision = _source.sourceRevision;
       _stateSourceKey = sourceKey;
-      _setState(const DiscoverDailyRecommendationState.disabled());
+      _setState(const DiscoverDailyRecommendationState.loading());
     }
 
     if (_state.isPendingReady && _state.hasPendingRecommendations) {
@@ -128,6 +133,11 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         unawaited(_refreshPendingRecommendations());
       }
       return _state;
+    }
+
+    // 首批推荐就绪前先进入加载态，让发现页立即展示骨架屏
+    if (!_state.enabled || !_state.isLoading) {
+      _setState(const DiscoverDailyRecommendationState.loading());
     }
 
     final cached = await _cacheStore.readSnapshot(activeSourceKey: sourceKey);
@@ -146,7 +156,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     }
 
     if (!_source.isInitialized) {
-      _setState(const DiscoverDailyRecommendationState(enabled: true));
+      // 源初始化完成后会再次触发准备流程，期间保持加载态
       return _state;
     }
 
@@ -196,6 +206,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       pendingGeneratedAt: next.pendingGeneratedAt,
       isRefreshing: next.isRefreshing,
       isPendingReady: next.isPendingReady,
+      isLoading: next.isLoading,
     );
     notifyListeners();
   }
@@ -358,12 +369,18 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     if (sourceKey != _stateSourceKey ||
         configurationKey != _stateConfigurationKey ||
         _stateSourceRevision != _source.sourceRevision) {
+      final wasEnabled = _state.enabled;
       _tasks.restart();
       _generation++;
       _stateSourceKey = sourceKey;
       _stateConfigurationKey = configurationKey;
       _refreshInFlight = null;
-      _setState(const DiscoverDailyRecommendationState.disabled());
+      // 已开启时直接切到加载态，避免轮播区域在重新准备期间先收起再出现
+      _setState(
+        wasEnabled
+            ? const DiscoverDailyRecommendationState.loading()
+            : const DiscoverDailyRecommendationState.disabled(),
+      );
     }
     if (!_supportsActiveSource) {
       _setState(const DiscoverDailyRecommendationState.disabled());

@@ -128,10 +128,17 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   Future<void> loadOtherSettings(BuildContext context) async {
-    await _profileController.loadOtherSettings(context);
+    // 推荐准备与个人设置读取互不依赖，并行执行以便轮播区域尽早出现
+    await Future.wait<void>([
+      _profileController.loadOtherSettings(context),
+      _prepareDailyRecommendation(),
+    ]);
+    _relayChange();
+  }
+
+  Future<void> _prepareDailyRecommendation() async {
     final enabled = await _dailyRecommendationService.loadEnabled();
     await _dailyRecommendationService.ensurePrepared(enabled: enabled);
-    _relayChange();
   }
 
   Future<void> performCheckIn(
