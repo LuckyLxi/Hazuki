@@ -424,16 +424,8 @@ class _HazukiAppState extends State<HazukiApp>
                                 ),
                               ),
                             ),
-                            ListenableBuilder(
-                              listenable: sl<PasswordLockService>(),
-                              builder: (context, _) {
-                                if (!sl<PasswordLockService>().shouldBlockApp) {
-                                  return const SizedBox.shrink();
-                                }
-                                return PasswordLockGateOverlay(
-                                  controller: sl<PasswordLockService>(),
-                                );
-                              },
+                            PasswordLockGateHost(
+                              controller: sl<PasswordLockService>(),
                             ),
                           ],
                         ),

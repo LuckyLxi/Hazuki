@@ -133,7 +133,6 @@ flutter:
     - assets/hazuki_plugin_sdk.js
     - assets/data/authors.txt
     - assets/data/opencc/
-    - assets/animations/
     - assets/images/
     - assets/stickers/loading/
 

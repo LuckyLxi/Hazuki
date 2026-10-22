@@ -39,7 +39,6 @@ class SearchResultsAppBar extends StatelessWidget
   Widget build(BuildContext context) {
     return hazukiFrostedAppBar(
       context: context,
-      enableBlur: false,
       title: title,
       actions: [
         if (showOrderControl)

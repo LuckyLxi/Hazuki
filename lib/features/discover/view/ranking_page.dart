@@ -678,7 +678,6 @@ class _RankingPageState extends State<RankingPage> {
       child: Scaffold(
         appBar: hazukiFrostedAppBar(
           context: context,
-          enableBlur: false,
           title: Text(strings.rankingTitle),
           actions: [
             IconButton(

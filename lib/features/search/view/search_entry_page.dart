@@ -496,7 +496,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                       forceFocusedAppearance: _forceInitialFocusedAppearance,
                     ),
                   ),
-                  enableBlur: false,
                   actions: [
                     IconButton(
                       key: const ValueKey('search-settings-button'),

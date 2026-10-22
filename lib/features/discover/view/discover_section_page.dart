@@ -145,7 +145,6 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
         appBar: hazukiFrostedAppBar(
           context: context,
           title: Text(widget.section.title),
-          enableBlur: false,
           backgroundAlpha: 1,
         ),
         body: ListenableBuilder(

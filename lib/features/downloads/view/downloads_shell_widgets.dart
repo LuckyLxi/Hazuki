@@ -40,7 +40,6 @@ class DownloadsPageAppBar extends StatelessWidget
   Widget build(BuildContext context) {
     return hazukiFrostedAppBar(
       context: context,
-      enableBlur: false,
       title: _DownloadsAnimatedAppBarTitle(
         selectionMode: selectionMode,
         selectedCount: selectedCount,

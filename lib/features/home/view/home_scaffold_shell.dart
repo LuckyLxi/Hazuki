@@ -557,7 +557,6 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                             ),
                       titleSpacing: Platform.isWindows ? null : 4,
                       centerTitle: Platform.isWindows,
-                      enableBlur: currentIndex != 0 && currentIndex != 1,
                       actions: [
                         HomeAppBarActions(
                           currentIndex: currentIndex,
