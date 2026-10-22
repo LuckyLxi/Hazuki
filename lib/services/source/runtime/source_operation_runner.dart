@@ -59,7 +59,8 @@ Future<T> runSourceOperation<T>(
         task,
         resource: handle,
         serviceOwned: serviceOwned,
-        retainAdmittedWork: retainOnSourceChange,
+        retainAdmittedWork:
+            retainOnSourceChange || origin?.downloadSession != null,
         canCache: () =>
             host.isCurrentHandle(handle) &&
             handle.session.loginIdentity == identity,

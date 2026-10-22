@@ -1,12 +1,14 @@
 # 第三阶段实施方案：任务取消、精确中断与运行时恢复
 
-状态：原生取消、代理/宿主资源、搜索及第四批其他服务接线已实现；第五批在当前工作区接入图片共享订阅、阅读生命周期、封面及封面预取。生产 worker 显式启用控制，独立包默认仍关闭。下载暂停/删除、云阅读私有会话任务化、健康判定和自动恢复仍未实施。最新结果见 [第五批图片与阅读验收](QUICKJS_IMAGE_READER_TASK_CONTROL_VALIDATION.md)；历史结果见 [第四批服务接线](QUICKJS_SERVICE_TASK_CONTROL_VALIDATION.md)、[搜索接线](QUICKJS_SEARCH_TASK_CANCELLATION_VALIDATION.md)、[第一批](QUICKJS_TASK_CONTROL_VALIDATION.md) 和 [第二批](QUICKJS_HOST_TASK_CONTROL_VALIDATION.md)。
+状态：原生取消、代理/宿主资源、搜索及第四批其他服务接线已实现；第五批已提交并接入图片共享订阅、阅读生命周期、封面及封面预取。生产 worker 显式启用控制，独立包默认仍关闭。第六批在当前工作区接入下载取消、运行租约、暂停/恢复、删除与文件收尾；云阅读私有会话任务化、健康判定和自动恢复仍未实施。最新结果见 [第六批下载验收](QUICKJS_DOWNLOAD_TASK_CONTROL_VALIDATION.md)；第五批结果见 [第五批图片与阅读验收](QUICKJS_IMAGE_READER_TASK_CONTROL_VALIDATION.md)；历史结果见 [第四批服务接线](QUICKJS_SERVICE_TASK_CONTROL_VALIDATION.md)、[搜索接线](QUICKJS_SEARCH_TASK_CANCELLATION_VALIDATION.md)、[第一批](QUICKJS_TASK_CONTROL_VALIDATION.md) 和 [第二批](QUICKJS_HOST_TASK_CONTROL_VALIDATION.md)。
 
 第三批历史验证（2026-10-21）：627 项针对性测试、1986 项完整覆盖率测试、格式检查及静态分析全部通过，随后完成 Windows 和 Android debug 构建。
 
 第四批历史验证（2026-10-22）：1066 项针对性回归、875 文件格式检查、静态分析及 Windows/Android debug 构建通过；完整覆盖率为 **2008 项通过、1 项失败**，失败为基线 `4ba4a7aa` 导航玻璃厚度断言不一致。详细结果见对应验收记录，不能用历史完整通过结果掩盖当前失败。未做真机交互、其他平台或独立包重新检查。
 
 第五批验证（2026-10-22）：878 文件格式检查、静态分析及 **1327 项针对性回归通过**；最终完整覆盖率为 **2041 项通过、1 项基线失败**；Windows/Android debug 构建通过。详细结果见第五批验收记录。导航基线断言按用户选择保留，不修改 UI 或断言制造全绿，完整应用验收尚未全部通过。
+
+第六批验证（2026-10-22）：880 文件格式检查、静态分析及 **1250 项针对性回归通过**；完整覆盖率为 **2064 项通过、1 项既有导航基线失败**；Windows debug（21.1 秒）与 Android debug（35.9 秒）构建通过。代码仍在工作区，未创建提交或 PR。完整应用验收尚未全绿，详细记录见第六批验收文档。
 
 ## 1. 目标、约束与现状
 
@@ -16,11 +18,11 @@
 
 当前可复用的基础（其余章节保留整体目标，不能视为所有业务均已实施）：
 
-- `SourceTaskRegistry` 已由宿主持有；搜索、第四批服务及第五批阅读/图片具有取消/超时终态、实际 handle/engine 绑定及资源收尾回执。页面读取、阅读租约与服务写入分开归属，Dart 已开始的提交计入收尾；下载完整生命周期仍待迁移。
+- `SourceTaskRegistry` 已由宿主持有；搜索、第四批服务及第五批阅读/图片具有取消/超时终态、实际 handle/engine 绑定及资源收尾回执。页面读取、阅读租约与服务写入分开归属，Dart 已开始的提交计入收尾；下载完整生命周期已在第六批工作区接入。
 - `SourceScriptEngine` 的命令有调用 ID、运行时 ID 和执行身份；原生 Promise reaction、job 和远程回调已保留注册上下文。
 - 插件 HTTP 已贯通 `CancelToken`，网络重试及搜索 450 ms 等待可取消；搜索替换/退出已实测停止目标 HTTP 和 Timer。
 - worker 的 Timer、宿主 Future、远程句柄按 work/task 清理，普通作业故障按实际 token 隔离，正常取消不关闭整个同源运行时。
-- 图片缓存按实际 handle 内的 source/URL 合并共享生产者，逐消费者订阅，最后消费者退出停止调度/脚本/GET。阅读与封面已接入释放；未迁移下载调用保留独立订阅，下载暂停仍主要靠 IO 前后状态检查。
+- 图片缓存按实际 handle 内的 source/URL 合并共享生产者，逐消费者订阅，最后消费者退出停止调度/脚本/GET。阅读与封面已接入释放；无 origin 的调用仍保留独立订阅；第六批下载使用逐运行订阅、可取消源任务和文件提交屏障。
 
 ## 2. 对外语义与接口
 

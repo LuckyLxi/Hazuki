@@ -61,7 +61,7 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
 
     cancellation?.addListener(stopped);
     stopped();
-    final session = task._origin.readerSession;
+    final session = task._origin.readerSession ?? task._origin.downloadSession;
     void sessionStopped() {
       if (session?.cancellation.reason case final reason?) {
         task._requestStop(reason);
@@ -328,6 +328,7 @@ class SourceTask {
   bool _serviceOwned = false;
   bool get survivesSourceChange =>
       _origin.readerSession != null ||
+      _origin.downloadSession != null ||
       _origin.retainOnSourceChange ||
       _survivesSourceChange;
   bool _survivesSourceChange = false;
@@ -349,6 +350,7 @@ class SourceTask {
   }) {
     checkActive();
     _checkResourceActive(resource);
+    _origin.downloadSession?.checkResource(resource);
     _resource = resource;
     _serviceOwned = serviceOwned;
     _survivesSourceChange = survivesSourceChange;

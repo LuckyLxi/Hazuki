@@ -31,6 +31,7 @@ enum SourceTaskStopReason {
   deadlineExceeded,
   executionTimeout,
   runtimeClosed,
+  downloadPaused,
 }
 
 class SourceTaskCancelled implements Exception {
@@ -78,6 +79,7 @@ class SourceTaskOrigin {
     this.cancellation,
     this.workTimeout,
     this.readerSession,
+    this.downloadSession,
     this.retainOnSourceChange = false,
   });
 
@@ -93,6 +95,7 @@ class SourceTaskOrigin {
   final SourceTaskCancellation? cancellation;
   final Duration? workTimeout;
   final SourceReaderSession? readerSession;
+  final SourceDownloadSession? downloadSession;
   final bool retainOnSourceChange;
 
   /// Observes result usefulness without changing execution or cancellation.
@@ -122,6 +125,23 @@ class SourceReaderSession {
     _released = true;
     cancellation.cancel(reason);
     _release();
+  }
+}
+
+/// Host-only download lease; independent of the page that enqueued it.
+class SourceDownloadSession extends SourceReaderSession {
+  SourceDownloadSession(
+    super.sourceKey,
+    super.release, {
+    Object? Function()? resource,
+  }) : _resource = resource;
+  final Object? Function()? _resource;
+
+  void checkResource(Object resource) {
+    checkActive();
+    if (_resource != null && !identical(_resource(), resource)) {
+      throw SourceTaskCancelled(id, SourceTaskStopReason.runtimeClosed);
+    }
   }
 }
 

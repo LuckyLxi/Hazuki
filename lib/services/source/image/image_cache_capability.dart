@@ -150,7 +150,7 @@ class ImageCacheCapability {
     SourceTaskOrigin? taskOrigin,
   }) async {
     final resolvedSourceKey = _resolveSourceKeyForRequest(sourceKey);
-    final session = taskOrigin?.readerSession;
+    final session = taskOrigin?.readerSession ?? taskOrigin?.downloadSession;
     session?.checkActive();
     if (session != null && session.sourceKey != resolvedSourceKey) {
       throw StateError('source_reader_session_mismatch');

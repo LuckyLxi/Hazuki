@@ -305,6 +305,11 @@ abstract interface class SourceReaderSessionGateway {
   SourceReaderSession acquireReaderSession(String sourceKey);
 }
 
+/// Optional download lifetime extension; offline/fake readers need no lease.
+abstract interface class SourceDownloadSessionGateway {
+  SourceDownloadSession acquireDownloadSession(String sourceKey);
+}
+
 /// Optional reader extension; old gateway implementations remain valid.
 abstract interface class SourceReadingProgressGateway {
   Future<void> reportReadingProgress(

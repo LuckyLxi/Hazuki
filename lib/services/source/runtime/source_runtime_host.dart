@@ -40,7 +40,8 @@ class SourceRuntimeHost extends ChangeNotifier {
       createHandle: _createHandle,
       onActiveSourceChanged: _notifyChanged,
       retainOnSourceChange: (key) =>
-          _readerSessions.any((session) => session.sourceKey == key),
+          _readerSessions.any((session) => session.sourceKey == key) ||
+          _downloadSessions.keys.any((session) => session.sourceKey == key),
     );
     runtimeRegistry = SourceRuntimeRegistry(
       allowedSources: _catalog,
@@ -68,6 +69,54 @@ class SourceRuntimeHost extends ChangeNotifier {
   final String serviceTaskOwnerId = createSourceTaskId();
   final Set<SourceReaderSession> _readerSessions = {};
 
+  final Map<SourceDownloadSession, SourceRuntimeHandle> _downloadSessions = {};
+
+  SourceDownloadSession acquireDownloadSession(String sourceKey) {
+    if (sourceKey.trim().isNotEmpty &&
+        !_catalog.any((entry) => entry.normalizedKey == sourceKey.trim())) {
+      throw SourceTaskCancelled(
+        createSourceTaskId(),
+        SourceTaskStopReason.pluginDisabled,
+      );
+    }
+    final key = normalize(sourceKey);
+    final handle = handleFor(key);
+    tasks.checkResourceActive(handle);
+    late final SourceDownloadSession session;
+    session = SourceDownloadSession(key, () {
+      final held = _downloadSessions.remove(session);
+      if (held != null &&
+          isCurrentHandle(held) &&
+          key != activeSourceKey &&
+          !_readerSessions.any((entry) => entry.sourceKey == key) &&
+          !_downloadSessions.keys.any((entry) => entry.sourceKey == key) &&
+          session.cancellation.reason != SourceTaskStopReason.pluginDisabled &&
+          session.cancellation.reason != SourceTaskStopReason.pluginUpdated &&
+          session.cancellation.reason != SourceTaskStopReason.runtimeClosed) {
+        _coordinator.remove(key);
+      }
+    }, resource: () => _downloadSessions[session]);
+    _downloadSessions[session] = handle;
+    return session;
+  }
+
+  /// Only the existing, explicit chapter recovery path may transfer a lease.
+  void transferDownloadSession(
+    SourceTaskOrigin? origin,
+    SourceRuntimeHandle previous,
+    SourceRuntimeHandle replacement,
+  ) {
+    final session = origin?.downloadSession;
+    if (session == null) return;
+    session.checkActive();
+    if (!identical(_downloadSessions[session], previous) ||
+        !isCurrentHandle(replacement)) {
+      throw StateError('source_download_session_mismatch');
+    }
+    tasks.checkResourceActive(replacement);
+    _downloadSessions[session] = replacement;
+  }
+
   SourceReaderSession acquireReaderSession(String sourceKey) {
     final key = normalize(sourceKey);
     tasks.checkResourceActive(handleFor(key));
@@ -81,7 +130,8 @@ class SourceRuntimeHost extends ChangeNotifier {
           reason == SourceTaskStopReason.runtimeClosed;
       if (!retiring &&
           key != activeSourceKey &&
-          !_readerSessions.any((entry) => entry.sourceKey == key)) {
+          !_readerSessions.any((entry) => entry.sourceKey == key) &&
+          !_downloadSessions.keys.any((entry) => entry.sourceKey == key)) {
         _coordinator.remove(key);
       }
     });
@@ -90,6 +140,15 @@ class SourceRuntimeHost extends ChangeNotifier {
   }
 
   void checkReaderSession(String key, SourceTaskOrigin? origin) {
+    final download = origin?.downloadSession;
+    if (download != null) {
+      download.checkActive();
+      final held = _downloadSessions[download];
+      if (download.sourceKey != key || held == null || !isCurrentHandle(held)) {
+        throw StateError('source_download_session_mismatch');
+      }
+      tasks.checkResourceActive(held);
+    }
     final session = origin?.readerSession;
     if (session == null) return;
     session.checkActive();
@@ -227,6 +286,9 @@ class SourceRuntimeHost extends ChangeNotifier {
             for (final session in _readerSessions.toList()) {
               if (session.sourceKey == handle.sourceKey) session.close(reason);
             }
+            for (final entry in _downloadSessions.entries.toList()) {
+              if (identical(entry.value, handle)) entry.key.close(reason);
+            }
             await stopped;
           }
         }
@@ -292,6 +354,9 @@ class SourceRuntimeHost extends ChangeNotifier {
   @override
   void dispose() {
     for (final session in _readerSessions.toList()) {
+      session.close(SourceTaskStopReason.runtimeClosed);
+    }
+    for (final session in _downloadSessions.keys.toList()) {
       session.close(SourceTaskStopReason.runtimeClosed);
     }
     tasks.dispose();

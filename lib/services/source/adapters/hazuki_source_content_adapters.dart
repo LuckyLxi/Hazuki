@@ -596,7 +596,8 @@ class HazukiSourceReaderAdapter
     implements
         SourceReaderGateway,
         SourceReadingProgressGateway,
-        SourceReaderSessionGateway {
+        SourceReaderSessionGateway,
+        SourceDownloadSessionGateway {
   @override
   Object get cloudReadingDelegate => _content;
   HazukiSourceReaderAdapter({
@@ -612,6 +613,10 @@ class HazukiSourceReaderAdapter
   @override
   SourceReaderSession acquireReaderSession(String sourceKey) =>
       _imagePreparation.acquireReaderSession(sourceKey);
+
+  @override
+  SourceDownloadSession acquireDownloadSession(String sourceKey) =>
+      _imagePreparation.acquireDownloadSession(sourceKey);
 
   final SourceContentOperations _content;
   final SourceImagePreparationCapability _imagePreparation;

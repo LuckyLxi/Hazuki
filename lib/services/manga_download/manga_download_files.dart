@@ -3,6 +3,7 @@ import 'dart:io';
 
 import '../source/source_capabilities.dart';
 import 'manga_download_models.dart';
+import 'manga_download_run.dart';
 import 'manga_download_recovery_disk_support.dart';
 import 'manga_download_storage_support.dart';
 
@@ -11,12 +12,15 @@ class MangaDownloadFiles {
   MangaDownloadFiles({
     required SourceReaderGateway? sourceReader,
     required MangaDownloadLogCallback logScan,
+    Future<void> Function(File temporary)? beforePublish,
   }) : _sourceReader = sourceReader,
+       _beforePublish = beforePublish,
        _disk = MangaDownloadRecoveryDiskSupport(logScan: logScan);
 
   static const _metadataFileName = 'comic.json';
   static const _legacyMetadataFileName = 'metadata.json';
   final SourceReaderGateway? _sourceReader;
+  final Future<void> Function(File)? _beforePublish;
   final MangaDownloadRecoveryDiskSupport _disk;
 
   Future<Directory> ensureComicDirectory(
@@ -40,11 +44,16 @@ class MangaDownloadFiles {
   Future<String> writeChapterImage(
     Directory chapterDir,
     int imageIndex,
-    PreparedChapterImageData image,
-  ) async {
+    PreparedChapterImageData image, {
+    MangaDownloadRun? run,
+  }) async {
     final name = '${imageIndex.toString().padLeft(4, '0')}.${image.extension}';
     final file = File('${chapterDir.path}/$name');
-    await file.writeAsBytes(image.bytes, flush: true);
+    await _publish(
+      file,
+      (temporary) => temporary.writeAsBytes(image.bytes, flush: true),
+      run: run,
+    );
     return file.path;
   }
 
@@ -68,7 +77,10 @@ class MangaDownloadFiles {
         if (entity is! File) {
           continue;
         }
-        if (_entityBaseName(entity).startsWith(prefix)) {
+        final name = _entityBaseName(entity);
+        if (name.startsWith(prefix) &&
+            !name.endsWith('.part') &&
+            !name.endsWith('.tmp')) {
           return entity.path;
         }
       }
@@ -79,12 +91,15 @@ class MangaDownloadFiles {
   Future<String?> downloadCoverIfNeeded({
     required MangaDownloadTask task,
     required Directory comicDir,
+    MangaDownloadRun? run,
   }) async {
+    run?.checkActive();
     final normalized = task.coverUrl.trim();
     if (normalized.isEmpty) {
       return null;
     }
     final existing = await _disk.findLocalCoverFile(comicDir);
+    run?.checkActive();
     if (existing != null) {
       return existing.path;
     }
@@ -97,26 +112,80 @@ class MangaDownloadFiles {
       final bytes = await sourceReader.downloadImageBytes(
         normalized,
         keepInMemory: false,
-        sourceKey: task.sourceKey,
+        sourceKey: run?.session?.sourceKey ?? task.sourceKey,
+        taskOrigin: run?.origin,
       );
-      await target.writeAsBytes(bytes, flush: true);
+      run?.checkActive();
+      Future<void> write() => _publish(
+        target,
+        (temporary) => temporary.writeAsBytes(bytes, flush: true),
+        run: run,
+      );
+      if (run == null) {
+        await write();
+      } else {
+        await run.commit(write);
+      }
       return target.path;
-    } catch (_) {
+    } catch (error) {
+      if (error is SourceTaskCancelled) rethrow;
+      run?.checkActive();
       return null;
     }
   }
 
+  final Map<String, Future<void>> _metadataWrites = {};
+
   Future<void> writeMetadataFile(
     Directory comicDir,
-    DownloadedMangaComic comic,
-  ) async {
-    final file = File('${comicDir.path}/$_metadataFileName');
-    await file.writeAsString(jsonEncode(comic.toJson()), flush: true);
-    final legacy = File('${comicDir.path}/$_legacyMetadataFileName');
-    if (await legacy.exists()) {
-      try {
+    DownloadedMangaComic comic, {
+    MangaDownloadRun? run,
+  }) {
+    final key = comicDir.absolute.path;
+    final previous = _metadataWrites[key] ?? Future<void>.value();
+    final result = previous.then((_) async {
+      run?.checkActive();
+      final file = File('${comicDir.path}/$_metadataFileName');
+      await _publish(
+        file,
+        (temporary) =>
+            temporary.writeAsString(jsonEncode(comic.toJson()), flush: true),
+        run: run,
+      );
+      run?.checkActive();
+      final legacy = File('${comicDir.path}/$_legacyMetadataFileName');
+      if (await legacy.exists()) {
+        run?.checkActive();
         await legacy.delete();
-      } catch (_) {}
+      }
+    });
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _metadataWrites[key] = tail;
+    tail.whenComplete(() {
+      if (identical(_metadataWrites[key], tail)) _metadataWrites.remove(key);
+    });
+    return result;
+  }
+
+  Future<void> _publish(
+    File target,
+    Future<File> Function(File) write, {
+    MangaDownloadRun? run,
+  }) async {
+    run?.checkActive();
+    final temporary = File(
+      '${target.parent.path}/.hazuki-${createSourceTaskId()}.part',
+    );
+    try {
+      await write(temporary);
+      await _beforePublish?.call(temporary);
+      run?.checkActive();
+      await temporary.rename(target.path);
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
     }
   }
 

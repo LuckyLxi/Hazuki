@@ -221,9 +221,16 @@ class OtherSettingsActions {
     }
 
     final normalized = MangaDownloadAccess.normalizeDownloadsRootPath(result);
-    await MangaDownloadAccess.saveDownloadsRootPath(normalized);
-    await MangaDownloadAccess.ensureNoMediaMarkerForPath(normalized);
-    await downloadService.handleRootPathChanged();
+    try {
+      await downloadService.changeDownloadsRootPath(normalized);
+    } catch (error) {
+      if (!context.mounted) return null;
+      await showHazukiPrompt(
+        context,
+        strings.otherMangaDownloadPathPickFailed(error.toString()),
+      );
+      return null;
+    }
     if (!context.mounted) {
       return null;
     }

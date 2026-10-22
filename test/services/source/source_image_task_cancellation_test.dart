@@ -114,6 +114,136 @@ void main() {
   });
 
   test(
+    'reader and download leases independently retain an idle source',
+    () async {
+      final old = host.activeHandle;
+      final reader = host.acquireReaderSession('one');
+      final download = host.acquireDownloadSession('one');
+      await host.activateSource('two');
+      reader.close();
+      expect(host.handleFor('one'), same(old));
+      final pending = old.imageCache.downloadImageBytes(
+        'https://fixture.test/leasedDownload',
+        useDiskCache: false,
+        taskOrigin: SourceTaskOrigin(
+          ownerId: 'download',
+          groupId: 'run',
+          requestSequence: 1,
+          downloadSession: download,
+        ),
+      );
+      await _until(() => http.pending.containsKey('leasedDownload'));
+      http.complete('leasedDownload');
+      expect(await pending, [1, 2, 3]);
+      download.close();
+      await old.whenDisposed;
+      expect(host.existingHandles.map((entry) => entry.sourceKey), ['two']);
+    },
+  );
+
+  test('paused download releases only its own shared HTTP consumer', () async {
+    final handle = host.activeHandle;
+    final session = host.acquireDownloadSession('one');
+    final signal = SourceTaskCancellation();
+    final download = handle.imageCache.downloadImageBytes(
+      'https://fixture.test/downloadShared',
+      useDiskCache: false,
+      taskOrigin: SourceTaskOrigin(
+        ownerId: 'download',
+        groupId: 'run',
+        requestSequence: 1,
+        cancellation: signal,
+        downloadSession: session,
+      ),
+    );
+    final stopped = expectLater(download, throwsA(isA<SourceTaskCancelled>()));
+    await _until(() => http.pending.containsKey('downloadShared'));
+    final reading = handle.imageCache.downloadImageBytes(
+      'https://fixture.test/downloadShared',
+      useDiskCache: false,
+      taskOrigin: origin('reading'),
+    );
+    await _until(
+      () =>
+          handle
+              .cache
+              .imageDownloadInFlight
+              .values
+              .single
+              .consumerMetadata
+              .length ==
+          2,
+    );
+    signal.cancel(SourceTaskStopReason.downloadPaused);
+    final receipt = await host.tasks.cancelGroup(
+      ownerId: 'download',
+      groupId: 'run',
+      reason: SourceTaskStopReason.downloadPaused,
+    );
+    await stopped;
+    await receipt.whenSettled;
+    expect(http.aborted, isEmpty);
+    http.complete('downloadShared');
+    expect(await reading, [1, 2, 3]);
+    session.close();
+  });
+
+  test(
+    'catalog replacement revokes download lease before admitting new instance',
+    () async {
+      final old = host.activeHandle;
+      final session = host.acquireDownloadSession('one');
+      await host.activateSource('two');
+      await host.replaceCatalog(const [
+        SourceCatalogEntry(
+          key: 'one',
+          name: 'One',
+          fileName: 'one.js',
+          pluginVersion: '2',
+        ),
+        SourceCatalogEntry(key: 'two', name: 'Two', fileName: 'two.js'),
+      ]);
+      expect(session.cancellation.reason, SourceTaskStopReason.pluginUpdated);
+      final replacement = host.handleFor('one');
+      final next = host.acquireDownloadSession('one');
+      session.close();
+      expect(host.handleFor('one'), same(replacement));
+      expect(
+        () => runSourceOperation(
+          host,
+          replacement,
+          'fixture.download',
+          (_) async => 1,
+          origin: SourceTaskOrigin(
+            ownerId: 'old',
+            groupId: 'run',
+            requestSequence: 1,
+            downloadSession: session,
+          ),
+        ),
+        throwsA(isA<SourceTaskCancelled>()),
+      );
+      expect(
+        await runSourceOperation(
+          host,
+          replacement,
+          'fixture.new',
+          (_) async => 2,
+          origin: SourceTaskOrigin(
+            ownerId: 'new',
+            groupId: 'run',
+            requestSequence: 1,
+            downloadSession: next,
+          ),
+        ),
+        2,
+      );
+      next.close();
+      await old.whenDisposed;
+    },
+  );
+
+  test(
     'one detached reader retains unowned download and cache intent',
     () async {
       final handle = host.activeHandle;
@@ -688,6 +818,115 @@ void main() {
     },
   );
 
+  test(
+    'download chapter recovery transfers its lease to the explicit replacement',
+    () async {
+      final old = host.activeHandle;
+      old.runtime.sourceMeta = const SourceMeta(
+        name: 'One',
+        key: 'one',
+        version: '1',
+        supportsAccount: false,
+        settingsDefaults: {},
+        presentation: {
+          'recreateOnStatus': [403],
+        },
+      );
+      final session = host.acquireDownloadSession('one');
+      engine.setOperationMessageHandler(
+        (message, context) => old.httpGateway.sendJsHttpRequest(
+          Map<String, dynamic>.from(message as Map),
+          hostContext: context,
+          execution: context.execution,
+          runtimeId: context.runtimeId,
+        ),
+      );
+      await engine.execute(
+        'this.__hazuki_source.comic.loadEp=()=>sendMessage({method:"http",http_method:"GET",url:"https://fixture.test/recover"}).then(()=>({images:["old"]}))',
+      );
+      initialize = () async {
+        final handle = host.handleFor('one');
+        if (handle.runtime.engine == null) {
+          final replacement = SourceScriptEngine(pluginId: 'one');
+          addTearDown(replacement.close);
+          replacement.operationGuard = handle.runOperation;
+          handle.runtime.engine = replacement;
+          await replacement.execute(
+            'globalThis.__hazuki_source={comic:{loadEp:()=>({images:["new"]})}}',
+          );
+        }
+      };
+      final ui = SourceUiOwner();
+      addTearDown(ui.dispose);
+      final pending = ui.run(
+        () => details().loadChapterImages(
+          comicId: 'comic',
+          epId: 'ep',
+          sourceKey: 'one',
+          taskOrigin: SourceTaskOrigin(
+            ownerId: 'download',
+            groupId: 'run',
+            requestSequence: 1,
+            downloadSession: session,
+          ),
+        ),
+      );
+      await _until(() => http.pending.containsKey('recover'));
+      http.pending['recover']!.single.complete(
+        ResponseBody.fromString('{}', 403),
+      );
+      expect(await pending, ['new']);
+      expect(host.handleFor('one'), isNot(same(old)));
+      expect(
+        await details().loadChapterImages(
+          comicId: 'comic',
+          epId: 'next',
+          sourceKey: 'one',
+          taskOrigin: SourceTaskOrigin(
+            ownerId: 'download',
+            groupId: 'next',
+            requestSequence: 2,
+            downloadSession: session,
+          ),
+        ),
+        ['new'],
+      );
+      session.close();
+    },
+  );
+
+  test(
+    'download preparation keeps its source and child subscription across switching',
+    () async {
+      final handle = host.activeHandle;
+      final session = host.acquireDownloadSession('one');
+      final prepare = SourceImagePreparationCapability(
+        runtimeHost: host,
+        downloadImageBytes: handle.imageCache.downloadImageBytes,
+      );
+      final pending = prepare.prepareChapterImageData(
+        'https://fixture.test/downloadPrepare',
+        comicId: 'comic',
+        epId: 'ep',
+        sourceKey: 'one',
+        useDiskCache: false,
+        taskOrigin: SourceTaskOrigin(
+          ownerId: 'download',
+          groupId: 'run',
+          requestSequence: 1,
+          downloadSession: session,
+        ),
+      );
+      await _until(() => http.pending.containsKey('downloadPrepare'));
+      await host.activateSource('two');
+      http.complete('downloadPrepare');
+      expect((await pending).bytes, [1, 2, 3]);
+      expect(host.handleFor('one'), same(handle));
+      session.close();
+      await handle.whenDisposed;
+    },
+  );
+
   test('chapter cancellation bypasses a requested runtime recovery', () async {
     final old = host.activeHandle;
     old.runtime.sourceMeta = const SourceMeta(
@@ -834,6 +1073,7 @@ void main() {
       final old = host.activeHandle;
       host.acquireReaderSession('one');
       Object? leaseError;
+      Object? downloadLeaseError;
       Future<void>? lateRejected;
       final pending = host.tasks.run<void>(
         pluginId: 'one',
@@ -845,6 +1085,11 @@ void main() {
             host.acquireReaderSession('one');
           } catch (error) {
             leaseError = error;
+          }
+          try {
+            host.acquireDownloadSession('one');
+          } catch (error) {
+            downloadLeaseError = error;
           }
           lateRejected = expectLater(
             old.imageCache.downloadImageBytes(
@@ -875,6 +1120,7 @@ void main() {
       await rejected;
       await lateRejected;
       expect(leaseError, isA<SourceTaskCancelled>());
+      expect(downloadLeaseError, isA<SourceTaskCancelled>());
       expect(http.pending, isEmpty);
       expect(host.activeHandle, isNot(same(old)));
     },

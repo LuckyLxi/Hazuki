@@ -102,6 +102,7 @@ class SourceOperationContext {
     SourceTaskRegistry registry,
     Future<T> Function(SourceTaskOrigin) operation, {
     SourceReaderSession? readerSession,
+    SourceDownloadSession? downloadSession,
   }) async {
     checkActive();
     final signal = SourceTaskCancellation();
@@ -126,6 +127,7 @@ class SourceOperationContext {
           requestSequence: task.snapshot.requestSequence,
           cancellation: signal,
           readerSession: readerSession,
+          downloadSession: downloadSession,
           retainOnSourceChange: task.survivesSourceChange,
         ),
       );

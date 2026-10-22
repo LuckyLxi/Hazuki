@@ -145,7 +145,10 @@ void registerApplicationServices(GetIt services) {
   }
   if (!services.isRegistered<MangaDownloadService>()) {
     services.registerLazySingleton<MangaDownloadService>(
-      () => MangaDownloadService(sourceReader: services<SourceReaderGateway>()),
+      () => MangaDownloadService(
+        sourceReader: services<SourceReaderGateway>(),
+        taskControl: services<SourceTaskControlGateway>(),
+      ),
     );
   }
   if (!services.isRegistered<DiscoverDailyRecommendationService>()) {

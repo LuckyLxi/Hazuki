@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
+import 'package:path/path.dart' as path_util;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/hazuki_models.dart';
@@ -19,10 +20,17 @@ export 'manga_download_models.dart';
 
 class MangaDownloadService extends ChangeNotifier
     implements MangaDownloadCommands, MangaDownloadLibrary {
-  MangaDownloadService({SourceReaderGateway? sourceReader}) {
+  MangaDownloadService({
+    SourceReaderGateway? sourceReader,
+    SourceTaskControlGateway? taskControl,
+    MangaDownloadFiles? files,
+    MangaDownloadAccess? access,
+  }) {
     _stateStore = MangaDownloadStateStore(logScan: _logScan);
-    _access = MangaDownloadAccess(logScan: _logScan);
-    _files = MangaDownloadFiles(sourceReader: sourceReader, logScan: _logScan);
+    _access = access ?? MangaDownloadAccess(logScan: _logScan);
+    _files =
+        files ??
+        MangaDownloadFiles(sourceReader: sourceReader, logScan: _logScan);
     _recoveryScanner = MangaDownloadRecoveryScanner(
       logScan: _logScan,
       taskByComicId: _state.taskByComicId,
@@ -46,7 +54,18 @@ class MangaDownloadService extends ChangeNotifier
       shouldRecoverTransientNetworkError: () =>
           _lifecycle.shouldRecoverTransientNetworkError,
       sourceReader: sourceReader,
+      taskControl: taskControl,
     );
+  }
+
+  bool _disposed = false;
+  Future<void> _persistTail = Future.value();
+  Future<void>? _disposeDrain;
+  Future<void> get whenDisposed => _disposeDrain ?? Future.value();
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
   }
 
   SharedPreferences? _prefs;
@@ -76,7 +95,15 @@ class MangaDownloadService extends ChangeNotifier
 
   @override
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _lifecycle.dispose();
+    _disposeDrain = Future.wait([
+      _queueExecutor.dispose(),
+      _persistTail,
+      ?_initFuture,
+    ]).then((_) {});
+    _disposeDrain!.ignore();
     super.dispose();
   }
 
@@ -109,6 +136,7 @@ class MangaDownloadService extends ChangeNotifier
 
   @override
   Future<void> ensureInitialized() async {
+    if (_disposed) throw StateError('download_service_disposed');
     final inFlight = _initFuture;
     if (inFlight != null) {
       await inFlight;
@@ -215,24 +243,37 @@ class MangaDownloadService extends ChangeNotifier
     }
 
     await ensureInitialized();
+    final priorTask = _state.taskByStorageKey(details.scopedId.storageKey);
+    final resumeAfterRedownload =
+        redownloadExisting &&
+        priorTask != null &&
+        priorTask.status != MangaDownloadTaskStatus.paused;
     if (redownloadExisting) {
       await _removeDownloadedChaptersForRedownload(
         details: details,
         chapters: chapters,
       );
     }
-    final result = _state.enqueue(
-      details: details,
-      coverUrl: coverUrl,
-      description: description,
-      chapters: chapters,
+    return _queueExecutor.withTaskBarrier(
+      details.scopedId.storageKey,
+      () async {
+        final result = _state.enqueue(
+          details: details,
+          coverUrl: coverUrl,
+          description: description,
+          chapters: chapters,
+        );
+        if (result == MangaDownloadEnqueueResult.queued) {
+          if (resumeAfterRedownload) {
+            _state.resumeTask(details.scopedId.storageKey);
+          }
+          await _persistState();
+          notifyListeners();
+        }
+        return result;
+      },
+      stop: false,
     );
-    if (result != MangaDownloadEnqueueResult.queued) return result;
-
-    await _persistState();
-    notifyListeners();
-    unawaited(_queueExecutor.processQueue());
-    return MangaDownloadEnqueueResult.queued;
   }
 
   Future<void> _removeDownloadedChaptersForRedownload({
@@ -259,53 +300,79 @@ class MangaDownloadService extends ChangeNotifier
       return;
     }
 
-    if (!await _ensureAndroidDownloadsAccess()) {
-      throw FileSystemException('Android downloads access not granted');
-    }
-    final rootDir = await _ensureRootDir();
-    final comicDir = Directory('${rootDir.path}/${downloaded.downloadDirName}');
-    final chapterDirectories = <String>{};
-    for (final chapter in chaptersToRemove) {
-      final directory = await _recoveryScanner.resolveChapterDirForEpId(
-        comicDir: comicDir,
-        epId: chapter.epId,
-        targets: chapters,
-        downloadedComic: downloaded,
-      );
-      if (directory != null && _isPathWithin(directory, comicDir)) {
-        chapterDirectories.add(directory.path);
-      }
-    }
-    for (final path in chapterDirectories) {
-      final directory = Directory(path);
-      if (await directory.exists()) {
-        await directory.delete(recursive: true);
-      }
-    }
+    _state.pauseTask(details.scopedId.storageKey);
+    return _queueExecutor.withTaskBarrier(
+      details.scopedId.storageKey,
+      () async {
+        final downloaded = downloadedComicByIdForSource(
+          details.id,
+          sourceKey: details.sourceKey.trim(),
+        );
+        if (downloaded == null) return;
+        final chaptersToRemove = downloaded.chapters
+            .where(
+              (chapter) => chapters.any(
+                (target) =>
+                    MangaDownloadState.chapterMatchesTarget(chapter, target),
+              ),
+            )
+            .toList();
+        if (chaptersToRemove.isEmpty) return;
+        await _publishState();
+        if (!await _ensureAndroidDownloadsAccess()) {
+          throw FileSystemException('Android downloads access not granted');
+        }
+        final rootDir = await _ensureRootDir();
+        final comicDir = Directory(
+          '${rootDir.path}/${downloaded.downloadDirName}',
+        );
+        final chapterDirectories = <String>{};
+        for (final chapter in chaptersToRemove) {
+          final directory = await _recoveryScanner.resolveChapterDirForEpId(
+            comicDir: comicDir,
+            epId: chapter.epId,
+            targets: chapters,
+            downloadedComic: downloaded,
+          );
+          if (directory != null && _isPathWithin(directory, comicDir)) {
+            chapterDirectories.add(directory.path);
+          }
+        }
+        for (final path in chapterDirectories) {
+          final directory = Directory(path);
+          if (await directory.exists()) {
+            await directory.delete(recursive: true);
+          }
+        }
 
-    final remainingChapters = downloaded.chapters
-        .where(
-          (chapter) => !chapters.any(
-            (target) =>
-                MangaDownloadState.chapterMatchesTarget(chapter, target),
-          ),
-        )
-        .toList(growable: false);
-    if (remainingChapters.isEmpty) {
-      _state.removeDownloaded({downloaded.storageKey});
-      await _files.deleteMetadataFiles(comicDir);
-    } else {
-      final updated = downloaded.copyWith(chapters: remainingChapters);
-      _state.upsertDownloadedComic(updated);
-      await _files.writeMetadataFile(comicDir, updated);
-    }
-    await _persistState();
-    notifyListeners();
+        final remainingChapters = downloaded.chapters
+            .where(
+              (chapter) => !chapters.any(
+                (target) =>
+                    MangaDownloadState.chapterMatchesTarget(chapter, target),
+              ),
+            )
+            .toList(growable: false);
+        if (remainingChapters.isEmpty) {
+          _state.removeDownloaded({downloaded.storageKey});
+          await _files.deleteMetadataFiles(comicDir);
+        } else {
+          final updated = downloaded.copyWith(chapters: remainingChapters);
+          _state.upsertDownloadedComic(updated);
+          await _files.writeMetadataFile(comicDir, updated);
+        }
+        await _persistState();
+        notifyListeners();
+      },
+      reason: SourceTaskStopReason.superseded,
+    );
   }
 
   bool _isPathWithin(Directory child, Directory parent) {
     String normalize(String path) {
-      final absolute = Directory(path).absolute.path.replaceAll('\\', '/');
+      final absolute = path_util
+          .normalize(path_util.absolute(path))
+          .replaceAll('\\', '/');
       final trimmed = absolute.endsWith('/')
           ? absolute.substring(0, absolute.length - 1)
           : absolute;
@@ -337,7 +404,9 @@ class MangaDownloadService extends ChangeNotifier
 
   Directory? _topLevelDirectoryWithinRoot(String path, Directory rootDir) {
     String normalize(String value) {
-      final absolute = File(value).absolute.path.replaceAll('\\', '/');
+      final absolute = path_util
+          .normalize(path_util.absolute(value))
+          .replaceAll('\\', '/');
       final trimmed = absolute.endsWith('/')
           ? absolute.substring(0, absolute.length - 1)
           : absolute;
@@ -366,45 +435,62 @@ class MangaDownloadService extends ChangeNotifier
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toSet();
-    if (ids.isEmpty) {
-      return;
-    }
-
-    final hasAccess = await _ensureAndroidDownloadsAccess();
-    if (!hasAccess) {
-      return;
-    }
-
-    final rootDir = await _ensureRootDir();
-    for (final storageKey in ids) {
-      try {
-        final comic = _state.downloadedComicByStorageKey(storageKey);
-        final scopedId = SourceScopedComicId.fromStorageKey(storageKey);
-        final removesLegacyDirectory =
-            scopedId.sourceKey.isEmpty ||
-            isHazukiJmSourceKey(scopedId.sourceKey);
-        final dirNames = <String>{
-          comic?.downloadDirName ?? scopedId.downloadDirName,
-          scopedId.downloadDirName,
-          // Downloads created before source-scoped IDs used the raw comic ID
-          // as their directory name. Keep deleting that legacy directory so a
-          // migrated download does not remain on disk after deletion.
-          if (removesLegacyDirectory && comic != null) comic.comicId,
-          if (removesLegacyDirectory) scopedId.comicId,
+    if (ids.isEmpty || !await _ensureAndroidDownloadsAccess()) return;
+    await Future.wait(
+      ids.map((key) async {
+        final scoped = SourceScopedComicId.fromStorageKey(key);
+        final affected = {
+          key,
+          if (scoped.sourceKey.isEmpty || isHazukiJmSourceKey(scoped.sourceKey))
+            for (final task in _tasks)
+              if (task.comicId == scoped.comicId &&
+                  (task.sourceKey.isEmpty ||
+                      isHazukiJmSourceKey(task.sourceKey)))
+                task.storageKey,
         };
-        final directories = <Directory>{
-          for (final dirName in dirNames) Directory('${rootDir.path}/$dirName'),
-          if (comic != null)
-            ..._downloadedComicDirectoriesWithinRoot(comic, rootDir),
-        };
-        for (final dir in directories) {
-          if (_isPathWithin(dir, rootDir) && await dir.exists()) {
-            await dir.delete(recursive: true);
-          }
+        for (final storageKey in affected) {
+          _state.pauseTask(storageKey);
         }
-      } catch (_) {}
-    }
-    _state.removeDownloaded(ids);
+        await _queueExecutor.withTaskBarriers(affected, () async {
+          for (final storageKey in affected) {
+            _state.pauseTask(storageKey);
+          }
+          await _publishState();
+          final rootDir = await _ensureRootDir();
+          final comic = _state.downloadedComicByStorageKey(key);
+          final scopedId = SourceScopedComicId.fromStorageKey(key);
+          final removesLegacy =
+              scopedId.sourceKey.isEmpty ||
+              isHazukiJmSourceKey(scopedId.sourceKey);
+          final names = <String>{
+            comic?.downloadDirName ?? scopedId.downloadDirName,
+            scopedId.downloadDirName,
+            if (removesLegacy && comic != null) comic.comicId,
+            if (removesLegacy) scopedId.comicId,
+          };
+          final directories = <Directory>{
+            for (final name in names) Directory('${rootDir.path}/$name'),
+            if (comic != null)
+              ..._downloadedComicDirectoriesWithinRoot(comic, rootDir),
+          };
+          for (final dir in directories) {
+            if (!_isPathWithin(dir, rootDir)) {
+              throw FileSystemException('download_path_outside_root', dir.path);
+            }
+            if (await dir.exists()) await dir.delete(recursive: true);
+          }
+          _state.removeDownloaded({key, if (comic != null) comic.storageKey});
+          for (final storageKey in affected) {
+            _state.resetTaskProgress(storageKey);
+          }
+          await _persistState();
+          notifyListeners();
+        }, reason: SourceTaskStopReason.downloadPaused);
+      }),
+    );
+  }
+
+  Future<void> _publishState() async {
     await _persistState();
     notifyListeners();
   }
@@ -413,97 +499,158 @@ class MangaDownloadService extends ChangeNotifier
   Future<void> pauseTask(String storageKey) async {
     await ensureInitialized();
     if (!_state.pauseTask(storageKey)) return;
-    await _persistState();
-    notifyListeners();
+    final drain = _queueExecutor.withTaskBarrier(storageKey, () async {
+      if (_state.pauseTask(storageKey)) await _publishState();
+    }, reason: SourceTaskStopReason.downloadPaused);
+    final published = _publishState();
+    await Future.wait([published, drain]);
   }
 
   @override
   Future<void> resumeTask(String storageKey) async {
     await ensureInitialized();
-    if (!_state.resumeTask(storageKey)) return;
-    await _persistState();
-    notifyListeners();
-    unawaited(_queueExecutor.processQueue());
+    await _queueExecutor.withTaskBarrier(storageKey, () async {
+      if (_state.resumeTask(storageKey)) await _publishState();
+    }, stop: false);
   }
 
   @override
   Future<void> pauseAllTasks() async {
     await ensureInitialized();
-    if (!_state.pauseAllTasks()) return;
-    await _persistState();
-    notifyListeners();
+    await Future.wait(_tasks.map((task) => pauseTask(task.storageKey)));
   }
 
   @override
   Future<void> resumeAllTasks() async {
     await ensureInitialized();
-    if (!_state.resumeAllTasks()) return;
-    await _persistState();
-    notifyListeners();
-    unawaited(_queueExecutor.processQueue());
+    await Future.wait(
+      _tasks
+          .where(
+            (task) =>
+                task.status == MangaDownloadTaskStatus.paused ||
+                task.status == MangaDownloadTaskStatus.failed,
+          )
+          .map((task) => resumeTask(task.storageKey)),
+    );
   }
 
   @override
   Future<void> deleteTask(String storageKey) async {
     await ensureInitialized();
-    if (_state.taskByStorageKey(storageKey) == null) {
-      return;
-    }
-
-    final hasAccess = await _ensureAndroidDownloadsAccess();
-    if (!hasAccess) {
-      return;
-    }
-
+    if (!await _ensureAndroidDownloadsAccess()) return;
     final task = _state.removeTask(storageKey);
     if (task == null) return;
-    final rootDir = await _ensureRootDir();
-    final comicDir = Directory('${rootDir.path}/${task.downloadDirName}');
-    final downloadedComic = _state.downloadedComicByStorageKey(task.storageKey);
-    if (task.currentChapterEpId?.isNotEmpty == true) {
+    await _queueExecutor.withTaskBarrier(task.storageKey, () async {
       try {
-        final chapterDir = await _recoveryScanner.resolveChapterDirForEpId(
-          comicDir: comicDir,
-          epId: task.currentChapterEpId!,
-          targets: task.targets,
-          downloadedComic: downloadedComic,
-        );
-        if (chapterDir != null && await chapterDir.exists()) {
-          await chapterDir.delete(recursive: true);
+        final rootDir = await _ensureRootDir();
+        final comicDir = Directory('${rootDir.path}/${task.downloadDirName}');
+        if (!_isPathWithin(comicDir, rootDir)) {
+          throw FileSystemException(
+            'download_path_outside_root',
+            comicDir.path,
+          );
         }
-      } catch (_) {}
-    }
-    if (downloadedComic == null) {
-      try {
-        if (await comicDir.exists()) {
+        final downloadedComic = _state.downloadedComicByStorageKey(
+          task.storageKey,
+        );
+        if (task.currentChapterEpId?.isNotEmpty == true &&
+            downloadedComic?.chapters.any(
+                  (chapter) => chapter.epId == task.currentChapterEpId,
+                ) !=
+                true) {
+          final chapterDir = await _recoveryScanner.resolveChapterDirForEpId(
+            comicDir: comicDir,
+            epId: task.currentChapterEpId!,
+            targets: task.targets,
+            downloadedComic: downloadedComic,
+          );
+          if (chapterDir != null) {
+            if (!_isPathWithin(chapterDir, comicDir)) {
+              throw FileSystemException(
+                'download_path_outside_root',
+                chapterDir.path,
+              );
+            }
+            if (await chapterDir.exists()) {
+              await chapterDir.delete(recursive: true);
+            }
+          }
+        }
+        if (downloadedComic == null && await comicDir.exists()) {
           await comicDir.delete(recursive: true);
         }
-      } catch (_) {}
-    }
-    await _persistState();
-    notifyListeners();
+        await _publishState();
+      } catch (_) {
+        // The captured instance stays retryable; a future enqueue is admitted
+        // only after this barrier releases.
+        if (_state.taskByStorageKey(task.storageKey) == null) {
+          _state.restoreTasks([
+            ..._tasks,
+            task.copyWith(status: MangaDownloadTaskStatus.paused),
+          ]);
+        }
+        await _publishState();
+        rethrow;
+      }
+    }, reason: SourceTaskStopReason.user);
+  }
+
+  Future<void> changeDownloadsRootPath(
+    String path, {
+    bool rescan = true,
+  }) async {
+    await ensureInitialized();
+    _state.pauseAllTasks();
+    await _queueExecutor.withAllBarrier(() async {
+      _state.pauseAllTasks();
+      await _publishState();
+      final normalized = MangaDownloadAccess.normalizeDownloadsRootPath(path);
+      final previous = await MangaDownloadAccess.loadDownloadsRootPath();
+      final directory = Directory(normalized);
+      await directory.create(recursive: true);
+      await File('${directory.path}/.nomedia').writeAsString('', flush: true);
+      try {
+        await MangaDownloadAccess.saveDownloadsRootPath(normalized);
+        await _reloadRoot(rescan: rescan);
+      } catch (_) {
+        await MangaDownloadAccess.saveDownloadsRootPath(previous);
+        rethrow;
+      }
+    });
   }
 
   Future<void> handleRootPathChanged({bool rescan = true}) async {
     await ensureInitialized();
-    _state.replaceDownloaded(const []);
+    _state.pauseAllTasks();
+    await _queueExecutor.withAllBarrier(() async {
+      _state.pauseAllTasks();
+      await _publishState();
+      await _reloadRoot(rescan: rescan);
+    });
+  }
 
+  Future<void> _reloadRoot({required bool rescan}) async {
+    var comics = const <DownloadedMangaComic>[];
     if (rescan) {
       final hasAccess = await _ensureAndroidDownloadsAccess();
-      if (hasAccess) {
-        final rootDir = await _ensureRootDir();
-        final result = await _recoveryScanner.scanDownloadedFromDisk(rootDir);
-        _state.replaceDownloaded(result.comics);
+      if (!hasAccess) {
+        throw FileSystemException('Android downloads access not granted');
       }
+      final rootDir = await _ensureRootDir();
+      final result = await _recoveryScanner.scanDownloadedFromDisk(rootDir);
+      comics = result.comics;
     }
-
-    await _persistState();
-    notifyListeners();
+    for (final task in _tasks) {
+      _state.resetTaskProgress(task.storageKey);
+    }
+    _state.replaceDownloaded(comics);
+    await _publishState();
   }
 
   Future<void> _init() async {
     _prefs = await SharedPreferences.getInstance();
     final restored = await _stateStore.restore(_prefs);
+    if (_disposed) return;
     _state.restoreTasks(restored.tasks);
     _sanitizeRestoredDownloadedState(restored.downloaded);
     await _persistState();
@@ -518,11 +665,20 @@ class MangaDownloadService extends ChangeNotifier
   }
 
   Future<void> _persistState() {
-    return _stateStore.persist(
-      prefs: _prefs,
-      tasks: _tasks,
-      downloaded: _downloaded,
+    final tasks = _tasks;
+    final downloaded = _downloaded;
+    final result = _persistTail.then(
+      (_) => _stateStore.persist(
+        prefs: _prefs,
+        tasks: tasks,
+        downloaded: downloaded,
+      ),
     );
+    _persistTail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return result;
   }
 
   Future<void> _flushState() async {

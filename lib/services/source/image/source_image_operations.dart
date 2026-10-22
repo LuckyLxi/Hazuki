@@ -47,6 +47,7 @@ class SourceImageOperationService implements SourceImageOperations {
   ImageCacheCapability get _activeCache => _cacheForSource('');
   ImageCacheCapability _cacheForTask(String key, SourceTaskOrigin? origin) {
     origin?.readerSession?.checkActive();
+    origin?.downloadSession?.checkActive();
     return _cacheForSource(key);
   }
 

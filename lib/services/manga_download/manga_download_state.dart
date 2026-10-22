@@ -373,6 +373,18 @@ class MangaDownloadState {
     _downloaded.removeWhere((comic) => storageKeys.contains(comic.storageKey));
   }
 
+  void resetTaskProgress(String storageKey) {
+    final index = _taskIndexForStorageKey(storageKey);
+    if (index < 0) return;
+    _tasks[index] = _tasks[index].copyWith(
+      completedEpIds: {},
+      clearCurrentChapterEpId: true,
+      clearCurrentChapterTitle: true,
+      currentImageIndex: 0,
+      currentImageTotal: 0,
+    );
+  }
+
   bool pauseTask(String storageKey) {
     final index = _taskIndexForStorageKey(storageKey);
     if (index < 0) return false;

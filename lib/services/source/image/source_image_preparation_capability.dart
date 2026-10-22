@@ -38,6 +38,9 @@ class SourceImagePreparationCapability {
   SourceReaderSession acquireReaderSession(String sourceKey) =>
       _runtimeHost.acquireReaderSession(sourceKey);
 
+  SourceDownloadSession acquireDownloadSession(String sourceKey) =>
+      _runtimeHost.acquireDownloadSession(sourceKey);
+
   bool isLocalImagePath(String value) {
     final normalized = value.trim();
     if (normalized.startsWith('/') || normalized.startsWith('file://')) {
@@ -65,6 +68,7 @@ class SourceImagePreparationCapability {
     SourceTaskOrigin? taskOrigin,
   }) async {
     taskOrigin?.readerSession?.checkActive();
+    taskOrigin?.downloadSession?.checkActive();
     final resolvedKey = _resolveSourceKey(sourceKey);
     _runtimeHost.checkReaderSession(resolvedKey, taskOrigin);
     final handle = _runtimeHost.handleFor(resolvedKey);
@@ -86,6 +90,7 @@ class SourceImagePreparationCapability {
             taskOrigin: origin,
           ),
           readerSession: taskOrigin?.readerSession,
+          downloadSession: taskOrigin?.downloadSession,
         );
         context.checkActive();
         final declaredSegments = await _resolveSourceDeclaredImageSegments(

@@ -48,6 +48,7 @@ class SourceComicDetailsCapability {
     SourceTaskOrigin? taskOrigin,
   }) {
     taskOrigin?.readerSession?.checkActive();
+    taskOrigin?.downloadSession?.checkActive();
     _runtimeHost.checkReaderSession(
       _resolveActiveSourceKey(sourceKey),
       taskOrigin,
@@ -301,6 +302,7 @@ class SourceComicDetailsCapability {
     SourceTaskOrigin? taskOrigin,
   }) async {
     taskOrigin?.readerSession?.checkActive();
+    taskOrigin?.downloadSession?.checkActive();
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
     _runtimeHost.checkReaderSession(resolvedSourceKey, taskOrigin);
     var handle = _runtimeHost.handleFor(resolvedSourceKey);
@@ -362,10 +364,12 @@ class SourceComicDetailsCapability {
         throw SourceTaskCancelled(resolvedSourceKey, reason);
       }
       _runtimeHost.checkReaderSession(resolvedSourceKey, taskOrigin);
+      final previous = handle;
       handle = _runtimeHost.recreateSourceRuntime(
         resolvedSourceKey,
         expectedHandle: handle,
       );
+      _runtimeHost.transferDownloadSession(taskOrigin, previous, handle);
     }
     throw StateError('unreachable');
   }
