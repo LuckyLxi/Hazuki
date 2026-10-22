@@ -140,6 +140,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   @override
   Widget build(BuildContext context) {
     return WindowsComicDetailHost(
+      suppressExistingPanel: true,
       child: Scaffold(
         appBar: hazukiFrostedAppBar(
           context: context,

@@ -3,12 +3,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_destination_route.dart';
 import 'package:hazuki/features/discover/view/discover_section_page.dart';
 import 'package:hazuki/features/discover/view/discover_section_page_widgets.dart';
 import 'package:hazuki/features/discover/view/tag_category_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import 'package:hazuki/widgets/windows_comic_detail_host.dart';
+import 'package:hazuki/widgets/windows_comic_detail_presentation_scope.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockCategoryGateway extends Mock implements SourceCategoryGateway {}
@@ -74,6 +78,124 @@ void main() {
     await tester.tap(find.text('Adventure'));
     await tester.pumpAndSettle();
     expect(find.byType(DiscoverSectionPage), findsOneWidget);
+  }
+
+  for (final openResultDetail in [false, true]) {
+    testWidgets('Windows special tag returns to the original detail '
+        '(open result: $openResultDetail)', (tester) async {
+      if (!useWindowsComicDetailPanel) return;
+      final controller = WindowsComicDetailController.instance;
+      controller.close();
+      addTearDown(controller.close);
+      final navigatorKey = GlobalKey<NavigatorState>();
+      when(
+        () => discoverSource.loadCategoryComicsByViewMore(
+          viewMoreUrl: any(named: 'viewMoreUrl'),
+          page: any(named: 'page'),
+          order: any(named: 'order'),
+          orders: any(named: 'orders'),
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      ).thenAnswer(
+        (_) async => const CategoryComicsResult(comics: [], maxPage: 1),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigatorKey,
+          theme: ThemeData(platform: TargetPlatform.windows),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => WindowsComicDetailPresentationScope(
+            panelBuilder:
+                (
+                  comic,
+                  heroTag, {
+                  required shouldAnimatePanelReveal,
+                  required isRestoringPreviousDetail,
+                  required initialTabIndex,
+                  required showHomeAction,
+                  required onBackRequested,
+                  required onHomeRequested,
+                }) => Material(
+                  child: Column(
+                    children: [
+                      Text('Detail ${comic.id}'),
+                      TextButton(
+                        onPressed: onBackRequested,
+                        child: const Text('Close detail'),
+                      ),
+                      Builder(
+                        builder: (context) => TextButton(
+                          onPressed: () => Navigator.of(context).push<void>(
+                            buildComicDetailDestinationRoute(
+                              context,
+                              (_) => DiscoverSectionPage(
+                                taskControl: FakeSourceTaskControl(),
+                                section: const ExploreSection(
+                                  title: 'Adventure',
+                                  comics: [],
+                                  viewMoreUrl: 'category:Adventure',
+                                ),
+                                comicDetailPageBuilder: (_, _) =>
+                                    const SizedBox.shrink(),
+                                sourceService: discoverSource,
+                                scrollSortBarWithContent: true,
+                              ),
+                            ),
+                          ),
+                          child: const Text('Special tag'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            child: child!,
+          ),
+          home: const WindowsComicDetailHost(
+            child: Scaffold(body: Text('Home')),
+          ),
+        ),
+      );
+      const root = ExploreComic(id: 'root', title: '', subTitle: '', cover: '');
+      const original = ExploreComic(
+        id: 'original',
+        title: '',
+        subTitle: '',
+        cover: '',
+      );
+      controller.open(root, 'root-hero');
+      controller.pushRelated(original, 'original-hero', historyTabIndex: 2);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Special tag'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Detail original'), findsNothing);
+      expect(find.text('Popular').hitTestable(), findsOneWidget);
+      if (openResultDetail) {
+        controller.open(
+          const ExploreComic(id: 'result', title: '', subTitle: '', cover: ''),
+          'result-hero',
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Detail result'), findsOneWidget);
+        await tester.tap(find.text('Close detail'));
+        await tester.pumpAndSettle();
+        expect(find.text('Popular').hitTestable(), findsOneWidget);
+      }
+
+      navigatorKey.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Detail original'), findsOneWidget);
+      expect(controller.entry?.heroTag, 'original-hero');
+      expect(controller.canGoBack, isTrue);
+      await tester.tap(find.text('Close detail'));
+      await tester.pumpAndSettle();
+      expect(find.text('Detail root'), findsOneWidget);
+      expect(controller.entry?.initialTabIndex, 2);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
