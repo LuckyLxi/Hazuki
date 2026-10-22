@@ -8,7 +8,6 @@ class HazukiPullToRefresh extends StatefulWidget {
     super.key,
     required this.onRefresh,
     required this.child,
-    this.edgeOffset = 0,
     this.refreshTriggerPullDistance = 104,
     this.maxContentOffset = 54,
     this.refreshHoldOffset = 50,
@@ -16,7 +15,6 @@ class HazukiPullToRefresh extends StatefulWidget {
 
   final Future<void> Function() onRefresh;
   final Widget child;
-  final double edgeOffset;
   final double refreshTriggerPullDistance;
   final double maxContentOffset;
   final double refreshHoldOffset;
@@ -254,9 +252,9 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh>
                 child: IgnorePointer(
                   child: _HazukiPullToRefreshIndicator(
                     progress: indicatorProgress,
+                    isArmed: _armed,
                     isRefreshing: _refreshing,
                     extent: indicatorExtent,
-                    topInset: widget.edgeOffset,
                   ),
                 ),
               ),
@@ -268,83 +266,227 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh>
   }
 }
 
-class _HazukiPullToRefreshIndicator extends StatelessWidget {
+/// 墨滴指示器：下拉时从顶部垂下一滴墨，颈部随拉动逐渐收细；越过触发点后
+/// 颈部掐断、墨滴脱离；刷新中墨滴弹跳落地并荡开涟漪。
+class _HazukiPullToRefreshIndicator extends StatefulWidget {
   const _HazukiPullToRefreshIndicator({
     required this.progress,
+    required this.isArmed,
     required this.isRefreshing,
     required this.extent,
-    required this.topInset,
   });
 
   final double progress;
+  final bool isArmed;
   final bool isRefreshing;
   final double extent;
-  final double topInset;
+
+  @override
+  State<_HazukiPullToRefreshIndicator> createState() =>
+      _HazukiPullToRefreshIndicatorState();
+}
+
+class _HazukiPullToRefreshIndicatorState
+    extends State<_HazukiPullToRefreshIndicator>
+    with TickerProviderStateMixin {
+  late final AnimationController _refreshController = AnimationController(
+    vsync: this,
+    duration: _InkDropPainter.refreshPeriod,
+  );
+  // 脱离动画按时间推进而非跟随手指，跨过触发点时形状不会瞬间跳变
+  late final AnimationController _detachController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+    value: widget.isArmed ? 1 : 0,
+  );
+  late final Animation<double> _detach = CurvedAnimation(
+    parent: _detachController,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _syncRefreshAnimation();
+  }
+
+  @override
+  void didUpdateWidget(_HazukiPullToRefreshIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isRefreshing != widget.isRefreshing) {
+      _syncRefreshAnimation();
+    }
+    if (oldWidget.isArmed != widget.isArmed && !widget.isRefreshing) {
+      if (widget.isArmed) {
+        _detachController.forward();
+      } else {
+        _detachController.reverse();
+      }
+    }
+  }
+
+  // 仅在刷新中驱动循环动画，下拉阶段完全由 progress 决定画面
+  void _syncRefreshAnimation() {
+    if (widget.isRefreshing) {
+      _refreshController.repeat();
+    } else {
+      _refreshController
+        ..stop()
+        ..value = 0;
+      _detachController.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    _detachController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (!isRefreshing && progress <= 0 && extent <= 0) {
+    if (!widget.isRefreshing && widget.progress <= 0 && widget.extent <= 0) {
       return const SizedBox.shrink();
     }
 
-    final theme = Theme.of(context);
-    final reveal = isRefreshing ? 1.0 : Curves.easeOutCubic.transform(progress);
-    final opacity = isRefreshing ? 1.0 : reveal;
-    final capsuleSize = 24 + (24 * reveal);
-    final spinnerSize = 12 + (16 * reveal);
-    final effectiveTopInset = math.min(topInset, extent * 0.4).toDouble();
-    final bottomPadding = math
-        .min(12.0, math.max(0.0, extent - capsuleSize))
-        .toDouble();
-    final indicatorValue = isRefreshing
-        ? null
-        : math.max(progress, 0.08).toDouble();
-
-    return ClipRect(
-      child: SizedBox.expand(
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: Padding(
-            padding: EdgeInsets.only(
-              top: effectiveTopInset,
-              bottom: bottomPadding,
-            ),
-            child: Opacity(
-              opacity: opacity,
-              child: SizedBox(
-                width: capsuleSize,
-                height: capsuleSize,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface.withValues(alpha: 0.96),
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.colorScheme.shadow.withValues(alpha: 0.08),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: SizedBox(
-                      width: spinnerSize,
-                      height: spinnerSize,
-                      child: RefreshProgressIndicator(
-                        value: indicatorValue,
-                        strokeWidth: 2.6,
-                        color: theme.colorScheme.primary,
-                        backgroundColor:
-                            theme.colorScheme.surfaceContainerHighest,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+    // 墨滴从指示区域顶边垂下，不再预留顶部内边距，否则拉满时上半截会被裁掉
+    return SizedBox.expand(
+      child: ClipRect(
+        child: Opacity(
+          opacity: (widget.extent / 26).clamp(0.0, 1.0),
+          child: CustomPaint(
+            size: Size.infinite,
+            painter: _InkDropPainter(
+              progress: widget.progress,
+              isRefreshing: widget.isRefreshing,
+              refresh: _refreshController,
+              detach: _detach,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _InkDropPainter extends CustomPainter {
+  _InkDropPainter({
+    required this.progress,
+    required this.isRefreshing,
+    required this.refresh,
+    required this.detach,
+    required this.color,
+  }) : super(repaint: Listenable.merge([refresh, detach]));
+
+  static const refreshPeriod = Duration(milliseconds: 1200);
+  // 墨滴中心距指示区域底边的距离
+  static const _centerFromBottom = 27.0;
+
+  final double progress;
+  final bool isRefreshing;
+  final Animation<double> refresh;
+  final Animation<double> detach;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height - _centerFromBottom;
+    final fill = Paint()..color = color;
+
+    if (isRefreshing) {
+      _paintRefreshing(canvas, cx, cy, fill);
+    } else {
+      _paintPulling(canvas, cx, cy, fill);
+    }
+  }
+
+  void _paintPulling(Canvas canvas, double cx, double cy, Paint fill) {
+    final e = Curves.easeOutCubic.transform(progress.clamp(0.0, 1.0));
+    final d = detach.value;
+    final top = cy - 26;
+    final r = 3 + 7 * e;
+    final dropY = top + 6 + (cy - top - 2) * e;
+    // 顶部附着处的半宽，脱离后即残墨的大小
+    final base = 12 - 5 * e;
+    // 颈部最细处：随下拉持续收细，脱离时收到 0 并断开成上下两段
+    final neck = (5 - 3.8 * e) * (1 - d);
+    final waistY = top + (dropY - r - top) * .55;
+    final upperTip = waistY + (top + 3 - waistY) * d;
+    final lowerTip = waistY + (dropY - r * 1.5 - waistY) * d;
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(cx - base, top - 2)
+        ..quadraticBezierTo(cx - neck - 1, top + 2, cx - neck, upperTip)
+        ..lineTo(cx + neck, upperTip)
+        ..quadraticBezierTo(cx + neck + 1, top + 2, cx + base, top - 2)
+        ..close(),
+      fill,
+    );
+
+    // 下半段侧边控制点从内凹的颈部过渡到外凸的水滴形
+    final ctrlDx = neck + (r * 1.1 - neck) * d;
+    final ctrlY = dropY - r * (.9 - .3 * d);
+    canvas.drawPath(
+      Path()
+        ..moveTo(cx - neck, lowerTip)
+        ..quadraticBezierTo(cx - ctrlDx, ctrlY, cx - r, dropY)
+        ..arcTo(
+          Rect.fromCircle(center: Offset(cx, dropY), radius: r),
+          math.pi,
+          -math.pi,
+          false,
+        )
+        ..quadraticBezierTo(cx + ctrlDx, ctrlY, cx + neck, lowerTip)
+        ..close(),
+      fill,
+    );
+  }
+
+  void _paintRefreshing(Canvas canvas, double cx, double cy, Paint fill) {
+    final seconds = refresh.value * refreshPeriod.inMilliseconds / 1000;
+    final ground = cy + 9;
+
+    // 两圈相位错开半个周期的涟漪
+    for (var k = 0; k < 2; k++) {
+      final f = (refresh.value + k * .5) % 1;
+      final rx = 8 + f * 18;
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(cx, ground),
+          width: rx * 2,
+          height: rx * .64,
+        ),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = color.withValues(alpha: color.a * (1 - f) * .55),
+      );
+    }
+
+    // 弹跳：落地瞬间压扁，离地后恢复圆形
+    const r = 8.0;
+    final bounce = math.sin(seconds * math.pi / .6).abs();
+    final squash = 1 - math.pow(1 - bounce, 6) * .35;
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx, ground - r * (2 - squash) * .5 - bounce * 10),
+        width: r / squash * .95 * 2,
+        height: r * squash * 2,
+      ),
+      fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_InkDropPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.isRefreshing != isRefreshing ||
+      oldDelegate.refresh != refresh ||
+      oldDelegate.detach != detach ||
+      oldDelegate.color != color;
 }

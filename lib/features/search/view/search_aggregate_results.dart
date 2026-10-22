@@ -371,8 +371,12 @@ class _SearchAggregateSectionPageState
             key: const ValueKey('aggregate-search-more-list'),
             controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-            itemCount: section.comics.length,
+            itemCount: section.comics.length + (section.loadingMore ? 1 : 0),
             itemBuilder: (context, index) {
+              // 加载更多指示器作为列表末项，排在漫画下方而不是叠在内容上
+              if (index >= section.comics.length) {
+                return const HazukiLoadMoreFooter(verticalPadding: 4);
+              }
               final comic = section.comics[index];
               final heroTag = widget.heroTagBuilder(
                 comic,
@@ -389,52 +393,57 @@ class _SearchAggregateSectionPageState
               );
             },
           )
-        : GridView.builder(
+        : CustomScrollView(
             key: const ValueKey('aggregate-search-more-grid3'),
             controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-            itemCount: section.comics.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.57,
-            ),
-            itemBuilder: (context, index) {
-              final comic = section.comics[index];
-              final heroTag = widget.heroTagBuilder(
-                comic,
-                'aggregate-search-more-${section.source.normalizedKey}-$index',
-              );
-              final contentWidth = MediaQuery.sizeOf(context).width - 52;
-              final coverCacheWidth =
-                  (contentWidth / 3 * MediaQuery.devicePixelRatioOf(context))
-                      .round();
-              return SearchComicGridItem(
-                key: ValueKey(
-                  'aggregate-search-grid-${section.source.normalizedKey}-${comic.id}',
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                sliver: SliverGrid.builder(
+                  itemCount: section.comics.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.57,
+                  ),
+                  itemBuilder: (context, index) {
+                    final comic = section.comics[index];
+                    final heroTag = widget.heroTagBuilder(
+                      comic,
+                      'aggregate-search-more-${section.source.normalizedKey}-$index',
+                    );
+                    final contentWidth = MediaQuery.sizeOf(context).width - 52;
+                    final coverCacheWidth =
+                        (contentWidth /
+                                3 *
+                                MediaQuery.devicePixelRatioOf(context))
+                            .round();
+                    return SearchComicGridItem(
+                      key: ValueKey(
+                        'aggregate-search-grid-${section.source.normalizedKey}-${comic.id}',
+                      ),
+                      comic: comic,
+                      heroTag: heroTag,
+                      index: index,
+                      coverCacheWidth: coverCacheWidth,
+                      placeholderColor: colorScheme.surfaceContainerHighest,
+                      onTap: () => widget.onComicTap(comic, heroTag),
+                    );
+                  },
                 ),
-                comic: comic,
-                heroTag: heroTag,
-                index: index,
-                coverCacheWidth: coverCacheWidth,
-                placeholderColor: colorScheme.surfaceContainerHighest,
-                onTap: () => widget.onComicTap(comic, heroTag),
-              );
-            },
+              ),
+              // 加载更多指示器排在网格之后，原底部留白保留在其下方
+              if (section.loadingMore)
+                const SliverToBoxAdapter(
+                  child: HazukiLoadMoreFooter(verticalPadding: 4),
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: 80)),
+            ],
           );
     return Stack(
       children: [
         results,
-        if (section.loadingMore)
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: 8,
-            child: IgnorePointer(
-              child: HazukiLoadMoreFooter(verticalPadding: 4),
-            ),
-          ),
         if (section.errorMessage != null)
           Positioned(
             left: 16,

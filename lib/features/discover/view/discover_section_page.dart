@@ -204,8 +204,6 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                         Positioned(left: 0, top: 0, right: 0, child: sortBar),
                     ],
                   ),
-                if (_controller.showLoadMoreFooter)
-                  const DiscoverSectionLoadMoreFooterOverlay(),
                 if (_controller.errorMessage != null)
                   DiscoverSectionErrorOverlay(
                     errorMessage: _controller.errorMessage!,

@@ -395,46 +395,28 @@ class DiscoverSectionContent extends StatelessWidget {
           childCount: controller.comics.length,
           addAutomaticKeepAlives: false,
         );
-        if (scrollHeader != null) {
-          return CustomScrollView(
-            controller: scrollController,
-            slivers: [
-              SliverToBoxAdapter(child: scrollHeader),
-              if (controller.comics.isEmpty)
-                SliverFillRemaining(hasScrollBody: false, child: emptyContent)
-              else
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(16, topPadding, 16, 12),
-                  sliver: SliverGrid(
-                    gridDelegate: gridDelegate,
-                    delegate: childrenDelegate,
-                  ),
-                ),
-            ],
-          );
-        }
-
-        return GridView.custom(
+        // 加载更多指示器作为网格之后的独立 sliver，排在漫画下方而不是叠在封面上
+        return CustomScrollView(
           controller: scrollController,
-          padding: EdgeInsets.fromLTRB(16, topPadding, 16, 12),
-          gridDelegate: gridDelegate,
-          childrenDelegate: childrenDelegate,
+          slivers: [
+            if (scrollHeader != null) SliverToBoxAdapter(child: scrollHeader),
+            if (controller.comics.isEmpty)
+              SliverFillRemaining(hasScrollBody: false, child: emptyContent)
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(16, topPadding, 16, 12),
+                sliver: SliverGrid(
+                  gridDelegate: gridDelegate,
+                  delegate: childrenDelegate,
+                ),
+              ),
+            if (controller.showLoadMoreFooter && controller.comics.isNotEmpty)
+              const SliverToBoxAdapter(
+                child: HazukiLoadMoreFooter(verticalPadding: 4),
+              ),
+          ],
         );
       },
-    );
-  }
-}
-
-class DiscoverSectionLoadMoreFooterOverlay extends StatelessWidget {
-  const DiscoverSectionLoadMoreFooterOverlay({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Positioned(
-      left: 0,
-      right: 0,
-      bottom: 8,
-      child: IgnorePointer(child: HazukiLoadMoreFooter(verticalPadding: 4)),
     );
   }
 }

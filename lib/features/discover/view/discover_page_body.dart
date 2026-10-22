@@ -55,7 +55,6 @@ class DiscoverPageBody extends StatelessWidget {
 
         return HazukiPullToRefresh(
           onRefresh: onRefresh,
-          edgeOffset: 56,
           child: ListView.builder(
             controller: scrollController,
             physics: const AlwaysScrollableScrollPhysics(

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
 
+/// 上滑加载更多的底部指示器：一本摊开的线框书，书页从右向左循环翻动。
 class HazukiLoadMoreFooter extends StatefulWidget {
   const HazukiLoadMoreFooter({super.key, this.verticalPadding = 6});
 
@@ -18,7 +19,7 @@ class _HazukiLoadMoreFooterState extends State<HazukiLoadMoreFooter>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
+    duration: _LoadMoreBookPainter.period,
   )..repeat();
 
   @override
@@ -35,54 +36,13 @@ class _HazukiLoadMoreFooterState extends State<HazukiLoadMoreFooter>
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: widget.verticalPadding),
         child: Center(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHigh.withAlpha(232),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withAlpha(148),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.shadow.withAlpha(18),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: AnimatedBuilder(
+          child: SizedBox(
+            width: 48,
+            height: 34,
+            child: CustomPaint(
+              painter: _LoadMoreBookPainter(
                 animation: _controller,
-                builder: (context, _) {
-                  final progress = _controller.value;
-                  final iconLift = math.sin(progress * math.pi * 2) * 1.4;
-
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Transform.translate(
-                        offset: Offset(0, -iconLift),
-                        child: Icon(
-                          Icons.keyboard_double_arrow_down_rounded,
-                          size: 16,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      for (var index = 0; index < 3; index++) ...[
-                        _AnimatedLoadDot(
-                          progress: progress,
-                          index: index,
-                          color: index == 1
-                              ? colorScheme.primary
-                              : colorScheme.secondary,
-                        ),
-                        if (index < 2) const SizedBox(width: 6),
-                      ],
-                    ],
-                  );
-                },
+                colorScheme: colorScheme,
               ),
             ),
           ),
@@ -92,45 +52,90 @@ class _HazukiLoadMoreFooterState extends State<HazukiLoadMoreFooter>
   }
 }
 
-class _AnimatedLoadDot extends StatelessWidget {
-  const _AnimatedLoadDot({
-    required this.progress,
-    required this.index,
-    required this.color,
-  });
+class _LoadMoreBookPainter extends CustomPainter {
+  _LoadMoreBookPainter({required this.animation, required this.colorScheme})
+    : super(repaint: animation);
 
-  final double progress;
-  final int index;
-  final Color color;
+  static const period = Duration(milliseconds: 700);
+  static const _pageWidth = 11.25;
+  static const _pageHeight = 14.25;
+  // 摊开书页外缘相对书脊的上翘量
+  static const _lift = 2.25;
+
+  final Animation<double> animation;
+  final ColorScheme colorScheme;
 
   @override
-  Widget build(BuildContext context) {
-    final phase = (progress - index * 0.14) % 1;
-    final wave = (math.sin(phase * math.pi * 2) + 1) / 2;
-    final scale = 0.72 + wave * 0.48;
-    final opacity = 0.3 + wave * 0.7;
-    final lift = 1.5 + wave * 2.2;
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final top = size.height / 2 - _pageHeight / 2;
+    final bottom = size.height / 2 + _pageHeight / 2;
+    final pageFill = Paint()..color = colorScheme.surface;
+    final edge = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.7
+      ..strokeJoin = StrokeJoin.round
+      ..color = colorScheme.primary;
+    final textLine = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = colorScheme.outlineVariant.withValues(alpha: .6);
 
-    return Transform.translate(
-      offset: Offset(0, -lift),
-      child: Transform.scale(
-        scale: scale,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: color.withAlpha((opacity * 255).round()),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withAlpha((opacity * 90).round()),
-                blurRadius: 6,
-              ),
-            ],
-          ),
-          child: const SizedBox(width: 7, height: 7),
-        ),
-      ),
-    );
+    for (final dir in const [-1.0, 1.0]) {
+      final page = _pagePath(cx, top, bottom, cx + dir * _pageWidth, 0);
+      canvas
+        ..drawPath(page, pageFill)
+        ..drawPath(page, edge);
+      // 每页三行示意文字，最后一行较短
+      for (var k = 0; k < 3; k++) {
+        final y = top + _pageHeight * (.3 + k * .18);
+        canvas.drawLine(
+          Offset(cx + dir * _pageWidth * .22, y - _lift * .4),
+          Offset(cx + dir * _pageWidth * (k == 2 ? .55 : .78), y - _lift * .55),
+          textLine,
+        );
+      }
+    }
+
+    // 翻动页：外缘按余弦从右侧扫到左侧，翻到中段时整体抬起
+    final a = Curves.easeInOutCubic.transform(animation.value);
+    final outerX = cx + _pageWidth * math.cos(math.pi * a);
+    final rise = math.sin(math.pi * a) * 3.75;
+    final flipping = _pagePath(cx, top, bottom, outerX, rise);
+    canvas
+      ..drawPath(
+        flipping,
+        Paint()
+          ..color = a < .5 ? colorScheme.surface : colorScheme.primaryContainer,
+      )
+      ..drawPath(flipping, edge);
   }
+
+  Path _pagePath(
+    double cx,
+    double top,
+    double bottom,
+    double outerX,
+    double rise,
+  ) {
+    final midX = (cx + outerX) / 2;
+    return Path()
+      ..moveTo(cx, top + 1)
+      ..quadraticBezierTo(
+        midX,
+        top - _lift - rise,
+        outerX,
+        top - _lift * .6 - rise * .4,
+      )
+      ..lineTo(outerX, bottom - _lift * .6 - rise * .4)
+      ..quadraticBezierTo(midX, bottom - _lift - rise, cx, bottom + 1)
+      ..close();
+  }
+
+  @override
+  bool shouldRepaint(_LoadMoreBookPainter oldDelegate) =>
+      oldDelegate.animation != animation ||
+      oldDelegate.colorScheme != colorScheme;
 }
 
 /// 搜索状态指示器：搜索中放大镜在书架上来回巡查；切到 [empty] 时

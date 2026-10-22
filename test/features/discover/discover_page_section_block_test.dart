@@ -123,7 +123,7 @@ void main() {
       expect(observer.latestRoute, isA<CupertinoPageRoute<void>>());
       await tester.pumpAndSettle();
       expect(find.byType(DiscoverSectionPage), findsOneWidget);
-      final grid = tester.widget<GridView>(find.byType(GridView));
+      final grid = tester.widget<SliverGrid>(find.byType(SliverGrid));
       final delegate =
           grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
       expect(delegate.maxCrossAxisExtent, 170);
