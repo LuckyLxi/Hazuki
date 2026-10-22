@@ -109,8 +109,6 @@ ARB files in `lib/l10n/`. Use `l10n(context)` from `lib/l10n/l10n.dart` to get `
 
 Tests mirror the `lib/` structure under `test/`. Two patterns: **smoke tests** (instantiate controllers/pages to verify construction) and **controller unit tests** (drive state transitions directly on the `ChangeNotifier`). Use `mocktail` for fakes and `HazukiDatabase.memory()` for isolated storage.
 
-The full suite currently has one known baseline failure (a navigation-bar thickness assertion: expected 10, actual 72.0). Report it as a pre-existing failure; do not change the UI or loosen the assertion without approval.
-
 ## Conventions
 
 - **Code comments must be written in Simplified Chinese** — docstrings and inline comments explaining *why/how*, kept concise and professional.
