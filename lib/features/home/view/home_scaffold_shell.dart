@@ -901,19 +901,10 @@ class _HomeAppBarSearchBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: HazukiLiquidGlass.changes,
-      builder: (context, _) => _buildSearchBox(context),
-    );
-  }
-
-  Widget _buildSearchBox(BuildContext context) {
     final theme = Theme.of(context);
-    final glass = HazukiLiquidGlass.isAvailable;
-    final content = Material(
-      color: glass
-          ? Colors.transparent
-          : hazukiSearchBoxBackgroundColor(context),
+    final searchBox = Material(
+      key: const ValueKey('home-app-bar-search-box'),
+      color: hazukiSearchBoxBackgroundColor(context),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(50),
         side: hazukiSearchBoxOutlineSide(context),
@@ -949,26 +940,6 @@ class _HomeAppBarSearchBox extends StatelessWidget {
           ),
         ),
       ),
-    );
-    final searchBox = Stack(
-      key: const ValueKey('home-app-bar-search-box'),
-      fit: StackFit.passthrough,
-      children: [
-        Positioned.fill(
-          child: IgnorePointer(
-            child: glass
-                ? GlassContainer(
-                    key: const ValueKey('home-search-liquid-glass-surface'),
-                    useOwnLayer: true,
-                    quality: HazukiLiquidGlass.navigationQuality,
-                    shape: const LiquidRoundedRectangle(borderRadius: 50),
-                    settings: HazukiLiquidGlass.navigationSettings(context),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ),
-        content,
-      ],
     );
     if (maxWidth == null) {
       return Padding(

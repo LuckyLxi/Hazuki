@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 
 class SearchBarShell extends StatelessWidget {
@@ -38,9 +36,8 @@ class SearchBarShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([focusNode, HazukiLiquidGlass.changes]),
+      listenable: focusNode,
       builder: (context, _) {
-        final glass = HazukiLiquidGlass.isAvailable;
         final showFocusedAppearance =
             forceFocusedAppearance || focusNode.hasFocus;
         return TweenAnimationBuilder<double>(
@@ -70,16 +67,11 @@ class SearchBarShell extends StatelessWidget {
               },
               elevation: const WidgetStatePropertyAll(0),
               backgroundColor: WidgetStatePropertyAll(
-                glass
-                    ? Colors.transparent
-                    : hazukiSearchBoxBackgroundColor(
-                        context,
-                        focusProgress: focusProgress,
-                      ),
+                hazukiSearchBoxBackgroundColor(
+                  context,
+                  focusProgress: focusProgress,
+                ),
               ),
-              surfaceTintColor: glass
-                  ? const WidgetStatePropertyAll(Colors.transparent)
-                  : null,
               shape: WidgetStatePropertyAll(
                 RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(50),
@@ -109,41 +101,13 @@ class SearchBarShell extends StatelessWidget {
               onChanged: onChanged,
             );
 
-            // Keep the editable control mounted when the setting changes.
-            // The glass samples the backdrop separately from the input layer.
-            final content = Stack(
-              fit: StackFit.passthrough,
-              children: [
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: glass
-                        ? GlassContainer(
-                            key: const ValueKey(
-                              'search-bar-liquid-glass-surface',
-                            ),
-                            useOwnLayer: true,
-                            quality: HazukiLiquidGlass.navigationQuality,
-                            shape: const LiquidRoundedRectangle(
-                              borderRadius: 50,
-                            ),
-                            settings: HazukiLiquidGlass.navigationSettings(
-                              context,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                ),
-                searchBar,
-              ],
-            );
-
             if (!compact) {
-              return SizedBox(height: 56, child: content);
+              return SizedBox(height: 56, child: searchBar);
             }
 
             return ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 40),
-              child: content,
+              child: searchBar,
             );
           },
         );
