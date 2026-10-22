@@ -939,81 +939,85 @@ Hazuki.registerSource({
     },
   );
 
-  test(
-    'new plugin searches, reads details and loads local chapter bytes',
-    () async {
-      final image = File('${root.path}/page.png');
-      final bytes = base64Decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQ0AAAAASUVORK5CYII=',
-      );
-      await image.writeAsBytes(bytes);
-      final assembly = SourceRuntimeAssembly(
-        pluginManager: manager,
-        secureSessionStorage: MemorySourceSecureSessionStorage(),
-      );
-      addTearDown(assembly.dispose);
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+  test('new plugin searches, reads details and loads local chapter bytes', () async {
+    final image = File('${root.path}/page.png');
+    final bytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQ0AAAAASUVORK5CYII=',
+    );
+    await image.writeAsBytes(bytes);
+    final assembly = SourceRuntimeAssembly(
+      pluginManager: manager,
+      secureSessionStorage: MemorySourceSecureSessionStorage(),
+    );
+    addTearDown(assembly.dispose);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (_) async => root.path,
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
             const MethodChannel('plugins.flutter.io/path_provider'),
-            (_) async => root.path,
-          );
-      addTearDown(
-        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(
-              const MethodChannel('plugins.flutter.io/path_provider'),
-              null,
-            ),
-      );
-      await assembly.runtimeRegistry.loadActiveSourcePreference();
-      await manager.importPackage(
-        package(
-          script:
-              "Hazuki.registerSource({resources:{'about.txt':'embedded'},search:{load:async(k)=>({comics:[{id:'a',title:k,cover:''}],maxPage:1})},comic:{loadInfo:async(id)=>({id,title:'Comic',chapters:{'c':'Chapter'},tags:{}}),loadEp:async()=>({images:['https://fixture.example/page.png']}),transformImageBytes:async(bytes)=>({bytes,extension:'png'})}});",
-        ),
-      );
-      assembly.testing.handleFor('independent').dio.httpClientAdapter =
-          _ImageAdapter(bytes);
-      await assembly.runtimeRegistry.ensureInitialized(
-        sourceKey: 'independent',
-      );
-      final engine = assembly.testing.handleFor('independent').runtime.engine!;
-      expect(
-        await engine.evaluate("Hazuki.resources.readText('about.txt')"),
-        'embedded',
-      );
-      await expectLater(
-        engine.evaluate("Hazuki.resources.readText('toString')"),
-        throwsA(anything),
-      );
-      expect(
-        (await assembly.gateways.search.searchComics(
-          keyword: 'hello',
-          page: 1,
-        )).comics.single.title,
-        'hello',
-      );
-      expect((await assembly.gateways.reader.loadComicDetails('a')).chapters, {
-        'c': 'Chapter',
-      });
-      expect(
-        await assembly.gateways.reader.loadChapterImages(
-          comicId: 'a',
-          epId: 'c',
-        ),
-        ['https://fixture.example/page.png'],
-      );
-      final prepared = await assembly.gateways.reader.prepareChapterImageData(
-        'https://fixture.example/page.png',
-        comicId: 'a',
-        epId: 'c',
-        useDiskCache: false,
-      );
-      expect(prepared.bytes, bytes);
-      expect(prepared.wasProcessed, true);
-      await manager.setEnabled('independent', false);
-      expect(assembly.runtimeRegistry.activeSourceKey, null);
-    },
-  );
+            null,
+          ),
+    );
+    await assembly.runtimeRegistry.loadActiveSourcePreference();
+    await manager.importPackage(
+      package(
+        script:
+            "Hazuki.registerSource({resources:{'about.txt':'embedded'},search:{load:async(k)=>({comics:[{id:'a',title:k,cover:''}],maxPage:1})},comic:{loadInfo:async(id)=>({id,title:'Comic',chapters:{'c':'Chapter'},tags:{}}),loadEp:async()=>({images:['https://fixture.example/page.png']}),transformImageBytes:async(bytes)=>({bytes,extension:'png'})}});",
+      ),
+    );
+    assembly.testing.handleFor('independent').dio.httpClientAdapter =
+        _ImageAdapter(bytes);
+    await assembly.runtimeRegistry.ensureInitialized(sourceKey: 'independent');
+    final engine = assembly.testing.handleFor('independent').runtime.engine!;
+    expect(
+      await engine.evaluate("Hazuki.resources.readText('about.txt')"),
+      'embedded',
+    );
+    await expectLater(
+      engine.evaluate("Hazuki.resources.readText('toString')"),
+      throwsA(anything),
+    );
+    expect(
+      await engine.evaluate(
+        'JSON.stringify(Hazuki.images.regions([{sx:0,sy:1,sw:2,sh:3,dx:4,dy:5,extra:6}],{width:8}))',
+      ),
+      '{"width":8,"regions":[{"sx":0,"sy":1,"sw":2,"sh":3,"dx":4,"dy":5}]}',
+    );
+    await expectLater(
+      engine.evaluate(
+        'Hazuki.images.regions([{sx:0,sy:0,sw:0,sh:1,dx:0,dy:0}])',
+      ),
+      throwsA(anything),
+    );
+    expect(
+      (await assembly.gateways.search.searchComics(
+        keyword: 'hello',
+        page: 1,
+      )).comics.single.title,
+      'hello',
+    );
+    expect((await assembly.gateways.reader.loadComicDetails('a')).chapters, {
+      'c': 'Chapter',
+    });
+    expect(
+      await assembly.gateways.reader.loadChapterImages(comicId: 'a', epId: 'c'),
+      ['https://fixture.example/page.png'],
+    );
+    final prepared = await assembly.gateways.reader.prepareChapterImageData(
+      'https://fixture.example/page.png',
+      comicId: 'a',
+      epId: 'c',
+      useDiskCache: false,
+    );
+    expect(prepared.bytes, bytes);
+    expect(prepared.wasProcessed, true);
+    await manager.setEnabled('independent', false);
+    expect(assembly.runtimeRegistry.activeSourceKey, null);
+  });
 }
 
 class _ImageAdapter implements HttpClientAdapter {

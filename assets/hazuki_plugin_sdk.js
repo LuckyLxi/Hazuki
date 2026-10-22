@@ -59,6 +59,18 @@ return Object.freeze({
     images: Object.freeze({reverseVerticalTiles(segments) {
         if (!Number.isInteger(segments) || segments < 0 || segments > 4096) throw new Error('plugin_invalid_image_segments');
         return {segments};
+    }, regions(regions, size = {}) {
+        // 宿主会再次严格校验边界，这里只拦截明显的格式错误。
+        const isIndex = value => Number.isInteger(value) && value >= 0;
+        if (!Array.isArray(regions) || regions.length > 4096 ||
+            !regions.every(r => r && ['sx', 'sy', 'sw', 'sh', 'dx', 'dy'].every(k => isIndex(r[k])) &&
+                r.sw > 0 && r.sh > 0) ||
+            (size.width != null && !(isIndex(size.width) && size.width > 0)) ||
+            (size.height != null && !(isIndex(size.height) && size.height > 0))) {
+            throw new Error('plugin_invalid_image_regions');
+        }
+        return {width: size.width, height: size.height,
+            regions: regions.map(({sx, sy, sw, sh, dx, dy}) => ({sx, sy, sw, sh, dx, dy}))};
     }}),
     convert: Convert,
     log: (message, level = 'info') => sendMessage({method: 'log', level, title: 'Plugin', content: message}),

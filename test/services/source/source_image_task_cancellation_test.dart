@@ -5,6 +5,7 @@ import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import 'package:hazuki/services/source/comic/source_comic_details_cache.dart';
 import 'package:hazuki/services/source/account/source_relogin_coordinator.dart';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,6 +57,57 @@ Future<void> _until(bool Function() predicate) async {
     await Future<void>.delayed(const Duration(milliseconds: 1));
   }
   expect(predicate(), isTrue);
+}
+
+SourceImagePreparationCapability _preparation(
+  SourceRuntimeHost host,
+  Uint8List bytes,
+) => SourceImagePreparationCapability(
+  runtimeHost: host,
+  downloadImageBytes:
+      (
+        url, {
+        comicId,
+        epId,
+        keepInMemory = true,
+        useDiskCache = true,
+        priority = false,
+        sourceKey = '',
+        taskOrigin,
+      }) async => bytes,
+);
+
+Future<Uint8List> _encodePng(
+  int width,
+  int height,
+  List<List<int>> pixels,
+) async {
+  final buffer = await ui.ImmutableBuffer.fromUint8List(
+    Uint8List.fromList(pixels.expand((pixel) => pixel).toList()),
+  );
+  final descriptor = ui.ImageDescriptor.raw(
+    buffer,
+    width: width,
+    height: height,
+    pixelFormat: ui.PixelFormat.rgba8888,
+  );
+  final codec = await descriptor.instantiateCodec();
+  final image = (await codec.getNextFrame()).image;
+  final png = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  codec.dispose();
+  descriptor.dispose();
+  buffer.dispose();
+  return png!.buffer.asUint8List();
+}
+
+Future<List<int>> _decodeRgba(Uint8List bytes) async {
+  final codec = await ui.instantiateImageCodec(bytes);
+  final image = (await codec.getNextFrame()).image;
+  final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  image.dispose();
+  codec.dispose();
+  return data!.buffer.asUint8List().toList();
 }
 
 void main() {
@@ -608,6 +660,87 @@ void main() {
         comicId: 'comic',
         epId: 'ep',
         taskOrigin: origin('transform'),
+      );
+      final failed = expectLater(pending, throwsA(isA<SourceTaskCancelled>()));
+      await entered.future;
+      final task = host.tasks.activeTasks.single;
+      final receipt = await host.tasks.cancelTask(
+        task.taskId,
+        SourceTaskStopReason.user,
+      );
+      await failed;
+      await receipt.whenSettled;
+      expect(await engine.evaluate('2+3'), 5);
+    },
+  );
+
+  test('applies plugin-declared image regions with real pixels', () async {
+    // 1×4 竖图，四行依次为红、绿、蓝、白；声明上下两半互换。
+    final source = await _encodePng(1, 4, [
+      [255, 0, 0, 255],
+      [0, 255, 0, 255],
+      [0, 0, 255, 255],
+      [255, 255, 255, 255],
+    ]);
+    await engine.execute(
+      'this.__hazuki_source.comic.mapImageRegions=(w,h)=>({regions:['
+      '{sx:0,sy:0,sw:w,sh:h/2,dx:0,dy:h/2},'
+      '{sx:0,sy:h/2,sw:w,sh:h/2,dx:0,dy:0}]})',
+    );
+    final preparation = _preparation(host, source);
+
+    final result = await preparation.prepareChapterImageData(
+      'https://fixture.test/regions.jpg',
+      comicId: 'comic',
+      epId: 'ep',
+    );
+
+    expect(result.wasProcessed, isTrue);
+    expect(result.extension, 'png');
+    expect(result.aspectRatio, 0.25);
+    expect(await _decodeRgba(result.bytes), [
+      0, 0, 255, 255, //
+      255, 255, 255, 255,
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+    ]);
+  });
+
+  test('null image regions fall back to the untouched source', () async {
+    final source = await _encodePng(1, 1, [
+      [9, 9, 9, 255],
+    ]);
+    await engine.execute('this.__hazuki_source.comic.mapImageRegions=()=>null');
+
+    final result = await _preparation(host, source).prepareChapterImageData(
+      'https://fixture.test/plain.png',
+      comicId: 'comic',
+      epId: 'ep',
+    );
+
+    expect(result.wasProcessed, isFalse);
+    expect(result.bytes, source);
+  });
+
+  test(
+    'cancel preparation task stops region mapping without affecting its engine',
+    () async {
+      final entered = Completer<void>();
+      engine.setOperationMessageHandler((_, context) {
+        entered.complete();
+        return null;
+      });
+      await engine.execute(
+        'this.__hazuki_source.comic.mapImageRegions=()=>{sendMessage({});while(true){}}',
+      );
+      final source = await _encodePng(1, 1, [
+        [0, 0, 0, 255],
+      ]);
+      final pending = _preparation(host, source).prepareChapterImageData(
+        'https://fixture.test/regions.png',
+        comicId: 'comic',
+        epId: 'ep',
+        taskOrigin: origin('regions'),
       );
       final failed = expectLater(pending, throwsA(isA<SourceTaskCancelled>()));
       await entered.future;
