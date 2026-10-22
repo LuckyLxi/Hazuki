@@ -66,6 +66,8 @@ class SourceReadingProgressUploads {
       (_freeze(progress) as Map).cast<String, Object>(),
     );
     final lease = host.acquireServiceRuntimeLease(handle);
+    // 记录接纳时的实例：它故障后该项结束，不转移到重建后的新实例。
+    final admittedEngine = handle.runtime.engine;
     final entry = _Upload(handle, identity, lease);
     _uploads.add(entry);
     final previous = _queues[sourceKey] ?? Future<void>.value();
@@ -90,6 +92,9 @@ class SourceReadingProgressUploads {
         _changed();
         context.checkActive();
         await context.withWorkTimeout<void>(workTimeout, () async {
+          if (admittedEngine?.failure case final failure?) {
+            throw failure.forTask(context.task.taskId);
+          }
           final engine = handle.runtime.engine;
           if (engine == null) return;
           handle.hostExecutionGuards[context.task.taskId] = () {

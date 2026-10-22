@@ -128,7 +128,7 @@ class MangaDownloadFiles {
       }
       return target.path;
     } catch (error) {
-      if (error is SourceTaskCancelled) rethrow;
+      if (error is SourceTaskCancelled || error is SourceRuntimeFailed) rethrow;
       run?.checkActive();
       return null;
     }

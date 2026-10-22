@@ -281,6 +281,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
       control?.checkActive();
       facade.runtime.sourceMeta = finalMeta;
       facade.runtime.engine = engine;
+      handle.watchEngine(engine);
       handle.htmlBridge = htmlBridge;
       if (oldEngine != null) handle.retireEngine(oldEngine);
       oldHtmlBridge.clear();

@@ -38,6 +38,7 @@ import 'source_localization_operations.dart';
 import 'source_runtime_capability.dart';
 import 'source_runtime_facade.dart';
 import 'source_runtime_handle.dart';
+import 'source_runtime_health.dart';
 import 'source_runtime_host.dart';
 import 'source_runtime_operations.dart';
 import 'source_runtime_view.dart';
@@ -121,6 +122,12 @@ class SourceRuntimeAssembly {
       bundledInitAssetPath: _bundledInitAssetPath,
       sourceIndexUrls: _sourceIndexUrls,
     );
+    _runtimeHost.onRuntimeFailed = SourceRuntimeHealthMonitor(
+      runtimeHost: _runtimeHost,
+      runtimeStateController: _runtimeStateController,
+      ensureSourceInitialized: (sourceKey) =>
+          _runtimeCapability.initialization.ensureSourceInitialized(sourceKey),
+    ).handleFailure;
     _accountCapability.interactive = SourceInteractiveLoginOperations(
       host: _runtimeHost,
       loadRuntime: _runtimeCapability.loadLoginRuntime,

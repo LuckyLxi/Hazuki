@@ -174,8 +174,10 @@ class SourceComicDetailsCapability {
         }
       } catch (error) {
         request.checkActive();
+        // 运行时故障不能经插件请求的重建重放到新实例。
         if (error is SourceTaskCancelled ||
             error is SourceScriptStopped ||
+            error is SourceRuntimeFailed ||
             isSourceUiCancellation(error)) {
           rethrow;
         }
@@ -341,7 +343,9 @@ class SourceComicDetailsCapability {
         }
       } catch (error) {
         rethrowSourceOperationStop(error);
-        if (!handle.recreationRequested || attempt == 1) {
+        if (error is SourceRuntimeFailed ||
+            !handle.recreationRequested ||
+            attempt == 1) {
           rethrow;
         }
       }

@@ -90,7 +90,12 @@ class SourceCloudReadingSession {
   Future<SourceRuntimeHandle> reader(SourceOperationContext context) async {
     checkActive();
     if (load == null) return owner;
-    if (_ready case final handle?) return handle;
+    if (_ready case final handle?) {
+      if (handle.runtime.engine != null) return handle;
+      // 私有实例故障后丢弃（暂存永不提交），本次读取重新初始化新的私有实例。
+      _ready = null;
+      unawaited(_disposePrivate(handle));
+    }
     var pending = _initializing;
     if (pending == null || !pending.available) {
       late final SourceSharedRequest<SourceRuntimeHandle> created;
@@ -186,8 +191,13 @@ class SourceCloudReadingSession {
     checkActive();
     context.checkActive();
     return handle.runOperation(() async {
+      final engine = handle.runtime.engine;
+      if (engine == null) {
+        throw handle.lastRuntimeFailure?.forTask(context.task.taskId) ??
+            StateError('source_script_engine_closed');
+      }
       final raw = await context.invoke(
-        handle.runtime.engine!,
+        engine,
         '(value) => globalThis.__hazuki_source.comic.$method(value)',
         [argument],
       );

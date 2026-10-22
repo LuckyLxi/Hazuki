@@ -53,6 +53,38 @@ class SourceTaskTimedOut extends SourceTaskCancelled {
 bool isSourceTaskCancellation(Object error) =>
     error is SourceTaskCancelled && error is! SourceTaskTimedOut;
 
+/// 运行时故障的结构化类别；不含脚本内容或凭据。
+enum SourceRuntimeFailureKind {
+  internalJob,
+  workerError,
+  exitedWithoutCleanup,
+  probeFailed,
+  bootstrap,
+}
+
+/// 运行时实例不可用。它是故障而不是取消，不能按静默取消处理，
+/// 也不能被降级、认证重试或自动重试吞掉。
+class SourceRuntimeFailed implements Exception {
+  const SourceRuntimeFailed(
+    this.runtimeId,
+    this.kind, {
+    this.taskId,
+    this.cause,
+  });
+  final String runtimeId;
+  final SourceRuntimeFailureKind kind;
+  final String? taskId;
+
+  /// 仅用于诊断，不进入面向用户的错误代码。
+  final Object? cause;
+
+  SourceRuntimeFailed forTask(String taskId) =>
+      SourceRuntimeFailed(runtimeId, kind, taskId: taskId, cause: cause);
+
+  @override
+  String toString() => 'source_runtime_failed:${kind.name}';
+}
+
 /// Explicit host-only request lifetime, including gaps between service calls.
 class SourceTaskCancellation extends ChangeNotifier {
   SourceTaskStopReason? _reason;

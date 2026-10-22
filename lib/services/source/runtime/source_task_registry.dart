@@ -80,7 +80,8 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
     }
     void scopeStopped() {
       final reason = scope?.reason;
-      if (reason == null) return;
+      // 实例故障由调用错误以 SourceRuntimeFailed 结算，不能转成取消。
+      if (reason == null || reason == 'runtimeFailed') return;
       task._requestStop(switch (reason) {
         'timeout' => SourceTaskStopReason.deadlineExceeded,
         'sourceChanged' => SourceTaskStopReason.sourceChanged,

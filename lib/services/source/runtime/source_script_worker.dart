@@ -14,6 +14,7 @@ Future<void> runSourceScriptWorker(Map<String, dynamic> configuration) async {
   } catch (error, stack) {
     worker.send({
       'type': 'failed',
+      'kind': 'bootstrap',
       'value': worker.codec.encode(JSError(error, stack)),
     });
     await worker.close();
@@ -77,6 +78,27 @@ class _SourceScriptWorker {
   bool draining = false;
   bool closing = false;
   bool pumping = false;
+  // 原生中断过正在执行的 JS 后，在下一个空闲检查点合并执行一次只读探针。
+  bool _probeNeeded = false;
+  bool _debugProbeFailure = false;
+
+  void _debugFault(String? kind) {
+    switch (kind) {
+      case 'internalJob':
+        _failRuntime(
+          StateError('source_runtime_debug_fault'),
+          StackTrace.current,
+          'internalJob',
+        );
+      case 'workerError':
+        Timer.run(() => throw StateError('source_runtime_debug_fault'));
+      case 'exitWithoutCleanup':
+        Isolate.exit();
+      case 'probe':
+        _debugProbeFailure = true;
+    }
+  }
+
   Future<void>? _closeFuture;
   String get runtimeId => configuration['runtimeId'] as String;
   Map<String, dynamic> get _internalExecution => {
@@ -116,6 +138,13 @@ class _SourceScriptWorker {
         return;
       }
       if (closing) return;
+      if (message['type'] == 'debugFault') {
+        // 仅供测试注入真实故障路径；release 构建中忽略。
+        if (!const bool.fromEnvironment('dart.vm.product')) {
+          _debugFault(message['kind'] as String?);
+        }
+        return;
+      }
       if (message['type'] == 'cancel') {
         final taskId = message['taskId'] as String;
         _cancelled[taskId] = message['reason'] as String;
@@ -240,11 +269,13 @@ class _SourceScriptWorker {
         'queueElapsedUs': task.startedUs,
       });
       calls[id] = token;
+      var entered = false;
       try {
         if (command['type'] != 'release' &&
             _cancelled.containsKey(tasks[token]!.execution['taskId'])) {
           throw QuickJsTaskStoppedError(token, QuickJsStopReason.cancelled);
         }
+        entered = true;
         final value = native.withTaskContext(token, () {
           switch (command['type']) {
             case 'execute':
@@ -311,6 +342,8 @@ class _SourceScriptWorker {
           _result(id, value, false);
         }
       } catch (error, stack) {
+        // 排队期间已取消、未进入 JS 的命令不需要探针。
+        if (entered && error is QuickJsTaskStoppedError) _probeNeeded = true;
         _result(id, error is JSError ? error : JSError(error, stack), true);
       }
       _drain();
@@ -374,6 +407,7 @@ class _SourceScriptWorker {
                   StateError('source_script_internal_job_failed');
             }
             if (step.status == QuickJsJobStatus.stopped) {
+              _probeNeeded = true;
               native.taskControl!.stopRetained(
                 step.taskToken,
                 reason: step.stopReason ?? QuickJsStopReason.cancelled,
@@ -388,69 +422,122 @@ class _SourceScriptWorker {
           }
         }
       } catch (error, stack) {
-        send({
-          'type': 'failed',
-          'value': codec.encode(
-            error is JSError ? error : JSError(error, stack),
-          ),
-        });
-        unawaited(close());
-        return;
-      }
-      _reapResources();
-      _flushCancelled();
-      _flushReleasedTasks();
-      if (!complete) {
-        Timer.run(batch);
+        _failRuntime(error, stack, 'internalJob');
         return;
       }
       try {
-        _publishSnapshot();
-      } catch (_) {
-        /* Retain the last valid snapshot. */
+        _finishBatch(complete, batch);
+      } catch (error, stack) {
+        // 清理或检查点自身失败说明运行时状态已不可信，按故障正常关闭。
+        _failRuntime(error, stack, 'internalJob');
       }
-      for (final result in results) {
-        send(result);
-      }
-      results.clear();
-      for (final token in _completeTokens.toList()) {
-        _completeTokens.remove(token);
-        native.taskControl!.complete(token);
-        final task = tasks[token];
-        if (task != null) task.completed = true;
-        _releaseTask(token);
-      }
-      _reapResources();
-      final shared = <String, int>{for (final id in _cancelled.keys) id: 0};
-      for (final work in [
-        ...callbacks.values.map((e) => e.$2),
-        ...delays.values.map((e) => e.$2),
-      ]) {
-        if (native.taskControl!.workState(work.workId) ==
-            QuickJsWorkState.retained) {
-          final id = tasks[work.taskToken]?.execution['taskId'] as String?;
-          if (id != null) shared[id] = (shared[id] ?? 0) + 1;
-        }
-      }
-      send({'type': 'checkpoint', 'shared': shared});
-      for (final id in _cancelPending.toList()) {
-        if (calls.values.any(
-              (token) => tasks[token]?.execution['taskId'] == id,
-            ) ||
-            queue.any(
-              (command) => (command['execution'] as Map?)?['taskId'] == id,
-            )) {
-          continue;
-        }
-        _cancelPending.remove(id);
-        send({'type': 'cancelAck', 'taskId': id});
-      }
-      draining = false;
-      _flushReleasedTasks();
-      if (queue.isNotEmpty) Timer.run(_pump);
     }
 
     batch();
+  }
+
+  void _finishBatch(bool complete, void Function() batch) {
+    _reapResources();
+    _flushCancelled();
+    _flushReleasedTasks();
+    if (!complete) {
+      Timer.run(batch);
+      return;
+    }
+    try {
+      _publishSnapshot();
+    } catch (_) {
+      /* Retain the last valid snapshot. */
+    }
+    for (final result in results) {
+      send(result);
+    }
+    results.clear();
+    for (final token in _completeTokens.toList()) {
+      _completeTokens.remove(token);
+      native.taskControl!.complete(token);
+      final task = tasks[token];
+      if (task != null) task.completed = true;
+      _releaseTask(token);
+    }
+    _reapResources();
+    final shared = <String, int>{for (final id in _cancelled.keys) id: 0};
+    for (final work in [
+      ...callbacks.values.map((e) => e.$2),
+      ...delays.values.map((e) => e.$2),
+    ]) {
+      if (native.taskControl!.workState(work.workId) ==
+          QuickJsWorkState.retained) {
+        final id = tasks[work.taskToken]?.execution['taskId'] as String?;
+        if (id != null) shared[id] = (shared[id] ?? 0) + 1;
+      }
+    }
+    send({'type': 'checkpoint', 'shared': shared});
+    for (final id in _cancelPending.toList()) {
+      if (calls.values.any(
+            (token) => tasks[token]?.execution['taskId'] == id,
+          ) ||
+          queue.any(
+            (command) => (command['execution'] as Map?)?['taskId'] == id,
+          )) {
+        continue;
+      }
+      _cancelPending.remove(id);
+      send({'type': 'cancelAck', 'taskId': id});
+    }
+    if (_probeNeeded && _cancelPending.isEmpty) {
+      _probeNeeded = false;
+      try {
+        _probe();
+      } catch (error, stack) {
+        _failRuntime(error, stack, 'probeFailed');
+        return;
+      }
+    }
+    draining = false;
+    _flushReleasedTasks();
+    if (queue.isNotEmpty) Timer.run(_pump);
+  }
+
+  /// 只读健康探针：不运行插件方法，只核对可精确比较的不变量。
+  /// 原生 task/work 总数包含主 isolate 预注册和内部 Promise 工作，不能与
+  /// worker 表直接相等，因此只检查内部求值与 worker 持有租约的 work。
+  void _probe() {
+    if (_debugProbeFailure) {
+      throw StateError('source_runtime_probe_failed:debug');
+    }
+    final evaluation = native.withTaskContext(
+      0,
+      () => native.evaluate('0', notifyJobs: false),
+    );
+    final value = evaluation.rawResult;
+    if (evaluation.isError || value is! num || value != 0) {
+      JSRef.freeRecursive(value);
+      throw StateError('source_runtime_probe_failed:evaluate');
+    }
+    for (final work in [
+      ...callbacks.values.map((e) => e.$2),
+      ...delays.values.map((e) => e.$2),
+      ...hostCalls.values.map((e) => e.$2),
+    ]) {
+      // worker 仍持有租约的 work 在原生侧必须存在。
+      if (native.taskControl!.workState(work.workId) ==
+          QuickJsWorkState.invalid) {
+        throw StateError('source_runtime_probe_failed:work');
+      }
+    }
+    send({'type': 'probe', 'healthy': true});
+  }
+
+  void _failRuntime(Object error, StackTrace stack, String kind) {
+    if (closing) return;
+    draining = false;
+    send({
+      'type': 'failed',
+      'kind': kind,
+      'value': codec.encode(error is JSError ? error : JSError(error, stack)),
+    });
+    unawaited(close());
   }
 
   void _flushReleasedTasks() {

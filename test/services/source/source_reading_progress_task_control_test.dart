@@ -172,6 +172,41 @@ void main() {
     },
   );
 
+  test(
+    'a runtime failure ends admitted uploads without moving them to the rebuilt instance',
+    () async {
+      final handle = host.activeHandle;
+      final failed = engine;
+      handle.watchEngine(failed);
+      final first = uploads.report(progress(1), 'one');
+      final second = uploads.report(progress(2), 'one');
+      await _until(() => calls.length == 1);
+
+      failed.debugInjectFault('internalJob');
+
+      await first;
+      await _until(() => handle.runtime.engine == null);
+      // 模拟恢复后发布的新实例；故障前接纳的第二项不得在它上面执行。
+      await install(handle);
+      final third = uploads.report(progress(3), 'one');
+      await second;
+      await _until(() => calls.length == 2);
+      gates[3]!.complete(null);
+      await third;
+      expect(calls.map((e) => e['page']), [1, 3]);
+      final failures = logs.events
+          .where(
+            (e) =>
+                e.event == 'source_task_failed' &&
+                (e.data as Map)['method'] == 'cloud.upload',
+          )
+          .map((e) => (e.data as Map)['errorType'])
+          .toList();
+      expect(failures, ['SourceRuntimeFailed', 'SourceRuntimeFailed']);
+      await failed.whenClosed.catchError((Object _) {});
+    },
+  );
+
   test('deep snapshot does not change while its upload is queued', () async {
     final first = uploads.report(progress(1), 'one');
     final visible = [2];

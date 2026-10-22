@@ -116,6 +116,8 @@ class SourceRuntimeInitializationOperations {
   }
 
   Future<void> _ensureHandleInitialized(SourceRuntimeHandle handle) async {
+    // 崩溃循环锁存后不再按需重建，等待显式手动重试。
+    if (handle.runtimeFault case final fault?) throw fault;
     final facade = handle.facade;
     if (handle.facade.initFuture == null && _isHandleInitialized(handle)) {
       return;

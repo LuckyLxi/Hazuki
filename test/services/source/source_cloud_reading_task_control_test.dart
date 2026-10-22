@@ -47,6 +47,8 @@ void main() {
     engine.operationGuard = handle.runOperation;
     handle.loadControl!.bindEngine(engine);
     handle.runtime.engine = engine;
+    // 与真实 loader 发布实例时一致，监听私有实例故障。
+    handle.watchEngine(engine);
     engine.setOperationMessageHandler((message, context) {
       final key = (message as Map)['id'] as String;
       calls.add(key);
@@ -144,6 +146,37 @@ void main() {
       replies['second']!.complete({'chapterId': 'ep', 'page': 2});
       expect((await second)!['imagePage'], 2);
       expect(calls, ['second']);
+    },
+  );
+
+  test(
+    'a failed private instance is discarded and the next read builds a new one',
+    () async {
+      final first = cloud.loadCloudReadingProgress(
+        'one',
+        'a',
+        taskOrigin: origin('a'),
+      );
+      await _until(() => calls.contains('a'));
+      replies['a']!.complete({'chapterId': 'ep', 'page': 1});
+      expect((await first)!['imagePage'], 1);
+      final failed = private.single;
+
+      failed.runtime.engine!.debugInjectFault('internalJob');
+
+      await _until(() => failed.runtime.engine == null);
+      final second = cloud.loadCloudReadingProgress(
+        'one',
+        'b',
+        taskOrigin: origin('b'),
+      );
+      await _until(() => calls.contains('b'));
+      replies['b']!.complete({'chapterId': 'ep', 'page': 2});
+      expect((await second)!['imagePage'], 2);
+      expect(private, hasLength(2));
+      await _until(() => failed.isDisposed);
+      // 主运行时不受私有实例故障影响。
+      expect(await main.evaluate('7'), 7);
     },
   );
 

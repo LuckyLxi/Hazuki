@@ -381,7 +381,9 @@ class SearchResultsController extends ChangeNotifier {
             return;
           }
         } catch (error) {
+          // 运行时故障不自动重试：重试会把已接纳的搜索重放到重建后的实例。
           if (isSilentSearchStop(error) ||
+              error is SourceRuntimeFailed ||
               _sourceUi.wasCancelled ||
               lifetime.reason != null) {
             rethrow;

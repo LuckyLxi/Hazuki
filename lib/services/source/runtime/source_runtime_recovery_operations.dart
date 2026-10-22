@@ -32,6 +32,8 @@ class SourceRuntimeRecoveryOperations {
   }) async {
     final normalizedSourceKey = _runtimeHost.normalize(sourceKey);
     final handle = _runtimeHost.handleFor(normalizedSourceKey);
+    // 手动重新下载脚本是显式恢复入口，解除故障锁存。
+    handle.clearRuntimeFault();
     await handle.runOperation(() async {
       final facade = handle.facade;
       _clearRuntimeCaches(handle, clearMetadata: false);
@@ -56,6 +58,8 @@ class SourceRuntimeRecoveryOperations {
 
   Future<void> reloadFromLocalSourceFiles() async {
     final handle = _runtimeHost.activeHandle;
+    // 手动重新加载是显式恢复入口，解除故障锁存。
+    handle.clearRuntimeFault();
     await handle.runOperation(() async {
       final facade = handle.facade;
       if (facade.isRefreshingSource) {
@@ -98,6 +102,8 @@ class SourceRuntimeRecoveryOperations {
   Future<bool> refreshSourceOnNetworkRecovery() {
     if (!_runtimeHost.hasActiveSource) return Future.value(false);
     final handle = _runtimeHost.activeHandle;
+    // 网络恢复是自动入口，不能绕过崩溃循环锁存。
+    if (handle.runtimeFault != null) return Future.value(false);
     return handle.runOperation(() => _refreshSource(handle));
   }
 

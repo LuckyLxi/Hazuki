@@ -444,19 +444,26 @@ class SourceUiService {
     }
   }
 
-  void cancelRuntime(String runtimeId) {
+  /// [reason] 为 `runtimeFailed` 时表示实例故障，[error] 随 scope 抛出。
+  void cancelRuntime(
+    String runtimeId, {
+    String reason = 'runtimeDisposed',
+    Object? error,
+  }) {
     for (final scope in scopes) {
-      if (scope.runtimeIds.contains(runtimeId)) scope.cancel('runtimeDisposed');
+      if (scope.runtimeIds.contains(runtimeId)) {
+        scope.cancel(reason, error: error);
+      }
     }
     for (final dialog in _dialogs.values.toList()) {
       if (dialog.runtimeId == runtimeId && !dialog.isClosed) {
-        dialog.scope.cancel('runtimeDisposed');
+        dialog.scope.cancel(reason, error: error);
       }
     }
     for (final entry in _executionScopes.entries.toList()) {
       if (entry.key.$1 == runtimeId) {
         final scope = entry.value;
-        scope.cancel('runtimeDisposed');
+        scope.cancel(reason, error: error);
         _releasedScopes.add(scope);
         _releaseScopeIfIdle(scope);
       }

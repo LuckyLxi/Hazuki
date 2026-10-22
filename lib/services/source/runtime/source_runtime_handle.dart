@@ -22,8 +22,18 @@ import 'source_task_registry.dart';
 import 'source_runtime_load_control.dart';
 import 'source_session_store.dart';
 import '../account/source_login_interaction.dart';
+import '../interaction/source_ui_scope.dart';
 import '../interaction/source_ui_service.dart';
+import '../models/source_task.dart';
 import '../../logging/app_log_store.dart';
+
+/// [recover] 为真表示消耗了本次单次自动恢复额度；为假表示故障已锁存。
+typedef SourceRuntimeFailureHandler =
+    void Function(
+      SourceRuntimeHandle handle,
+      SourceRuntimeFailed failure, {
+      required bool recover,
+    });
 
 Dio _createSourceDio() {
   return createHazukiDio(
@@ -47,6 +57,7 @@ class SourceRuntimeHandle
     AppLogStore? appLogStore,
     SourceTaskRegistry? tasks,
     bool Function(SourceRuntimeHandle handle)? canCacheImages,
+    this.onRuntimeFailed,
   }) : _ensureInitialized = ensureInitialized,
        _notifyRuntimeStateChanged = notifyRuntimeStateChanged,
        _secureStorage = secureStorage,
@@ -82,6 +93,9 @@ class SourceRuntimeHandle
   bool _disposed = false;
   bool _disposeRequested = false;
   bool _recreationRequested = false;
+  final SourceRuntimeFailureHandler? onRuntimeFailed;
+  bool _autoRecoveryAvailable = true;
+  SourceRuntimeFailed? _runtimeFault;
   int _activeOperationCount = 0;
   final Object _operationZoneKey = Object();
   final Set<SourceScriptEngine> _retiredEngines = {};
@@ -190,6 +204,70 @@ class SourceRuntimeHandle
   bool get isDisposalRequested => _disposeRequested || _disposed;
 
   bool get recreationRequested => _recreationRequested;
+
+  /// 自动恢复额度用尽后锁存的故障；只能由显式手动入口解除。
+  SourceRuntimeFailed? get runtimeFault => _runtimeFault;
+
+  /// 最近一次已发布实例的故障；发布新实例后清空。
+  SourceRuntimeFailed? get lastRuntimeFailure => _lastRuntimeFailure;
+  SourceRuntimeFailed? _lastRuntimeFailure;
+
+  /// 监听已发布实例的故障。回调须与实例处于同一错误 zone，否则其关闭错误
+  /// 无法传给收尾监听；只解除加载时继承的交互 scope。
+  void watchEngine(SourceScriptEngine engine) {
+    _lastRuntimeFailure = null;
+    engine.whenFailed
+        .then<void>(
+          (failure) => SourceUiScope.withoutInteractionSync(
+            () => _engineFailed(engine, failure),
+          ),
+        )
+        .ignore();
+  }
+
+  void _engineFailed(SourceScriptEngine engine, SourceRuntimeFailed failure) {
+    // 旧实例或已退役 handle 的迟到故障一律忽略。
+    if (_disposed || _disposeRequested || !identical(runtime.engine, engine)) {
+      return;
+    }
+    runtime.engine = null;
+    _lastRuntimeFailure = failure;
+    // 故障实例由 worker 自行释放；仅未正常清理的退出仍作为收尾失败报告。
+    final closing = engine.whenClosed.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {
+        if (failure.kind == SourceRuntimeFailureKind.exitedWithoutCleanup) {
+          Error.throwWithStackTrace(error, stack);
+        }
+      },
+    );
+    closing.ignore();
+    _engineClosures.add(closing);
+    final recover = _autoRecoveryAvailable;
+    if (recover) {
+      _autoRecoveryAvailable = false;
+    } else {
+      _runtimeFault = failure;
+    }
+    try {
+      onRuntimeFailed?.call(this, failure, recover: recover);
+    } catch (_) {
+      // 恢复调度失败不能影响故障隔离。
+    }
+  }
+
+  /// 恢复后的实例成功完成业务操作，重新获得单次自动恢复额度。
+  void noteOperationSucceeded() {
+    if (runtime.engine != null && _runtimeFault == null) {
+      _autoRecoveryAvailable = true;
+    }
+  }
+
+  /// 显式手动重试、重新加载或重新下载脚本时解除锁存。
+  void clearRuntimeFault() {
+    _runtimeFault = null;
+    _autoRecoveryAvailable = true;
+  }
 
   void _onResponseStatus(int statusCode) {
     final statuses = runtime.sourceMeta?.presentation['recreateOnStatus'];

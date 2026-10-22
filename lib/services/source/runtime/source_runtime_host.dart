@@ -65,6 +65,9 @@ class SourceRuntimeHost extends ChangeNotifier {
   final AppLogStore logStore;
   final SourceTaskRegistry tasks = SourceTaskRegistry();
   final String serviceTaskOwnerId = createSourceTaskId();
+
+  /// 由组合根设置的运行时故障处理；只作用于本宿主创建的来源 handle。
+  SourceRuntimeFailureHandler? onRuntimeFailed;
   final Set<SourceReaderSession> _readerSessions = {};
 
   final Map<SourceDownloadSession, SourceRuntimeHandle> _downloadSessions = {};
@@ -383,6 +386,8 @@ class SourceRuntimeHost extends ChangeNotifier {
     appLogStore: logStore,
     tasks: tasks,
     canCacheImages: (handle) => isCurrentHandle(handle),
+    onRuntimeFailed: (handle, failure, {required recover}) =>
+        onRuntimeFailed?.call(handle, failure, recover: recover),
   )..pluginDirectory = definitionFor(sourceKey).pluginDirectory;
 
   void _notifyChanged() {

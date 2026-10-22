@@ -79,7 +79,9 @@ void main() {
       translateSourceText: (text, {sourceKey = ''}) => text,
     );
     engine = SourceScriptEngine(pluginId: 'one');
-    addTearDown(engine.close);
+    final created = engine;
+    // 故障实例的 whenClosed 以故障原因结束，收尾只需确认释放完成。
+    addTearDown(() => created.close().catchError((Object _) {}));
     final handle = host.handleFor('one');
     engine.operationGuard = handle.runOperation;
     handle.runtime.engine = engine;
@@ -320,6 +322,40 @@ void main() {
       await receipt.whenSettled.timeout(const Duration(seconds: 2));
       expect(host.handleFor('one'), same(handle));
       expect(handle.runtime.engine, same(engine));
+    },
+  );
+
+  test(
+    'a runtime failure bypasses plugin-requested runtime recreation',
+    () async {
+      final handle = host.handleFor('one');
+      handle.runtime.sourceMeta = SourceMeta(
+        name: 'One',
+        key: 'one',
+        version: '1',
+        supportsAccount: false,
+        settingsDefaults: {},
+        presentation: {
+          'recreateOnStatus': [419],
+        },
+      );
+      handle.dio.httpClientAdapter = _StatusAdapter();
+      await handle.httpGateway.sendJsHttpRequest({
+        'url': 'https://fixture.test/',
+        'http_method': 'GET',
+      });
+      expect(handle.recreationRequested, isTrue);
+      final pending = details.loadComicDetails(
+        '123',
+        taskOrigin: origin('detail'),
+      );
+      final failed = expectLater(pending, throwsA(isA<SourceRuntimeFailed>()));
+      await waitForCalls(1);
+      engine.debugInjectFault('internalJob');
+      await failed;
+      // 不经插件请求的重建把同一请求重放到新 handle。
+      expect(host.handleFor('one'), same(handle));
+      expect(contexts, hasLength(1));
     },
   );
 

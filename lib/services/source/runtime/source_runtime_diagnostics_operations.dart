@@ -15,6 +15,8 @@ class SourceRuntimeDiagnosticsOperations {
 
   void logRuntimeRetryRequested(String source) {
     if (!_runtimeHost.hasActiveSource) return;
+    // 状态卡重试是显式手动入口，解除活动来源的故障锁存后再重新加载内容。
+    _runtimeHost.activeHandle.clearRuntimeFault();
     final facade = _facade;
     facade.addApplicationLog(
       level: 'info',

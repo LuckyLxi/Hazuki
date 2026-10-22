@@ -331,6 +331,40 @@ void main() {
     },
   );
 
+  test(
+    'a runtime failure while preparing images pauses without retry or replay',
+    () async {
+      reader.beforeImage = (_) async => throw const SourceRuntimeFailed(
+        'runtime',
+        SourceRuntimeFailureKind.internalJob,
+      );
+      await enqueue();
+      await _until(
+        () => service.tasks.single.status == MangaDownloadTaskStatus.paused,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(service.tasks.single.status, MangaDownloadTaskStatus.paused);
+      expect(service.tasks.single.retryCount, 0);
+      expect(reader.imageCalls, 1);
+      expect(control.groups, isNotEmpty);
+    },
+  );
+
+  test('a runtime failure while loading a chapter pauses the task', () async {
+    reader.beforeChapter = (_) async => throw const SourceRuntimeFailed(
+      'runtime',
+      SourceRuntimeFailureKind.workerError,
+    );
+    await enqueue();
+    await _until(
+      () => service.tasks.single.status == MangaDownloadTaskStatus.paused,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(service.tasks.single.status, MangaDownloadTaskStatus.paused);
+    expect(service.tasks.single.retryCount, 0);
+    expect(reader.imageCalls, 0);
+  });
+
   test('cover cancellation bypasses optional-cover failure fallback', () async {
     final entered = Completer<void>();
     reader.beforeCover = (origin) async {

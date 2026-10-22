@@ -71,6 +71,14 @@ Future<T> runSourceOperation<T>(
         try {
           result = await operation(context);
         } on SourceUiCancelled catch (error) {
+          if (error.reason == 'runtimeFailed') {
+            // 故障撤销的交互权限仍按运行时故障结算。
+            final failure = SourceUiScope.current?.failure;
+            if (failure is SourceRuntimeFailed) {
+              throw failure.forTask(task.taskId);
+            }
+            rethrow;
+          }
           task.requestStop(
             error.reason == 'timeout'
                 ? SourceTaskStopReason.deadlineExceeded
@@ -80,6 +88,7 @@ Future<T> runSourceOperation<T>(
           rethrow;
         }
         context.checkActive();
+        handle.noteOperationSucceeded();
         return result;
       });
       if (!serviceOwned) return run();
@@ -89,6 +98,7 @@ Future<T> runSourceOperation<T>(
         void changed() {
           final reason = scope?.reason;
           if (reason != null &&
+              reason != 'runtimeFailed' &&
               (waiting || reason == 'user' || reason == 'timeout')) {
             task.requestStop(switch (reason) {
               'ownerGone' => SourceTaskStopReason.ownerDisposed,

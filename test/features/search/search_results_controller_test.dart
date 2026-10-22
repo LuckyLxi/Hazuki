@@ -110,4 +110,47 @@ void main() {
       expect(requests, ['recent', 'popular', 'score', '']);
     },
   );
+
+  test(
+    'a runtime failure is shown without automatic retry while ordinary errors retry',
+    () async {
+      final source = _Source();
+      when(() => source.activeSourceKey).thenReturn('custom');
+      when(() => source.allowedSources).thenReturn(const [
+        SourceCatalogEntry(key: 'custom', name: 'Custom', fileName: 'c.js'),
+      ]);
+      Object failure = const SourceRuntimeFailed(
+        'runtime',
+        SourceRuntimeFailureKind.internalJob,
+      );
+      var calls = 0;
+      final controller = SearchResultsController(
+        taskControl: FakeSourceTaskControl(),
+        initialOrder: 'mr',
+        sourceService: source,
+        searchPageLoader:
+            ({required keyword, required page, required order}) async {
+              calls++;
+              throw failure;
+            },
+      );
+      addTearDown(controller.dispose);
+      final messages = SearchMessages(
+        timeout: 'timeout',
+        failed: (error) => error,
+      );
+      await controller.search(messages, keyword: 'test', page: 1);
+      // 运行时故障不能被重试重放到重建后的实例，但要显示错误而非静默。
+      expect(calls, 1);
+      expect(
+        controller.searchErrorMessage,
+        'source_runtime_failed:internalJob',
+      );
+
+      calls = 0;
+      failure = Exception('ordinary');
+      await controller.search(messages, keyword: 'again', page: 1);
+      expect(calls, greaterThan(1));
+    },
+  );
 }

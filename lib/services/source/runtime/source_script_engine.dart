@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:quickjs_engine/quickjs_engine.dart';
 
 import 'source_script_codec.dart';
@@ -40,6 +41,7 @@ class SourceScriptEngine {
         (error) => _workerFailed(
           StateError('source_script_worker_failed'),
           StackTrace.fromString('$error'),
+          SourceRuntimeFailureKind.workerError,
         ),
       ),
     );
@@ -51,6 +53,7 @@ class SourceScriptEngine {
             _workerFailed(
               StateError('source_script_worker_exited_without_cleanup'),
               StackTrace.current,
+              SourceRuntimeFailureKind.exitedWithoutCleanup,
             );
           }
           _fail(StateError('source_script_worker_closed'), StackTrace.current);
@@ -82,7 +85,7 @@ class SourceScriptEngine {
             ).then<void>(
               (_) {},
               onError: (Object error, StackTrace stack) {
-                _workerFailed(error, stack);
+                _workerFailed(error, stack, SourceRuntimeFailureKind.bootstrap);
                 if (!_closed.isCompleted) _closed.completeError(error, stack);
                 _messages.close();
                 _errors.close();
@@ -102,6 +105,8 @@ class SourceScriptEngine {
   final ReceivePort _exit = ReceivePort();
   final Completer<void> _ready = Completer<void>();
   final Completer<void> _closed = Completer<void>();
+  final Completer<SourceRuntimeFailed> _failed =
+      Completer<SourceRuntimeFailed>();
   final Map<int, Completer<dynamic>> _pending = {};
   final Map<int, SourceScriptExecution> _callExecutions = {};
   final Map<String, int> _waitingTaskIds = {};
@@ -126,6 +131,7 @@ class SourceScriptEngine {
   bool _workerExited = false;
   Object? _workerFailure;
   StackTrace? _workerFailureStack;
+  SourceRuntimeFailed? _runtimeFailure;
   Map<String, dynamic> _snapshot = {};
   Map<String, int> _shutdownDiagnostics = {};
   Map<String, int> get shutdownDiagnostics =>
@@ -177,6 +183,21 @@ class SourceScriptEngine {
 
   Future<void> get ready => _ready.future;
   Future<void> get whenClosed => _closed.future;
+
+  /// 仅在实例故障时完成；正常关闭或退役永不完成。
+  Future<SourceRuntimeFailed> get whenFailed => _failed.future;
+
+  /// 实例故障的结构化原因；正常关闭时为空。
+  SourceRuntimeFailed? get failure => _runtimeFailure;
+
+  /// 测试专用：在 worker 内触发真实的故障路径。release 构建的 worker 会忽略。
+  /// [kind] 取 `internalJob`、`workerError`、`exitWithoutCleanup` 或 `probe`。
+  @visibleForTesting
+  void debugInjectFault(String kind) => _worker?.send({
+    'type': 'debugFault',
+    'runtimeId': runtimeId,
+    'kind': kind,
+  });
   Map<String, dynamic> get snapshot => Map.unmodifiable(_snapshot);
   dynamic cachedValue(String expression) => _snapshot[expression];
   void setMessageHandler(dynamic Function(dynamic) handler) =>
@@ -462,7 +483,7 @@ class SourceScriptEngine {
     SourceScriptExecution? execution,
     bool retainAdmittedWork = false,
   }) async {
-    if (_closing) throw StateError('source_script_engine_closed');
+    _checkOpen(execution);
     // Callback cleanup must still run after its owner has cancelled.
     final scope = inspection || kind == 'release'
         ? null
@@ -477,6 +498,8 @@ class SourceScriptEngine {
     }
     try {
       await ready;
+    } on SourceRuntimeFailed catch (failure) {
+      throw execution == null ? failure : failure.forTask(execution.taskId);
     } finally {
       if (waitingTaskId != null) {
         final remaining = _waitingTaskIds[waitingTaskId]! - 1;
@@ -488,7 +511,7 @@ class SourceScriptEngine {
         _checkSettled();
       }
     }
-    if (_closing) throw StateError('source_script_engine_closed');
+    _checkOpen(execution);
     final scopeReason = scope?.reason;
     // Preserve admitted service work without renewing its UI authority.
     if (!retainAdmittedWork && scopeReason != null) {
@@ -664,12 +687,26 @@ class SourceScriptEngine {
           SourceScriptExecution.fromMap(message['execution'] as Map),
           runtimeId,
         );
+      case 'probe':
+        try {
+          onDiagnostic?.call({
+            'runtimeId': runtimeId,
+            'phase': 'runtimeProbe',
+            'healthy': message['healthy'] == true,
+          });
+        } catch (_) {
+          /* Diagnostics cannot change execution. */
+        }
       case 'rejection':
         if (!_closing) _rejectionHandler?.call(_codec.decode(message['value']));
       case 'failed':
         _workerFailed(
           _codec.decode(message['value']) as Object,
           StackTrace.current,
+          SourceRuntimeFailureKind.values
+                  .where((kind) => kind.name == message['kind'])
+                  .firstOrNull ??
+              SourceRuntimeFailureKind.internalJob,
         );
       case 'closed':
         _acknowledgedClose = true;
@@ -802,14 +839,39 @@ class SourceScriptEngine {
     }
   }
 
+  void _checkOpen(SourceScriptExecution? execution) {
+    if (!_closing) return;
+    if (_runtimeFailure case final failure?) {
+      throw execution == null ? failure : failure.forTask(execution.taskId);
+    }
+    throw StateError('source_script_engine_closed');
+  }
+
   void _fail(Object error, StackTrace stack) {
-    SourceUiService.instance.cancelRuntime(runtimeId);
+    // 故障以独立原因撤销交互，避免被调用方当作正常退役的静默取消。
+    if (error is SourceRuntimeFailed) {
+      SourceUiService.instance.cancelRuntime(
+        runtimeId,
+        reason: 'runtimeFailed',
+        error: error,
+      );
+    } else {
+      SourceUiService.instance.cancelRuntime(runtimeId);
+    }
     _closing = true;
     _control?.shutdown();
     _refreshResources();
     if (!_ready.isCompleted) _ready.completeError(error, stack);
-    for (final completion in _pending.values) {
-      if (!completion.isCompleted) completion.completeError(error, stack);
+    for (final entry in _pending.entries) {
+      final completion = entry.value;
+      if (completion.isCompleted) continue;
+      final taskId = _callExecutions[entry.key]?.taskId;
+      completion.completeError(
+        error is SourceRuntimeFailed && taskId != null
+            ? error.forTask(taskId)
+            : error,
+        stack,
+      );
     }
     _pending.clear();
     _callExecutions.clear();
@@ -820,10 +882,20 @@ class SourceScriptEngine {
     _handshakes.clear();
   }
 
-  void _workerFailed(Object error, StackTrace stack) {
+  void _workerFailed(
+    Object error,
+    StackTrace stack,
+    SourceRuntimeFailureKind kind,
+  ) {
     _workerFailure ??= error;
     _workerFailureStack ??= stack;
-    _fail(error, stack);
+    final failure = _runtimeFailure ??= SourceRuntimeFailed(
+      runtimeId,
+      kind,
+      cause: error,
+    );
+    if (!_failed.isCompleted) _failed.complete(failure);
+    _fail(failure, stack);
   }
 
   Future<void> close() {

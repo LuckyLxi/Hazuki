@@ -213,6 +213,10 @@ class MangaDownloadQueueExecutor {
       }
       running?.stop(error.reason);
       _state.pauseTask(selected.storageKey);
+    } on SourceRuntimeFailed {
+      // 运行时故障不重放到重建后的实例：与插件更新一致，暂停等待手动恢复。
+      running?.stop(SourceTaskStopReason.runtimeClosed);
+      _state.pauseTask(selected.storageKey);
     } catch (error) {
       if (running == null) {
         _state.updateTask(
@@ -487,6 +491,7 @@ class MangaDownloadQueueExecutor {
       }, checkAfter: false);
     } catch (e) {
       if (e is SourceTaskCancelled && e is! SourceTaskTimedOut) rethrow;
+      if (e is SourceRuntimeFailed) rethrow;
       run.checkActive();
       if (_isTransientDownloadError(e) &&
           _shouldRecoverTransientNetworkError()) {
