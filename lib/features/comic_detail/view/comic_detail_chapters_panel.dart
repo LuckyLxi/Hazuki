@@ -14,11 +14,13 @@ class ComicDetailChaptersPanel extends StatefulWidget {
     required this.details,
     required this.onChapterTap,
     required this.onDownloadConfirm,
+    this.initialChapterId,
   });
 
   final ComicDetailsData details;
   final void Function(String epId, String chapterTitle, int index) onChapterTap;
   final ValueChanged<Set<String>> onDownloadConfirm;
+  final String? initialChapterId;
 
   @override
   State<ComicDetailChaptersPanel> createState() =>
@@ -34,7 +36,12 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
   Map<String, String> get _visibleChapters {
     final groups = widget.details.chapterGroups;
     if (groups.isEmpty) return widget.details.chapters;
-    return (groups.where((g) => g.id == _groupId).firstOrNull ?? groups.first)
+    final initial = widget.details.groupForChapter(
+      widget.initialChapterId ?? '',
+    );
+    return (groups.where((g) => g.id == _groupId).firstOrNull ??
+            initial ??
+            groups.first)
         .chapters;
   }
 
@@ -262,7 +269,7 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
                         child: ChapterGroupPicker(
                           details: widget.details,
                           selectedGroupId: _groupId,
-
+                          initialChapterId: widget.initialChapterId,
                           onSelected: (value) =>
                               setState(() => _groupId = value),
                         ),

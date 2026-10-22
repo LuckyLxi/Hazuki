@@ -7,6 +7,7 @@ import 'package:hazuki/shared/source_task_owner.dart';
 
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -262,9 +263,15 @@ class ReaderActionsController {
           useSafeArea: false,
           backgroundColor: Colors.transparent,
           constraints: const BoxConstraints(maxWidth: double.infinity),
-          sheetAnimationStyle: const AnimationStyle(
-            duration: Duration(milliseconds: 380),
-            reverseDuration: Duration(milliseconds: 280),
+          sheetAnimationStyle: AnimationStyle(
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 320),
+            curve: Curves.easeOutQuart,
+            reverseDuration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
+            reverseCurve: Curves.easeInCubic,
           ),
           builder: (routeContext) {
             final themedData =
@@ -272,8 +279,9 @@ class ReaderActionsController {
             return Theme(
               data: themedData,
               child: ExpandingChapterSheet(
-                cornerRadius: 20,
-                builder: (sheetContext) => ChaptersPanelSheet(
+                cornerRadius: 28,
+                safePadding: MediaQuery.paddingOf(context),
+                builder: (sheetContext) => ComicDetailChaptersPanel(
                   details: details,
                   initialChapterId: _pageContext.epId,
                   onDownloadConfirm: (selectedEpIds) {

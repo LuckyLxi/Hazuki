@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
 import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/widgets/chapters_panel_sheet.dart';
+import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 
 class _Reader extends Fake implements SourceReaderGateway {
   @override
@@ -103,26 +104,80 @@ void main() {
   testWidgets(
     'reader chapter picker opens on the current group and reports a global index',
     (tester) async {
-      int? index;
+      late BuildContext context;
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: ChaptersPanelSheet(
-              details: _details,
-              initialChapterId: '1',
-              onChapterTap: (_, _, i) => index = i,
-              onDownloadConfirm: (_) {},
-            ),
+          home: Builder(
+            builder: (c) {
+              context = c;
+              return const Scaffold();
+            },
           ),
         ),
       );
+      final changed = <ReaderPageContext>[];
+      final controller = ReaderActionsController(
+        context: () => context,
+        isMounted: () => true,
+        updateState: (fn) => fn(),
+        logEvent: (_, {level = 'info', source = 'reader', content}) {},
+        logPayload: ([extra]) => extra ?? {},
+        sourceReader: _Reader(),
+        pageContext: ReaderPageContext(
+          title: 'Comic',
+          chapterTitle: 'Alternative',
+          comicId: 'comic',
+          epId: '1',
+          chapterIndex: 2,
+          images: const [],
+          sourceKey: 'sample',
+          commentsWidgetBuilder:
+              ({
+                required comicId,
+                required sourceKey,
+                subId,
+                chapterId,
+                scrollController,
+                onRequestTabFullscreen,
+                interactionState,
+              }) => const SizedBox.shrink(),
+        ),
+        onChapterChanged: (chapter, {animate = true}) => changed.add(chapter),
+        downloader: _Downloader(),
+      );
+      addTearDown(controller.dispose);
+      await controller.openChaptersPanel();
+      await tester.pumpAndSettle();
+      expect(find.byType(ComicDetailChaptersPanel), findsOneWidget);
       expect(find.text('Alternative'), findsOneWidget);
       expect(find.text('First'), findsNothing);
+      final dropdown = find.byType(HazukiFrostedDropdown<String>);
+      expect(
+        tester.widget<HazukiFrostedDropdown<String>>(dropdown).selected,
+        'b',
+      );
       await tester.tap(find.text('Alternative'));
-      expect(index, 2);
+      await tester.pumpAndSettle();
+      expect(changed, isEmpty);
+      expect(find.byType(ComicDetailChaptersPanel), findsNothing);
+
+      await controller.openChaptersPanel();
+      await tester.pumpAndSettle();
+      await tester.tap(dropdown);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Serial').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Alternative'), findsNothing);
+      expect(find.text('Second'), findsOneWidget);
+      await tester.tap(find.text('Second'));
+      await tester.pumpAndSettle();
+      expect(changed.single.epId, '2');
+      expect(changed.single.chapterIndex, 1);
+      expect(find.byType(ComicDetailChaptersPanel), findsNothing);
+      expect(tester.takeException(), isNull);
     },
   );
 
