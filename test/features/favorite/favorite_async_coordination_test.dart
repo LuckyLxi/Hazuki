@@ -492,22 +492,19 @@ void main() {
       () => local.loadFavoriteFolders(sourceKey: 'jm'),
     ).thenAnswer((_) => pending.future);
     when(
-      () => preferences.saveSortOrder('updatedNewest'),
+      () => preferences.saveSortOrder('readNewest'),
     ).thenAnswer((_) async {});
     when(
       () => local.loadFavoriteComics(
         page: 1,
         folderId: 'local',
-        sortOrder: 'updatedNewest',
+        sortOrder: 'readNewest',
         sourceKey: 'jm',
       ),
     ).thenAnswer((_) async => FavoriteComicsResult.success([_comic('sorted')]));
 
     final reload = controller.reloadFolders();
-    await controller.changeSortOrder(
-      'updatedNewest',
-      timeoutMessage: 'timeout',
-    );
+    await controller.changeSortOrder('readNewest', timeoutMessage: 'timeout');
     pending.complete(
       FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
@@ -546,7 +543,7 @@ void main() {
         () => local.loadFavoriteComics(
           page: 1,
           folderId: 'local',
-          sortOrder: 'updatedNewest',
+          sortOrder: 'readNewest',
           sourceKey: any(named: 'sourceKey'),
         ),
       ).thenAnswer(
@@ -554,20 +551,20 @@ void main() {
       );
       await controller.loadInitial(timeoutMessage: 'timeout');
       await controller.toggleMode(timeoutMessage: 'timeout');
-      expect(savedOrder, 'updatedNewest');
-      expect(controller.appBarActionsState.currentSortOrder, 'updatedNewest');
+      expect(savedOrder, 'readNewest');
+      expect(controller.appBarActionsState.currentSortOrder, 'readNewest');
       activeSource = 'picacg';
       sourceChanged();
       await _settle();
       expect(controller.mode, FavoritePageMode.local);
-      expect(controller.appBarActionsState.currentSortOrder, 'updatedNewest');
+      expect(controller.appBarActionsState.currentSortOrder, 'readNewest');
       expect(controller.appBarActionsState.sortOrders, [
         'savedNewest',
         'savedOldest',
-        'updatedNewest',
+        'readNewest',
       ]);
       expect(controller.comics.single.id, 'updated');
-      verify(() => preferences.saveSortOrder('updatedNewest')).called(1);
+      verify(() => preferences.saveSortOrder('readNewest')).called(1);
     },
   );
 

@@ -159,6 +159,8 @@ class SourcePluginManifest {
                   !const [
                     'savedNewest',
                     'savedOldest',
+                    'readNewest',
+                    // 已下线，兼容已发布插件，加载时迁移为 readNewest。
                     'updatedNewest',
                   ].contains(entry.value),
             ))) {

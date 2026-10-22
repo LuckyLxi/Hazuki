@@ -24,6 +24,9 @@ abstract interface class LocalFavoritesPersistence {
   });
   Future<int> nextComicFolderSavedAtMs(String storageKey, String folderId);
 
+  /// 按 storageKey 汇总阅读记录与阅读进度中最近一次阅读时间。
+  Future<Map<String, int>> loadLastReadAtMs();
+
   Future<List<LocalFavoriteFolderTombstone>> loadFolderTombstones();
   Future<List<LocalFavoriteEntryTombstone>> loadEntryTombstones();
   Future<List<LocalFavoriteComicFolderTombstone>> loadComicFolderTombstones();
@@ -227,6 +230,28 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
         entryTombstone?.deletedAtMs ?? 0,
       ].reduce((a, b) => a > b ? a : b),
     );
+  }
+
+  @override
+  Future<Map<String, int>> loadLastReadAtMs() async {
+    final result = <String, int>{};
+    void merge(String storageKey, int timestampMs) {
+      final current = result[storageKey];
+      if (current == null || timestampMs > current) {
+        result[storageKey] = timestampMs;
+      }
+    }
+
+    // 阅读记录有条数上限，阅读进度补齐被裁掉的旧条目。
+    for (final row
+        in await _database.select(_database.readHistoryEntries).get()) {
+      merge(row.storageKey, row.timestampMs);
+    }
+    for (final row
+        in await _database.select(_database.readingProgressEntries).get()) {
+      merge(row.storageKey, row.timestampMs);
+    }
+    return result;
   }
 
   int _timestampAfter(int value) {

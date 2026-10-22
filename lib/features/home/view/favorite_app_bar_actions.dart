@@ -35,7 +35,7 @@ class FavoriteAppBarActions extends StatelessWidget {
     return switch (order) {
       'savedNewest' => l10n(context).favoriteSortNewToOld,
       'savedOldest' => l10n(context).favoriteSortOldToNew,
-      'updatedNewest' => l10n(context).homeFavoriteSortByUpdateTime,
+      'readNewest' => l10n(context).homeFavoriteSortByReadTime,
       // Compatibility for plugins published before favoriteOrderLabels.
       'dd' => l10n(context).favoriteSortNewToOld,
       'da' => l10n(context).favoriteSortOldToNew,
@@ -45,6 +45,28 @@ class FavoriteAppBarActions extends StatelessWidget {
       '-datetime_modifier' => l10n(context).homeFavoriteSortByFavoriteTime,
       _ => order,
     };
+  }
+
+  /// 本地模式把收藏时间的正序/倒序收进同一个子菜单。
+  List<HazukiFrostedMenuOption<String>> _sortOptions(BuildContext context) {
+    HazukiFrostedMenuOption<String> option(String order) =>
+        HazukiFrostedMenuOption<String>(
+          value: order,
+          label: _sortLabel(context, order),
+        );
+    if (state.currentMode != FavoritePageMode.local) {
+      return state.sortOrders.map(option).toList();
+    }
+    const savedOrders = ['savedNewest', 'savedOldest'];
+    final saved = state.sortOrders.where(savedOrders.contains).toList();
+    return [
+      if (saved.isNotEmpty)
+        HazukiFrostedMenuOption<String>.submenu(
+          label: l10n(context).homeFavoriteSortByFavoriteTime,
+          children: saved.map(option).toList(),
+        ),
+      ...state.sortOrders.where((o) => !savedOrders.contains(o)).map(option),
+    ];
   }
 
   @override
@@ -98,25 +120,19 @@ class FavoriteAppBarActions extends StatelessWidget {
         if (state.showSort)
           HazukiFrostedMenuButton<String>(
             key: ValueKey((state.sourceKey, state.currentMode)),
-            pluginMenu: SourcePluginMenuBinding(
-              menuId: isLocalMode
-                  ? 'favorites.local.sort'
-                  : 'favorites.cloud.sort',
-              sourceKey: state.sourceKey.isEmpty ? null : state.sourceKey,
-              gateway: sourcePlugins,
-              entries: state.menu.isEmpty ? null : state.menu,
-            ),
+            // 本地排序完全由 App 定义，不接受插件菜单声明。
+            pluginMenu: isLocalMode
+                ? null
+                : SourcePluginMenuBinding(
+                    menuId: 'favorites.cloud.sort',
+                    sourceKey: state.sourceKey.isEmpty ? null : state.sourceKey,
+                    gateway: sourcePlugins,
+                    entries: state.menu.isEmpty ? null : state.menu,
+                  ),
             tooltip: l10n(context).homeSortTooltip,
             selected: state.currentSortOrder,
             onSelected: onSortSelected,
-            options: state.sortOrders
-                .map(
-                  (order) => HazukiFrostedMenuOption<String>(
-                    value: order,
-                    label: _sortLabel(context, order),
-                  ),
-                )
-                .toList(),
+            options: _sortOptions(context),
             icon: const Icon(Icons.sort_rounded),
           ),
         if (state.showCreateFolder)

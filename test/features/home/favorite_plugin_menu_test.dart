@@ -45,7 +45,6 @@ Future<void> _pumpMenu(
   List<String> orders = const ['dd', 'da', 'score'],
   bool logged = true,
   String sourceKey = 'custom',
-  List<SourceFavoriteMenuEntry> localMenu = const [],
 }) async {
   final state = FavoritePageData()..mode = mode;
   state.favoriteSortOrder = 'dd';
@@ -65,7 +64,6 @@ Future<void> _pumpMenu(
               favoriteSortOrders: orders,
               favoriteSortLabels: const {'score': 'Score'},
               favoriteMenu: _menu,
-              localFavoriteMenu: localMenu,
               sourceKey: sourceKey,
             ),
             sourcePlugins: gateway,
@@ -105,7 +103,7 @@ void main() {
   });
 
   testWidgets(
-    'local favorites accept an explicit generic menu and retain host sorting',
+    'local favorites ignore plugin menu declarations and keep host sorting',
     (tester) async {
       final selected = <String>[];
       await _pumpMenu(
@@ -113,19 +111,12 @@ void main() {
         gateway: gateway,
         mode: FavoritePageMode.local,
         onSort: selected.add,
-        localMenu: SourceFavoriteMenuEntry.parseList([
-          {
-            'id': 'saved',
-            'title': 'Local saved',
-            'children': [
-              {'value': 'savedOldest'},
-            ],
-          },
-        ]),
       );
       await tester.tap(find.byIcon(Icons.sort_rounded));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Local saved'));
+      expect(find.text('Saved'), findsNothing);
+      expect(find.text('Export'), findsNothing);
+      await tester.tap(find.text('Favorite time'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Old to new'));
       await tester.pumpAndSettle();

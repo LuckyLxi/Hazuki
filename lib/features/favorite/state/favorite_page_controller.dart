@@ -172,10 +172,6 @@ class FavoritePageController extends ChangeNotifier {
           _presentationFor(_activeSourceKey),
           'favorites.cloud.sort',
         ),
-        localFavoriteMenu: SourceFavoriteMenuEntry.forLocation(
-          _presentationFor(_activeSourceKey),
-          'favorites.local.sort',
-        ),
         favoriteSortLabels:
             _presentationFor(_activeSourceKey)['favoriteOrderLabels'] is Map
             ? Map<String, dynamic>.from(

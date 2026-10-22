@@ -64,7 +64,6 @@ class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
     required List<String> favoriteSortOrders,
     Map<String, dynamic> favoriteSortLabels = const {},
     List<SourceFavoriteMenuEntry> favoriteMenu = const [],
-    List<SourceFavoriteMenuEntry> localFavoriteMenu = const [],
     String sourceKey = '',
   }) {
     if (mode == FavoritePageMode.local) {
@@ -73,7 +72,6 @@ class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
         showCreateFolder: true,
         currentSortOrder: favoriteSortOrder,
         sortOrders: localFavoriteSortOrders,
-        menu: localFavoriteMenu,
         sourceKey: sourceKey,
         showModeToggle: true,
         currentMode: mode,

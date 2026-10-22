@@ -237,7 +237,7 @@ void main() {
           page: 1,
           folderId: 'folder',
           sourceKey: 'custom_sort',
-          sortOrder: 'updatedNewest',
+          sortOrder: 'readNewest',
         ),
       ).thenAnswer((_) async => const FavoriteComicsResult.success([]));
       final loader = FavoriteListLoader(
@@ -254,7 +254,7 @@ void main() {
         ),
         page: 1,
         folderId: 'folder',
-        sortOrder: 'updatedNewest',
+        sortOrder: 'readNewest',
         timeoutMessage: '',
       );
       verify(
@@ -262,7 +262,7 @@ void main() {
           page: 1,
           folderId: 'folder',
           sourceKey: 'custom_sort',
-          sortOrder: 'updatedNewest',
+          sortOrder: 'readNewest',
         ),
       ).called(1);
       loader.dispose();

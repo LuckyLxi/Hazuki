@@ -12,8 +12,12 @@ void main() {
       tester,
     ) async {
       final orders = mode == FavoritePageMode.local
-          ? ['savedNewest', 'savedOldest', 'updatedNewest']
+          ? ['savedNewest', 'savedOldest', 'readNewest']
           : ['dd', 'da'];
+      // 本地模式收藏时间正倒序收进子菜单，顶层只保留其余策略。
+      final topLevelValues = mode == FavoritePageMode.local
+          ? [null, 'readNewest']
+          : orders;
       var selected = orders.first;
       var sortCalls = 0;
       var folderCalls = 0;
@@ -55,7 +59,7 @@ void main() {
             .widget<HazukiFrostedMenuButton<String>>(button)
             .options
             .map((option) => option.value),
-        orders,
+        topLevelValues,
       );
       await tester.tap(find.byIcon(Icons.sort_rounded));
       await tester.pumpAndSettle();
@@ -79,6 +83,66 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('local favorite-time submenu selects saved orders', (
+    tester,
+  ) async {
+    var selected = 'readNewest';
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: StatefulBuilder(
+          builder: (context, setState) => Scaffold(
+            appBar: AppBar(
+              actions: [
+                FavoriteAppBarActions(
+                  state: FavoriteAppBarActionsState(
+                    showSort: true,
+                    showCreateFolder: false,
+                    currentSortOrder: selected,
+                    sortOrders: const [
+                      'savedNewest',
+                      'savedOldest',
+                      'readNewest',
+                    ],
+                    showModeToggle: false,
+                    currentMode: FavoritePageMode.local,
+                  ),
+                  onSortSelected: (order) => setState(() => selected = order),
+                  onCreateFolderPressed: () {},
+                  onModeTogglePressed: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final submenu = tester
+        .widget<HazukiFrostedMenuButton<String>>(
+          find.byType(HazukiFrostedMenuButton<String>),
+        )
+        .options
+        .first;
+    expect(submenu.label, 'Favorite time');
+    expect(submenu.children.map((option) => option.label), [
+      'New to old',
+      'Old to new',
+    ]);
+
+    await tester.tap(find.byIcon(Icons.sort_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey(('hazuki-frosted-menu', 'Favorite time'))),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Old to new'));
+    await tester.pumpAndSettle();
+    expect(selected, 'savedOldest');
+    expect(tester.takeException(), isNull);
+  });
 
   for (final locale in ['zh', 'en']) {
     testWidgets('cloud sort labels follow plugin declarations in $locale', (
