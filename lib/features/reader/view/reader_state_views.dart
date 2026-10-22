@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hazuki/widgets/widgets.dart';
 
 class ReaderStateScaffold extends StatelessWidget {
   const ReaderStateScaffold({
@@ -30,7 +31,7 @@ class ReaderLoadingStateView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ReaderStateScaffold(
       theme: theme,
-      child: const Center(child: CircularProgressIndicator()),
+      child: const Center(child: HazukiMangaPanelsLoadingIndicator(size: 136)),
     );
   }
 }
