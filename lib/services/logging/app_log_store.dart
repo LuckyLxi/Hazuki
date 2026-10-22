@@ -23,8 +23,9 @@ class AppLogStore extends ChangeNotifier {
 
   static const Duration retention = Duration(days: 7);
   static const Duration duplicateWindow = Duration(minutes: 5);
-  static const int maxPersistentBytes = 10 * 1024 * 1024;
-  static const int maxPersistentEvents = 2000;
+  // 上限按“导出后能直接交给 AI 分析”的体量设定。
+  static const int maxPersistentBytes = 2 * 1024 * 1024;
+  static const int maxPersistentEvents = 1000;
   static const String _encryptionKeyName = 'hazuki_log_encryption_key_v2';
 
   final AppLogSecretStorage? _secureStorage;
@@ -32,6 +33,7 @@ class AppLogStore extends ChangeNotifier {
   final List<AppLogEvent> _events = <AppLogEvent>[];
   Timer? _persistTimer;
   Future<void>? _persistFuture;
+  Future<void>? _restoreFuture;
   bool _persistPending = false;
   int _persistenceGeneration = 0;
   bool _captureEnabled = false;
@@ -52,7 +54,9 @@ class AppLogStore extends ChangeNotifier {
     }
     _initialized = true;
     if (captureEnabled && _secureStorage != null) {
-      await _loadPersistedLogs();
+      final restoring = _loadPersistedLogs();
+      _restoreFuture = restoring;
+      await restoring;
     } else {
       await _deletePersistedLogs();
     }
@@ -171,6 +175,9 @@ class AppLogStore extends ChangeNotifier {
 
   Future<void> _drainPersistence() async {
     try {
+      // 历史快照恢复完成前写盘会覆盖尚未合并的旧日志。
+      final restoring = _restoreFuture;
+      if (restoring != null) await restoring;
       while (_persistPending && _captureEnabled) {
         _persistPending = false;
         _prune();
@@ -199,19 +206,26 @@ class AppLogStore extends ChangeNotifier {
   }
 
   Future<void> _loadPersistedLogs() async {
+    final generation = _persistenceGeneration;
     try {
       final file = await _logFile();
       if (!await file.exists()) return;
       final payload = await file.readAsString();
       final key = await _loadOrCreateKey();
-      final decoded = await Isolate.run(() => _decryptSnapshot(payload, key));
-      _events
-        ..clear()
-        ..addAll(decoded.map(AppLogEvent.fromJson).whereType<AppLogEvent>());
+      final restored = await Isolate.run(
+        () => _decryptSnapshot(
+          payload,
+          key,
+        ).map(AppLogEvent.fromJson).whereType<AppLogEvent>().toList(),
+      );
+      // 恢复期间若已关闭采集或清空日志，旧快照作废。
+      if (!_captureEnabled || generation != _persistenceGeneration) return;
+      // 恢复在后台进行，期间新写入的日志需排在历史记录之后。
+      _events.insertAll(0, restored);
     } catch (error, stackTrace) {
       debugPrint('Failed to load encrypted logs: $error');
       debugPrintStack(stackTrace: stackTrace);
-      await _deletePersistedLogs();
+      if (generation == _persistenceGeneration) await _deletePersistedLogs();
     }
   }
 

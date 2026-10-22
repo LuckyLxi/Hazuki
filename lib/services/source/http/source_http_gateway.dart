@@ -172,6 +172,7 @@ class SourceHttpGateway {
     final data = request['data'];
     final cancelToken = hostContext == null ? null : CancelToken();
     var finished = false;
+    var cancelled = false;
     if (hostContext != null) {
       hostContext.whenStopped.then((_) {
         if (!finished) cancelToken!.cancel('source_work_stopped');
@@ -202,6 +203,10 @@ class SourceHttpGateway {
       );
     } catch (e) {
       error = e.toString();
+      cancelled =
+          e is SourceScriptStopped ||
+          e is DioException && CancelToken.isCancel(e) ||
+          hostContext?.isStopped == true;
       hostContext?.checkActive();
       if (e is SourceScriptStopped ||
           e is DioException && CancelToken.isCancel(e)) {
@@ -230,6 +235,7 @@ class SourceHttpGateway {
         requestData: data,
         responseHeaders: _flattenHeaders(response?.headers),
         responseBody: response?.data,
+        cancelled: cancelled,
         taskContext: execution == null
             ? null
             : {
@@ -377,6 +383,7 @@ class SourceHttpGateway {
               requestData: options.data,
               responseHeaders: _flattenHeaders(error.response?.headers),
               responseBody: error.response?.data,
+              cancelled: CancelToken.isCancel(error),
               taskContext:
                   (options.extra[_imageExecutionKey] as SourceScriptExecution?)
                       ?.toMap(),

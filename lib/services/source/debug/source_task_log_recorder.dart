@@ -13,6 +13,13 @@ class SourceTaskLogRecorder {
 
   final AppLogStore store;
 
+  static const _terminalStates = {
+    SourceTaskState.succeeded,
+    SourceTaskState.failed,
+    SourceTaskState.cancelled,
+    SourceTaskState.timedOut,
+  };
+
   void record(
     SourceTaskSnapshot task,
     SourceTaskEvent event,
@@ -24,6 +31,12 @@ class SourceTaskLogRecorder {
     if (!store.captureEnabled) return;
     final discarded = event == SourceTaskEvent.resultDiscarded;
     final settled = event == SourceTaskEvent.resourcesSettled;
+    // 每个来源任务都会经历多次状态切换；中间态与正常完成的资源回收不含诊断价值，
+    // 只记录终态以及异常结束后的资源回收，避免日志被任务流水淹没。
+    if (!discarded && !settled && !_terminalStates.contains(task.state)) {
+      return;
+    }
+    if (settled && task.state == SourceTaskState.succeeded) return;
     // Task capture excludes search text even when exports keep all other data.
     String redact(String value) {
       var text = value;
@@ -54,9 +67,13 @@ class SourceTaskLogRecorder {
     };
 
     store.add(
-      level: !discarded && !settled && task.state == SourceTaskState.failed
-          ? 'error'
-          : 'debug',
+      level: discarded || settled
+          ? 'debug'
+          : switch (task.state) {
+              SourceTaskState.failed => 'error',
+              SourceTaskState.timedOut => 'warning',
+              _ => 'debug',
+            },
       area: AppLogArea.source,
       source: 'source_task',
       event: discarded

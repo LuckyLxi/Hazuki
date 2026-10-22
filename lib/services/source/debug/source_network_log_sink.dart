@@ -12,6 +12,7 @@ typedef SourceNetworkLogAppender =
       Map<String, dynamic>? responseHeaders,
       Object? responseBody,
       Map<String, Object?>? taskContext,
+      bool cancelled,
     });
 
 class SourceNetworkLogSink {
@@ -32,6 +33,7 @@ class SourceNetworkLogSink {
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
     Map<String, Object?>? taskContext,
+    bool cancelled = false,
   }) => _append(
     method: method,
     url: url,
@@ -45,5 +47,6 @@ class SourceNetworkLogSink {
     responseHeaders: responseHeaders,
     responseBody: responseBody,
     taskContext: taskContext,
+    cancelled: cancelled,
   );
 }

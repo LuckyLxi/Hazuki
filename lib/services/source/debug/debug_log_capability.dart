@@ -63,6 +63,7 @@ class DebugLogCapability {
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
     Map<String, Object?>? taskContext,
+    bool cancelled = false,
   }) => _network.append(
     method: method,
     url: url,
@@ -76,5 +77,6 @@ class DebugLogCapability {
     responseHeaders: responseHeaders,
     responseBody: responseBody,
     taskContext: taskContext,
+    cancelled: cancelled,
   );
 }

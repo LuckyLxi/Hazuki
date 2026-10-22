@@ -38,7 +38,7 @@ void main() {
 
     expect(text, startsWith('Hazuki Diagnostic Log'));
     expect(text.indexOf('Started'), lessThan(text.indexOf('Failed')));
-    expect(text, contains('"token": "[hidden]"'));
+    expect(text, contains('"token":"[hidden]"'));
     expect(text, contains('[ERROR] [NETWORK]'));
   });
 
@@ -51,7 +51,7 @@ void main() {
       sanitization: AppLogSanitization.keepEverything,
     );
 
-    expect(text, contains('"token": "secret"'));
+    expect(text, contains('"token":"secret"'));
   });
 
   test('redacts credentials from all exported event metadata', () {

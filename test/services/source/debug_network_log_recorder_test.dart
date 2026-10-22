@@ -65,6 +65,52 @@ void main() {
     );
   });
 
+  test('keeps only a summary for successful requests', () {
+    host.activeHandle.debugLog.appendNetworkLogEntry(
+      method: 'GET',
+      url: 'https://api.example/comics',
+      statusCode: 200,
+      error: null,
+      startedAt: DateTime.now(),
+      requestHeaders: const {'Cookie': 'session=secret'},
+      responseHeaders: const {'Content-Type': 'application/json'},
+      responseBody: 'z' * 1000,
+    );
+
+    final event = host.logStore.events.single;
+    final data = event.data as Map;
+    expect(event.level, AppLogLevel.info);
+    expect(data.containsKey('requestHeaders'), isFalse);
+    expect(data.containsKey('responseHeaders'), isFalse);
+    expect(data.containsKey('responseBody'), isFalse);
+    expect(data['responseBodyPreview'], startsWith('z' * 300));
+    expect((data['responseBodyPreview'] as String).length, lessThan(400));
+  });
+
+  test('classifies cancelled and client-error requests below error', () {
+    host.activeHandle.debugLog.appendNetworkLogEntry(
+      method: 'GET',
+      url: 'https://api.example/cancelled',
+      statusCode: null,
+      error: 'DioException [request cancelled]',
+      startedAt: DateTime.now(),
+      cancelled: true,
+    );
+    host.activeHandle.debugLog.appendNetworkLogEntry(
+      method: 'GET',
+      url: 'https://api.example/missing',
+      statusCode: 404,
+      error: null,
+      startedAt: DateTime.now(),
+    );
+
+    expect(host.logStore.events.map((event) => event.level), [
+      AppLogLevel.debug,
+      AppLogLevel.warning,
+    ]);
+    expect(host.logStore.events.first.title, 'GET CANCELLED');
+  });
+
   test('merges consecutive duplicate network entries', () {
     for (var index = 0; index < 2; index++) {
       host.activeHandle.debugLog.appendNetworkLogEntry(

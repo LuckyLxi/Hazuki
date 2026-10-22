@@ -65,7 +65,7 @@ class SourceRuntimeStateController {
       error: error,
     );
     facade.addApplicationLog(
-      level: 'warning',
+      level: 'error',
       title: 'Source runtime failed',
       source: 'source_runtime',
       content: facade.runtimeState.toDebugMap(),

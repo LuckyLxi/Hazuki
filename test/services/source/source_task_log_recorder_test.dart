@@ -38,8 +38,6 @@ void main() {
         throwsA(same(error)),
       );
       expect(store.events.map((event) => event.event), [
-        'source_task_created',
-        'source_task_running',
         'source_task_failed',
         'source_task_resources_settled',
       ]);
@@ -88,7 +86,7 @@ void main() {
       expect(store.events, isEmpty);
       await store.setCaptureEnabled(true);
       await run();
-      expect(store.events, hasLength(4));
+      expect(store.events, hasLength(1));
       expect((store.events.last.data as Map)['pluginId'], 'a-plugin');
       expect((store.events.last.data as Map)['state'], 'succeeded');
       await store.setCaptureEnabled(false);

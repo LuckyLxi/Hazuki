@@ -68,7 +68,8 @@ class SourceRuntimeHealthMonitor {
   ) {
     try {
       handle.facade.addApplicationLog(
-        level: 'warning',
+        // 已自动恢复的崩溃仅作提示；恢复失败会导致来源不可用，记为错误。
+        level: recovery == 'recovered' ? 'warning' : 'error',
         title: 'Source runtime failure',
         source: 'source_runtime',
         content: {

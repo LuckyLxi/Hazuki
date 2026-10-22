@@ -133,6 +133,7 @@ class SourceRuntimeHandle
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
     Map<String, Object?>? taskContext,
+    bool cancelled = false,
   }) {
     debugLog.appendNetworkLogEntry(
       method: method,
@@ -147,6 +148,7 @@ class SourceRuntimeHandle
       responseHeaders: responseHeaders,
       responseBody: responseBody,
       taskContext: taskContext,
+      cancelled: cancelled,
     );
   });
   late final SourceHttpGateway httpGateway = SourceHttpGateway(

@@ -540,7 +540,7 @@ void main() {
     expect((log['data'] as Map)['body'], longMessage);
   });
 
-  test('network debug export data keeps full response body', () async {
+  test('network debug export data keeps failed response body', () async {
     final service = sl<SourceRuntimeAssembly>();
     await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
     final longBody = '{"body":"${'y' * 1400}"}';
@@ -548,7 +548,7 @@ void main() {
     service.testing.debug.appendNetworkLogEntry(
       method: 'POST',
       url: 'source://account.login',
-      statusCode: 200,
+      statusCode: 500,
       error: null,
       startedAt: DateTime.now(),
       source: 'source_login',

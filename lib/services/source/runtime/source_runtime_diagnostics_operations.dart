@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../common/source_prefs_keys.dart';
 import 'source_runtime_facade.dart';
@@ -32,7 +35,17 @@ class SourceRuntimeDiagnosticsOperations {
     final enabled =
         prefs.getBool(SourcePrefsKeys.softwareLogCaptureEnabled) ?? false;
     facade?.debug.softwareLogCaptureEnabled = enabled;
-    await _runtimeHost.logStore.initialize(captureEnabled: enabled);
+    // 采集开关在调用时同步生效；历史日志的密钥读取与解密较慢，放到后台完成，
+    // 避免拖慢启动。
+    unawaited(
+      _runtimeHost.logStore.initialize(captureEnabled: enabled).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        debugPrint('Failed to initialize log store: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }),
+    );
     return enabled;
   }
 

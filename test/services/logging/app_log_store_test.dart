@@ -294,8 +294,83 @@ void main() {
     },
   );
 
+  test('restoring persisted logs keeps events added meanwhile', () async {
+    final directory = await Directory.systemTemp.createTemp('hazuki-log-test-');
+    final secureStorage = MemorySourceSecureSessionStorage();
+    addTearDown(() async {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    });
+    final store = AppLogStore(
+      secureStorage: secureStorage,
+      supportDirectory: () async => directory,
+    );
+    await store.initialize(captureEnabled: true);
+    store.add(
+      level: 'info',
+      area: AppLogArea.application,
+      source: 'test',
+      event: 'old',
+      title: 'Old',
+    );
+    await store.flush();
+
+    final restored = AppLogStore(
+      secureStorage: secureStorage,
+      supportDirectory: () async => directory,
+    );
+    final restoring = restored.initialize(captureEnabled: true);
+    restored.add(
+      level: 'info',
+      area: AppLogArea.application,
+      source: 'test',
+      event: 'new',
+      title: 'New',
+    );
+    await restoring;
+    expect(restored.events.map((event) => event.event), ['old', 'new']);
+
+    await restored.flush();
+    final reloaded = AppLogStore(
+      secureStorage: secureStorage,
+      supportDirectory: () async => directory,
+    );
+    await reloaded.initialize(captureEnabled: true);
+    expect(reloaded.events.map((event) => event.event), ['old', 'new']);
+    store.dispose();
+    restored.dispose();
+    reloaded.dispose();
+  });
+
+  test('truncates oversized strings and lists before storing', () async {
+    final store = AppLogStore();
+    addTearDown(store.dispose);
+    await store.setCaptureEnabled(true);
+    store.add(
+      level: 'info',
+      area: AppLogArea.application,
+      source: 'test',
+      event: 'large',
+      title: 'Large',
+      data: {
+        'text': 'x' * (maxLogStringLength + 10),
+        'items': List<int>.generate(maxLogListLength + 5, (index) => index),
+      },
+    );
+
+    final data = store.events.single.data as Map;
+    expect(data['text'], startsWith('x' * maxLogStringLength));
+    expect(
+      data['text'],
+      endsWith('[truncated, ${maxLogStringLength + 10} chars total]'),
+    );
+    expect(data['items'], hasLength(maxLogListLength + 1));
+    expect((data['items'] as List).last, '[5 more items truncated]');
+  });
+
   test(
-    'skips an individual event that exceeds the persistence limit',
+    'truncated oversized event stays within the persistence limit',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'hazuki-log-test-',
@@ -334,7 +409,10 @@ void main() {
         supportDirectory: () async => directory,
       );
       await restored.initialize(captureEnabled: true);
-      expect(restored.events, isEmpty);
+      expect(
+        (restored.events.single.data as String).length,
+        lessThan(maxLogStringLength + 64),
+      );
       store.dispose();
       restored.dispose();
     },
