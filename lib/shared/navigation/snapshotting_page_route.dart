@@ -121,13 +121,15 @@ class _TransitionSnapshot extends StatefulWidget {
 class _TransitionSnapshotState extends State<_TransitionSnapshot> {
   final SnapshotController _controller = SnapshotController();
   final _scrolling = <ScrollPosition>{};
+  final _liveContent = <_RouteTransitionLiveContentState>{};
   bool _snapshotScheduled = false;
 
   bool get _isAnimating =>
       widget.animation.status.isAnimating ||
       widget.secondaryAnimation.status.isAnimating;
 
-  bool get _shouldCache => _isAnimating && !_hasVisibleScrollingContent;
+  bool get _shouldCache =>
+      _isAnimating && !_hasVisibleScrollingContent && !_hasVisibleLiveContent;
 
   bool get _hasVisibleScrollingContent {
     _scrolling.removeWhere(
@@ -135,22 +137,36 @@ class _TransitionSnapshotState extends State<_TransitionSnapshot> {
           position.context.notificationContext?.mounted != true ||
           !position.isScrollingNotifier.value,
     );
-    return _scrolling.any((position) {
-      RenderObject? node = position.context.notificationContext
-          ?.findRenderObject();
-      while (node != null) {
-        // Hidden home tabs must not prevent caching the visible page.
-        if (node is RenderOffstage && node.offstage ||
-            node is RenderOpacity && node.opacity == 0 ||
-            node is RenderAnimatedOpacity &&
-                node.opacity.value == 0 &&
-                !node.opacity.status.isAnimating) {
-          return false;
-        }
-        node = node.parent;
+    return _scrolling.any(
+      (position) => _isRenderVisible(position.context.notificationContext),
+    );
+  }
+
+  bool get _hasVisibleLiveContent =>
+      _liveContent.any((content) => _isRenderVisible(content.context));
+
+  static bool _isRenderVisible(BuildContext? context) {
+    RenderObject? node = context?.findRenderObject();
+    while (node != null) {
+      // Hidden home tabs must not prevent caching the visible page.
+      if (node is RenderOffstage && node.offstage ||
+          node is RenderOpacity && node.opacity == 0 ||
+          node is RenderAnimatedOpacity &&
+              node.opacity.value == 0 &&
+              !node.opacity.status.isAnimating) {
+        return false;
       }
-      return true;
-    });
+      node = node.parent;
+    }
+    return true;
+  }
+
+  void _registerLiveContent(_RouteTransitionLiveContentState content) {
+    if (mounted && _liveContent.add(content)) _updateSnapshotting();
+  }
+
+  void _unregisterLiveContent(_RouteTransitionLiveContentState content) {
+    if (mounted && _liveContent.remove(content)) _updateSnapshotting();
   }
 
   bool _handleScroll(ScrollNotification notification) {
@@ -232,12 +248,65 @@ class _TransitionSnapshotState extends State<_TransitionSnapshot> {
   Widget build(BuildContext context) {
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScroll,
-      child: GlassSnapshot(
-        controller: _controller,
-        mode: SnapshotMode.permissive,
-        autoresize: true,
-        child: widget.child,
+      child: _TransitionSnapshotScope(
+        state: this,
+        child: GlassSnapshot(
+          controller: _controller,
+          mode: SnapshotMode.permissive,
+          autoresize: true,
+          child: widget.child,
+        ),
       ),
     );
   }
+}
+
+class _TransitionSnapshotScope extends InheritedWidget {
+  const _TransitionSnapshotScope({required this.state, required super.child});
+
+  final _TransitionSnapshotState state;
+
+  @override
+  bool updateShouldNotify(_TransitionSnapshotScope oldWidget) =>
+      oldWidget.state != state;
+}
+
+/// 声明 [child] 在路由转场期间需要逐帧实时渲染。
+///
+/// 快照路由在转场时会把页面缓存成静态图，其中的持续动画会停在缓存那一帧。
+/// 包裹后只要该内容可见，所在路由就放弃本次转场缓存；不在快照路由内时不起作用。
+class RouteTransitionLiveContent extends StatefulWidget {
+  const RouteTransitionLiveContent({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<RouteTransitionLiveContent> createState() =>
+      _RouteTransitionLiveContentState();
+}
+
+class _RouteTransitionLiveContentState
+    extends State<RouteTransitionLiveContent> {
+  _TransitionSnapshotState? _host;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final host = context
+        .dependOnInheritedWidgetOfExactType<_TransitionSnapshotScope>()
+        ?.state;
+    if (host == _host) return;
+    _host?._unregisterLiveContent(this);
+    _host = host;
+    host?._registerLiveContent(this);
+  }
+
+  @override
+  void dispose() {
+    _host?._unregisterLiveContent(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

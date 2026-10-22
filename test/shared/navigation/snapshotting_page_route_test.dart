@@ -70,6 +70,75 @@ void main() {
     });
   }
 
+  testWidgets('visible live content keeps its route rendering live', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app());
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    final showLive = ValueNotifier(true);
+    addTearDown(showLive.dispose);
+
+    navigator.push(
+      buildSnapshottingPageRoute<void>(
+        builder: (_) => Scaffold(
+          body: Column(
+            children: [
+              const Text('Detail'),
+              ValueListenableBuilder<bool>(
+                valueListenable: showLive,
+                builder: (_, show, _) => show
+                    ? const RouteTransitionLiveContent(child: Text('Live'))
+                    : const SizedBox(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    // 转场中存在可见的实时内容，整条路由不缓存
+    expect(_isSnapshotting('Detail'), isFalse);
+
+    showLive.value = false;
+    await tester.pump();
+    await tester.pump();
+    // 实时内容移除后，剩余转场恢复缓存
+    expect(_isSnapshotting('Detail'), isTrue);
+
+    await tester.pumpAndSettle();
+    expect(_isSnapshotting('Detail'), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hidden live content does not block route caching', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app());
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+
+    navigator.push(
+      buildSnapshottingPageRoute<void>(
+        builder: (_) => const Scaffold(
+          body: Column(
+            children: [
+              Text('Detail'),
+              Offstage(child: RouteTransitionLiveContent(child: Text('Live'))),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(_isSnapshotting('Detail'), isTrue);
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('cancelling a back swipe releases both snapshots', (
     tester,
   ) async {

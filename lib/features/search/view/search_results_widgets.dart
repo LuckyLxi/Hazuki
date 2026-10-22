@@ -8,7 +8,6 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/source_runtime_status_card.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:lottie/lottie.dart';
 
 class SearchResultsStateView extends StatelessWidget {
   const SearchResultsStateView({
@@ -47,19 +46,10 @@ class SearchResultsStateView extends StatelessWidget {
           minHeight: 360,
         );
       } else {
-        child = SizedBox(
-          key: const ValueKey('search-loading'),
-          height: 360,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const HazukiSearchingAnimationIndicator(size: 156),
-                const SizedBox(height: 12),
-                Text(strings.searchLoading),
-              ],
-            ),
-          ),
+        child = _SearchLensStateView(
+          key: const ValueKey('search-lens'),
+          empty: false,
+          label: strings.searchLoading,
         );
       }
     } else if (searchErrorMessage != null && searchComics.isEmpty) {
@@ -97,19 +87,10 @@ class SearchResultsStateView extends StatelessWidget {
         );
       }
     } else if (searchComics.isEmpty) {
-      child = SizedBox(
-        key: const ValueKey('search-empty'),
-        height: 320,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const _SearchEmptyAnimation(size: 200),
-              const SizedBox(height: 12),
-              Text(strings.searchEmpty),
-            ],
-          ),
-        ),
+      child = _SearchLensStateView(
+        key: const ValueKey('search-lens'),
+        empty: true,
+        label: strings.searchEmpty,
       );
     } else {
       child = const SizedBox(key: ValueKey('search-hidden'));
@@ -137,23 +118,36 @@ class SearchResultsStateView extends StatelessWidget {
   }
 }
 
-class _SearchEmptyAnimation extends StatelessWidget {
-  const _SearchEmptyAnimation({required this.size});
+/// 搜索中与无结果共用的状态视图。两种状态使用同一个 key，
+/// 让外层 [AnimatedSwitcher] 原地更新而不是替换，指示器才能从搜索动画衔接到空结果动画。
+class _SearchLensStateView extends StatelessWidget {
+  const _SearchLensStateView({
+    super.key,
+    required this.empty,
+    required this.label,
+  });
 
-  final double size;
+  final bool empty;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Lottie.asset(
-          'assets/stickers/loading/search_empty_no_history.json',
-          width: size,
-          height: size,
-          fit: BoxFit.contain,
-          repeat: false,
+    return SizedBox(
+      height: 360,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            HazukiSearchLensIndicator(empty: empty),
+            const SizedBox(height: 12),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 240),
+              child: Text(
+                label,
+                key: ValueKey(empty ? 'search-empty' : 'search-loading'),
+              ),
+            ),
+          ],
         ),
       ),
     );
