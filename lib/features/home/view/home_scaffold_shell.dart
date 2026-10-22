@@ -304,10 +304,23 @@ class HomeScaffoldShell extends StatefulWidget {
 }
 
 class _HomeScaffoldShellState extends State<HomeScaffoldShell>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _sourceSwitchDialogOpen = ValueNotifier(false);
   final _sourceSwitchButtonKey = GlobalKey();
   final _homeContentAnimating = ValueNotifier(false);
+  // 内容区与应用栏共享同一道切口过渡。
+  late final _tabTransition = HomeTabCutTransition(
+    vsync: this,
+    initialIndex: widget.currentIndex,
+    onTransitionChanged: (animating) => _homeContentAnimating.value = animating,
+  );
+
+  @override
+  void didUpdateWidget(HomeScaffoldShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 在子树重建前切换，使应用栏与内容区在同一帧收到进度变化。
+    _tabTransition.select(widget.currentIndex);
+  }
 
   Future<void> _showSourceSwitchWithMorph(
     FavoriteFoldersMorphOrigin origin,
@@ -383,6 +396,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
   @override
   void dispose() {
     _sourceSwitchDialogOpen.dispose();
+    _tabTransition.dispose();
     _homeContentAnimating.dispose();
     _profileDrawerController.dispose();
     super.dispose();
@@ -412,8 +426,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
         '$activeSourceKey|${avatarUrl ?? ''}|$profileLoading|${widget.isLogged}|$username';
     final homeContent = HomeContentStack(
       currentIndex: currentIndex,
-      onTransitionChanged: (animating) =>
-          _homeContentAnimating.value = animating,
+      transition: _tabTransition,
       discoverChild: NotificationListener<DiscoverBackToTopNotification>(
         onNotification: (notification) {
           setState(() {
@@ -532,10 +545,17 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   builder: (context, leadingWidth, _) {
-                    final appBar = hazukiFrostedAppBar(
+                    // overlay 为切页期间叠在上方的进入页应用栏：背景透明，
+                    // 头像位只占位，确保组件位置与切换完成后的真实布局一致。
+                    PreferredSizeWidget buildAppBar(
+                      int index, {
+                      bool overlay = false,
+                    }) => hazukiFrostedAppBar(
                       context: context,
                       leading: Platform.isWindows
                           ? null
+                          : overlay
+                          ? const SizedBox.shrink()
                           : _HomeAppBarProfileButton(
                               downloadStatus: downloadStatus,
                               activeSourceKey: activeSourceKey,
@@ -549,31 +569,42 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                             ),
                       leadingWidth: Platform.isWindows ? null : leadingWidth,
                       automaticallyImplyLeading: false,
-                      title: currentIndex == 1
+                      backgroundAlpha: overlay ? 0 : 0.72,
+                      title: index == 1
                           ? null
-                          : _HomeAppBarSearchBox(
-                              onOpenSearch: onOpenSearch,
-                              maxWidth: Platform.isWindows ? 320 : null,
+                          : HomeTabCutClip(
+                              transition: _tabTransition,
+                              index: 0,
+                              child: _HomeAppBarSearchBox(
+                                onOpenSearch: onOpenSearch,
+                                maxWidth: Platform.isWindows ? 320 : null,
+                              ),
                             ),
                       titleSpacing: Platform.isWindows ? null : 4,
                       centerTitle: Platform.isWindows,
                       actions: [
-                        HomeAppBarActions(
-                          currentIndex: currentIndex,
-                          discoverSearchMorphProgress:
-                              discoverSearchMorphProgress,
-                          forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
-                          favoriteAppBarActions: favoriteAppBarActions,
-                          sourcePlugins: widget.sourcePlugins,
-                          onOpenSearch: onOpenSearch,
-                          onFavoriteSortSelected: onFavoriteSortSelected,
-                          onFavoriteCreateFolderPressed:
-                              onFavoriteCreateFolderPressed,
-                          onFavoriteModeTogglePressed:
-                              onFavoriteModeTogglePressed,
+                        HomeTabCutClip(
+                          transition: _tabTransition,
+                          index: 1,
+                          child: HomeAppBarActions(
+                            currentIndex: index,
+                            discoverSearchMorphProgress:
+                                discoverSearchMorphProgress,
+                            forceDiscoverSearchInAppBar:
+                                usePinnedDiscoverSearch,
+                            favoriteAppBarActions: favoriteAppBarActions,
+                            sourcePlugins: widget.sourcePlugins,
+                            onOpenSearch: onOpenSearch,
+                            onFavoriteSortSelected: onFavoriteSortSelected,
+                            onFavoriteCreateFolderPressed:
+                                onFavoriteCreateFolderPressed,
+                            onFavoriteModeTogglePressed:
+                                onFavoriteModeTogglePressed,
+                          ),
                         ),
                       ],
                     );
+                    final appBar = buildAppBar(currentIndex);
                     return HazukiLiquidGlass.backdropScope(
                       child: Scaffold(
                         key: scaffoldKey,
@@ -587,6 +618,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                             child: HomeDrawerSnapshot(
                               animation: _profileDrawerController,
                               enabled: !Platform.isWindows,
+                              contentAnimating: _homeContentAnimating,
                               // The app bar normally composites over Scaffold's
                               // background. Include it in the isolated raster
                               // so its translucent glass keeps the same tint.
@@ -594,7 +626,32 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                                 color: Theme.of(
                                   context,
                                 ).scaffoldBackgroundColor,
-                                child: appBar,
+                                // 切页期间真实应用栏保持退出页布局，进入页组件
+                                // 由上层透明应用栏承载，两者按同一切口互补裁剪。
+                                child: AnimatedBuilder(
+                                  animation: _tabTransition.animation,
+                                  builder: (context, _) {
+                                    if (!_tabTransition.isAnimating) {
+                                      return Stack(children: [appBar]);
+                                    }
+                                    return Stack(
+                                      children: [
+                                        buildAppBar(_tabTransition.outgoing),
+                                        Positioned.fill(
+                                          child: IgnorePointer(
+                                            child: HeroMode(
+                                              enabled: false,
+                                              child: buildAppBar(
+                                                _tabTransition.incoming,
+                                                overlay: true,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ),

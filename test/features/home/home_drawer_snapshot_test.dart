@@ -108,9 +108,9 @@ void main() {
           reason:
               'changing content must keep painting while snapshotting is off',
         );
-        // Opacity has finished at 220ms, but the slide continues until 240ms.
+        // The panel-cut transition runs for 480ms; stop just before it ends.
         await tester.pump(
-          Duration(milliseconds: startDuringDrawer ? 144 : 112),
+          Duration(milliseconds: startDuringDrawer ? 384 : 352),
         );
         expect(contentAnimating.value, isTrue);
         expect(_snapshot(tester).allowSnapshotting, isFalse);
