@@ -615,6 +615,36 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     _notify();
   });
 
+  /// 按 [ids] 重排已安装插件。顺序写入注册表，并通过目录变更同步到切换漫画源列表；
+  /// [ids] 必须恰好覆盖当前全部已安装插件。
+  Future<void> reorder(List<String> ids) => _serialize(() async {
+    final previous = Map<String, InstalledSourcePlugin>.of(_installed);
+    if (ids.length != previous.length ||
+        ids.toSet().length != ids.length ||
+        !ids.every(previous.containsKey)) {
+      throw const SourcePluginException('plugin_invalid_order');
+    }
+    if (listEquals(ids, previous.keys.toList())) return;
+    void apply(Iterable<String> order) => _installed
+      ..clear()
+      ..addEntries(order.map((id) => MapEntry(id, previous[id]!)));
+    apply(ids);
+    var committed = false;
+    try {
+      await _commit();
+      committed = true;
+      await onCatalogChanged?.call(catalog);
+    } catch (_) {
+      apply(previous.keys);
+      if (committed) {
+        await _commit();
+        await onCatalogChanged?.call(catalog);
+      }
+      rethrow;
+    }
+    _notify();
+  });
+
   Future<void> uninstall(String id) => _serialize(() async {
     final old = _requirePlugin(id);
     _installed.remove(id);

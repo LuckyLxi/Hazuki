@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_repository.dart';
@@ -11,6 +12,10 @@ import 'source_plugin_settings_page.dart';
 part 'source_plugins_widgets.dart';
 
 enum _PluginOperationPage { installed, available }
+
+enum _PluginMarketFilter { all, notInstalled, updates }
+
+enum _PluginSheetAction { settings, update, copyRepository, uninstall }
 
 enum SourcePluginsTab { installed, market }
 
@@ -32,6 +37,10 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
   bool get _busy => _busyPage != null;
   final Set<String> _installing = {};
   final Map<String, bool> _pendingEnabled = {};
+  _PluginMarketFilter _marketFilter = _PluginMarketFilter.all;
+  bool _sorting = false;
+  // 排序模式下的乐观顺序，避免等待注册表写入时列表回跳。
+  List<String>? _sortOrder;
   bool get _hasOperations => _busy || _installing.isNotEmpty;
 
   @override
@@ -191,6 +200,75 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     await _manager.installFromRepository(repository, entry);
   }
 
+  bool _hasUpdate(String id) =>
+      _manager.availableUpdates.any((update) => update.entry.id == id);
+
+  SourcePluginUpdate? _updateFor(String id) {
+    for (final update in _manager.availableUpdates) {
+      if (update.entry.id == id) return update;
+    }
+    return null;
+  }
+
+  // 只有来自内置或已登记仓库的插件才能走仓库更新流程。
+  bool _canUpdate(InstalledSourcePlugin plugin) =>
+      plugin.repository != null &&
+      (plugin.repository == sourcePluginsRepositoryUrl ||
+          _manager.repositories.contains(plugin.repository));
+
+  String _repositoryLabel(InstalledSourcePlugin plugin) {
+    final repository = plugin.repository;
+    if (repository == null) return l10n(context).pluginsLocalPackage;
+    return repository == sourcePluginsRepositoryUrl
+        ? sourcePluginsRepositoryName
+        : repository;
+  }
+
+  Future<void> _showActions(InstalledSourcePlugin plugin) async {
+    final s = l10n(context);
+    final id = plugin.manifest.id;
+    final update = _updateFor(id);
+    final action = await showModalBottomSheet<_PluginSheetAction>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => _PluginActionSheet(
+        plugin: plugin,
+        subtitle: '${plugin.manifest.version} · $id',
+        settingsEnabled: plugin.enabled,
+        updateLabel: _canUpdate(plugin)
+            ? (update == null
+                  ? s.pluginsCheckUpdate
+                  : s.pluginsUpdateTo(update.entry.version))
+            : null,
+        updateTrailing: update == null ? null : _repositoryLabel(plugin),
+        canCopyRepository: plugin.repository != null,
+      ),
+    );
+    if (action == null || !mounted || _hasOperations) return;
+    switch (action) {
+      case _PluginSheetAction.settings:
+        unawaited(
+          Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  SourcePluginSettingsPage(gateway: _manager, id: id),
+            ),
+          ),
+        );
+      case _PluginSheetAction.update:
+        await _run(() => _update(id));
+      case _PluginSheetAction.copyRepository:
+        await Clipboard.setData(ClipboardData(text: plugin.repository!));
+        if (mounted) {
+          unawaited(showHazukiPrompt(context, s.pluginsRepositoryCopied));
+        }
+      case _PluginSheetAction.uninstall:
+        await _confirmUninstall(plugin);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = l10n(context);
@@ -201,6 +279,17 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
         appBar: hazukiFrostedAppBar(
           context: context,
           title: Text(s.pluginsTitle),
+          actions: [
+            AnimatedBuilder(
+              animation: _manager,
+              builder: (context, _) => IconButton(
+                tooltip: s.pluginsImportLocal,
+                onPressed: _hasOperations ? null : () => _run(_import),
+                icon: const Icon(Icons.note_add_outlined),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
@@ -219,66 +308,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
               child: AnimatedBuilder(
                 animation: _manager,
                 builder: (context, _) => TabBarView(
-                  children: [
-                    ListView(
-                      key: const PageStorageKey('installed-plugins'),
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                      children: [
-                        _overview(context),
-                        if (_busyPage == _PluginOperationPage.installed)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 16),
-                            child: LinearProgressIndicator(),
-                          ),
-                        const SizedBox(height: 28),
-                        _PluginSectionHeader(
-                          title: s.pluginsInstalled,
-                          count: _manager.installed.length,
-                        ),
-                        const SizedBox(height: 12),
-                        if (_manager.installed.isEmpty)
-                          _PluginEmptyState(
-                            icon: Icons.extension_outlined,
-                            message: s.pluginsEmpty,
-                          )
-                        else
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final width = constraints.maxWidth >= 800
-                                  ? (constraints.maxWidth - 16) / 2
-                                  : constraints.maxWidth;
-                              return Wrap(
-                                spacing: 16,
-                                runSpacing: 16,
-                                children: [
-                                  for (final plugin in _manager.installed)
-                                    SizedBox(
-                                      width: width,
-                                      child: _installedCard(context, plugin),
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
-                      ],
-                    ),
-                    ListView(
-                      key: const PageStorageKey('available-plugins'),
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                      children: [
-                        if (_busyPage == _PluginOperationPage.available ||
-                            _manager.checkingIndex) ...[
-                          const LinearProgressIndicator(),
-                          const SizedBox(height: 12),
-                        ],
-                        if (_manager.indexError case final error?) ...[
-                          _PluginError(message: error),
-                          const SizedBox(height: 12),
-                        ],
-                        _repositoryCard(context, sourcePluginsRepositoryUrl),
-                      ],
-                    ),
-                  ],
+                  children: [_installedTab(context), _marketTab(context)],
                 ),
               ),
             ),
@@ -288,205 +318,509 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     );
   }
 
-  Widget _overview(BuildContext context) {
+  List<InstalledSourcePlugin> _sortedInstalled() {
+    final installed = _manager.installed;
+    final order = _sortOrder;
+    if (order == null) return installed;
+    final byId = {for (final plugin in installed) plugin.manifest.id: plugin};
+    return [
+      for (final id in order) ?byId[id],
+      // 排序期间新安装的插件追加到末尾。
+      for (final plugin in installed)
+        if (!order.contains(plugin.manifest.id)) plugin,
+    ];
+  }
+
+  Future<void> _movePlugin(int oldIndex, int newIndex) async {
+    final ids = [for (final plugin in _sortedInstalled()) plugin.manifest.id];
+    if (oldIndex == newIndex) return;
+    ids.insert(newIndex, ids.removeAt(oldIndex));
+    setState(() => _sortOrder = ids);
+    try {
+      await _manager.reorder(ids);
+    } catch (error) {
+      if (!mounted) return;
+      // 写入失败时管理器已回滚，丢弃乐观顺序以显示真实顺序。
+      setState(() => _sortOrder = null);
+      unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+    }
+  }
+
+  void _setSorting(bool sorting) => setState(() {
+    _sorting = sorting;
+    _sortOrder = null;
+  });
+
+  Widget _installedTab(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 260),
+    switchInCurve: Curves.easeOutCubic,
+    switchOutCurve: Curves.easeInCubic,
+    transitionBuilder: (child, animation) => FadeTransition(
+      opacity: animation,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.98, end: 1).animate(animation),
+        child: child,
+      ),
+    ),
+    child: _sorting && _manager.installed.length > 1
+        ? _installedSortList(context)
+        : _installedList(context),
+  );
+
+  Widget _installedList(BuildContext context) {
     final s = l10n(context);
     final theme = Theme.of(context);
-    return _PluginSurface(
-      color: theme.colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.extension_rounded,
-              size: 32,
-              color: theme.colorScheme.onPrimaryContainer,
+    final installed = _manager.installed;
+    return ListView(
+      key: const PageStorageKey('installed-plugins'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        if (_busyPage == _PluginOperationPage.installed) ...[
+          const LinearProgressIndicator(),
+          const SizedBox(height: 16),
+        ],
+        if (installed.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${s.pluginsInstalled} · ${installed.length}',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _hasOperations ? null : () => _setSorting(true),
+                  icon: const Icon(Icons.swap_vert, size: 18),
+                  label: Text(s.pluginsSort),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              s.pluginsSubtitle,
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: theme.colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.w600,
+          ),
+        _PluginFadeSwitcher(
+          child: installed.isEmpty
+              ? _PluginEmptyState(
+                  key: const ValueKey('installed-empty'),
+                  icon: Icons.extension_outlined,
+                  message: s.pluginsEmpty,
+                )
+              : const SizedBox(key: ValueKey('installed-list')),
+        ),
+        _AnimatedPluginGrid<InstalledSourcePlugin>(
+          items: installed,
+          keyOf: (plugin) => plugin.manifest.id,
+          itemBuilder: _installedCard,
+        ),
+      ],
+    );
+  }
+
+  Widget _installedSortList(BuildContext context) {
+    final s = l10n(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final plugins = _sortedInstalled();
+    return ReorderableListView.builder(
+      key: const PageStorageKey('installed-plugins-sort'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      buildDefaultDragHandles: false,
+      header: Padding(
+        padding: const EdgeInsets.only(left: 4, bottom: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                s.pluginsSortHint,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _PluginBadge(
-                  label: '${s.pluginsInstalled} · ${_manager.installed.length}',
-                ),
-                _PluginBadge(
-                  label:
-                      '${s.pluginsEnabled} · ${_manager.installed.where((plugin) => plugin.enabled).length}',
-                ),
-                _PluginBadge(
-                  label:
-                      '${s.pluginsAvailable} · ${_manager.entriesFor(sourcePluginsRepositoryUrl).length}',
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                FilledButton.icon(
-                  onPressed: _hasOperations ? null : () => _run(_import),
-                  icon: const Icon(Icons.file_open_outlined),
-                  label: Text(s.pluginsImportLocal),
-                ),
-              ],
+            const SizedBox(width: 12),
+            FilledButton.tonal(
+              onPressed: () => _setSorting(false),
+              child: Text(s.pluginsSortDone),
             ),
           ],
         ),
       ),
+      itemCount: plugins.length,
+      onReorderItem: (oldIndex, newIndex) =>
+          unawaited(_movePlugin(oldIndex, newIndex)),
+      proxyDecorator: (child, index, animation) => AnimatedBuilder(
+        animation: animation,
+        child: child,
+        builder: (context, child) {
+          final t = Curves.easeOutCubic.transform(animation.value);
+          // 阴影只画在卡片区域，不包含条目底部间距。
+          return Transform.scale(
+            scale: 1 + 0.03 * t,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  bottom: 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: scheme.shadow.withValues(alpha: 0.22 * t),
+                          blurRadius: 18 * t,
+                          offset: Offset(0, 6 * t),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Material(type: MaterialType.transparency, child: child),
+              ],
+            ),
+          );
+        },
+      ),
+      itemBuilder: (context, index) {
+        final plugin = plugins[index];
+        return Padding(
+          key: ValueKey('plugin-sort-${plugin.manifest.id}'),
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _PluginSurface(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+              child: Row(
+                children: [
+                  _PluginAvatar(
+                    label: plugin.manifest.name,
+                    background: plugin.enabled
+                        ? scheme.primary
+                        : scheme.surfaceContainerHighest,
+                    foreground: plugin.enabled
+                        ? scheme.onPrimary
+                        : scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          plugin.manifest.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${plugin.manifest.id} · ${plugin.enabled ? s.pluginsEnabled : s.pluginsDisabled}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Semantics(
+                      label: s.pluginsSortHandle(plugin.manifest.name),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.drag_handle_rounded,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _marketTab(BuildContext context) {
+    final s = l10n(context);
+    const repository = sourcePluginsRepositoryUrl;
+    final entries = _manager.entriesFor(repository);
+    final notInstalled = entries
+        .where((entry) => _manager.pluginFor(entry.id) == null)
+        .toList();
+    final updates = entries.where((entry) => _hasUpdate(entry.id)).toList();
+    final visible = switch (_marketFilter) {
+      _PluginMarketFilter.all => entries,
+      _PluginMarketFilter.notInstalled => notInstalled,
+      _PluginMarketFilter.updates => updates,
+    };
+    return ListView(
+      key: const PageStorageKey('available-plugins'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        if (_busyPage == _PluginOperationPage.available ||
+            _manager.checkingIndex) ...[
+          const LinearProgressIndicator(),
+          const SizedBox(height: 12),
+        ],
+        if (_manager.indexError case final error?) ...[
+          _PluginError(message: error),
+          const SizedBox(height: 12),
+        ],
+        _repositoryHeader(
+          context,
+          repository,
+          count: entries.length,
+          updates: updates.length,
+        ),
+        const SizedBox(height: 12),
+        if (entries.isEmpty)
+          _PluginEmptyState(
+            icon: Icons.storefront_outlined,
+            message: s.pluginsRepositoryEmpty,
+          )
+        else ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final (filter, label, count) in [
+                (_PluginMarketFilter.all, s.pluginsFilterAll, entries.length),
+                (
+                  _PluginMarketFilter.notInstalled,
+                  s.pluginsFilterNotInstalled,
+                  notInstalled.length,
+                ),
+                (
+                  _PluginMarketFilter.updates,
+                  s.pluginsFilterUpdates,
+                  updates.length,
+                ),
+              ])
+                ChoiceChip(
+                  label: Text('$label $count'),
+                  selected: _marketFilter == filter,
+                  showCheckmark: false,
+                  onSelected: (_) => setState(() => _marketFilter = filter),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _PluginFadeSwitcher(
+            child: visible.isEmpty
+                ? Padding(
+                    key: const ValueKey('market-filter-empty'),
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Text(
+                      s.pluginsFilterEmpty,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                : const SizedBox(key: ValueKey('market-list')),
+          ),
+          _AnimatedPluginGrid<SourcePluginIndexEntry>(
+            items: visible,
+            keyOf: (entry) => entry.id,
+            itemBuilder: (context, entry) =>
+                _marketCard(context, repository, entry),
+          ),
+        ],
+      ],
     );
   }
 
   Widget _installedCard(BuildContext context, InstalledSourcePlugin plugin) {
     final s = l10n(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final id = plugin.manifest.id;
+    final enabled = _pendingEnabled[id] ?? plugin.enabled;
+    final update = _canUpdate(plugin) ? _updateFor(id) : null;
+    final error = _manager.errors[id];
     return _PluginSurface(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                _PluginIcon(
-                  icon: Icons.extension_outlined,
-                  highlighted: plugin.enabled,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        plugin.manifest.name,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+      child: InkWell(
+        onTap: _hasOperations ? null : () => _showActions(plugin),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  _PluginAvatar(
+                    label: plugin.manifest.name,
+                    background: enabled
+                        ? scheme.primary
+                        : scheme.surfaceContainerHighest,
+                    foreground: enabled
+                        ? scheme.onPrimary
+                        : scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 220),
+                          style: theme.textTheme.titleMedium!.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: enabled
+                                ? scheme.onSurface
+                                : scheme.onSurfaceVariant,
+                          ),
+                          child: Text(plugin.manifest.name),
                         ),
-                      ),
-                      Text(
-                        plugin.manifest.id,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Semantics(
-                  label: plugin.manifest.name,
-                  child: Switch(
-                    value:
-                        _pendingEnabled[plugin.manifest.id] ?? plugin.enabled,
-                    onChanged:
-                        _hasOperations ||
-                            _pendingEnabled.containsKey(plugin.manifest.id)
-                        ? null
-                        : (value) => _setEnabled(plugin.manifest.id, value),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _PluginBadge(label: plugin.manifest.version),
-                _PluginBadge(
-                  label: plugin.enabled ? s.pluginsEnabled : s.pluginsDisabled,
-                  highlighted: plugin.enabled,
-                ),
-                if (plugin.customEdited)
-                  _PluginBadge(label: s.pluginsLocallyEdited),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  plugin.repository == null
-                      ? Icons.insert_drive_file_outlined
-                      : Icons.link,
-                  size: 18,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    plugin.repository ?? s.pluginsLocalPackage,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (_manager.errors[plugin.manifest.id] case final error?) ...[
-              const SizedBox(height: 12),
-              _PluginError(message: error),
-            ],
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Divider(height: 1),
-            ),
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: [
-                TextButton.icon(
-                  onPressed: _hasOperations || !plugin.enabled
-                      ? null
-                      : () => Navigator.push(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => SourcePluginSettingsPage(
-                              gateway: _manager,
-                              id: plugin.manifest.id,
-                            ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$id · ${_repositoryLabel(plugin)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
                           ),
                         ),
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: Text(s.settingsTitle),
-                ),
-                if (plugin.repository != null &&
-                    (plugin.repository == sourcePluginsRepositoryUrl ||
-                        _manager.repositories.contains(plugin.repository)))
-                  TextButton.icon(
-                    onPressed: _hasOperations
-                        ? null
-                        : () => _run(() => _update(plugin.manifest.id)),
-                    icon: const Icon(Icons.update, size: 18),
-                    label: Text(
-                      _manager.availableUpdates.any(
-                            (update) => update.entry.id == plugin.manifest.id,
-                          )
-                          ? s.pluginsUpdate
-                          : s.pluginsCheckUpdate,
+                      ],
                     ),
                   ),
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    foregroundColor: theme.colorScheme.error,
+                  const SizedBox(width: 4),
+                  Semantics(
+                    label: plugin.manifest.name,
+                    child: Switch(
+                      value: enabled,
+                      onChanged:
+                          _hasOperations || _pendingEnabled.containsKey(id)
+                          ? null
+                          : (value) => _setEnabled(id, value),
+                    ),
                   ),
-                  onPressed: _hasOperations
-                      ? null
-                      : () => _confirmUninstall(plugin),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: Text(s.pluginsUninstall),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _PluginBadge(
+                          label: enabled ? s.pluginsEnabled : s.pluginsDisabled,
+                          highlighted: enabled,
+                        ),
+                        _PluginBadge(label: plugin.manifest.version),
+                        if (plugin.customEdited)
+                          _PluginBadge(label: s.pluginsLocallyEdited),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    key: ValueKey('plugin-actions-$id'),
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).moreButtonTooltip,
+                    onPressed: _hasOperations
+                        ? null
+                        : () => _showActions(plugin),
+                    icon: const Icon(Icons.more_horiz),
+                  ),
+                ],
+              ),
+              _PluginRevealSection(
+                visible: update != null,
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(top: 8, end: 8),
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: scheme.tertiary,
+                        foregroundColor: scheme.onTertiary,
+                      ),
+                      onPressed: _hasOperations
+                          ? null
+                          : () => _run(() => _update(id)),
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      label: Text(
+                        s.pluginsUpdateTo(update?.entry.version ?? ''),
+                      ),
+                    ),
+                  ),
                 ),
-              ],
+              ),
+              _PluginRevealSection(
+                visible: error != null,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(top: 12, end: 8),
+                  child: _PluginError(message: error ?? ''),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _repositoryHeader(
+    BuildContext context,
+    String repository, {
+    required int count,
+    required int updates,
+  }) {
+    final s = l10n(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return _PluginSurface(
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+        child: Row(
+          children: [
+            Icon(Icons.layers_outlined, color: scheme.onPrimaryContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    sourcePluginsRepositoryName,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: scheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    s.pluginsRepositorySummary(count, updates),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onPrimaryContainer,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: s.pluginsRefresh,
+              style: IconButton.styleFrom(
+                backgroundColor: scheme.surfaceContainerLowest,
+                foregroundColor: scheme.primary,
+              ),
+              onPressed: _hasOperations || _manager.checkingIndex
+                  ? null
+                  : () => _run(
+                      () => _manager.refreshRepository(repository),
+                      page: _PluginOperationPage.available,
+                    ),
+              icon: const Icon(Icons.refresh),
             ),
           ],
         ),
@@ -494,90 +828,114 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     );
   }
 
-  Widget _repositoryCard(BuildContext context, String repository) {
+  Widget _marketCard(
+    BuildContext context,
+    String repository,
+    SourcePluginIndexEntry entry,
+  ) {
     final s = l10n(context);
     final theme = Theme.of(context);
-    final entries = _manager.entriesFor(repository);
+    final scheme = theme.colorScheme;
+    final installed = _manager.pluginFor(entry.id);
+    final hasUpdate = installed != null && _hasUpdate(entry.id);
+    final installing = _installing.contains(entry.id);
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          entry.name,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text.rich(
+          TextSpan(
+            children: [
+              if (hasUpdate) ...[
+                TextSpan(
+                  text: '${entry.id} · ${installed.manifest.version} → ',
+                ),
+                TextSpan(
+                  text: entry.version,
+                  style: TextStyle(
+                    color: scheme.tertiary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ] else
+                TextSpan(text: '${entry.id} · ${entry.version}'),
+            ],
+          ),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+    final action = FilledButton(
+      key: ValueKey('plugin-market-action-${entry.id}'),
+      style: hasUpdate
+          ? FilledButton.styleFrom(
+              backgroundColor: scheme.tertiary,
+              foregroundColor: scheme.onTertiary,
+            )
+          : null,
+      onPressed:
+          _busy ||
+              installing ||
+              _manager.checkingIndex ||
+              (installed != null && !hasUpdate)
+          ? null
+          : () => _run(
+              () => _installFromRepository(repository, entry),
+              pluginId: entry.id,
+            ),
+      child: _PluginOperationLabel(
+        loading: installing,
+        loadingLabel: s.commonLoading,
+        label: installed == null
+            ? s.pluginsInstall
+            : hasUpdate
+            ? s.pluginsUpdate
+            : s.pluginsAlreadyInstalled,
+      ),
+    );
     return _PluginSurface(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              sourcePluginsRepositoryName,
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton.icon(
-                onPressed: _hasOperations || _manager.checkingIndex
-                    ? null
-                    : () => _run(
-                        () => _manager.refreshRepository(repository),
-                        page: _PluginOperationPage.available,
-                      ),
-                icon: const Icon(Icons.refresh, size: 18),
-                label: Text(s.pluginsRefresh),
-              ),
-            ),
-            if (entries.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Text(
-                  s.pluginsRepositoryEmpty,
-                  textAlign: TextAlign.center,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // 窄屏或大字号时按钮放到文字下方，避免横向溢出。
+            final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+            final compact = constraints.maxWidth / scale < 240;
+            return Row(
+              crossAxisAlignment: compact
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
+              children: [
+                _PluginAvatar(
+                  label: entry.name,
+                  background: installed == null
+                      ? scheme.secondaryContainer
+                      : scheme.surfaceContainerHighest,
+                  foreground: installed == null
+                      ? scheme.onSecondaryContainer
+                      : scheme.onSurfaceVariant,
                 ),
-              ),
-            for (final entry in entries) ...[
-              const Divider(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(entry.name, style: theme.textTheme.titleSmall),
-                        Text(
-                          '${entry.version} · ${entry.id}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.tonal(
-                    key: ValueKey('plugin-market-action-${entry.id}'),
-                    onPressed:
-                        _busy ||
-                            _installing.contains(entry.id) ||
-                            _manager.checkingIndex ||
-                            (_manager.pluginFor(entry.id) != null &&
-                                !_manager.availableUpdates.any(
-                                  (update) => update.entry.id == entry.id,
-                                ))
-                        ? null
-                        : () => _run(
-                            () => _installFromRepository(repository, entry),
-                            pluginId: entry.id,
-                          ),
-                    child: _PluginOperationLabel(
-                      loading: _installing.contains(entry.id),
-                      loadingLabel: s.commonLoading,
-                      label: _manager.pluginFor(entry.id) == null
-                          ? s.pluginsInstall
-                          : _manager.availableUpdates.any(
-                              (update) => update.entry.id == entry.id,
-                            )
-                          ? s.pluginsUpdate
-                          : s.pluginsAlreadyInstalled,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: compact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [info, const SizedBox(height: 12), action],
+                        )
+                      : info,
+                ),
+                if (!compact) ...[const SizedBox(width: 12), action],
+              ],
+            );
+          },
         ),
       ),
     );

@@ -1560,6 +1560,34 @@
     }
   },
   "pluginsViewDetails": "查看详情",
+  "pluginsRepositorySummary": "{count} 个插件 · {updates} 个可更新",
+  "@pluginsRepositorySummary": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "updates": { "type": "int" }
+    }
+  },
+  "pluginsFilterAll": "全部",
+  "pluginsFilterNotInstalled": "未安装",
+  "pluginsFilterUpdates": "可更新",
+  "pluginsFilterEmpty": "没有符合条件的插件",
+  "pluginsUpdateTo": "更新到 {version}",
+  "@pluginsUpdateTo": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "pluginsCopyRepository": "复制仓库地址",
+  "pluginsRepositoryCopied": "已复制仓库地址",
+  "pluginsSort": "排序",
+  "pluginsSortDone": "完成",
+  "pluginsSortHint": "拖动右侧手柄调整顺序，切换漫画源时按此顺序显示",
+  "pluginsSortHandle": "拖动调整 {name} 的位置",
+  "@pluginsSortHandle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
   "sourceBackupRestoreTitle": "恢复本地备份",
   "sourceBackupRestoreConfirm": "确定恢复到上次保存前的源码吗？当前源码会被覆盖，恢复成功后将清除备份。重启应用后生效。",
   "sourceRedownloadTitle": "重新下载插件",

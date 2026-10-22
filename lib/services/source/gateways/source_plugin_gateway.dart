@@ -30,6 +30,9 @@ abstract interface class SourcePluginGateway implements Listenable {
     SourcePluginIndexEntry entry,
   );
   Future<void> setEnabled(String id, bool enabled);
+
+  /// 调整已安装插件顺序，切换漫画源列表随之变化。
+  Future<void> reorder(List<String> ids);
   Future<void> uninstall(String id);
   Future<SourcePluginIndexEntry?> checkUpdate(String id);
   Future<SourceMeta?> loadMetadata(String id);

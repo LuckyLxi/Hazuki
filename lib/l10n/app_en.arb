@@ -1560,6 +1560,34 @@
     }
   },
   "pluginsViewDetails": "View details",
+  "pluginsRepositorySummary": "{count} plugins · {updates} updates",
+  "@pluginsRepositorySummary": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "updates": { "type": "int" }
+    }
+  },
+  "pluginsFilterAll": "All",
+  "pluginsFilterNotInstalled": "Not installed",
+  "pluginsFilterUpdates": "Updates",
+  "pluginsFilterEmpty": "No plugins match this filter",
+  "pluginsUpdateTo": "Update to {version}",
+  "@pluginsUpdateTo": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "pluginsCopyRepository": "Copy repository URL",
+  "pluginsRepositoryCopied": "Repository URL copied",
+  "pluginsSort": "Sort",
+  "pluginsSortDone": "Done",
+  "pluginsSortHint": "Drag the handles to reorder. The source switcher uses this order.",
+  "pluginsSortHandle": "Drag to move {name}",
+  "@pluginsSortHandle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
   "sourceBackupRestoreTitle": "Restore local backup",
   "sourceBackupRestoreConfirm": "Restore the source from before the last save? This replaces the current source and clears the backup after success. Restart the app to apply it.",
   "sourceRedownloadTitle": "Download plugin again",

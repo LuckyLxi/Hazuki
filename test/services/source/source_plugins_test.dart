@@ -289,6 +289,71 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
   );
 
   test(
+    'reorder persists, drives catalog order and rolls back on failure',
+    () async {
+      await manager.initialize();
+      for (final id in ['alpha', 'beta', 'gamma']) {
+        await manager.importPackage(package(id: id));
+      }
+      final published = <List<String>>[];
+      manager.onCatalogChanged = (catalog) async =>
+          published.add([for (final entry in catalog) entry.key]);
+
+      await manager.reorder(['gamma', 'alpha', 'beta']);
+      expect(manager.installed.map((plugin) => plugin.manifest.id), [
+        'gamma',
+        'alpha',
+        'beta',
+      ]);
+      expect(published.single, ['gamma', 'alpha', 'beta']);
+
+      // 顺序不变时不写注册表，也不重新发布目录。
+      await manager.reorder(['gamma', 'alpha', 'beta']);
+      expect(published, hasLength(1));
+
+      for (final invalid in [
+        ['gamma', 'alpha'],
+        ['gamma', 'alpha', 'alpha'],
+        ['gamma', 'alpha', 'missing'],
+      ]) {
+        await expectLater(
+          manager.reorder(invalid),
+          throwsA(isA<SourcePluginException>()),
+        );
+      }
+
+      manager.onCatalogChanged = (_) async => throw StateError('runtime busy');
+      await expectLater(
+        manager.reorder(['beta', 'gamma', 'alpha']),
+        throwsA(isA<StateError>()),
+      );
+      expect(manager.installed.map((plugin) => plugin.manifest.id), [
+        'gamma',
+        'alpha',
+        'beta',
+      ]);
+      manager.onCatalogChanged = null;
+
+      final restored = SourcePluginManager(
+        directory: () async => root,
+        legacyDirectories: [],
+      );
+      await restored.initialize();
+      expect(restored.installed.map((plugin) => plugin.manifest.id), [
+        'gamma',
+        'alpha',
+        'beta',
+      ]);
+      expect(restored.catalog.map((entry) => entry.key), [
+        'gamma',
+        'alpha',
+        'beta',
+      ]);
+      restored.dispose();
+    },
+  );
+
+  test(
     'rejects incompatible or malformed JS and missing runtime methods',
     () async {
       for (final bytes in [

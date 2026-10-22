@@ -74,6 +74,8 @@ class HazukiSourcePluginAdapter implements SourcePluginGateway {
   Future<void> setEnabled(String id, bool enabled) =>
       manager.setEnabled(id, enabled);
   @override
+  Future<void> reorder(List<String> ids) => manager.reorder(ids);
+  @override
   Future<void> uninstall(String id) => manager.uninstall(id);
   @override
   Future<SourcePluginIndexEntry?> checkUpdate(String id) =>
