@@ -1926,6 +1926,7 @@ class _DesktopDetailFacade extends ComicDetailFeatureFacade {
     String id, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) async => ComicDetailsData(
     id: id,
     sourceKey: 'copy_manga',
@@ -1968,6 +1969,7 @@ class _DownloadSelectionDetailFacade extends _DesktopDetailFacade {
     String id, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) async => (await super.loadComicDetails(
     id,
   )).copyWith(chapters: const {'1': 'Chapter 1', '2': 'Chapter 2'});
@@ -2050,6 +2052,7 @@ class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
     String id, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) => _completer.future;
 }
 
@@ -2066,6 +2069,7 @@ class _ReadingProgressDetailFacade extends _NavigationDetailFacade {
     String id, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) async => (await super.loadComicDetails(id)).copyWith(
     chapters: const {'1': 'Chapter 1', '2': 'Chapter 2', '3': 'Chapter 3'},
   );

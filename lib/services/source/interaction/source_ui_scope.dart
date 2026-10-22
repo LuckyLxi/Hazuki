@@ -46,6 +46,7 @@ class SourceUiScope extends ChangeNotifier {
   String? reason;
   Object? failure;
   bool finished = false;
+  bool survivesSourceChange = false;
   final Set<String> runtimeIds = {};
   final Set<String> pluginIds = {};
   bool get available => !finished && reason == null;

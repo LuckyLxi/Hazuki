@@ -389,6 +389,7 @@ class _Reader extends Fake implements SourceReaderGateway {
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     chapters.add(epId);
     scopes.add(sourceKey);
@@ -403,6 +404,7 @@ class _Reader extends Fake implements SourceReaderGateway {
     String sourceKey = '',
     bool useDiskCache = true,
     bool priority = false,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     images.add(url);
     scopes.add(sourceKey);
@@ -418,6 +420,7 @@ class _Reader extends Fake implements SourceReaderGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     coverDownloads++;
     scopes.add(sourceKey);

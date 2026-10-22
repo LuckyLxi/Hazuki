@@ -9,7 +9,7 @@ import 'source_shared_request.dart';
 class SourceCacheStore {
   final LinkedHashMap<String, Uint8List> imageBytesCache =
       LinkedHashMap<String, Uint8List>();
-  final Map<String, Future<Uint8List>> imageDownloadInFlight = {};
+  final Map<String, SourceSharedRequest<Uint8List>> imageDownloadInFlight = {};
   final LinkedHashMap<String, ComicDetailsData> comicDetailsMemoryCache =
       LinkedHashMap<String, ComicDetailsData>();
   final Map<String, SourceSharedRequest<ComicDetailsData>>

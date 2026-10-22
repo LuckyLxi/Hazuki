@@ -134,6 +134,7 @@ abstract interface class SourceComicDetailGateway {
     String comicId, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
@@ -148,11 +149,13 @@ abstract interface class SourceComicDetailGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<void> prefetchComicImages({
     required String comicId,
@@ -161,6 +164,7 @@ abstract interface class SourceComicDetailGateway {
     required int count,
     required int memoryCount,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,
@@ -251,11 +255,13 @@ abstract interface class SourceReaderGateway {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<PreparedChapterImageData> prepareChapterImageData(
     String imageUrl, {
@@ -264,6 +270,7 @@ abstract interface class SourceReaderGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<Uint8List> downloadImageBytes(
     String url, {
@@ -273,6 +280,7 @@ abstract interface class SourceReaderGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   bool isLocalImagePath(String value);
   String normalizeLocalImagePath(String value);
@@ -290,6 +298,11 @@ abstract interface class SourceReaderGateway {
     Object? content,
     String source = 'reader',
   });
+}
+
+/// Optional extension for production readers; offline/fake readers need no lease.
+abstract interface class SourceReaderSessionGateway {
+  SourceReaderSession acquireReaderSession(String sourceKey);
 }
 
 /// Optional reader extension; old gateway implementations remain valid.

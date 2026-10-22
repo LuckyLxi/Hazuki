@@ -18,6 +18,7 @@ import 'source_runtime_facade.dart';
 import 'source_runtime_kernel.dart';
 import 'source_secure_session_storage.dart';
 import 'source_script_engine.dart';
+import 'source_task_registry.dart';
 import 'source_session_store.dart';
 import '../account/source_login_interaction.dart';
 import '../interaction/source_ui_service.dart';
@@ -43,10 +44,19 @@ class SourceRuntimeHandle
     required Future<void> Function(String sourceKey) ensureInitialized,
     required void Function(String sourceKey) notifyRuntimeStateChanged,
     AppLogStore? appLogStore,
+    SourceTaskRegistry? tasks,
+    bool Function(SourceRuntimeHandle handle)? canCacheImages,
   }) : _ensureInitialized = ensureInitialized,
        _notifyRuntimeStateChanged = notifyRuntimeStateChanged,
        _secureStorage = secureStorage,
-       appLogStore = appLogStore ?? AppLogStore();
+       appLogStore = appLogStore ?? AppLogStore(),
+       tasks = tasks ?? SourceTaskRegistry(),
+       _ownsTasks = tasks == null,
+       _canCacheImages = canCacheImages;
+
+  final SourceTaskRegistry tasks;
+  final bool _ownsTasks;
+  final bool Function(SourceRuntimeHandle handle)? _canCacheImages;
 
   @override
   final String sourceKey;
@@ -162,7 +172,11 @@ class SourceRuntimeHandle
   late final LineSettingsCapability lineSettings = LineSettingsCapability(
     facade,
   );
-  late final ImageCacheCapability imageCache = ImageCacheCapability(facade);
+  late final ImageCacheCapability imageCache = ImageCacheCapability(
+    facade,
+    tasks: tasks,
+    canCache: () => !_disposed && (_canCacheImages?.call(this) ?? true),
+  );
   late final ExploreCacheCapability exploreCache = ExploreCacheCapability(
     facade,
   );
@@ -250,6 +264,7 @@ class SourceRuntimeHandle
       return;
     }
     _disposed = true;
+    if (_ownsTasks) tasks.dispose();
 
     final engine = runtime.engine;
     runtime

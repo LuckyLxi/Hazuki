@@ -13,6 +13,7 @@ class _Reader extends Fake implements SourceReaderGateway {
   Future<ComicDetailsData> loadComicDetails(
     String id, {
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async => _details;
 }
 

@@ -43,6 +43,23 @@ void main() {
   });
   tearDown(() => state.dispose());
 
+  test('old prefetch drain cannot reset a new generation runner', () async {
+    final old = Completer<void>();
+    final current = Completer<void>();
+    download = (_) => old.future;
+    scheduler.requestPrefetchAhead(0);
+    state.resetForImages(images);
+    download = (_) => current.future;
+    scheduler.requestPrefetchAhead(5);
+    old.complete();
+    await Future<void>.delayed(Duration.zero);
+    expect(state.prefetchAheadRunning, isTrue);
+    expect(downloads, hasLength(12));
+    current.complete();
+    await Future<void>.delayed(Duration.zero);
+    expect(state.prefetchAheadRunning, isFalse);
+  });
+
   test(
     'prioritizes both visible pages and skips cached neighbor requests',
     () async {

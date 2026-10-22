@@ -42,6 +42,7 @@ class _Images extends Fake implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) {
     requests.add('$sourceKey|$url');
     return cover.future;

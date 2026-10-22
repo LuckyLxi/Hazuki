@@ -1,5 +1,7 @@
 # 第三阶段第一批：原生取消基础与隔离验证
 
+本文保留第一批当时的范围与验收结果。当前生产启用情况和后续变更见 [第二批运行时与宿主桥接记录](QUICKJS_HOST_TASK_CONTROL_VALIDATION.md)。
+
 本批只修改独立 QuickJS 包、针对性测试、CI 和迁移记录。`taskControlEnabled` 默认 `false`，生产 `SourceScriptEngine` 未启用新能力。应用任务模型、页面、HTTP、下载取消、超时配置、登录事务和自动恢复均未修改。UI 和动画未改动，保留工作区已有的 `assets/data/authors.txt` 修改。
 
 ## 实现与使用约定

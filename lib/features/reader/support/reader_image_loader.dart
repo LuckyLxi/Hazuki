@@ -53,7 +53,24 @@ class ReaderImageLoader {
     String url, {
     required bool useDiskCache,
     bool priority = false,
+    SourceTaskOrigin? taskOrigin,
   }) async {
+    final generation = _pipelineState.generation;
+    void checkActive() {
+      final reason = taskOrigin?.cancellation?.reason;
+      if (reason != null) throw SourceTaskCancelled(url, reason);
+      taskOrigin?.readerSession?.checkActive();
+      if (_pipelineState.disposed || generation != _pipelineState.generation) {
+        throw SourceTaskCancelled(
+          url,
+          _pipelineState.disposed
+              ? SourceTaskStopReason.ownerDisposed
+              : SourceTaskStopReason.superseded,
+        );
+      }
+    }
+
+    checkActive();
     final overrideBuilder = _imageProviderBuilder;
     if (overrideBuilder != null) {
       return overrideBuilder(url, useDiskCache: useDiskCache);
@@ -66,36 +83,63 @@ class ReaderImageLoader {
       final file = File(_sourceService.normalizeLocalImagePath(url));
       try {
         final bytes = await file.readAsBytes();
-        await _rememberAspectRatioFromBytes(url, bytes);
-      } catch (_) {}
+        checkActive();
+        await _rememberAspectRatioFromBytes(
+          url,
+          bytes,
+          checkActive: checkActive,
+        );
+      } catch (error) {
+        if (error is SourceTaskCancelled) rethrow;
+      }
       return FileImage(file);
     }
 
-    if (!await _acquireUnscramblePermit(priority: priority)) {
+    if (!await _acquireUnscramblePermit(
+      priority: priority,
+      checkActive: checkActive,
+      generation: generation,
+      taskOrigin: taskOrigin,
+    )) {
       throw StateError('reader_disposed');
     }
     try {
       // A cache retry keeps its existing permit. Recursively acquiring a
       // second permit would deadlock when all five active images are corrupt.
       while (true) {
-        final prepared = await _sourceService.prepareChapterImageData(
-          url,
-          comicId: _comicId,
-          epId: _epId,
-          useDiskCache: useDiskCache,
-          priority: priority,
-          sourceKey: _sourceKey,
-        );
-        _rememberAspectRatio(url, prepared.aspectRatio);
-        final decoded = imageAspectRatioCache.containsKey(url)
+        checkActive();
+        PreparedChapterImageData? prepared;
+        try {
+          prepared = await _sourceService.prepareChapterImageData(
+            url,
+            comicId: _comicId,
+            epId: _epId,
+            useDiskCache: useDiskCache,
+            priority: priority,
+            sourceKey: _sourceKey,
+            taskOrigin: taskOrigin,
+          );
+        } on SourceImageDecodeFailure {
+          // Retry a corrupt cached image using the same permit below.
+        }
+        checkActive();
+        _rememberAspectRatio(url, prepared?.aspectRatio);
+        final decoded = prepared == null
+            ? false
+            : imageAspectRatioCache.containsKey(url)
             ? true
-            : await _rememberAspectRatioFromBytes(url, prepared.bytes);
+            : await _rememberAspectRatioFromBytes(
+                url,
+                prepared.bytes,
+                checkActive: checkActive,
+              );
         if (!decoded) {
           if (!useDiskCache) {
             throw StateError('reader_image_decode_failed');
           }
           _evictImageBytesFromMemory([url]);
           await _evictImageCacheEntries([url]);
+          checkActive();
           providerCache.remove(url);
           providerFutureCache.remove(url);
           if (_noImageModeEnabled()) {
@@ -111,11 +155,17 @@ class ReaderImageLoader {
         return MemoryImage(prepared.bytes);
       }
     } finally {
-      _releaseUnscramblePermit();
+      _releaseUnscramblePermit(generation);
     }
   }
 
-  Future<bool> _acquireUnscramblePermit({required bool priority}) async {
+  Future<bool> _acquireUnscramblePermit({
+    required bool priority,
+    required void Function() checkActive,
+    required int generation,
+    SourceTaskOrigin? taskOrigin,
+  }) async {
+    checkActive();
     if (_pipelineState.activeUnscrambleTasks < _maxUnscrambleConcurrency) {
       _pipelineState.activeUnscrambleTasks++;
       return true;
@@ -126,19 +176,34 @@ class ReaderImageLoader {
     } else {
       _pipelineState.decodeWaiters.add(waiter);
     }
-    await waiter.completer.future;
-    if (_pipelineState.disposed) return false;
-    _pipelineState.activeUnscrambleTasks++;
-    return true;
+    try {
+      await Future.any([
+        waiter.completer.future,
+        if (taskOrigin?.cancellation case final cancellation?)
+          cancellation.whenStopped,
+        if (taskOrigin?.readerSession case final session?)
+          session.cancellation.whenStopped,
+      ]);
+      checkActive();
+      return waiter.granted;
+    } catch (_) {
+      if (waiter.granted) _releaseUnscramblePermit(generation);
+      rethrow;
+    } finally {
+      _pipelineState.decodeWaiters.remove(waiter);
+    }
   }
 
-  void _releaseUnscramblePermit() {
+  void _releaseUnscramblePermit(int generation) {
+    if (generation != _pipelineState.generation) return;
     if (_pipelineState.activeUnscrambleTasks > 0) {
       _pipelineState.activeUnscrambleTasks--;
     }
     while (_pipelineState.decodeWaiters.isNotEmpty) {
       final waiter = _pipelineState.decodeWaiters.removeAt(0);
       if (!waiter.completer.isCompleted) {
+        waiter.granted = true;
+        _pipelineState.activeUnscrambleTasks++;
         waiter.completer.complete();
         break;
       }
@@ -147,8 +212,9 @@ class ReaderImageLoader {
 
   Future<bool> _rememberAspectRatioFromBytes(
     String url,
-    Uint8List bytes,
-  ) async {
+    Uint8List bytes, {
+    required void Function() checkActive,
+  }) async {
     if (imageAspectRatioCache.containsKey(url)) {
       return true;
     }
@@ -158,6 +224,7 @@ class ReaderImageLoader {
         final frame = await codec.getNextFrame();
         final image = frame.image;
         try {
+          checkActive();
           if (image.height <= 0) {
             return false;
           }
@@ -171,7 +238,8 @@ class ReaderImageLoader {
       } finally {
         codec.dispose();
       }
-    } catch (_) {
+    } catch (error) {
+      if (error is SourceTaskCancelled) rethrow;
       return false;
     }
   }

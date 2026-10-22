@@ -39,6 +39,8 @@ class SourceRuntimeHost extends ChangeNotifier {
       defaultSourceKey: defaultSourceKey,
       createHandle: _createHandle,
       onActiveSourceChanged: _notifyChanged,
+      retainOnSourceChange: (key) =>
+          _readerSessions.any((session) => session.sourceKey == key),
     );
     runtimeRegistry = SourceRuntimeRegistry(
       allowedSources: _catalog,
@@ -64,6 +66,38 @@ class SourceRuntimeHost extends ChangeNotifier {
   final AppLogStore logStore;
   final SourceTaskRegistry tasks = SourceTaskRegistry();
   final String serviceTaskOwnerId = createSourceTaskId();
+  final Set<SourceReaderSession> _readerSessions = {};
+
+  SourceReaderSession acquireReaderSession(String sourceKey) {
+    final key = normalize(sourceKey);
+    tasks.checkResourceActive(handleFor(key));
+    late final SourceReaderSession session;
+    session = SourceReaderSession(key, () {
+      _readerSessions.remove(session);
+      final reason = session.cancellation.reason;
+      final retiring =
+          reason == SourceTaskStopReason.pluginDisabled ||
+          reason == SourceTaskStopReason.pluginUpdated ||
+          reason == SourceTaskStopReason.runtimeClosed;
+      if (!retiring &&
+          key != activeSourceKey &&
+          !_readerSessions.any((entry) => entry.sourceKey == key)) {
+        _coordinator.remove(key);
+      }
+    });
+    _readerSessions.add(session);
+    return session;
+  }
+
+  void checkReaderSession(String key, SourceTaskOrigin? origin) {
+    final session = origin?.readerSession;
+    if (session == null) return;
+    session.checkActive();
+    if (session.sourceKey != key || !_readerSessions.contains(session)) {
+      throw StateError('source_reader_session_mismatch');
+    }
+  }
+
   final void Function(String, SourceRuntimeState)? onRuntimeState;
 
   late final SourceRuntimeCoordinator<SourceRuntimeHandle> _coordinator;
@@ -186,12 +220,14 @@ class SourceRuntimeHost extends ChangeNotifier {
           if (next == null ||
               old?.pluginVersion != next.pluginVersion ||
               old?.pluginDirectory != next.pluginDirectory) {
-            await tasks.cancelResource(
-              handle,
-              next == null
-                  ? SourceTaskStopReason.pluginDisabled
-                  : SourceTaskStopReason.pluginUpdated,
-            );
+            final reason = next == null
+                ? SourceTaskStopReason.pluginDisabled
+                : SourceTaskStopReason.pluginUpdated;
+            final stopped = tasks.retireResource(handle, reason);
+            for (final session in _readerSessions.toList()) {
+              if (session.sourceKey == handle.sourceKey) session.close(reason);
+            }
+            await stopped;
           }
         }
         for (final old in _catalog) {
@@ -244,6 +280,8 @@ class SourceRuntimeHost extends ChangeNotifier {
     ensureInitialized: _ensureSourceInitialized,
     notifyRuntimeStateChanged: notifyActiveRuntimeChanged,
     appLogStore: logStore,
+    tasks: tasks,
+    canCacheImages: (handle) => isCurrentHandle(handle),
   )..pluginDirectory = definitionFor(sourceKey).pluginDirectory;
 
   void _notifyChanged() {
@@ -253,6 +291,9 @@ class SourceRuntimeHost extends ChangeNotifier {
 
   @override
   void dispose() {
+    for (final session in _readerSessions.toList()) {
+      session.close(SourceTaskStopReason.runtimeClosed);
+    }
     tasks.dispose();
     for (final source in _catalog) {
       _coordinator.remove(source.key);

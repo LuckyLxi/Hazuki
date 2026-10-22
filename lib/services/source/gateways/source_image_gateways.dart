@@ -18,6 +18,7 @@ abstract interface class SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
 }
 

@@ -82,6 +82,7 @@ class _Images extends Fake implements SourceRecommendationGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async => delayed ? pending.future : bytes;
   @override
   void addApplicationLog({

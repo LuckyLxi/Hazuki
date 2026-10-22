@@ -39,6 +39,7 @@ abstract interface class SourceContentOperations {
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   bool supportComicLikeForSource(String sourceKey);
   Future<void> toggleComicLike({
@@ -291,10 +292,12 @@ class SourceContentOperationService
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _comicDetails.loadChapterImages(
     comicId: comicId,
     epId: epId,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   bool supportComicLikeForSource(String sourceKey) =>

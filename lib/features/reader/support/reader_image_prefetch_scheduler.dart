@@ -19,6 +19,7 @@ class ReaderImagePrefetchWindow {
 class ReaderImagePrefetchScheduler {
   ReaderImagePrefetchScheduler({
     required ReaderImagePipelineState state,
+    this.onWindowChanged,
     required ReaderImagePrefetchWindow Function(int index) windowFor,
     required Future<ImageProvider> Function(String url, {bool priority})
     getImageProvider,
@@ -32,10 +33,14 @@ class ReaderImagePrefetchScheduler {
        _downloadImageBytes = downloadImageBytes,
        _evictImageBytesFromMemory = evictImageBytesFromMemory;
 
+  int? _runningGeneration;
+
   static const int _prefetchAroundCount = 10;
   static const int _prefetchAheadMemoryCount = 6;
   static const int _providerKeepBehindCount = 12;
   static const int _providerKeepAheadCount = 24;
+  final void Function(Set<String> providers, Set<String> bytes)?
+  onWindowChanged;
   final ReaderImagePipelineState _pipelineState;
   final ReaderImagePrefetchWindow Function(int index) _windowFor;
   final Future<ImageProvider> Function(String url, {bool priority})
@@ -50,6 +55,27 @@ class ReaderImagePrefetchScheduler {
   void prefetchAround(int currentSpreadIndex) {
     final window = _windowFor(currentSpreadIndex);
     final anchorImageIndex = window.anchorImageIndex;
+    onWindowChanged?.call(
+      {
+        for (var i = 0; i < window.images.length; i++)
+          if ((i >= anchorImageIndex - _providerKeepBehindCount &&
+                  i <= anchorImageIndex + _providerKeepAheadCount) ||
+              window.visibleImageIndices.contains(i))
+            window.images[i],
+      },
+      {
+        for (
+          var i = anchorImageIndex + window.spreadSize;
+          i < window.images.length &&
+              i <
+                  anchorImageIndex +
+                      window.spreadSize +
+                      _prefetchAheadMemoryCount;
+          i++
+        )
+          if (i >= 0) window.images[i],
+      },
+    );
     var start = anchorImageIndex - _prefetchAroundCount;
     if (start < 0) {
       start = 0;
@@ -94,7 +120,7 @@ class ReaderImagePrefetchScheduler {
       return;
     }
     _pipelineState.queuedPrefetchAheadIndex = currentIndex;
-    if (_pipelineState.prefetchAheadRunning) {
+    if (_runningGeneration == _pipelineState.generation) {
       return;
     }
     unawaited(_drainPrefetchAheadQueue());
@@ -150,9 +176,11 @@ class ReaderImagePrefetchScheduler {
   }
 
   Future<void> _drainPrefetchAheadQueue() async {
-    if (_pipelineState.prefetchAheadRunning) {
+    if (_runningGeneration == _pipelineState.generation) {
       return;
     }
+    final generation = _pipelineState.generation;
+    _runningGeneration = generation;
     _pipelineState.prefetchAheadRunning = true;
     try {
       while (true) {
@@ -162,13 +190,19 @@ class ReaderImagePrefetchScheduler {
           break;
         }
         await _prefetchAheadFrom(currentIndex);
-        if (_pipelineState.disposed) break;
+        if (_pipelineState.disposed ||
+            generation != _pipelineState.generation) {
+          break;
+        }
       }
     } finally {
-      _pipelineState.prefetchAheadRunning = false;
-      if (!_pipelineState.disposed &&
-          _pipelineState.queuedPrefetchAheadIndex != null) {
-        unawaited(_drainPrefetchAheadQueue());
+      if (_runningGeneration == generation) {
+        _runningGeneration = null;
+        _pipelineState.prefetchAheadRunning = false;
+        if (!_pipelineState.disposed &&
+            _pipelineState.queuedPrefetchAheadIndex != null) {
+          unawaited(_drainPrefetchAheadQueue());
+        }
       }
     }
   }

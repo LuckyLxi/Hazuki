@@ -62,6 +62,7 @@ void main() {
             useDiskCache = true,
             priority = false,
             sourceKey = '',
+            taskOrigin,
           }) async {
             arguments = {
               'url': url,
@@ -124,6 +125,7 @@ SourceImagePreparationCapability _createCapability({
           useDiskCache = true,
           priority = false,
           sourceKey = '',
+          taskOrigin,
         }) async => Uint8List(0),
   );
 }

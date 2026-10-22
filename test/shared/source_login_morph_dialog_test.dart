@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -547,5 +548,6 @@ class _Images implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async => throw StateError('Unexpected image request');
 }

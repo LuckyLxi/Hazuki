@@ -16,6 +16,7 @@ import '../runtime/source_shared_request.dart';
 import '../runtime/source_host_call_context.dart';
 import '../debug/source_task_log_recorder.dart';
 import '../interaction/source_ui_scope.dart';
+import '../interaction/source_ui_service.dart';
 
 class SourceComicDetailsCapability {
   SourceComicDetailsCapability({
@@ -46,6 +47,11 @@ class SourceComicDetailsCapability {
     bool forceRefresh = false,
     SourceTaskOrigin? taskOrigin,
   }) {
+    taskOrigin?.readerSession?.checkActive();
+    _runtimeHost.checkReaderSession(
+      _resolveActiveSourceKey(sourceKey),
+      taskOrigin,
+    );
     if (taskOrigin == null) {
       return _loadComicDetails(
         comicId,
@@ -56,7 +62,9 @@ class SourceComicDetailsCapability {
     final recorder = SourceTaskLogRecorder(_runtimeHost.logStore);
     return _runtimeHost.tasks.run(
       pluginId: _resolveActiveSourceKey(sourceKey),
-      method: 'search.directId',
+      method: taskOrigin.readerSession == null
+          ? 'search.directId'
+          : 'reader.details',
       origin: taskOrigin,
       observe: (task, event, disposition, error, stack) => recorder.record(
         task,
@@ -290,21 +298,47 @@ class SourceComicDetailsCapability {
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
+    taskOrigin?.readerSession?.checkActive();
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    _runtimeHost.checkReaderSession(resolvedSourceKey, taskOrigin);
     var handle = _runtimeHost.handleFor(resolvedSourceKey);
+    final callerScope = SourceUiScope.current;
+    final caller = callerScope?.controllerOwner;
+    final routeOwner =
+        callerScope?.owner ?? SourceUiService.instance.captureOwner?.call();
     for (var attempt = 0; attempt < 2; attempt++) {
       final facade = handle.facade;
       try {
-        final images = await _loadChapterImagesFromSource(
-          comicId: comicId,
-          epId: epId,
-          facade: facade,
+        Future<List<String>> run() => runSourceOperation(
+          _runtimeHost,
+          handle,
+          'reader.chapter',
+          (context) => _loadChapterImagesFromSource(
+            comicId: comicId,
+            epId: epId,
+            facade: facade,
+            context: context,
+          ),
+          origin: taskOrigin,
+          retainOnSourceChange: taskOrigin == null,
+          sensitiveValues: [comicId, epId],
+        );
+        // Attempt scopes retire independently of the caller's reading scope.
+        final images = await SourceUiService.instance.run(
+          run,
+          inheritCurrent: false,
+          abortOnScopeCancellation: false,
+          owner: caller is SourceUiOwner ? caller : null,
+          routeOwner: routeOwner,
+          captureRouteOwner: false,
         );
         if (!handle.recreationRequested) {
           return images;
         }
-      } catch (_) {
+      } catch (error) {
+        rethrowSourceOperationStop(error);
         if (!handle.recreationRequested || attempt == 1) {
           rethrow;
         }
@@ -324,6 +358,10 @@ class SourceComicDetailsCapability {
           'operation': 'load_chapter_images',
         },
       );
+      if (taskOrigin?.cancellation?.reason case final reason?) {
+        throw SourceTaskCancelled(resolvedSourceKey, reason);
+      }
+      _runtimeHost.checkReaderSession(resolvedSourceKey, taskOrigin);
       handle = _runtimeHost.recreateSourceRuntime(
         resolvedSourceKey,
         expectedHandle: handle,
@@ -336,19 +374,22 @@ class SourceComicDetailsCapability {
     required String comicId,
     required String epId,
     required HazukiSourceFacade facade,
+    required SourceOperationContext context,
   }) async {
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
+      context.checkActive();
       final engine = facade.js.engine;
       if (engine == null) {
         throw Exception('source_not_initialized');
       }
 
-      final dynamic result = await engine.evaluate(
+      final dynamic result = await context.evaluate(
+        engine,
         'this.__hazuki_source.comic.loadEp(${jsonEncode(comicId)}, ${jsonEncode(epId)})',
         name: 'source_chapter_images.js',
       );
-      final dynamic resolved = await facade.js.resolve(result);
+      final dynamic resolved = await context.resolve(facade.js.resolve(result));
       if (resolved is! Map) {
         return const [];
       }

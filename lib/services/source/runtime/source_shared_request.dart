@@ -15,11 +15,23 @@ class SourceSharedRequest<T> {
     required this.method,
     required Future<T> Function(SourceSharedRequest<T>) operation,
     required void Function() onUnavailable,
+    this.drainOperationOnStop = false,
   }) : _operation = operation,
        _onUnavailable = onUnavailable;
 
   final String pluginId;
   final String method;
+  final bool drainOperationOnStop;
+  final SourceTaskCancellation cancellation = SourceTaskCancellation();
+  final _operationSettled = Completer<void>();
+  final List<void Function(SourceTaskStopReason)> _stopHandlers = [];
+  final Map<Object, Object?> _metadata = {};
+  Iterable<Object?> get consumerMetadata => _metadata.values;
+  void addStopHandler(void Function(SourceTaskStopReason) handler) {
+    checkActive();
+    _stopHandlers.add(handler);
+  }
+
   final String resourceId = createSourceTaskId();
   final Future<T> Function(SourceSharedRequest<T>) _operation;
   final void Function() _onUnavailable;
@@ -70,6 +82,11 @@ class SourceSharedRequest<T> {
   }
 
   void _waitingChanged() {
+    if (_scope?.available == true) {
+      _scope!.survivesSourceChange = _subscriberTasks.values.any(
+        (task) => task == null || task.survivesSourceChange,
+      );
+    }
     final reason = _scope?.reason;
     if (reason == 'user' || reason == 'timeout') {
       for (final task in _subscriberTasks.values.toList()) {
@@ -149,11 +166,13 @@ class SourceSharedRequest<T> {
       ),
     ).then<void>(
       (value) {
+        _operationSettled.complete();
         _completed = true;
         _onUnavailable();
         _result.complete(value);
       },
       onError: (Object error, StackTrace stack) {
+        _operationSettled.complete();
         if (error is SourceTaskCancelled) _stop(error.reason);
         _completed = true;
         _onUnavailable();
@@ -162,13 +181,14 @@ class SourceSharedRequest<T> {
     );
   }
 
-  Future<T> subscribe({SourceTask? task}) async {
+  Future<T> subscribe({SourceTask? task, Object? metadata}) async {
     checkActive();
     task?.checkActive();
     final id = Object();
     final scope = SourceUiScope.current;
     _subscribers[id] = scope;
     _subscriberTasks[id] = task;
+    _metadata[id] = metadata;
     if (task != null &&
         _engines.isNotEmpty &&
         task.snapshot.runtimeId == null) {
@@ -180,6 +200,8 @@ class SourceSharedRequest<T> {
         detached = true;
         _subscribers.remove(id);
         _subscriberTasks.remove(id);
+        _metadata.remove(id);
+        _waitingChanged();
         if (scope != null && !scope.finished) {
           scope.setExternalWaiting(
             this,
@@ -220,16 +242,27 @@ class SourceSharedRequest<T> {
 
   Future<void> _stop(SourceTaskStopReason reason) {
     if (_settled case final settled?) return settled;
+    final completion = Completer<void>();
+    final settled = _settled = completion.future;
+    settled.ignore();
     _stopReason = reason;
+    cancellation.cancel(reason);
     _onUnavailable();
-    final settled = Future.wait([
+    for (final handler in _stopHandlers) {
+      handler(reason);
+    }
+    Future.wait([
+      if (drainOperationOnStop) _operationSettled.future,
       if (_pendingCommits != 0) _commitsSettled!.future,
       for (final engine in _engines)
         engine
             .cancelExecution(resourceId, reason.name)
             .then((receipt) => receipt.whenSettled),
-    ]).then<void>((_) {});
-    settled.ignore();
-    return _settled = settled;
+    ]).then<void>(
+      (_) => completion.complete(),
+      onError: (Object error, StackTrace stack) =>
+          completion.completeError(error, stack),
+    );
+    return settled;
   }
 }

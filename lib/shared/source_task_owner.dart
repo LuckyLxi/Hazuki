@@ -5,9 +5,11 @@ import '../services/source/models/source_task.dart';
 
 /// An explicit request group; pagination keeps the group until replacement.
 class SourceTaskOwner {
-  SourceTaskOwner(this.control);
-  final SourceTaskControlGateway control;
-  final String ownerId = createSourceTaskId();
+  SourceTaskOwner(this.control, {this.readerSession, String? ownerId})
+    : ownerId = ownerId ?? createSourceTaskId();
+  final SourceTaskControlGateway? control;
+  final SourceReaderSession? readerSession;
+  final String ownerId;
   String _groupId = createSourceTaskId();
   SourceTaskCancellation _signal = SourceTaskCancellation();
   int _sequence = 0;
@@ -19,6 +21,7 @@ class SourceTaskOwner {
     requestSequence: ++_sequence,
     cancellation: _signal,
     workTimeout: workTimeout,
+    readerSession: readerSession,
   );
 
   void restart([
@@ -27,14 +30,16 @@ class SourceTaskOwner {
     generation++;
     _signal.cancel(reason);
     unawaited(
-      control.cancelGroup(ownerId: ownerId, groupId: _groupId, reason: reason),
+      control?.cancelGroup(ownerId: ownerId, groupId: _groupId, reason: reason),
     );
     _groupId = createSourceTaskId();
     _signal = SourceTaskCancellation();
   }
 
-  void dispose() {
-    _signal.cancel(SourceTaskStopReason.ownerDisposed);
-    unawaited(control.cancelOwner(ownerId, SourceTaskStopReason.ownerDisposed));
+  void dispose([
+    SourceTaskStopReason reason = SourceTaskStopReason.ownerDisposed,
+  ]) {
+    _signal.cancel(reason);
+    unawaited(control?.cancelOwner(ownerId, reason));
   }
 }

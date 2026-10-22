@@ -13,8 +13,10 @@ Future<T> runSourceOperation<T>(
   Future<T> Function(SourceOperationContext) operation, {
   SourceTaskOrigin? origin,
   bool serviceOwned = false,
+  bool retainOnSourceChange = false,
   List<String> sensitiveValues = const [],
 }) {
+  host.checkReaderSession(handle.sourceKey, origin);
   final version = host.catalog
       .where((entry) => entry.normalizedKey == handle.sourceKey)
       .firstOrNull
@@ -47,12 +49,17 @@ Future<T> runSourceOperation<T>(
       sensitiveValues: sensitiveValues,
     ),
     operation: (task) {
-      task.bindResource(handle, serviceOwned: serviceOwned);
+      task.bindResource(
+        handle,
+        serviceOwned: serviceOwned,
+        survivesSourceChange: retainOnSourceChange,
+      );
       final identity = handle.session.loginIdentity;
       final context = SourceOperationContext(
         task,
         resource: handle,
         serviceOwned: serviceOwned,
+        retainAdmittedWork: retainOnSourceChange,
         canCache: () =>
             host.isCurrentHandle(handle) &&
             handle.session.loginIdentity == identity,

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -271,6 +272,7 @@ class _EmptyImageGateway implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) {
     throw StateError('No image download expected in this test.');
   }

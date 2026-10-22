@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import 'dart:typed_data';
 
 import 'image_cache_capability.dart';
@@ -20,6 +21,7 @@ abstract interface class SourceImageOperations {
     required int count,
     int memoryCount = 0,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<Uint8List> downloadImageBytes(
     String url, {
@@ -29,6 +31,7 @@ abstract interface class SourceImageOperations {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<void> clearImageCache();
   Future<void> evictImageCacheEntries(
@@ -42,6 +45,10 @@ class SourceImageOperationService implements SourceImageOperations {
 
   final ImageCacheCapability Function(String sourceKey) _cacheForSource;
   ImageCacheCapability get _activeCache => _cacheForSource('');
+  ImageCacheCapability _cacheForTask(String key, SourceTaskOrigin? origin) {
+    origin?.readerSession?.checkActive();
+    return _cacheForSource(key);
+  }
 
   @override
   int get imageCacheMaxBytes => _activeCache.maxBytes;
@@ -72,13 +79,15 @@ class SourceImageOperationService implements SourceImageOperations {
     required int count,
     int memoryCount = 0,
     String sourceKey = '',
-  }) => _cacheForSource(sourceKey).prefetchComicImages(
+    SourceTaskOrigin? taskOrigin,
+  }) => _cacheForTask(sourceKey, taskOrigin).prefetchComicImages(
     comicId: comicId,
     epId: epId,
     imageUrls: imageUrls,
     count: count,
     memoryCount: memoryCount,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<Uint8List> downloadImageBytes(
@@ -89,7 +98,8 @@ class SourceImageOperationService implements SourceImageOperations {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
-  }) => _cacheForSource(sourceKey).downloadImageBytes(
+    SourceTaskOrigin? taskOrigin,
+  }) => _cacheForTask(sourceKey, taskOrigin).downloadImageBytes(
     url,
     comicId: comicId,
     epId: epId,
@@ -97,6 +107,7 @@ class SourceImageOperationService implements SourceImageOperations {
     useDiskCache: useDiskCache,
     priority: priority,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<void> clearImageCache() => _activeCache.clear();

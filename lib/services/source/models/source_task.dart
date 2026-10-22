@@ -77,6 +77,8 @@ class SourceTaskOrigin {
     this.resultDisposition,
     this.cancellation,
     this.workTimeout,
+    this.readerSession,
+    this.retainOnSourceChange = false,
   });
 
   factory SourceTaskOrigin.standalone() => SourceTaskOrigin(
@@ -90,10 +92,37 @@ class SourceTaskOrigin {
   final int requestSequence;
   final SourceTaskCancellation? cancellation;
   final Duration? workTimeout;
+  final SourceReaderSession? readerSession;
+  final bool retainOnSourceChange;
 
   /// Observes result usefulness without changing execution or cancellation.
   /// This callback is local to the host and must never cross an isolate port.
   final SourceTaskResultDisposition Function()? resultDisposition;
+}
+
+/// A host-only reading lease. Cancellation never grants interaction authority.
+class SourceReaderSession {
+  SourceReaderSession(this.sourceKey, this._release);
+  final String id = createSourceTaskId();
+  final String sourceKey;
+  final void Function() _release;
+  final SourceTaskCancellation cancellation = SourceTaskCancellation();
+  bool _released = false;
+
+  void checkActive() {
+    if (cancellation.reason case final reason?) {
+      throw SourceTaskCancelled(id, reason);
+    }
+  }
+
+  void close([
+    SourceTaskStopReason reason = SourceTaskStopReason.ownerDisposed,
+  ]) {
+    if (_released) return;
+    _released = true;
+    cancellation.cancel(reason);
+    _release();
+  }
 }
 
 class SourceTaskSnapshot {

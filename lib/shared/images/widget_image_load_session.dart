@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '../../services/source/models/source_task.dart';
 
 import '../../services/source/gateways/source_image_gateways.dart';
 import 'widget_image_memory.dart';
@@ -7,7 +8,14 @@ import 'widget_image_memory.dart';
 class WidgetImageLoadSession {
   int _generation = 0;
 
-  void invalidate() => _generation++;
+  SourceTaskCancellation? _cancellation;
+  void invalidate([
+    SourceTaskStopReason reason = SourceTaskStopReason.superseded,
+  ]) {
+    _generation++;
+    _cancellation?.cancel(reason);
+    _cancellation = null;
+  }
 
   WidgetImageLoadRequest begin({
     required String url,
@@ -16,22 +24,28 @@ class WidgetImageLoadSession {
     required bool peekGatewayMemory,
     required bool keepInGatewayMemory,
     required bool keepInWidgetMemory,
-  }) => WidgetImageLoadRequest._(
-    this,
-    ++_generation,
-    url,
-    gateway,
-    sourceKey,
-    peekGatewayMemory,
-    keepInGatewayMemory,
-    keepInWidgetMemory,
-  );
+  }) {
+    invalidate();
+    final cancellation = _cancellation = SourceTaskCancellation();
+    return WidgetImageLoadRequest._(
+      this,
+      _generation,
+      cancellation,
+      url,
+      gateway,
+      sourceKey,
+      peekGatewayMemory,
+      keepInGatewayMemory,
+      keepInWidgetMemory,
+    );
+  }
 }
 
 class WidgetImageLoadRequest {
   WidgetImageLoadRequest._(
     this._session,
     this._generation,
+    this._cancellation,
     this.url,
     this.gateway,
     this.sourceKey,
@@ -42,6 +56,7 @@ class WidgetImageLoadRequest {
 
   final WidgetImageLoadSession _session;
   final int _generation;
+  final SourceTaskCancellation _cancellation;
   final String url;
   final SourceImageGateway gateway;
   final String sourceKey;
@@ -73,6 +88,12 @@ class WidgetImageLoadRequest {
     url,
     sourceKey: sourceKey,
     keepInMemory: _keepInGatewayMemory,
+    taskOrigin: SourceTaskOrigin(
+      ownerId: createSourceTaskId(),
+      groupId: createSourceTaskId(),
+      requestSequence: _generation,
+      cancellation: _cancellation,
+    ),
   );
 
   void retain(Uint8List bytes) {

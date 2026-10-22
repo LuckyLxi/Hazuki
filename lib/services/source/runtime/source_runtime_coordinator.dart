@@ -11,16 +11,19 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
     required String defaultSourceKey,
     required T Function(String sourceKey) createHandle,
     required void Function() onActiveSourceChanged,
+    bool Function(String sourceKey)? retainOnSourceChange,
   }) : _catalog = List.unmodifiable(catalog),
        _defaultSourceKey = defaultSourceKey,
        _createHandle = createHandle,
        _onActiveSourceChanged = onActiveSourceChanged,
+       _retainOnSourceChange = retainOnSourceChange,
        _activeSourceKey = defaultSourceKey;
 
   List<SourceCatalogEntry> _catalog;
   final String _defaultSourceKey;
   final T Function(String sourceKey) _createHandle;
   final void Function() _onActiveSourceChanged;
+  final bool Function(String sourceKey)? _retainOnSourceChange;
   final Map<String, T> _handles = {};
   String _activeSourceKey;
   Future<void> _activationTail = Future.value();
@@ -85,7 +88,8 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
       final nextHandle = handleFor(normalized);
       await persistSelection(nextHandle);
       _activeSourceKey = normalized;
-      if (identical(_handles[previousSourceKey], previousHandle)) {
+      if (identical(_handles[previousSourceKey], previousHandle) &&
+          _retainOnSourceChange?.call(previousSourceKey) != true) {
         _handles.remove(previousSourceKey);
         previousHandle?.requestDispose();
       }

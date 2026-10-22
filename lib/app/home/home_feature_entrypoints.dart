@@ -138,6 +138,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     sourceUpdate: sl<SourceUpdateGateway>(),
   );
   final readerDependencies = ReaderDependencies(
+    taskControl: sl<SourceTaskControlGateway>(),
     sourceReader: sl<SourceReaderGateway>(),
     sourceSettings: sl<SourceSettingsGateway>(),
     readingProgressService: sl<ReadingProgressService>(),

@@ -8,10 +8,12 @@ class ReaderDependencies {
     required this.sourceSettings,
     required this.readingProgressService,
     required this.downloader,
+    this.taskControl,
   });
 
   final SourceReaderGateway sourceReader;
   final SourceSettingsGateway sourceSettings;
   final ReadingProgressService readingProgressService;
   final MangaDownloadCommands downloader;
+  final SourceTaskControlGateway? taskControl;
 }

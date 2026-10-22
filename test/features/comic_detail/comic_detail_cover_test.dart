@@ -235,6 +235,7 @@ class _CoverImageGateway implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     downloadCount += 1;
     return _imageBytes;

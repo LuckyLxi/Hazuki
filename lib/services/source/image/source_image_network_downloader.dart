@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:dio/dio.dart';
 
 import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_shared_request.dart';
+import '../runtime/source_operation_context.dart';
 
 typedef SourceImageLoadConfigResolver =
     Future<dynamic> Function(String url, String comicId, String epId);
@@ -32,26 +35,54 @@ class SourceImageNetworkDownloader {
        _resolveCookie = resolveCookie,
        _requestBytes = requestBytes;
 
-  factory SourceImageNetworkDownloader.forFacade(HazukiSourceFacade facade) {
+  factory SourceImageNetworkDownloader.forFacade(
+    HazukiSourceFacade facade, {
+    SourceSharedRequest<Uint8List>? request,
+  }) {
+    final cancelToken = CancelToken();
+    request?.addStopHandler((reason) => cancelToken.cancel(reason.name));
+    Future<void> ready() async {
+      request?.checkActive();
+      final initialization = facade.ensureInitialized();
+      if (request == null) {
+        await initialization;
+      } else {
+        await Future.any([
+          initialization,
+          request.cancellation.whenStopped.then((_) => request.checkActive()),
+        ]);
+      }
+      request?.checkActive();
+    }
+
     return SourceImageNetworkDownloader(
       resolveLoadConfig: (url, comicId, epId) =>
           facade.handle.runOperation(() async {
-            await facade.ensureInitialized();
+            await ready();
             final engine = facade.js.engine;
             if (engine == null) return null;
+            request?.bindEngine(engine);
             final raw = await engine.evaluate(
               buildImageLoadScript(url, comicId: comicId, epId: epId),
               name: 'source_on_image_load.js',
+              execution: request?.execution,
+              retainAdmittedWork: request != null,
             );
             return facade.js.resolve(raw);
           }),
       resolveCookie: facade.httpGateway.buildCookieHeader,
       requestBytes: (url, headers) async {
-        await facade.ensureInitialized();
+        await ready();
         final response = await facade.httpGateway.getBytes(
           url,
           headers: headers,
           category: 'image_download',
+          cancelToken: cancelToken,
+          checkActive: request?.checkActive,
+          execution: request?.execution,
+          commitCookies: request == null
+              ? null
+              : (operation) => request.runCommit(operation),
         );
         return SourceImageBytesResponse(
           statusCode: response.statusCode,
@@ -69,11 +100,14 @@ class SourceImageNetworkDownloader {
     String url, {
     String? comicId,
     String? epId,
+    void Function()? checkActive,
   }) async {
+    checkActive?.call();
     final headers = <String, dynamic>{};
     var requestUrl = url;
     try {
       final config = await _resolveLoadConfig(url, comicId ?? '', epId ?? '');
+      checkActive?.call();
       if (config is Map) {
         final configuredUrl = config['url'];
         if (configuredUrl is String && configuredUrl.trim().isNotEmpty) {
@@ -84,7 +118,10 @@ class SourceImageNetworkDownloader {
           headers.addAll(Map<String, dynamic>.from(rawHeaders));
         }
       }
-    } catch (_) {}
+    } catch (error) {
+      checkActive?.call();
+      rethrowSourceOperationStop(error);
+    }
 
     final cookie = _resolveCookie(requestUrl);
     if (cookie != null &&
@@ -93,7 +130,15 @@ class SourceImageNetworkDownloader {
       headers['cookie'] = cookie;
     }
 
-    final response = await _requestBytes(requestUrl, headers);
+    checkActive?.call();
+    final SourceImageBytesResponse response;
+    try {
+      response = await _requestBytes(requestUrl, headers);
+    } catch (_) {
+      checkActive?.call();
+      rethrow;
+    }
+    checkActive?.call();
     final data = response.data;
     if (response.statusCode != 200 || data == null || data.isEmpty) {
       throw Exception('image_download_failed:${response.statusCode ?? -1}');

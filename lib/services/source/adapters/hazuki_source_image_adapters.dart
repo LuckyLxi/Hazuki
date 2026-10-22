@@ -36,6 +36,7 @@ class HazukiSourceImageAdapter implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _image.downloadImageBytes(
     url,
     comicId: comicId,
@@ -44,6 +45,7 @@ class HazukiSourceImageAdapter implements SourceImageGateway {
     useDiskCache: useDiskCache,
     priority: priority,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
 }
 
@@ -77,6 +79,7 @@ class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _image.downloadImageBytes(
     url,
     comicId: comicId,
@@ -85,6 +88,7 @@ class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
     useDiskCache: useDiskCache,
     priority: priority,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
 
   @override
@@ -213,6 +217,7 @@ class HazukiSourceDailyRecommendationAdapter
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _image.downloadImageBytes(
     url,
     comicId: comicId,
@@ -221,5 +226,6 @@ class HazukiSourceDailyRecommendationAdapter
     useDiskCache: useDiskCache,
     priority: priority,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
 }

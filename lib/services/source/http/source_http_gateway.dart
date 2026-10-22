@@ -4,6 +4,7 @@ import '../../network/hazuki_network.dart';
 import '../debug/source_network_log_sink.dart';
 import '../runtime/source_cookie_store.dart';
 import '../models/source_script_execution.dart';
+import '../models/source_task.dart';
 import '../runtime/source_host_call_context.dart';
 
 class SourceHttpGateway {
@@ -22,6 +23,8 @@ class SourceHttpGateway {
 
   final SourceCookieStore _cookieStore;
   static const _hostContextKey = 'hazukiSourceHostCallContext';
+  static const _imageCommitKey = 'hazukiImageCookieCommit';
+  static const _imageExecutionKey = 'hazukiImageExecution';
   static Map<String, String> _noUserAgents() => const {};
   final Map<String, String> Function() _browserUserAgents;
   final SourceNetworkLogSink _networkLogSink;
@@ -129,16 +132,24 @@ class SourceHttpGateway {
     HazukiNetworkRetryPolicy retryPolicy =
         HazukiNetworkRetryPolicy.conservative,
     CancelToken? cancelToken,
+    void Function()? checkActive,
+    Future<void> Function(Future<void> Function())? commitCookies,
+    SourceScriptExecution? execution,
   }) {
     return request<List<int>>(
       url,
       options: Options(
         responseType: ResponseType.bytes,
         headers: headers,
-        extra: category == null ? const {} : {'hazukiLogCategory': category},
+        extra: {
+          'hazukiLogCategory': ?category,
+          _imageCommitKey: ?commitCookies,
+          _imageExecutionKey: ?execution,
+        },
       ),
       retryPolicy: retryPolicy,
       cancelToken: cancelToken,
+      checkActive: checkActive,
     );
   }
 
@@ -286,7 +297,17 @@ class SourceHttpGateway {
               response.requestOptions.extra[_hostContextKey]
                   as SourceHostCallContext?;
           try {
-            if (context == null) {
+            final imageCommit =
+                response.requestOptions.extra[_imageCommitKey]
+                    as Future<void> Function(Future<void> Function())?;
+            if (imageCommit != null) {
+              await imageCommit(
+                () => _cookieStore.saveFromHeaders(
+                  requestUrl,
+                  response.headers.map,
+                ),
+              );
+            } else if (context == null) {
               await _cookieStore.saveFromHeaders(
                 requestUrl,
                 response.headers.map,
@@ -304,7 +325,7 @@ class SourceHttpGateway {
               DioException(
                 requestOptions: response.requestOptions,
                 response: response,
-                type: context?.isStopped == true
+                type: context?.isStopped == true || error is SourceTaskCancelled
                     ? DioExceptionType.cancel
                     : DioExceptionType.unknown,
                 error: error,
@@ -332,6 +353,10 @@ class SourceHttpGateway {
               requestData: response.requestOptions.data,
               responseHeaders: _flattenHeaders(response.headers),
               responseBody: response.data,
+              taskContext:
+                  (response.requestOptions.extra[_imageExecutionKey]
+                          as SourceScriptExecution?)
+                      ?.toMap(),
             );
           }
           handler.next(response);
@@ -352,6 +377,9 @@ class SourceHttpGateway {
               requestData: options.data,
               responseHeaders: _flattenHeaders(error.response?.headers),
               responseBody: error.response?.data,
+              taskContext:
+                  (options.extra[_imageExecutionKey] as SourceScriptExecution?)
+                      ?.toMap(),
             );
           }
           handler.next(error);

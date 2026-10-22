@@ -3,6 +3,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
+import 'package:hazuki/shared/source_task_owner.dart';
 
 import 'package:flutter/material.dart';
 
@@ -31,6 +32,8 @@ class ReaderActionsController {
     required ReaderPageContext pageContext,
     required ReaderChapterChanged onChapterChanged,
     required MangaDownloadCommands downloader,
+    SourceTaskControlGateway? taskControl,
+    SourceReaderSession? readerSession,
   }) : _context = context,
        _isMounted = isMounted,
        _updateState = updateState,
@@ -39,7 +42,23 @@ class ReaderActionsController {
        _sourceReader = sourceReader,
        _pageContext = pageContext,
        _onChapterChanged = onChapterChanged,
-       _downloader = downloader;
+       _downloader = downloader,
+       _detailsTasks = SourceTaskOwner(
+         taskControl,
+         readerSession: readerSession,
+       ),
+       _tracksTasks = taskControl != null || readerSession != null;
+
+  final SourceTaskOwner _detailsTasks;
+  final bool _tracksTasks;
+  bool _closed = false;
+  void dispose([
+    SourceTaskStopReason reason = SourceTaskStopReason.ownerDisposed,
+  ]) {
+    if (_closed) return;
+    _closed = true;
+    _detailsTasks.dispose(reason);
+  }
 
   final ReaderContextGetter _context;
   final ReaderIsMounted _isMounted;
@@ -63,6 +82,12 @@ class ReaderActionsController {
       sourceCommentsEnabled(_pageContext.sourceKey, context: _context());
 
   Future<ComicDetailsData> loadReaderComicDetails() async {
+    if (_closed) {
+      throw SourceTaskCancelled(
+        _pageContext.comicId,
+        SourceTaskStopReason.ownerDisposed,
+      );
+    }
     final details =
         _chapterDetailsCache ??
         (_pageContext.offlineMode
@@ -70,7 +95,14 @@ class ReaderActionsController {
             : await _sourceReader.loadComicDetails(
                 _pageContext.comicId,
                 sourceKey: _pageContext.sourceKey,
+                taskOrigin: _tracksTasks ? _detailsTasks.origin() : null,
               ));
+    if (_closed) {
+      throw SourceTaskCancelled(
+        _pageContext.comicId,
+        SourceTaskStopReason.ownerDisposed,
+      );
+    }
     _chapterDetailsCache ??= details;
     return details;
   }
@@ -124,7 +156,7 @@ class ReaderActionsController {
     try {
       await onFavoriteRequested(_context());
     } catch (error) {
-      if (!_isMounted()) {
+      if (_closed || isSourceTaskCancellation(error) || !_isMounted()) {
         return;
       }
       final context = _context();
@@ -179,7 +211,7 @@ class ReaderActionsController {
         },
       );
     } catch (error) {
-      if (!_isMounted()) {
+      if (_closed || isSourceTaskCancellation(error) || !_isMounted()) {
         return;
       }
       final context = _context();
@@ -581,7 +613,7 @@ class ReaderActionsController {
         ),
       );
     } catch (error) {
-      if (!_isMounted()) {
+      if (_closed || isSourceTaskCancellation(error) || !_isMounted()) {
         return;
       }
       unawaited(

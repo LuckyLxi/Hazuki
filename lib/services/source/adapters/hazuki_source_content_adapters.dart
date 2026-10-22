@@ -341,10 +341,12 @@ class HazukiSourceComicDetailAdapter
     String comicId, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) => _content.loadComicDetails(
     comicId,
     sourceKey: sourceKey,
     forceRefresh: forceRefresh,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
@@ -365,6 +367,7 @@ class HazukiSourceComicDetailAdapter
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _image.downloadImageBytes(
     url,
     comicId: comicId,
@@ -373,16 +376,19 @@ class HazukiSourceComicDetailAdapter
     useDiskCache: useDiskCache,
     priority: priority,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _content.loadChapterImages(
     comicId: comicId,
     epId: epId,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<void> prefetchComicImages({
@@ -392,6 +398,7 @@ class HazukiSourceComicDetailAdapter
     required int count,
     required int memoryCount,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _image.prefetchComicImages(
     comicId: comicId,
     epId: epId,
@@ -399,6 +406,7 @@ class HazukiSourceComicDetailAdapter
     count: count,
     memoryCount: memoryCount,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<FavoriteFoldersResult> loadFavoriteFolders({
@@ -585,7 +593,10 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
 
 class HazukiSourceReaderAdapter
     with SourceCloudReadingAdapter
-    implements SourceReaderGateway, SourceReadingProgressGateway {
+    implements
+        SourceReaderGateway,
+        SourceReadingProgressGateway,
+        SourceReaderSessionGateway {
   @override
   Object get cloudReadingDelegate => _content;
   HazukiSourceReaderAdapter({
@@ -597,6 +608,10 @@ class HazukiSourceReaderAdapter
        _imagePreparation = imagePreparation,
        _image = image,
        _debug = debug;
+
+  @override
+  SourceReaderSession acquireReaderSession(String sourceKey) =>
+      _imagePreparation.acquireReaderSession(sourceKey);
 
   final SourceContentOperations _content;
   final SourceImagePreparationCapability _imagePreparation;
@@ -621,16 +636,23 @@ class HazukiSourceReaderAdapter
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
-  }) => _content.loadComicDetails(comicId, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _content.loadComicDetails(
+    comicId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _content.loadChapterImages(
     comicId: comicId,
     epId: epId,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<PreparedChapterImageData> prepareChapterImageData(
@@ -640,6 +662,7 @@ class HazukiSourceReaderAdapter
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _imagePreparation.prepareChapterImageData(
     imageUrl,
     comicId: comicId,
@@ -647,6 +670,7 @@ class HazukiSourceReaderAdapter
     useDiskCache: useDiskCache,
     priority: priority,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<Uint8List> downloadImageBytes(
@@ -657,6 +681,7 @@ class HazukiSourceReaderAdapter
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _image.downloadImageBytes(
     url,
     comicId: comicId,
@@ -665,6 +690,7 @@ class HazukiSourceReaderAdapter
     useDiskCache: useDiskCache,
     priority: priority,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   bool isLocalImagePath(String value) =>

@@ -10,15 +10,33 @@ import 'ui_flags.dart';
 
 class ComicCoverPrefetcher {
   ComicCoverPrefetcher({required SourceImageGateway imageGateway})
-    : _imageGateway = imageGateway;
+    : _imageGateway = imageGateway {
+    hazukiNoImageModeNotifier.addListener(_noImageModeChanged);
+  }
 
   final SourceImageGateway _imageGateway;
-  final Set<String> _inFlightKeys = <String>{};
+  final Map<String, SourceTaskCancellation> _inFlight = {};
+  final String _ownerId = createSourceTaskId();
+  int _sequence = 0;
+  void _noImageModeChanged() {
+    if (hazukiNoImageModeNotifier.value) _cancelExcept({});
+  }
+
+  void _cancelExcept(
+    Set<String> keep, [
+    SourceTaskStopReason reason = SourceTaskStopReason.superseded,
+  ]) {
+    for (final key in _inFlight.keys.toList()) {
+      if (!keep.contains(key)) _inFlight.remove(key)!.cancel(reason);
+    }
+  }
+
   bool _disposed = false;
 
   void dispose() {
     _disposed = true;
-    _inFlightKeys.clear();
+    hazukiNoImageModeNotifier.removeListener(_noImageModeChanged);
+    _cancelExcept({}, SourceTaskStopReason.ownerDisposed);
   }
 
   void prefetchAroundScroll({
@@ -30,6 +48,9 @@ class ComicCoverPrefetcher {
     int maxRequests = 24,
     bool priority = true,
   }) {
+    if (comics.isEmpty || hazukiNoImageModeNotifier.value) {
+      _cancelExcept({});
+    }
     if (_disposed ||
         comics.isEmpty ||
         hazukiNoImageModeNotifier.value ||
@@ -66,11 +87,16 @@ class ComicCoverPrefetcher {
         comics.isEmpty ||
         maxRequests <= 0 ||
         hazukiNoImageModeNotifier.value) {
+      _cancelExcept({});
       return;
     }
 
     final start = startIndex.clamp(0, comics.length - 1);
     final end = endIndex.clamp(start, comics.length - 1);
+    _cancelExcept({
+      for (var i = start; i <= end; i++)
+        if (_requestFor(comics[i]) case final request?) request.cacheKey,
+    });
     final requests = <_CoverPrefetchRequest>[];
     final seenKeys = <String>{};
 
@@ -78,7 +104,7 @@ class ComicCoverPrefetcher {
       final request = _requestFor(comics[index]);
       if (request == null ||
           !seenKeys.add(request.cacheKey) ||
-          _inFlightKeys.contains(request.cacheKey)) {
+          _inFlight.containsKey(request.cacheKey)) {
         continue;
       }
       if (_hasMemoryHit(request)) {
@@ -124,10 +150,13 @@ class ComicCoverPrefetcher {
   }
 
   void _startPrefetch(_CoverPrefetchRequest request, {required bool priority}) {
-    _inFlightKeys.add(request.cacheKey);
+    final signal = SourceTaskCancellation();
+    _inFlight[request.cacheKey] = signal;
     unawaited(
-      _download(request, priority: priority).whenComplete(() {
-        _inFlightKeys.remove(request.cacheKey);
+      _download(request, priority: priority, signal: signal).whenComplete(() {
+        if (identical(_inFlight[request.cacheKey], signal)) {
+          _inFlight.remove(request.cacheKey);
+        }
       }),
     );
   }
@@ -135,6 +164,7 @@ class ComicCoverPrefetcher {
   Future<void> _download(
     _CoverPrefetchRequest request, {
     required bool priority,
+    required SourceTaskCancellation signal,
   }) async {
     try {
       final Uint8List bytes = await _imageGateway.downloadImageBytes(
@@ -142,8 +172,14 @@ class ComicCoverPrefetcher {
         keepInMemory: true,
         priority: priority,
         sourceKey: request.sourceKey,
+        taskOrigin: SourceTaskOrigin(
+          ownerId: _ownerId,
+          groupId: createSourceTaskId(),
+          requestSequence: ++_sequence,
+          cancellation: signal,
+        ),
       );
-      if (_disposed) {
+      if (_disposed || signal.reason != null) {
         return;
       }
       putHazukiWidgetImageMemory(

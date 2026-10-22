@@ -189,3 +189,10 @@ class SourceVersionCheckResult {
   final String remoteVersion;
   final bool hasUpdate;
 }
+
+/// Image data failed decoding; the reader may retry once without disk cache.
+class SourceImageDecodeFailure implements Exception {
+  const SourceImageDecodeFailure();
+  @override
+  String toString() => 'reader_image_decode_failed';
+}

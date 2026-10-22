@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:hazuki/features/reader/support/reader_input_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_prefetch.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
@@ -85,6 +86,14 @@ class ReaderPage extends StatefulWidget {
 class _ReaderPageHostState extends State<ReaderPage> {
   final _chapterNavigatorKey = GlobalKey<NavigatorState>();
   late ReaderPage _chapter = widget;
+  late final SourceReaderSession? _readerSession = () {
+    final reader = widget.dependencies.sourceReader;
+    return !widget.offlineMode && reader is SourceReaderSessionGateway
+        ? (reader as SourceReaderSessionGateway).acquireReaderSession(
+            widget.sourceKey,
+          )
+        : null;
+  }();
   bool _chapterCanHandlePop = false;
   bool _settingsDrawerOpen = false;
 
@@ -121,6 +130,7 @@ class _ReaderPageHostState extends State<ReaderPage> {
       skipEntrance: skipEntrance,
       builder: (_) => _ReaderChapterPage(
         page: chapter,
+        readerSession: _readerSession,
         restoreEntry: restoreEntry,
         onChapterChanged: _switchChapter,
         onExitReader: () => Navigator.of(context).maybePop(),
@@ -140,6 +150,12 @@ class _ReaderPageHostState extends State<ReaderPage> {
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _readerSession?.close();
+    super.dispose();
   }
 
   @override
@@ -186,6 +202,7 @@ class _ReaderChapterRoute extends MaterialPageRoute<void> {
 class _ReaderChapterPage extends StatefulWidget {
   const _ReaderChapterPage({
     required this.page,
+    this.readerSession,
     required this.onChapterChanged,
     required this.onExitReader,
     required this.onSettingsDrawerChanged,
@@ -193,6 +210,7 @@ class _ReaderChapterPage extends StatefulWidget {
   });
 
   final ReaderPage page;
+  final SourceReaderSession? readerSession;
   final bool restoreEntry;
   final ReaderChapterChanged onChapterChanged;
   final VoidCallback onExitReader;
@@ -227,7 +245,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     epId: widget.page.epId,
     chapterIndex: widget.page.chapterIndex,
     images: widget.page.images,
-    sourceKey: widget.page.sourceKey,
+    sourceKey: (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
     coverUrl: widget.page.coverUrl,
     comicTheme: widget.page.comicTheme,
     onFavoriteRequested: widget.page.onFavoriteRequested,
@@ -263,11 +281,13 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         noImageModeEnabled: () => _noImageModeEnabled,
         comicId: widget.page.comicId,
         epId: widget.page.epId,
-        sourceKey: widget.page.sourceKey,
+        sourceKey: (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
         onImageAspectRatioResolved: _handleImageAspectRatioResolved,
         sourceService: widget.page.dependencies.sourceReader,
+        taskControl: widget.page.dependencies.taskControl,
+        readerSession: widget.readerSession,
       );
   late final ReaderZoomController _readerZoomController = ReaderZoomController(
     transformationController: _zoomController,
@@ -353,7 +373,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         logPayload: _readerLogPayload,
         comicId: widget.page.comicId,
         epId: widget.page.epId,
-        sourceKey: widget.page.sourceKey,
+        sourceKey: (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
         chapterTitle: widget.page.chapterTitle,
         chapterIndex: widget.page.chapterIndex,
         widgetImages: widget.page.images,
@@ -364,7 +384,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
           final source = widget.page.dependencies.sourceReader;
           return source is! SourceCloudReadingGateway ||
               !await (source as SourceCloudReadingGateway).usesCloudReading(
-                widget.page.sourceKey,
+                (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
               );
         },
         onSettingsReady: () {
@@ -394,9 +414,13 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
         sourceReader: widget.page.dependencies.sourceReader,
+        taskControl: widget.page.dependencies.taskControl,
+        readerSession: widget.readerSession,
         pageContext: _pageContext,
         onChapterChanged: (chapter, {animate = true}) {
           _progressReporter.close('chapter');
+          _imagePipelineController.retire();
+          _actionsController.dispose(SourceTaskStopReason.superseded);
           widget.onChapterChanged(chapter, animate: animate);
         },
         downloader: widget.page.dependencies.downloader,
@@ -504,7 +528,8 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       return gateway is SourceReadingProgressGateway
           ? (gateway as SourceReadingProgressGateway).reportReadingProgress(
               progress,
-              sourceKey: widget.page.sourceKey,
+              sourceKey:
+                  (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
             )
           : Future<void>.value();
     },
@@ -644,7 +669,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     _sessionController.initialize();
     _sourceImageQuality = ReaderSourceImageQualitySettings.load(
       _sourceSettings,
-      widget.page.sourceKey,
+      (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
     );
     if (Platform.isWindows) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -669,7 +694,8 @@ class _ReaderPageState extends State<_ReaderChapterPage>
           widget.page.dependencies.readingProgressService
               .load(
                 comicId: widget.page.comicId,
-                sourceKey: widget.page.sourceKey,
+                sourceKey:
+                    (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
               )
               .then(
                 (position) {
@@ -708,6 +734,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     _progressReporter.close('exit');
     _sessionController.dispose();
     _imagePipelineController.dispose();
+    _actionsController.dispose();
     super.dispose();
   }
 
@@ -906,7 +933,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         });
         await ReaderSourceImageQualitySettings.updateImageQuality(
           _sourceSettings,
-          widget.page.sourceKey,
+          (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
           normalized,
         );
       },

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:collection';
 
+import '../models/source_task.dart';
+
 /// Limits concurrent image downloads and orders pending work.
 class ImageDownloadScheduler {
   ImageDownloadScheduler({int maxConcurrent = 4})
@@ -15,9 +17,18 @@ class ImageDownloadScheduler {
     String key, {
     required bool priority,
     required Future<T> Function() task,
+    SourceTaskCancellation? cancellation,
   }) async {
-    await _acquire(key, priority: priority);
+    void checkActive() {
+      if (cancellation?.reason case final reason?) {
+        throw SourceTaskCancelled(key, reason);
+      }
+    }
+
+    checkActive();
+    await _acquire(key, priority: priority, cancellation: cancellation);
     try {
+      checkActive();
       return await task();
     } finally {
       _release();
@@ -38,7 +49,11 @@ class ImageDownloadScheduler {
     }
   }
 
-  Future<void> _acquire(String key, {required bool priority}) async {
+  Future<void> _acquire(
+    String key, {
+    required bool priority,
+    SourceTaskCancellation? cancellation,
+  }) async {
     if (_activeCount < _maxConcurrent) {
       _activeCount++;
       return;
@@ -49,7 +64,22 @@ class ImageDownloadScheduler {
     } else {
       _waiters.addLast(waiter);
     }
-    await waiter.completer.future;
+    void stopped() {
+      if (cancellation?.reason case final reason?) {
+        // A granted waiter owns its permit; schedule's finally releases it.
+        if (_waiters.remove(waiter)) {
+          waiter.completer.completeError(SourceTaskCancelled(key, reason));
+        }
+      }
+    }
+
+    cancellation?.addListener(stopped);
+    try {
+      stopped();
+      await waiter.completer.future;
+    } finally {
+      cancellation?.removeListener(stopped);
+    }
   }
 
   void _release() {

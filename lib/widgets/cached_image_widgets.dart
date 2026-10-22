@@ -303,6 +303,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
 
   @override
   void dispose() {
+    _loadSession.invalidate(SourceTaskStopReason.ownerDisposed);
     _cancelDeferredLoad();
     _reportState(HazukiCachedImageLoadState.idle);
     hazukiNoImageModeNotifier.removeListener(_handleNoImageModeChanged);
@@ -897,6 +898,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
 
   @override
   void dispose() {
+    _loadSession.invalidate(SourceTaskStopReason.ownerDisposed);
     hazukiNoImageModeNotifier.removeListener(_handleNoImageModeChanged);
     _releaseDecodedImage();
     super.dispose();

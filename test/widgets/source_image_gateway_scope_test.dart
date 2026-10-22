@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -230,6 +231,7 @@ class _FakeSourceImageGateway implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     final resolvedSourceKey = sourceKey.trim().isEmpty
         ? activeSourceKey
@@ -273,6 +275,7 @@ class _ControlledSourceImageGateway implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) {
     return _download.future;
   }

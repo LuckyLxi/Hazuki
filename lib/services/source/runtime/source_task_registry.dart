@@ -21,6 +21,7 @@ typedef SourceTaskObserver =
 class SourceTaskRegistry implements SourceTaskControlGateway {
   final Map<String, SourceTask> _tasks = {};
   final Map<String, SourceTaskSnapshot> _finished = {};
+  final Expando<SourceTaskStopReason> _retiredResources = Expando();
   bool _disposed = false;
 
   List<SourceTaskSnapshot> get activeTasks => List.unmodifiable(
@@ -46,6 +47,7 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
       origin: origin ?? SourceTaskOrigin.standalone(),
       observe: observe,
       onResourcesChanged: _prune,
+      checkResourceActive: checkResourceActive,
     );
     _tasks[task.taskId] = task;
     task._notify(SourceTaskEvent.stateChanged);
@@ -59,7 +61,20 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
 
     cancellation?.addListener(stopped);
     stopped();
+    final session = task._origin.readerSession;
+    void sessionStopped() {
+      if (session?.cancellation.reason case final reason?) {
+        task._requestStop(reason);
+      }
+    }
+
+    session?.cancellation.addListener(sessionStopped);
+    sessionStopped();
     final scope = SourceUiScope.current;
+    if ((session != null || task._origin.retainOnSourceChange) &&
+        scope?.available == true) {
+      scope!.survivesSourceChange = true;
+    }
     void scopeStopped() {
       final reason = scope?.reason;
       if (reason == null) return;
@@ -126,6 +141,7 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
       Error.throwWithStackTrace(failure, stack);
     } finally {
       cancellation?.removeListener(stopped);
+      session?.cancellation.removeListener(sessionStopped);
       if (cancellation != null && linkUiCancellation) {
         scope?.removeListener(scopeStopped);
       }
@@ -241,11 +257,29 @@ class SourceTaskRegistry implements SourceTaskControlGateway {
         .where(
           (task) =>
               identical(task._resource, resource) &&
+              (reason != SourceTaskStopReason.sourceChanged ||
+                  !task.survivesSourceChange) &&
               (includeServiceTasks || !task._serviceOwned),
         )
         .map((task) => task.taskId)
         .toSet();
     return _cancel((task) => ids.contains(task.taskId), reason);
+  }
+
+  void checkResourceActive(Object resource) {
+    final reason = _disposed
+        ? SourceTaskStopReason.runtimeClosed
+        : _retiredResources[resource];
+    if (reason != null) throw SourceTaskCancelled(createSourceTaskId(), reason);
+  }
+
+  /// Catalog retirement also rejects submissions made during cancel callbacks.
+  Future<SourceTaskCancelReceipt> retireResource(
+    Object resource,
+    SourceTaskStopReason reason,
+  ) {
+    _retiredResources[resource] ??= reason;
+    return cancelResource(resource, reason);
   }
 
   void dispose() {
@@ -266,10 +300,12 @@ class SourceTask {
     required SourceTaskOrigin origin,
     required SourceTaskObserver? observe,
     required void Function() onResourcesChanged,
+    required void Function(Object) checkResourceActive,
   }) : _pluginVersion = pluginVersion,
        _origin = origin,
        _observe = observe,
-       _onResourcesChanged = onResourcesChanged;
+       _onResourcesChanged = onResourcesChanged,
+       _checkResourceActive = checkResourceActive;
 
   final String taskId = createSourceTaskId();
   final String pluginId;
@@ -277,6 +313,7 @@ class SourceTask {
   final SourceTaskOrigin _origin;
   final SourceTaskObserver? _observe;
   final void Function() _onResourcesChanged;
+  final void Function(Object) _checkResourceActive;
   final DateTime _createdAt = DateTime.now().toUtc();
   final Stopwatch _clock = Stopwatch();
   final Set<SourceScriptEngine> _engines = {};
@@ -289,6 +326,11 @@ class SourceTask {
   bool _settling = false;
   Object? _resource;
   bool _serviceOwned = false;
+  bool get survivesSourceChange =>
+      _origin.readerSession != null ||
+      _origin.retainOnSourceChange ||
+      _survivesSourceChange;
+  bool _survivesSourceChange = false;
   int _pendingCommits = 0;
   Completer<void>? _commitsSettled;
   String? _pluginVersion;
@@ -300,10 +342,16 @@ class SourceTask {
   DateTime? _settledAt;
   Future<void> get whenStopped => _stopped.future;
 
-  void bindResource(Object resource, {bool serviceOwned = false}) {
+  void bindResource(
+    Object resource, {
+    bool serviceOwned = false,
+    bool survivesSourceChange = false,
+  }) {
     checkActive();
+    _checkResourceActive(resource);
     _resource = resource;
     _serviceOwned = serviceOwned;
+    _survivesSourceChange = survivesSourceChange;
   }
 
   Future<T> runCommit<T>(Future<T> Function() operation) async {

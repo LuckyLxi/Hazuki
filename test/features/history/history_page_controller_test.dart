@@ -346,6 +346,7 @@ class _ControlledReaderGateway implements SourceReaderGateway {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) {
     calls++;
     return _details.future;

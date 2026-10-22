@@ -477,10 +477,15 @@ class SourceUiService {
 
   void cancelPlugin(String pluginId, String reason) {
     for (final scope in scopes) {
-      if (scope.pluginIds.contains(pluginId)) scope.cancel(reason);
+      if (scope.pluginIds.contains(pluginId) &&
+          !(reason == 'sourceChanged' && scope.survivesSourceChange)) {
+        scope.cancel(reason);
+      }
     }
     for (final dialog in _dialogs.values.toList()) {
-      if (dialog.pluginId == pluginId && !dialog.isClosed) {
+      if (dialog.pluginId == pluginId &&
+          !dialog.isClosed &&
+          !(reason == 'sourceChanged' && dialog.scope.survivesSourceChange)) {
         dialog.scope.cancel(reason);
       }
     }

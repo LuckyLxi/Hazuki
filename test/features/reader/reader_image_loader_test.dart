@@ -55,6 +55,48 @@ void main() {
   }
 
   test(
+    'old generation release cannot consume a new generation permit',
+    () async {
+      final pending = <String, Completer<PreparedChapterImageData>>{};
+      prepare((call) {
+        final key = call.positionalArguments.single as String;
+        return (pending[key] = Completer<PreparedChapterImageData>()).future;
+      });
+      final old = [
+        for (var i = 0; i < 5; i++) loader.load('old$i', useDiskCache: true),
+      ];
+      final rejected = [
+        for (final future in old)
+          expectLater(future, throwsA(isA<SourceTaskCancelled>())),
+      ];
+      await Future<void>.delayed(Duration.zero);
+      state.clearProviderCaches();
+      final current = [
+        for (var i = 0; i < 5; i++) loader.load('new$i', useDiskCache: true),
+      ];
+      await Future<void>.delayed(Duration.zero);
+      final queued = loader.load('queued', useDiskCache: true);
+      for (var i = 0; i < 5; i++) {
+        pending['old$i']!.complete(_data(ratio: 9));
+      }
+      await Future.wait(rejected);
+      expect(state.activeUnscrambleTasks, 5);
+      expect(pending.containsKey('queued'), isFalse);
+      expect(state.imageAspectRatioCache, isEmpty);
+      pending['new0']!.complete(_data(ratio: 1));
+      await current.first;
+      await Future<void>.delayed(Duration.zero);
+      expect(pending.containsKey('queued'), isTrue);
+      for (var i = 1; i < 5; i++) {
+        pending['new$i']!.complete(_data(ratio: 1));
+      }
+      pending['queued']!.complete(_data(ratio: 1));
+      await Future.wait([...current, queued]);
+      expect(state.activeUnscrambleTasks, 0);
+    },
+  );
+
+  test(
     'uses prepared dimensions and returns bytes without publishing a provider',
     () async {
       prepare((_) async => _data(ratio: 1.5));
@@ -143,12 +185,19 @@ void main() {
         for (var i = 0; i < 5; i++) loader.load('$i', useDiskCache: true),
       ];
       final waiting = loader.load('queued', useDiskCache: true);
-      final rejected = expectLater(waiting, throwsStateError);
+      final rejected = expectLater(
+        waiting,
+        throwsA(isA<SourceTaskCancelled>()),
+      );
+      final runningRejected = [
+        for (final future in running)
+          expectLater(future, throwsA(isA<SourceTaskCancelled>())),
+      ];
       await Future<void>.delayed(Duration.zero);
       state.dispose();
       await rejected;
       pending.complete(_data(ratio: 1));
-      await Future.wait(running);
+      await Future.wait(runningRejected);
       expect(state.decodeWaiters, isEmpty);
       expect(state.activeUnscrambleTasks, 0);
     },
