@@ -45,6 +45,7 @@ class _Reader extends Fake
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {
     required String sourceKey,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     events.add(progress);
   }

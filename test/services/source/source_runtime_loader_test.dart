@@ -18,6 +18,9 @@ import 'package:hazuki/services/source/runtime/source_script_storage.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/source/runtime/source_text_downloader.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hazuki/services/source/content/source_cloud_reading.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
+import 'package:hazuki/services/source/models/source_task.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +50,78 @@ void main() {
       );
     },
   );
+  test(
+    'private cloud loader cancellation drains its HTTP candidate without replacing the owner',
+    () async {
+      final fixture = await _createRuntimeFixture();
+      final owner = fixture.host.activeHandle;
+      final main = owner.runtime.engine!;
+      await owner.session.saveSourceData('jm', 'login_session', 'account');
+      await main.evaluate(
+        'globalThis.__hazuki_source.comic.loadReadingProgress=()=>null',
+      );
+      await fixture.file.writeAsString(
+        _runtimeScript(
+          '2.0.0',
+          init:
+              "await sendMessage({method:'http',url:'https://fixture.test/private-init'});",
+        ),
+      );
+      final entered = Completer<void>();
+      final aborted = Completer<void>();
+      SourceRuntimeHandle? candidate;
+      final cloud = SourceCloudReadingCapability(
+        fixture.host,
+        _CloudOperations(),
+        loadReadRuntime: (handle) async {
+          candidate = handle;
+          handle.dio.interceptors.add(
+            InterceptorsWrapper(
+              onRequest: (request, handler) async {
+                entered.complete();
+                await request.cancelToken!.whenCancel;
+                aborted.complete();
+                handler.reject(
+                  DioException.requestCancelled(
+                    requestOptions: request,
+                    reason: 'stopped',
+                  ),
+                );
+              },
+            ),
+          );
+          await fixture.loader.loadMetadata(handle, fixture.file);
+        },
+      );
+      addTearDown(() async {
+        cloud.dispose();
+        await cloud.whenSettled;
+      });
+      final pending = cloud.loadCloudReadingProgress(
+        'jm',
+        'comic',
+        taskOrigin: const SourceTaskOrigin(
+          ownerId: 'cloud',
+          groupId: 'read',
+          requestSequence: 1,
+        ),
+      );
+      final stopped = expectLater(pending, throwsA(isA<SourceTaskCancelled>()));
+      await entered.future;
+      final receipt = await fixture.host.tasks.cancelOwner(
+        'cloud',
+        SourceTaskStopReason.user,
+      );
+      await stopped;
+      await receipt.whenSettled;
+      await aborted.future;
+      expect(candidate!.isDisposed, isTrue);
+      expect(owner.runtime.engine, same(main));
+      expect(owner.runtime.sourceMeta!.version, '1.0.0');
+      expect(await main.evaluate('16'), 16);
+    },
+  );
+
   test('extracts the source class name and rejects invalid scripts', () {
     expect(
       extractSourceClassName('class ExampleSource extends ComicSource {}'),
@@ -417,4 +492,9 @@ class _LoaderScriptStore implements SourceScriptStore {
   Future<void> write(String sourceKey, String content) async {
     await file.writeAsString(content);
   }
+}
+
+class _CloudOperations extends Fake implements SourceRuntimeOperations {
+  @override
+  Future<void> ensureSourceInitialized(String key) async {}
 }

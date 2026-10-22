@@ -51,7 +51,11 @@ class SourceJsBridgeCookieCapability {
     String? runtimeId,
     SourceMeta? Function()? sourceMeta,
   }) {
-    hostContext?.checkActive();
+    if (hostContext != null) {
+      hostContext.validateAuthority = handle
+          .hostExecutionGuards[(execution ?? hostContext.execution).taskId];
+      hostContext.checkActive();
+    }
     if (message is! Map) return null;
     final map = Map<String, dynamic>.from(message);
     final method = map['method']?.toString();

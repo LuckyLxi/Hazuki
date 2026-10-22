@@ -627,12 +627,14 @@ class HazukiSourceReaderAdapter
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {
     required String sourceKey,
+    SourceTaskOrigin? taskOrigin,
   }) {
     final content = _content;
     return content is SourceReadingProgressGateway
         ? (content as SourceReadingProgressGateway).reportReadingProgress(
             progress,
             sourceKey: sourceKey,
+            taskOrigin: taskOrigin,
           )
         : Future<void>.value();
   }

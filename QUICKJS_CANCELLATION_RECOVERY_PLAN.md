@@ -1,6 +1,6 @@
 # 第三阶段实施方案：任务取消、精确中断与运行时恢复
 
-状态：原生取消、代理/宿主资源、搜索及第四批其他服务接线已实现；第五批已提交并接入图片共享订阅、阅读生命周期、封面及封面预取。生产 worker 显式启用控制，独立包默认仍关闭。第六批在当前工作区接入下载取消、运行租约、暂停/恢复、删除与文件收尾；云阅读私有会话任务化、健康判定和自动恢复仍未实施。最新结果见 [第六批下载验收](QUICKJS_DOWNLOAD_TASK_CONTROL_VALIDATION.md)；第五批结果见 [第五批图片与阅读验收](QUICKJS_IMAGE_READER_TASK_CONTROL_VALIDATION.md)；历史结果见 [第四批服务接线](QUICKJS_SERVICE_TASK_CONTROL_VALIDATION.md)、[搜索接线](QUICKJS_SEARCH_TASK_CANCELLATION_VALIDATION.md)、[第一批](QUICKJS_TASK_CONTROL_VALIDATION.md) 和 [第二批](QUICKJS_HOST_TASK_CONTROL_VALIDATION.md)。
+状态：原生取消、代理/宿主资源、搜索及第四批其他服务接线已实现；第五批已提交并接入图片共享订阅、阅读生命周期、封面及封面预取。生产 worker 显式启用控制，独立包默认仍关闭。第六批已提交为 `c97aad1f`，接入下载取消、运行租约、暂停/恢复、删除与文件收尾；第七批接入云阅读私有会话、共享历史、页面取消与上传服务租约/FIFO。健康判定和自动恢复仍未实施。最新结果及测试场景映射见 [第七批云阅读验收](QUICKJS_CLOUD_READING_TASK_CONTROL_VALIDATION.md)；第六批结果见 [第六批下载验收](QUICKJS_DOWNLOAD_TASK_CONTROL_VALIDATION.md)；第五批结果见 [第五批图片与阅读验收](QUICKJS_IMAGE_READER_TASK_CONTROL_VALIDATION.md)；历史结果见 [第四批服务接线](QUICKJS_SERVICE_TASK_CONTROL_VALIDATION.md)、[搜索接线](QUICKJS_SEARCH_TASK_CANCELLATION_VALIDATION.md)、[第一批](QUICKJS_TASK_CONTROL_VALIDATION.md) 和 [第二批](QUICKJS_HOST_TASK_CONTROL_VALIDATION.md)。
 
 第三批历史验证（2026-10-21）：627 项针对性测试、1986 项完整覆盖率测试、格式检查及静态分析全部通过，随后完成 Windows 和 Android debug 构建。
 
@@ -8,7 +8,9 @@
 
 第五批验证（2026-10-22）：878 文件格式检查、静态分析及 **1327 项针对性回归通过**；最终完整覆盖率为 **2041 项通过、1 项基线失败**；Windows/Android debug 构建通过。详细结果见第五批验收记录。导航基线断言按用户选择保留，不修改 UI 或断言制造全绿，完整应用验收尚未全部通过。
 
-第六批验证（2026-10-22）：880 文件格式检查、静态分析及 **1250 项针对性回归通过**；完整覆盖率为 **2064 项通过、1 项既有导航基线失败**；Windows debug（21.1 秒）与 Android debug（35.9 秒）构建通过。代码仍在工作区，未创建提交或 PR。完整应用验收尚未全绿，详细记录见第六批验收文档。
+第六批验证（2026-10-22）：880 文件格式检查、静态分析及 **1250 项针对性回归通过**；完整覆盖率为 **2064 项通过、1 项既有导航基线失败**；Windows debug（21.1 秒）与 Android debug（35.9 秒）构建通过。第六批已提交为 `c97aad1f`。完整应用验收尚未全绿，详细记录见第六批验收文档。
+
+第七批验证（2026-10-22）：886 文件格式检查、静态分析及 **1205 项针对性回归通过**；完整覆盖率 **2090 项通过、1 项既有导航基线失败**；Windows debug（30.8 秒）与 Android debug（25.9 秒）顺序构建通过。按修订计划整批作为一个 Conventional Commit，排除用户既有搜索栏及 `CLAUDE.md` 修改。**完整应用验收尚未全绿**；场景映射、命令和日志见第七批验收记录。
 
 ## 1. 目标、约束与现状
 
@@ -18,7 +20,7 @@
 
 当前可复用的基础（其余章节保留整体目标，不能视为所有业务均已实施）：
 
-- `SourceTaskRegistry` 已由宿主持有；搜索、第四批服务及第五批阅读/图片具有取消/超时终态、实际 handle/engine 绑定及资源收尾回执。页面读取、阅读租约与服务写入分开归属，Dart 已开始的提交计入收尾；下载完整生命周期已在第六批工作区接入。
+- `SourceTaskRegistry` 已由宿主持有；搜索、第四批服务及第五批阅读/图片具有取消/超时终态、实际 handle/engine 绑定及资源收尾回执。页面读取、阅读租约与服务写入分开归属，Dart 已开始的提交计入收尾；下载完整生命周期已在第六批提交；第七批云阅读与上传同样进入统一任务表。
 - `SourceScriptEngine` 的命令有调用 ID、运行时 ID 和执行身份；原生 Promise reaction、job 和远程回调已保留注册上下文。
 - 插件 HTTP 已贯通 `CancelToken`，网络重试及搜索 450 ms 等待可取消；搜索替换/退出已实测停止目标 HTTP 和 Timer。
 - worker 的 Timer、宿主 Future、远程句柄按 work/task 清理，普通作业故障按实际 token 隔离，正常取消不关闭整个同源运行时。
@@ -49,13 +51,17 @@ Future<SourceTaskCancelReceipt> cancelOwner(String ownerId, SourceTaskStopReason
 
 receipt 区分已请求、已结束和不存在，携带 `whenSettled`；请求方法不等待其他调用仍使用的共享工作。`whenSettled` 在目标调用终止、订阅解除及其非共享资源清理后完成。共享资源转由剩余消费者持有，另记保留数量，不能冒充“全部底层工作已停止”。重复取消幂等，终态只写一次。
 
+### 第七批云阅读与上传口径
+
+读取会话固定主 handle/账号、私有 engine 和代次；初始化与历史刷新独立共享，切源立即停止读取，私有暂存永不提交主账号。已接纳上传同步冻结数据、登记任务并持有 `SourceServiceRuntimeLease`，退出/换章/切源后继续原主运行时 FIFO；账号/catalog 撤销旧队列。阅读、下载、上传共同保留非活动 handle，不恢复撤销的交互权限。上传的默认 30 秒执行预算从轮到该笔时开始，排队时间不计入；其他调用现有 `SourceTaskOrigin.workTimeout` 计时语义保持不变。超时结构化停止，收尾释放租约后继续下一项，不重试或重放。详见第七批计划与验收。
+
 ### 状态、异常与截止时间
 
 - 状态为 created、running、cancelRequested、succeeded、failed、cancelled、timedOut。排队、执行、等待宿主及等待 Promise 另作命令阶段，避免一个业务任务多条命令间反复改变业务状态。
-- 原因使用枚举：user、superseded、ownerDisposed、downloadPaused、pluginDisabled、pluginUpdated、deadlineExceeded、executionTimeout、runtimeClosed。运行时故障使用单独错误类型，不伪装成取消。
+- 原因使用枚举：user、superseded、ownerDisposed、downloadPaused、pluginDisabled、pluginUpdated、deadlineExceeded、executionTimeout、runtimeClosed、downloadPaused、accountChanged。运行时故障使用单独错误类型，不伪装成取消。
 - 新增 `SourceTaskCancelled`、`SourceTaskTimedOut`、`SourceRuntimeFailed` 类型，携带 taskId/runtimeId 和结构化原因；扩展值编码保留这些类型。取消不能被 HTTP 错误包装、重新登录或自动重试吞掉。
 - 主 isolate 串行裁决取消、截止时间和已解析结果的先后；接受取消后，迟到成功结果只能丢弃。结果已完成后取消返回“已结束”。请求序号检查继续保留。
-- 普通搜索及聚合搜索每次服务调用沿用当前 25 秒期限；自动重试的新调用重新计时，分组不设新的总期限。其他操作不凭空增加总超时，保留现有网络、初始化等待和单次 JS 五秒配置。UTC 时间用于日志，进程内 Stopwatch/剩余预算用于计时。
+- 普通搜索及聚合搜索每次服务调用沿用当前 25 秒期限；自动重试的新调用重新计时，分组不设新的总期限。除第七批单笔上传新增的 30 秒执行预算外，其他操作不增加总超时，保留现有网络、初始化等待和单次 JS 五秒配置。UTC 时间用于日志，进程内 Stopwatch/剩余预算用于计时。
 
 ## 3. 原生控制通道与 worker 协议
 

@@ -42,6 +42,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     required Route<void> Function(WidgetBuilder) destinationRouteBuilder,
     required Route<void> Function(WidgetBuilder) expandedReaderRouteBuilder,
   }) : _readTasks = SourceTaskOwner(taskControl),
+       _progressTasks = SourceTaskOwner(taskControl),
        _destinationRouteBuilder = destinationRouteBuilder,
        _expandedReaderRouteBuilder = expandedReaderRouteBuilder,
        _repository = repository,
@@ -75,6 +76,7 @@ class ComicDetailActionsController extends ChangeNotifier {
   final MethodChannel _mediaChannel;
 
   final SourceTaskOwner _readTasks;
+  final SourceTaskOwner _progressTasks;
   bool _disposed = false;
   int _readerOpenRequest = 0;
 
@@ -233,7 +235,10 @@ class ComicDetailActionsController extends ChangeNotifier {
     int? chapterIndex,
     bool fromExpandedChapterSheet = false,
   }) async {
+    if (_disposed) return;
     final readerRequest = ++_readerOpenRequest;
+    _progressTasks.restart();
+    final origin = _progressTasks.origin();
     FocusManager.instance.primaryFocus?.unfocus();
     final chapters = details.chapters;
     if (chapters.isEmpty) {
@@ -254,10 +259,18 @@ class ComicDetailActionsController extends ChangeNotifier {
     var lastReadProgress = _lastReadProgressGetter();
     if (epId == null) {
       try {
-        if (await _repository.usesWebsiteReadingProgress()) {
-          lastReadProgress = await _repository.loadReadingProgress(_comic.id);
+        if (await _repository.usesWebsiteReadingProgress(taskOrigin: origin)) {
+          lastReadProgress = await _repository.loadReadingProgress(
+            _comic.id,
+            taskOrigin: origin,
+          );
         }
-      } catch (_) {
+      } catch (error) {
+        if (error is SourceTaskCancelled ||
+            _disposed ||
+            readerRequest != _readerOpenRequest) {
+          return;
+        }
         lastReadProgress = null;
         if (_disposed || !context.mounted) return;
         unawaited(
@@ -648,8 +661,9 @@ class ComicDetailActionsController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _readTasks.dispose();
     _disposed = true;
+    _progressTasks.dispose();
+    _readTasks.dispose();
     super.dispose();
   }
 }

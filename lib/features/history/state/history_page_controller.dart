@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hazuki/shared/source_task_owner.dart';
 import 'package:hazuki/services/source/content/source_cloud_reading.dart';
 
 import 'package:flutter/foundation.dart';
@@ -15,8 +16,10 @@ class HistoryPageController extends ChangeNotifier {
     required ReadHistoryService readHistoryService,
     required SourceSelectionGateway sourceService,
     SourceReaderGateway? readerService,
+    SourceTaskControlGateway? taskControl,
     SourcePresentationReader presentationFor = emptySourcePresentation,
-  }) : _readHistoryService = readHistoryService,
+  }) : _cloudTasks = SourceTaskOwner(taskControl),
+       _readHistoryService = readHistoryService,
        _sourceService = sourceService,
        _readerService = readerService,
        _presentationFor = presentationFor,
@@ -42,6 +45,7 @@ class HistoryPageController extends ChangeNotifier {
   final SourcePresentationReader _presentationFor;
   final HistoryPageData _state = HistoryPageData();
 
+  final SourceTaskOwner _cloudTasks;
   bool _disposed = false;
   void _handleCloudSessionChanged() {
     if (_disposed) return;
@@ -191,7 +195,10 @@ class HistoryPageController extends ChangeNotifier {
     bool playEntryAnimation = true,
     bool preserveExistingOrder = false,
   }) async {
+    if (_disposed) return;
     final requestVersion = ++_requestVersion;
+    _cloudTasks.restart();
+    final origin = _cloudTasks.origin();
     final sourceKey = _activeSourceKey;
     if (markLoading && !_state.loading) {
       _state.beginLoading();
@@ -210,7 +217,7 @@ class HistoryPageController extends ChangeNotifier {
     if (reader is SourceCloudReadingGateway) {
       try {
         final cloud = await (reader as SourceCloudReadingGateway)
-            .refreshCloudReadingHistory(sourceKey);
+            .refreshCloudReadingHistory(sourceKey, taskOrigin: origin);
         final ids = history.map((c) => c.scopedId.storageKey).toSet();
         history.addAll(cloud.where((c) => ids.add(c.scopedId.storageKey)));
       } catch (_) {
@@ -392,6 +399,7 @@ class HistoryPageController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _cloudTasks.dispose();
     final reader = _readerService;
     if (reader is SourceCloudReadingEvents) {
       (reader as SourceCloudReadingEvents).removeListener(

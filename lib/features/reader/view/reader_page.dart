@@ -385,6 +385,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
           return source is! SourceCloudReadingGateway ||
               !await (source as SourceCloudReadingGateway).usesCloudReading(
                 (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
+                taskOrigin: _cloudReadOrigin,
               );
         },
         onSettingsReady: () {
@@ -518,6 +519,14 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       if (mounted) _reportActualViewport();
     });
   }
+
+  final _cloudReadCancellation = SourceTaskCancellation();
+  late final _cloudReadOrigin = SourceTaskOrigin(
+    ownerId: createSourceTaskId(),
+    groupId: createSourceTaskId(),
+    requestSequence: 0,
+    cancellation: _cloudReadCancellation,
+  );
 
   bool _foreground = true;
   late final _progressReporter = ReaderProgressReporter(
@@ -731,6 +740,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     _windowsTitleBarController?.releaseCustomTitleBarSuppression(this);
     _resetAnimController.dispose();
     WidgetsBinding.instance.removeObserver(this);
+    _cloudReadCancellation.cancel(SourceTaskStopReason.ownerDisposed);
     _progressReporter.close('exit');
     _sessionController.dispose();
     _imagePipelineController.dispose();

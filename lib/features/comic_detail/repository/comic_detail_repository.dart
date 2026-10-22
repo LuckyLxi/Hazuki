@@ -214,30 +214,40 @@ class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
 
   // ── Persistence ──────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>?> loadReadingProgress(String comicId) async {
+  Future<Map<String, dynamic>?> loadReadingProgress(
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     final source = _source;
     if (source is SourceCloudReadingGateway &&
         await (source as SourceCloudReadingGateway).usesCloudReading(
           _sourceKey,
+          taskOrigin: taskOrigin,
         )) {
       return (source as SourceCloudReadingGateway).loadCloudReadingProgress(
         _sourceKey,
         comicId,
+        taskOrigin: taskOrigin,
       );
     }
     return _readingProgress.load(comicId: comicId, sourceKey: _sourceKey);
   }
 
-  Future<bool> usesWebsiteReadingProgress() async {
+  Future<bool> usesWebsiteReadingProgress({
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     final source = _source;
     return source is SourceCloudReadingGateway &&
         await (source as SourceCloudReadingGateway).usesCloudReading(
           _sourceKey,
+          taskOrigin: taskOrigin,
         );
   }
 
-  Stream<void> watchReadingProgressChanges() async* {
-    if (await usesWebsiteReadingProgress()) return;
+  Stream<void> watchReadingProgressChanges({
+    SourceTaskOrigin? taskOrigin,
+  }) async* {
+    if (await usesWebsiteReadingProgress(taskOrigin: taskOrigin)) return;
     yield* _readingProgress.changes;
   }
 

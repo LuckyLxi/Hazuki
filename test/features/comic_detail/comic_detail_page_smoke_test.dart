@@ -2083,8 +2083,10 @@ class _MutableReadingProgressDetailFacade extends _ReadingProgressDetailFacade {
   };
 
   @override
-  Future<Map<String, dynamic>?> loadReadingProgress(String comicId) async =>
-      progress;
+  Future<Map<String, dynamic>?> loadReadingProgress(
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  }) async => progress;
 }
 
 class _DelayedReadingProgressService extends ReadingProgressService {

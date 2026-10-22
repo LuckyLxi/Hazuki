@@ -25,7 +25,10 @@ class _Reader extends Fake
         SourceReadingProgressGateway,
         SourceCloudReadingGateway {
   @override
-  Future<bool> usesCloudReading(String sourceKey) async => true;
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async => true;
   final events = <Map<String, Object>>[];
   @override
   bool isLocalImagePath(String value) => true;
@@ -52,6 +55,7 @@ class _Reader extends Fake
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {
     required String sourceKey,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     events.add(progress);
   }

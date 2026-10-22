@@ -139,6 +139,8 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
     required bool runSourceInit,
   }) async {
     final facade = handle.facade;
+    final control = handle.loadControl;
+    control?.checkActive();
     if (handle.isDisposed) throw Exception('source_runtime_disposed');
     final cancellation = handle.loginCancellation;
     cancellation?.check();
@@ -154,6 +156,12 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
       memoryLimit: 64 * 1024 * 1024,
       hostPromiseRejectionHandler: (_) {},
     );
+    Future<dynamic> evaluate(String code, {String? name}) => control == null
+        ? engine.evaluate(code, name: name)
+        : control.evaluate(engine, code, name: name);
+    Future<void> execute(String code, {String? name}) => control == null
+        ? engine.execute(code, name: name)
+        : control.execute(engine, code, name: name);
     final oldEngine = facade.runtime.engine;
     final oldHtmlBridge = handle.htmlBridge;
     final htmlBridge = SourceHtmlBridge();
@@ -165,6 +173,8 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
     cancellation?.addListener(cancelCandidate);
     handle.loadingRuntimeIds.add(engine.runtimeId);
     try {
+      control?.checkActive();
+      control?.bindEngine(engine);
       engine.onDiagnostic = (data) => handle.appLogStore.add(
         level: 'info',
         area: AppLogArea.source,
@@ -186,25 +196,30 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
               : candidateMeta,
         ),
       );
-      await engine.setGlobal('appVersion', '1.0.0');
+      await engine.setGlobal(
+        'appVersion',
+        '1.0.0',
+        execution: control?.execution,
+      );
 
-      await engine.execute(initScript, name: 'init.js');
-      await engine.execute(sdk, name: 'hazuki_plugin_sdk.js');
-      await evaluateSourcePlugin(engine, sourceScript);
-      final manifest = await registeredSourcePluginManifest(engine);
+      await execute(initScript, name: 'init.js');
+      await execute(sdk, name: 'hazuki_plugin_sdk.js');
+      await evaluateSourcePlugin(engine, sourceScript, control: control);
+      final manifest = await registeredSourcePluginManifest(
+        engine,
+        control: control,
+      );
       if (manifest.id != handle.sourceKey) {
         throw const SourcePluginException('plugin_identity_mismatch');
       }
 
-      final name = (await engine.evaluate('this.__hazuki_source.name') ?? '')
+      final name = (await evaluate('this.__hazuki_source.name') ?? '')
           .toString();
-      final key = (await engine.evaluate('this.__hazuki_source.key') ?? '')
+      final key = (await evaluate('this.__hazuki_source.key') ?? '').toString();
+      final version = (await evaluate('this.__hazuki_source.version') ?? '')
           .toString();
-      final version =
-          (await engine.evaluate('this.__hazuki_source.version') ?? '')
-              .toString();
       final supportsAccount = jsAsBool(
-        await engine.evaluate('!!this.__hazuki_source.account?.login'),
+        await evaluate('!!this.__hazuki_source.account?.login'),
       );
       if (name.isEmpty || key.isEmpty || version.isEmpty) {
         throw Exception('source_metadata_incomplete');
@@ -212,7 +227,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
       Future<Map<String, dynamic>> readSettings() async =>
           Map<String, dynamic>.from(
             jsonDecode(
-                  await engine.evaluate(
+                  await evaluate(
                         'JSON.stringify(this.__hazuki_source.settings ?? {})',
                       )
                       as String,
@@ -229,7 +244,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
         supportsAccount: supportsAccount,
         settingsDefaults: parseSourceSettingsDefaults(settings),
         presentation: jsAsMap(
-          await engine.evaluate('this.__hazuki_source.presentation ?? {}'),
+          await evaluate('this.__hazuki_source.presentation ?? {}'),
         ),
         settings: settings,
       );
@@ -244,10 +259,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
       candidateMeta = meta;
       if (runSourceInit) {
         await SourceUiScope.timeout(
-          engine.evaluate(
-            'this.__hazuki_source.init?.()',
-            name: 'source_init.js',
-          ),
+          evaluate('this.__hazuki_source.init?.()', name: 'source_init.js'),
           const Duration(seconds: 90),
         );
       }
@@ -266,6 +278,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
         settings: finalSettings,
       );
       if (handle.isDisposed) throw Exception('source_runtime_disposed');
+      control?.checkActive();
       facade.runtime.sourceMeta = finalMeta;
       facade.runtime.engine = engine;
       handle.htmlBridge = htmlBridge;

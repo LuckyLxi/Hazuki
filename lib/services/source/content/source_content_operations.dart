@@ -3,6 +3,7 @@ import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
 import 'dart:convert';
 import 'source_cloud_reading.dart';
+import 'source_reading_progress_uploads.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../category/source_category_capability.dart';
@@ -100,6 +101,7 @@ class SourceContentOperationService
        _category = category,
        _comicDetails = comicDetails {
     _cloud;
+    _uploads;
   }
 
   final SourceRuntimeHost _runtimeHost;
@@ -107,7 +109,7 @@ class SourceContentOperationService
   final SourceExploreCapability _explore;
   final SourceCategoryCapability _category;
   final SourceComicDetailsCapability _comicDetails;
-  final Map<String, Future<void>> _progressQueues = {};
+  late final _uploads = SourceReadingProgressUploads(_runtimeHost);
   List<SourceTaskSnapshot> get activeSearchTasks => _runtimeHost
       .tasks
       .activeTasks
@@ -119,68 +121,46 @@ class SourceContentOperationService
     _runtimeOperations,
     loadReadRuntime: loadCloudReadRuntime,
   );
-  void dispose() => _cloud.dispose();
+  Future<void> get whenCloudReadingSettled => _cloud.whenSettled;
+  Future<void> get whenSettled =>
+      Future.wait([_cloud.whenSettled, _uploads.whenSettled]);
+  void dispose() {
+    _cloud.dispose();
+    _uploads.dispose();
+  }
+
   @override
   void addListener(void Function() listener) => _cloud.addListener(listener);
   @override
   void removeListener(void Function() listener) =>
       _cloud.removeListener(listener);
   @override
-  Future<bool> usesCloudReading(String sourceKey) =>
-      _cloud.usesCloudReading(sourceKey);
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) => _cloud.usesCloudReading(sourceKey, taskOrigin: taskOrigin);
   @override
   Future<Map<String, dynamic>?> loadCloudReadingProgress(
     String sourceKey,
-    String comicId,
-  ) => _cloud.loadCloudReadingProgress(sourceKey, comicId);
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  }) => _cloud.loadCloudReadingProgress(
+    sourceKey,
+    comicId,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<List<ExploreComic>> refreshCloudReadingHistory(String sourceKey) =>
-      _cloud.refreshCloudReadingHistory(sourceKey);
+  Future<List<ExploreComic>> refreshCloudReadingHistory(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) => _cloud.refreshCloudReadingHistory(sourceKey, taskOrigin: taskOrigin);
 
   @override
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {
     required String sourceKey,
-  }) {
-    if (!_runtimeHost.runtimeRegistry.isAllowedSourceKey(sourceKey)) {
-      return Future.value();
-    }
-    final handle = _runtimeHost.handleFor(sourceKey);
-    final account = handle.session.loginIdentity;
-    if (account == null) return Future.value();
-    final snapshot = Map<String, Object>.from(progress);
-    final previous = _progressQueues[sourceKey] ?? Future<void>.value();
-    final next = previous
-        .then((_) async {
-          if (handle.isDisposed ||
-              !_runtimeHost.isCurrentHandle(handle) ||
-              !_runtimeHost.runtimeRegistry.isAllowedSourceKey(sourceKey) ||
-              handle.session.loginIdentity != account) {
-            return;
-          }
-          final engine = handle.runtime.engine;
-          if (engine == null ||
-              await engine.evaluate(
-                    'typeof this.__hazuki_source.comic?.onReadingProgress === "function"',
-                  ) !=
-                  true) {
-            return;
-          }
-          await handle.facade.js.resolve(
-            engine.invoke(
-              '(progress) => this.__hazuki_source.comic.onReadingProgress(progress)',
-              [snapshot],
-            ),
-          );
-        })
-        .catchError((Object _) {});
-    _progressQueues[sourceKey] = next;
-    return next.whenComplete(() {
-      if (identical(_progressQueues[sourceKey], next)) {
-        _progressQueues.remove(sourceKey);
-      }
-    });
-  }
+    SourceTaskOrigin? taskOrigin,
+  }) => _uploads.report(progress, sourceKey, origin: taskOrigin);
 
   @override
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({

@@ -16,20 +16,25 @@ class _Source extends Fake
   bool fail = false;
   Map<String, dynamic>? progress;
   @override
-  Future<bool> usesCloudReading(String sourceKey) async => cloud;
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async => cloud;
   @override
   Future<Map<String, dynamic>?> loadCloudReadingProgress(
     String sourceKey,
-    String comicId,
-  ) async {
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     if (fail) throw StateError('cloud_reading_login_required');
     return progress;
   }
 
   @override
   Future<List<ExploreComic>> refreshCloudReadingHistory(
-    String sourceKey,
-  ) async => [];
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async => [];
 }
 
 class _Local extends Fake implements LocalFavoritesRepository {}

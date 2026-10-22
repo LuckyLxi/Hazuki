@@ -53,6 +53,9 @@ class SourceHostCallContext {
   /// Set before starting an authoritative write that cannot be interrupted.
   /// close waits for that write, while ordinary subscriptions can be detached.
   bool requiresDrain = false;
+
+  /// Optional host-only authority check, also applied to delayed commits.
+  void Function()? validateAuthority;
   int _pendingCommits = 0;
   Completer<void>? _commitsSettled;
   Future<void> get whenCommitsSettled =>
@@ -75,6 +78,7 @@ class SourceHostCallContext {
   Future<void> get whenStopped => _stopped.future;
   void checkActive() {
     if (_failure case final error?) throw error;
+    validateAuthority?.call();
   }
 
   void stop(SourceScriptStopped error) {

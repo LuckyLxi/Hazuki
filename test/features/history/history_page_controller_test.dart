@@ -205,6 +205,37 @@ void main() {
     },
   );
 
+  test(
+    'history replacement and disposal release only their cloud subscriptions',
+    () async {
+      final reader = _CloudHistoryReader();
+      final controller = HistoryPageController(
+        readHistoryService: sl<ReadHistoryService>(),
+        sourceService: sl<SourceSelectionGateway>(),
+        readerService: reader,
+      );
+      reader.waitForCancellation = true;
+      final first = controller.loadInitial();
+      while (reader.origins.isEmpty) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      final second = controller.reload();
+      while (reader.origins.length < 2) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(
+        reader.origins.first.cancellation!.reason,
+        SourceTaskStopReason.superseded,
+      );
+      controller.dispose();
+      await Future.wait([first, second]);
+      expect(
+        reader.origins.last.cancellation!.reason,
+        SourceTaskStopReason.ownerDisposed,
+      );
+    },
+  );
+
   test('detail return reload preserves current history order', () async {
     final service = sl<ReadHistoryService>();
     await service.importJsonList([
@@ -382,15 +413,29 @@ class _CloudHistoryReader extends Fake
         SourceCloudReadingGateway,
         SourceCloudReadingEvents {
   List<ExploreComic> records = [];
+  bool waitForCancellation = false;
+  final origins = <SourceTaskOrigin>[];
   @override
-  Future<bool> usesCloudReading(String sourceKey) async => true;
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async => true;
   @override
   Future<Map<String, dynamic>?> loadCloudReadingProgress(
     String sourceKey,
-    String comicId,
-  ) async => null;
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  }) async => null;
   @override
   Future<List<ExploreComic>> refreshCloudReadingHistory(
-    String sourceKey,
-  ) async => List.of(records);
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
+    if (taskOrigin != null) origins.add(taskOrigin);
+    if (waitForCancellation) {
+      await taskOrigin!.cancellation!.whenStopped;
+      throw SourceTaskCancelled('history', taskOrigin.cancellation!.reason!);
+    }
+    return List.of(records);
+  }
 }

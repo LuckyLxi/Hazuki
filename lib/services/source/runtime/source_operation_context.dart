@@ -86,6 +86,24 @@ class SourceOperationContext {
     return result;
   }
 
+  /// Starts a budget only when the caller enters its execution phase.
+  Future<T> withWorkTimeout<T>(
+    Duration timeout,
+    Future<T> Function() operation,
+  ) {
+    checkActive();
+    // An admitted service write has an execution budget independent of the
+    // page's revoked interaction authority. Its UI scope stays revoked.
+    return Future<T>.sync(operation).timeout(
+      timeout,
+      onTimeout: () {
+        task.requestStop(SourceTaskStopReason.deadlineExceeded);
+        task.checkActive();
+        throw StateError('source_timeout_not_stopped');
+      },
+    );
+  }
+
   Future<T> commit<T>(Future<T> Function() operation) {
     checkActive();
     return task.runCommit(operation);

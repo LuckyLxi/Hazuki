@@ -314,6 +314,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     buildHistoryPage:
         ({required comicDetailPageBuilder, required onFavoriteRequested}) {
           return HistoryPage(
+            taskControl: sl<SourceTaskControlGateway>(),
             readHistoryService: sl<ReadHistoryService>(),
             sourceService: sl<SourceSelectionGateway>(),
             readerService: sl<SourceReaderGateway>(),

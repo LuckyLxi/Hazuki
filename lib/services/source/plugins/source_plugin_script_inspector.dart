@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import '../runtime/source_script_engine.dart';
+import '../runtime/source_runtime_load_control.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../runtime/source_js_bridge_cookie_capability.dart';
@@ -76,23 +77,33 @@ class SourcePluginScriptInspector {
 
 Future<void> evaluateSourcePlugin(
   SourceScriptEngine engine,
-  String script,
-) async {
-  await engine.execute(script, name: 'main.js');
-  if (await engine.evaluate('!!globalThis.__hazuki_source') == true) return;
+  String script, {
+  SourceRuntimeLoadControl? control,
+}) async {
+  Future<dynamic> evaluate(String code) =>
+      control == null ? engine.evaluate(code) : control.evaluate(engine, code);
+  if (control == null) {
+    await engine.execute(script, name: 'main.js');
+  } else {
+    await control.execute(engine, script, name: 'main.js');
+  }
+  if (await evaluate('!!globalThis.__hazuki_source') == true) return;
   final sourceClass = RegExp(
     r'class\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+extends\s+(?:HazukiSource|ComicSource)\b',
   ).firstMatch(script)?.group(1);
   if (sourceClass == null) {
     throw const SourcePluginException('plugin_registration_missing');
   }
-  await engine.evaluate('Hazuki.registerSource(new $sourceClass())');
+  await evaluate('Hazuki.registerSource(new $sourceClass())');
 }
 
 Future<SourcePluginManifest> registeredSourcePluginManifest(
-  SourceScriptEngine engine,
-) async {
-  if (await engine.evaluate(
+  SourceScriptEngine engine, {
+  SourceRuntimeLoadControl? control,
+}) async {
+  Future<dynamic> evaluate(String code) =>
+      control == null ? engine.evaluate(code) : control.evaluate(engine, code);
+  if (await evaluate(
         'typeof globalThis.__hazuki_source.comic?.loadReadingHistory === "function" && typeof globalThis.__hazuki_source.comic?.loadReadingProgress !== "function"',
       ) ==
       true) {
@@ -101,12 +112,12 @@ Future<SourcePluginManifest> registeredSourcePluginManifest(
     );
   }
   SourceLoginMethod.parse(
-    await engine.evaluate('globalThis.__hazuki_source.account?.loginMethods'),
+    await evaluate('globalThis.__hazuki_source.account?.loginMethods'),
   );
   final manifest = SourcePluginManifest.fromJson({
     ...Map<String, dynamic>.from(
       jsonDecode(
-            await engine.evaluate(
+            await evaluate(
                   'JSON.stringify((({key,name,version,apiVersion,presentation,settings,translation,comic})=>({id:key,name,version,apiVersion,presentation:{...presentation,...(typeof comic?.loadReadingProgress === "function" ? {__hostCloudReading:true} : {})},settings,translation}))(globalThis.__hazuki_source))',
                 )
                 as String,
@@ -119,7 +130,7 @@ Future<SourcePluginManifest> registeredSourcePluginManifest(
     manifest.presentation['dailyRecommendation'],
   );
   if (recommendation?.mode == DailyRecommendationMode.plugin &&
-      await engine.evaluate(
+      await evaluate(
             'typeof globalThis.__hazuki_source.dailyRecommendation?.load === "function"',
           ) !=
           true) {
@@ -135,7 +146,7 @@ Future<SourcePluginManifest> registeredSourcePluginManifest(
       _ => null,
     };
     if (callback != null &&
-        await engine.evaluate(
+        await evaluate(
               'typeof globalThis.__hazuki_source.$callback === "function"',
             ) !=
             true) {

@@ -234,6 +234,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       mediaChannel: _comicDetailMediaChannel,
     );
     _sessionController = ComicDetailSessionController(
+      taskControl: widget.dependencies.taskControl,
       repository: _repository,
       comic: widget.comic,
       sourceKey: widget.comic.sourceKey,

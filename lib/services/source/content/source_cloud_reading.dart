@@ -1,8 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../account/source_login_interaction.dart';
-import '../account/source_login_storage_transaction.dart';
+import '../models/source_task.dart';
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../runtime/source_shared_request.dart';
+import 'source_cloud_reading_session.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../runtime/source_runtime_handle.dart';
@@ -12,12 +14,19 @@ import '../runtime/source_runtime_operations.dart';
 /// Optional capability. No cloud position ever enters the local progress DB or
 /// the WebDAV participant. This account-scoped cache is for display only.
 abstract interface class SourceCloudReadingGateway {
-  Future<bool> usesCloudReading(String sourceKey);
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  });
   Future<Map<String, dynamic>?> loadCloudReadingProgress(
     String sourceKey,
-    String comicId,
-  );
-  Future<List<ExploreComic>> refreshCloudReadingHistory(String sourceKey);
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<List<ExploreComic>> refreshCloudReadingHistory(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  });
 }
 
 abstract interface class SourceCloudReadingEvents implements Listenable {}
@@ -38,30 +47,39 @@ mixin SourceCloudReadingAdapter
   }
 
   @override
-  Future<bool> usesCloudReading(String sourceKey) async {
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     final delegate = cloudReadingDelegate;
     return delegate is SourceCloudReadingGateway &&
-        await delegate.usesCloudReading(sourceKey);
+        await delegate.usesCloudReading(sourceKey, taskOrigin: taskOrigin);
   }
 
   @override
   Future<Map<String, dynamic>?> loadCloudReadingProgress(
     String sourceKey,
-    String comicId,
-  ) async {
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     final delegate = cloudReadingDelegate;
     return delegate is SourceCloudReadingGateway
-        ? delegate.loadCloudReadingProgress(sourceKey, comicId)
+        ? delegate.loadCloudReadingProgress(
+            sourceKey,
+            comicId,
+            taskOrigin: taskOrigin,
+          )
         : null;
   }
 
   @override
   Future<List<ExploreComic>> refreshCloudReadingHistory(
-    String sourceKey,
-  ) async {
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     final delegate = cloudReadingDelegate;
     return delegate is SourceCloudReadingGateway
-        ? delegate.refreshCloudReadingHistory(sourceKey)
+        ? delegate.refreshCloudReadingHistory(sourceKey, taskOrigin: taskOrigin)
         : const [];
   }
 }
@@ -80,27 +98,30 @@ class SourceCloudReadingCapability extends ChangeNotifier
   final SourceRuntimeHost host;
   final SourceRuntimeOperations operations;
   final Future<void> Function(SourceRuntimeHandle)? loadReadRuntime;
-  SourceRuntimeHandle? _readerHandle;
-  Future<SourceRuntimeHandle>? _readerInitialization;
-  SourceLoginStorageTransaction? _readerStorage;
-  Completer<void> _cancelSignal = Completer<void>();
-  String? _identity;
-  String? _source;
-  SourceRuntimeHandle? _owner;
-  int _generation = 0;
+  SourceCloudReadingSession? _session;
+  SourceSharedRequest<List<ExploreComic>>? _importing;
   final _history = <ExploreComic>[];
-  Future<List<ExploreComic>>? _importing;
+  final _closing = <Future<void>>[];
   bool _disposed = false;
+
+  Future<void> get whenSettled => Future.wait(_closing).then((_) {});
 
   @override
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
-    _generation++;
-    _history.clear();
-    _cancelReadRuntime();
     host.removeListener(_changed);
     host.runtimeRegistry.removeListener(_changed);
+    _retire(SourceTaskStopReason.ownerDisposed);
+    _history.clear();
     super.dispose();
+  }
+
+  void _retire(SourceTaskStopReason reason) {
+    final session = _session;
+    _session = null;
+    _importing = null;
+    if (session != null) _closing.add(session.close(reason));
   }
 
   void _changed() {
@@ -108,19 +129,32 @@ class SourceCloudReadingCapability extends ChangeNotifier
     final key = host.activeSourceKey;
     final handle = key.isEmpty ? null : host.handleFor(key);
     final identity = handle?.session.loginIdentity;
-    if (key == _source && identity == _identity && identical(handle, _owner)) {
+    final current = _session;
+    if (current != null &&
+        identical(current.owner, handle) &&
+        current.identity == identity) {
       return;
     }
-    _source = key;
-    _identity = identity;
-    _owner = handle;
-    _generation++;
-    _cancelReadRuntime();
+    final reason = current?.owner.sourceKey != key
+        ? SourceTaskStopReason.sourceChanged
+        : !identical(current?.owner, handle)
+        ? SourceTaskStopReason.pluginUpdated
+        : SourceTaskStopReason.accountChanged;
+    _retire(reason);
     _history.clear();
-    _importing = null;
+    if (handle != null) {
+      _session = SourceCloudReadingSession(
+        host,
+        handle,
+        identity,
+        loadReadRuntime,
+      );
+    }
     notifyListeners();
-    if (identity != null) {
+    final session = _session;
+    if (identity != null && session != null) {
       scheduleMicrotask(() async {
+        if (_disposed || !identical(_session, session)) return;
         try {
           await refreshCloudReadingHistory(key);
         } catch (_) {
@@ -130,111 +164,80 @@ class SourceCloudReadingCapability extends ChangeNotifier
     }
   }
 
-  void _cancelReadRuntime() {
-    if (!_cancelSignal.isCompleted) _cancelSignal.complete();
-    _cancelSignal = Completer<void>();
-    final handle = _readerHandle;
-    _readerHandle = null;
-    _readerInitialization = null;
-    _readerStorage?.discard();
-    _readerStorage = null;
-    handle?.loginCancellation?.cancel();
-    handle?.dio.close(force: true);
-    handle?.requestDispose();
-    // Only the private reading runtime is retired; the owner's shared runtime
-    // keeps serving its admitted reading, search and download operations.
-    final closing = handle?.runtime.engine?.close();
-    closing?.ignore();
-  }
+  SourceTaskOrigin _readOrigin(SourceTaskOrigin? origin) => SourceTaskOrigin(
+    ownerId: origin?.ownerId ?? createSourceTaskId(),
+    groupId: origin?.groupId ?? createSourceTaskId(),
+    requestSequence: origin?.requestSequence ?? 0,
+    cancellation: origin?.cancellation,
+    resultDisposition: origin?.resultDisposition,
+    workTimeout: origin?.workTimeout,
+  );
 
-  Future<SourceRuntimeHandle> _reader(SourceRuntimeHandle owner) {
-    final load = loadReadRuntime;
-    if (load == null) return Future.value(owner);
-    final pending = _readerInitialization;
-    if (pending != null) return pending;
-    final generation = _generation;
-    final transaction = _readerStorage = SourceLoginStorageTransaction(
-      owner.secureStorage,
-    );
-    final handle = _readerHandle =
-        SourceRuntimeHandle(
-            sourceKey: owner.sourceKey,
-            secureStorage: transaction,
-            ensureInitialized: (_) async {},
-            notifyRuntimeStateChanged: (_) {},
-          )
-          ..pluginDirectory = owner.pluginDirectory
-          ..loginCancellation = SourceLoginCancellation();
-    handle.session
-      ..prefs = owner.session.prefs
-      ..stagedStore = Map<String, dynamic>.from(
-        jsonDecode(jsonEncode(owner.session.loadSourceStore(owner.sourceKey)))
-            as Map,
-      );
-    return _readerInitialization = () async {
-      try {
-        await load(handle);
-        _check(owner, generation);
-        return handle;
-      } catch (_) {
-        if (identical(_readerHandle, handle)) _cancelReadRuntime();
-        rethrow;
-      }
-    }();
-  }
-
-  Future<Object?> _invoke(
+  Future<SourceCloudReadingSession> _ready(
     SourceRuntimeHandle owner,
-    int generation,
-    String method,
-    Object argument,
+    SourceOperationContext context,
   ) async {
-    final signal = _cancelSignal.future;
-    _check(owner, generation);
-    final handle = await _reader(owner);
-    _check(owner, generation);
-    return Future.any<Object?>([
-      handle.facade.js.resolve(
-        handle.runtime.engine!.invoke(
-          '(value) => globalThis.__hazuki_source.comic.$method(value)',
-          [argument],
-        ),
-      ),
-      signal.then((_) => throw StateError('cloud_reading_session_changed')),
+    final identity = owner.session.loginIdentity;
+    final hadSnapshot = owner.session.prefs != null;
+    await Future.any([
+      operations.ensureSourceInitialized(owner.sourceKey),
+      context.task.whenStopped.then((_) => context.checkActive()),
     ]);
+    context.checkActive();
+    if (_disposed ||
+        !host.isCurrentHandle(owner) ||
+        owner.sourceKey != host.activeSourceKey ||
+        !host.runtimeRegistry.isAllowedSourceKey(owner.sourceKey)) {
+      throw const SourceTaskCancelled(
+        'cloud.ready',
+        SourceTaskStopReason.sourceChanged,
+      );
+    }
+    if (hadSnapshot && identity != owner.session.loginIdentity) {
+      throw const SourceTaskCancelled(
+        'cloud.ready',
+        SourceTaskStopReason.accountChanged,
+      );
+    }
+    // A read never rotates the account's identity by creating a login marker.
+    // The real login transaction owns that marker. Legacy credentials already
+    // provide loginIdentity, including when two readers become ready together.
+    _changed();
+    final session = _session!;
+    session.checkActive();
+    return session;
   }
 
-  Future<SourceRuntimeHandle> _ready(String key) async {
-    if (_disposed) throw StateError('cloud_reading_disposed');
-    if (!host.runtimeRegistry.isAllowedSourceKey(key) ||
-        key != host.activeSourceKey) {
-      throw StateError('cloud_reading_source_changed');
-    }
-    final ownerBeforeInit = host.handleFor(key);
-    final hadAccountSnapshot = ownerBeforeInit.session.prefs != null;
-    final accountBeforeInit = ownerBeforeInit.session.loginIdentity;
-    await operations.ensureSourceInitialized(key);
+  Future<T> _read<T>(
+    String key,
+    String method,
+    SourceTaskOrigin? origin,
+    Future<T> Function(SourceCloudReadingSession, SourceOperationContext)
+    operation,
+  ) async {
     if (_disposed ||
         key != host.activeSourceKey ||
         !host.runtimeRegistry.isAllowedSourceKey(key)) {
-      throw StateError('cloud_reading_source_changed');
-    }
-    final session = host.handleFor(key).session;
-    if (!host.isCurrentHandle(ownerBeforeInit) ||
-        (hadAccountSnapshot && session.loginIdentity != accountBeforeInit)) {
-      throw StateError('cloud_reading_session_changed');
-    }
-    if (session.hasLogin &&
-        session.loadSourceData(key, 'login_session') is! String) {
-      await session.saveSourceData(
-        key,
-        'login_session',
-        DateTime.now().microsecondsSinceEpoch.toString(),
+      throw const SourceTaskCancelled(
+        'cloud.read',
+        SourceTaskStopReason.sourceChanged,
       );
-      host.notifyActiveRuntimeChanged(key);
     }
-    _changed();
-    return host.handleFor(key);
+    final owner = host.handleFor(key);
+    SourceCloudReadingSession? session;
+    SourceOperationContext? context;
+    try {
+      return await runSourceOperation(host, owner, method, (task) async {
+        context = task;
+        session = await _ready(owner, task);
+        session!.attach(task);
+        return operation(session!, task);
+      }, origin: _readOrigin(origin));
+    } finally {
+      if (session != null && context != null) {
+        await session!.release(context!.task);
+      }
+    }
   }
 
   bool _declares(SourceRuntimeHandle h, String method) =>
@@ -243,102 +246,139 @@ class SourceCloudReadingCapability extends ChangeNotifier
       ) ==
       true;
 
-  bool _mayUseCloudReading(SourceRuntimeHandle handle) {
-    if (handle.runtime.engine != null) {
-      return _declares(handle, 'loadReadingProgress');
-    }
-    // The inspector derives this hint from the actual function declaration.
-    // Legacy catalogs need no network initialization just to retain local mode.
-    return host
-            .definitionFor(handle.sourceKey)
-            .presentation['__hostCloudReading'] ==
-        true;
-  }
+  bool _mayUseCloudReading(SourceRuntimeHandle handle) =>
+      handle.runtime.engine != null
+      ? _declares(handle, 'loadReadingProgress')
+      : host
+                .definitionFor(handle.sourceKey)
+                .presentation['__hostCloudReading'] ==
+            true;
 
   @override
-  Future<bool> usesCloudReading(String sourceKey) async {
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     if (!host.runtimeRegistry.isAllowedSourceKey(sourceKey)) return false;
-    final handle = host.handleFor(sourceKey);
-    if (!_mayUseCloudReading(handle)) return false;
-    return _declares(await _ready(sourceKey), 'loadReadingProgress');
-  }
-
-  void _check(SourceRuntimeHandle h, int generation) {
-    if (generation != _generation ||
-        h.isDisposed ||
-        !host.isCurrentHandle(h) ||
-        h.sourceKey != host.activeSourceKey ||
-        h.session.loginIdentity != _identity) {
-      throw StateError('cloud_reading_session_changed');
-    }
+    final owner = host.handleFor(sourceKey);
+    if (!_mayUseCloudReading(owner)) return false;
+    return _read(
+      sourceKey,
+      'cloud.capability',
+      taskOrigin,
+      (session, context) async =>
+          _declares(session.owner, 'loadReadingProgress'),
+    );
   }
 
   @override
   Future<Map<String, dynamic>?> loadCloudReadingProgress(
     String sourceKey,
-    String comicId,
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  }) => _read(sourceKey, 'cloud.progress', taskOrigin, (
+    session,
+    context,
   ) async {
-    final h = await _ready(sourceKey);
-    if (!_declares(h, 'loadReadingProgress')) {
+    if (!_declares(session.owner, 'loadReadingProgress')) {
       throw StateError('cloud_reading_not_supported');
     }
-    if (h.session.loginIdentity == null) {
+    if (session.identity == null) {
       throw StateError('cloud_reading_login_required');
     }
-    final generation = _generation;
-    final raw = await _invoke(h, generation, 'loadReadingProgress', comicId);
-    _check(h, generation);
+    final raw = await session.invoke(context, 'loadReadingProgress', comicId);
+    context.checkActive();
+    session.checkActive();
     return raw == null ? null : parseCloudReadingProgress(raw);
-  }
+  });
 
   @override
   Future<List<ExploreComic>> refreshCloudReadingHistory(
-    String sourceKey,
-  ) async {
-    if (_disposed) throw StateError('cloud_reading_disposed');
-    if (!host.runtimeRegistry.isAllowedSourceKey(sourceKey) ||
-        sourceKey != host.activeSourceKey) {
-      throw StateError('cloud_reading_source_changed');
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
+    if (_disposed ||
+        sourceKey != host.activeSourceKey ||
+        !host.runtimeRegistry.isAllowedSourceKey(sourceKey)) {
+      throw const SourceTaskCancelled(
+        'cloud.history',
+        SourceTaskStopReason.sourceChanged,
+      );
     }
-    final handle = host.handleFor(sourceKey);
-    if (!_mayUseCloudReading(handle) ||
-        (handle.runtime.engine != null &&
-            !_declares(handle, 'loadReadingHistory'))) {
+    final owner = host.handleFor(sourceKey);
+    if (!_mayUseCloudReading(owner) ||
+        (owner.runtime.engine != null &&
+            !_declares(owner, 'loadReadingHistory'))) {
       return const [];
     }
-    await handle.session.ensurePrefs();
-    if (handle.session.loginIdentity == null) return const [];
-    final h = await _ready(sourceKey);
-    if (h.session.loginIdentity == null ||
-        !_declares(h, 'loadReadingProgress') ||
-        !_declares(h, 'loadReadingHistory')) {
-      return const [];
-    }
-    final pending = _importing;
-    if (pending != null) return pending;
-    final generation = _generation;
-    final work = _loadHistory(h, generation);
-    _importing = work;
-    try {
-      return await work;
-    } catch (_) {
-      _check(h, generation);
-      // Cache is allowed for display, never for position restoration.
-      return List.unmodifiable(_history);
-    } finally {
-      if (identical(_importing, work)) _importing = null;
-    }
+    await owner.session.ensurePrefs();
+    if (owner.session.loginIdentity == null) return const [];
+    return _read(sourceKey, 'cloud.history', taskOrigin, (
+      session,
+      context,
+    ) async {
+      if (!_declares(owner, 'loadReadingProgress') ||
+          !_declares(owner, 'loadReadingHistory')) {
+        return const [];
+      }
+      var pending = _importing;
+      if (pending == null || !pending.available) {
+        late final SourceSharedRequest<List<ExploreComic>> created;
+        created = SourceSharedRequest<List<ExploreComic>>(
+          pluginId: sourceKey,
+          method: 'cloud.history.producer',
+          drainOperationOnStop: true,
+          onUnavailable: () {
+            if (identical(_importing, created)) _importing = null;
+          },
+          operation: (request) async {
+            SourceOperationContext? producer;
+            try {
+              return await runSourceOperation(
+                host,
+                owner,
+                'cloud.history.pages',
+                (task) {
+                  producer = task;
+                  session.attach(task);
+                  return _loadHistory(session, task);
+                },
+                origin: SourceTaskOrigin(
+                  ownerId: request.resourceId,
+                  groupId: request.resourceId,
+                  requestSequence: 0,
+                  cancellation: request.cancellation,
+                ),
+              );
+            } finally {
+              if (producer != null) await session.release(producer!.task);
+            }
+          },
+        );
+        _importing = pending = created;
+      }
+      try {
+        return await pending.subscribe(task: context.task);
+      } catch (error) {
+        rethrowSourceOperationStop(error);
+        session.checkActive();
+        context.checkActive();
+        return List.unmodifiable(_history);
+      }
+    });
   }
 
   Future<List<ExploreComic>> _loadHistory(
-    SourceRuntimeHandle h,
-    int generation,
+    SourceCloudReadingSession session,
+    SourceOperationContext context,
   ) async {
     final items = <String, (ExploreComic, int)>{};
     for (var page = 1; ; page++) {
-      _check(h, generation);
-      final raw = await _invoke(h, generation, 'loadReadingHistory', page);
-      _check(h, generation);
+      session.checkActive();
+      context.checkActive();
+      final raw = await session.invoke(context, 'loadReadingHistory', page);
+      session.checkActive();
+      context.checkActive();
       if (raw is! Map || raw['items'] is! List) {
         throw const FormatException('cloud_reading_invalid_history');
       }
@@ -363,7 +403,7 @@ class SourceCloudReadingCapability extends ChangeNotifier
             title: comic['title'] as String,
             subTitle: comic['subTitle']?.toString() ?? '',
             cover: comic['cover']?.toString() ?? '',
-            sourceKey: h.sourceKey,
+            sourceKey: session.owner.sourceKey,
             tags:
                 (comic['tags'] as List?)?.map((v) => v.toString()).toList() ??
                 const [],
@@ -374,7 +414,8 @@ class SourceCloudReadingCapability extends ChangeNotifier
       if (list.isEmpty || (max is int && page >= max)) break;
     }
     final ordered = items.values.toList()..sort((a, b) => b.$2.compareTo(a.$2));
-    _check(h, generation);
+    session.checkActive();
+    context.checkActive();
     _history
       ..clear()
       ..addAll(ordered.map((v) => v.$1));

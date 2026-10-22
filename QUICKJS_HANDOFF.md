@@ -2,9 +2,24 @@
 
 更新时间：2026-10-22。项目：`D:\Project\Hazuki`，Windows / PowerShell。
 
-## 第六批最新状态（优先）
+## 第七批最新状态（优先）
 
-第三阶段第六批 **下载任务取消与文件收尾** 已在工作区实现，HEAD 为 `dev / f6d11c9e`。第五批已提交；本批接手时工作区干净，没有覆盖既有修改，没有创建提交或 PR。最新验证见 `QUICKJS_DOWNLOAD_TASK_CONTROL_VALIDATION.md`，第五批及以下章节为历史基线。
+第七批 **云阅读私有会话与进度上传任务化** 按 Claude 修订版计划实施，基线为 `dev / 5265b54e`。第六批已提交为 `c97aad1f`，此前“尚未提交”的描述已更正。第七批最终结果和重点场景测试映射见 [第七批验收记录](QUICKJS_CLOUD_READING_TASK_CONTROL_VALIDATION.md)，范围依据见 [修订计划](QUICKJS_CLOUD_READING_TASK_CONTROL_PLAN.md)。
+
+- 私有初始化和云历史按独立生产者/逐消费者共享，单个读取取消不关闭主 engine 或共享 Dio；私有实例关闭可等待。`_ready()` 只在 source、账号或实际主 handle 变化时退役；普通错误保留同会话历史缓存降级，结构化停止优先。
+- 历史页、详情进度、打开阅读器前的云位置和阅读器能力检查接入生命周期。详情监听与单次读取使用不同分组。切源立即停止云读取，私有暂存存储始终丢弃；云位置不写本地进度库或 WebDAV。
+- 上传在首个异步间隙前检查登录、深冻结数据、捕获实际 handle/账号、取得服务租约并登记任务。退出、换章和切源后，已接纳项继续原主运行时 FIFO，不恢复旧交互权限。统一 `_retainsSource` 管理阅读/下载/上传，原释放条件保持不变。
+- **30 秒预算从该笔轮到执行时开始，排队时间不计入**；排队仍可被账号/catalog 等生命周期撤销。超时保持 `SourceTaskTimedOut` / `timedOut`，收尾后释放租约并推进后项。普通失败容错但记录 failed，结构化停止向外传播。
+- 非活动账号与旧实例同样受撤销；执行及宿主提交前核验身份。content / assembly 提供 `whenSettled`，销毁后停止接纳并等待专属工作和已开始提交；服务器已接收的写入不承诺回滚。
+- 本批新增 24 项回归；私有会话、共享历史、上传预算/FIFO/数据冻结、真实 loader 和页面生命周期重点场景已映射到验收文档。最终格式检查 886 文件、0 变化，静态分析无问题，**1205 项针对性回归通过**；完整覆盖率 **2090 项通过、1 项既有导航厚度断言失败**（期望 10、实际 72.0）。Windows debug（30.8 秒）、Android debug（25.9 秒）顺序构建通过；没有修改导航 UI 或断言，**完整应用验收尚未全绿**。
+
+本批按用户要求作为一个 Conventional Commit：`feat(source): control cloud reading sessions and progress uploads`；`CLAUDE.md`、`lib/features/search/view/search_bar_shell.dart`、`test/features/search/search_bar_shell_test.dart` 是接手时的既有修改，保留并排除在本批提交之外。没有修改原生包、依赖、assets、UI 或动画，没有新增自动重放。健康判定、自动恢复及最终设备验收留后续。
+
+接手先读 `AGENTS.md`、本节、修订计划及验收记录，再核对 `git status --short` 与 `git log -3 --oneline`。测试场景映射在第七批验收记录的“重点场景与具体测试”表；以下章节均为历史快照。
+
+## 第六批已提交基线（历史）
+
+第三阶段第六批 **下载任务取消与文件收尾** 已提交为 `c97aad1f feat(download): implement cancellable download tasks and file finalization`。以下验证描述第六批实施时点；当时基线为 `f6d11c9e`，工作区干净。最新验证见 `QUICKJS_DOWNLOAD_TASK_CONTROL_VALIDATION.md`，第五批及以下章节为历史基线。
 
 - 下载服务显式注入任务控制，每个 storageKey 的每次执行使用新 group、取消信号和下载会话；章节、封面、图片准备及原始图片子订阅贯通 origin。阅读与下载租约独立，切源保留有效下载，停用/更新暂停旧运行并等待用户手动恢复。
 - 暂停/恢复、删除、覆盖重下经过逐 key 收尾屏障；保存目录切换经过全局屏障。删除已下载漫画保留暂停任务并清除对应完成标记；删除任务保留完整章节，失败恢复暂停任务并返回错误。
@@ -14,7 +29,7 @@
 
 接手先读 `AGENTS.md`、本节和第六批验收记录，再核对 `git status --short` 与 `git log -3 --oneline`。本批新增 `manga_download_run.dart` 与 `manga_download_task_lifetime_test.dart`，既有图片任务取消回归增加下载会话场景，均须保留。
 
-下一批规划云阅读私有会话任务化；健康判定/自动恢复及最终设备验收继续后续实施。本批没有授权自动重放。
+云阅读私有会话任务化已在第七批实现；健康判定/自动恢复及最终设备验收继续后续实施。本批没有授权自动重放。
 
 ## 第五批已提交基线
 
@@ -29,9 +44,9 @@
 - 封面/头像组件及封面预取接入订阅释放，首帧、占位及动画参数保持原样。未修改导航厚度断言，完整验收仍须明确记录基线失败。
 - 下载暂停/删除、云阅读私有会话任务化、健康判定/自动恢复及最终设备验收留后续；没有修改原生包、依赖、assets 或 CI。
 
-新对话先读 `AGENTS.md`、本节及第五批验收记录，再执行 `git status --short` 和 `git log -3 --oneline`。第五批已在 HEAD；本次第六批修改尚在工作区，保留所有新增测试与文档。优先入口为图片缓存/调度/下载器、`SourceSharedRequest`、`SourceReaderSession`、runtime host 和阅读图片流水线；新回归为 `source_image_task_cancellation_test.dart`、`reader_task_lifetime_test.dart` 与 `comic_cover_task_lifetime_test.dart`。
+新对话先读 `AGENTS.md`、本节及第五批验收记录，再执行 `git status --short` 和 `git log -3 --oneline`。第五批和第六批均已提交，保留所有新增测试与文档。优先入口为图片缓存/调度/下载器、`SourceSharedRequest`、`SourceReaderSession`、runtime host 和阅读图片流水线；新回归为 `source_image_task_cancellation_test.dart`、`reader_task_lifetime_test.dart` 与 `comic_cover_task_lifetime_test.dart`。
 
-第五批历史交接建议先规划下载暂停/删除与文件收尾，该项现已在第六批工作区实现；后续范围以上方第六批状态为准。
+第五批历史交接建议先规划下载暂停/删除与文件收尾，该项已在第六批提交；后续范围以上方最新状态为准。
 
 **以下是第四批历史交接快照。其“当前状态”“未实施”“下一步”只描述第四批交接时点，第五批状态和验证以上方及新验收记录为准。**
 

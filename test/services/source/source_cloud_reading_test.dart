@@ -13,6 +13,7 @@ import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hazuki/services/source/models/source_task.dart';
 
 class _Operations extends Fake implements SourceRuntimeOperations {
   Future<void>? delay;
@@ -160,7 +161,10 @@ void main() {
         'globalThis.__hazuki_source.comic.loadReadingProgress=()=>null',
       );
       final pending = cloud.usesCloudReading('sample');
-      final assertion = expectLater(pending, throwsStateError);
+      final assertion = expectLater(
+        pending,
+        throwsA(isA<SourceTaskCancelled>()),
+      );
       await host.replaceCatalog(const []);
       waiting.complete();
       await assertion;
@@ -199,7 +203,7 @@ void main() {
     );
     await login('first');
     final pending = cloud.loadCloudReadingProgress('sample', 'c');
-    final assertion = expectLater(pending, throwsStateError);
+    final assertion = expectLater(pending, throwsA(isA<SourceTaskCancelled>()));
     await Future<void>.delayed(Duration.zero);
     await login('second');
     delayed.complete({'chapterId': 'old', 'page': 30});
@@ -261,7 +265,10 @@ void main() {
         );
         await login('first');
         final pending = cloud.loadCloudReadingProgress('sample', 'c');
-        final assertion = expectLater(pending, throwsStateError);
+        final assertion = expectLater(
+          pending,
+          throwsA(isA<SourceTaskCancelled>()),
+        );
         await http.started.future;
         if (logout) {
           await SourceAccountSessionCapability(runtimeHost: host).logout();

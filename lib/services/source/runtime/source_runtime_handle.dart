@@ -19,6 +19,7 @@ import 'source_runtime_kernel.dart';
 import 'source_secure_session_storage.dart';
 import 'source_script_engine.dart';
 import 'source_task_registry.dart';
+import 'source_runtime_load_control.dart';
 import 'source_session_store.dart';
 import '../account/source_login_interaction.dart';
 import '../interaction/source_ui_service.dart';
@@ -65,6 +66,8 @@ class SourceRuntimeHandle
   String? pluginDirectory;
   SourceLoginPresenter? loginPresenter;
   SourceLoginCancellation? loginCancellation;
+  SourceRuntimeLoadControl? loadControl;
+  final Map<String, void Function()> hostExecutionGuards = {};
   final Future<void> Function(String sourceKey) _ensureInitialized;
   final void Function(String sourceKey) _notifyRuntimeStateChanged;
   final Dio dio = _createSourceDio();
@@ -290,6 +293,7 @@ class SourceRuntimeHandle
       },
     );
     _whenDisposed.future.ignore();
+    hostExecutionGuards.clear();
     session.clearMemory();
     cache.clearMemory();
     htmlBridge.clear();

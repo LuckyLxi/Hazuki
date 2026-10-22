@@ -463,6 +463,13 @@ class SourceRuntimeAssembly {
     return comics;
   }
 
+  Future<void> get whenSettled {
+    final content = _contentOperations;
+    return content is SourceContentOperationService
+        ? content.whenSettled
+        : Future.value();
+  }
+
   void dispose() {
     final content = _contentOperations;
     if (content is SourceContentOperationService) content.dispose();

@@ -39,9 +39,7 @@ class SourceRuntimeHost extends ChangeNotifier {
       defaultSourceKey: defaultSourceKey,
       createHandle: _createHandle,
       onActiveSourceChanged: _notifyChanged,
-      retainOnSourceChange: (key) =>
-          _readerSessions.any((session) => session.sourceKey == key) ||
-          _downloadSessions.keys.any((session) => session.sourceKey == key),
+      retainOnSourceChange: _retainsSource,
     );
     runtimeRegistry = SourceRuntimeRegistry(
       allowedSources: _catalog,
@@ -71,6 +69,40 @@ class SourceRuntimeHost extends ChangeNotifier {
 
   final Map<SourceDownloadSession, SourceRuntimeHandle> _downloadSessions = {};
 
+  final Map<SourceServiceRuntimeLease, SourceRuntimeHandle> _serviceLeases = {};
+  bool _retainsSource(String key) =>
+      _readerSessions.any((entry) => entry.sourceKey == key) ||
+      _downloadSessions.keys.any((entry) => entry.sourceKey == key) ||
+      _serviceLeases.keys.any((entry) => entry.sourceKey == key);
+
+  SourceServiceRuntimeLease acquireServiceRuntimeLease(
+    SourceRuntimeHandle handle,
+  ) {
+    tasks.checkResourceActive(handle);
+    if (!isCurrentHandle(handle)) {
+      throw const SourceTaskCancelled(
+        'service.lease',
+        SourceTaskStopReason.runtimeClosed,
+      );
+    }
+    late final SourceServiceRuntimeLease lease;
+    lease = SourceServiceRuntimeLease(handle.sourceKey, () {
+      final held = _serviceLeases.remove(lease);
+      final reason = lease.cancellation.reason;
+      if (held != null &&
+          isCurrentHandle(held) &&
+          held.sourceKey != activeSourceKey &&
+          !_retainsSource(held.sourceKey) &&
+          reason != SourceTaskStopReason.pluginDisabled &&
+          reason != SourceTaskStopReason.pluginUpdated &&
+          reason != SourceTaskStopReason.runtimeClosed) {
+        _coordinator.remove(held.sourceKey);
+      }
+    }, resource: () => _serviceLeases[lease]);
+    _serviceLeases[lease] = handle;
+    return lease;
+  }
+
   SourceDownloadSession acquireDownloadSession(String sourceKey) {
     if (sourceKey.trim().isNotEmpty &&
         !_catalog.any((entry) => entry.normalizedKey == sourceKey.trim())) {
@@ -88,8 +120,7 @@ class SourceRuntimeHost extends ChangeNotifier {
       if (held != null &&
           isCurrentHandle(held) &&
           key != activeSourceKey &&
-          !_readerSessions.any((entry) => entry.sourceKey == key) &&
-          !_downloadSessions.keys.any((entry) => entry.sourceKey == key) &&
+          !_retainsSource(key) &&
           session.cancellation.reason != SourceTaskStopReason.pluginDisabled &&
           session.cancellation.reason != SourceTaskStopReason.pluginUpdated &&
           session.cancellation.reason != SourceTaskStopReason.runtimeClosed) {
@@ -128,10 +159,7 @@ class SourceRuntimeHost extends ChangeNotifier {
           reason == SourceTaskStopReason.pluginDisabled ||
           reason == SourceTaskStopReason.pluginUpdated ||
           reason == SourceTaskStopReason.runtimeClosed;
-      if (!retiring &&
-          key != activeSourceKey &&
-          !_readerSessions.any((entry) => entry.sourceKey == key) &&
-          !_downloadSessions.keys.any((entry) => entry.sourceKey == key)) {
+      if (!retiring && key != activeSourceKey && !_retainsSource(key)) {
         _coordinator.remove(key);
       }
     });
@@ -140,6 +168,14 @@ class SourceRuntimeHost extends ChangeNotifier {
   }
 
   void checkReaderSession(String key, SourceTaskOrigin? origin) {
+    final service = origin?.serviceLease;
+    if (service != null) {
+      service.checkActive();
+      if (service.sourceKey != key) {
+        throw StateError('source_service_lease_mismatch');
+      }
+      service.checkResource(handleFor(key));
+    }
     final download = origin?.downloadSession;
     if (download != null) {
       download.checkActive();
@@ -289,6 +325,9 @@ class SourceRuntimeHost extends ChangeNotifier {
             for (final entry in _downloadSessions.entries.toList()) {
               if (identical(entry.value, handle)) entry.key.close(reason);
             }
+            for (final entry in _serviceLeases.entries.toList()) {
+              if (identical(entry.value, handle)) entry.key.close(reason);
+            }
             await stopped;
           }
         }
@@ -358,6 +397,9 @@ class SourceRuntimeHost extends ChangeNotifier {
     }
     for (final session in _downloadSessions.keys.toList()) {
       session.close(SourceTaskStopReason.runtimeClosed);
+    }
+    for (final lease in _serviceLeases.keys.toList()) {
+      lease.close(SourceTaskStopReason.runtimeClosed);
     }
     tasks.dispose();
     for (final source in _catalog) {

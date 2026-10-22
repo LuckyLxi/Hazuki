@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:hazuki/shared/source_task_owner.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -11,6 +13,7 @@ import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class ComicDetailSessionController extends ChangeNotifier {
   ComicDetailSessionController({
+    SourceTaskControlGateway? taskControl,
     required ComicDetailFeatureFacade repository,
     required ExploreComic comic,
     required String sourceKey,
@@ -19,7 +22,9 @@ class ComicDetailSessionController extends ChangeNotifier {
       required bool cloudFavoriteOverride,
     })
     applyInitialFavoriteOverrides,
-  }) : _repository = repository,
+  }) : _progressTasks = SourceTaskOwner(taskControl),
+       _progressWatchTasks = SourceTaskOwner(taskControl),
+       _repository = repository,
        _comic = comic,
        _sourceKey = sourceKey,
        _applyInitialFavoriteOverrides = applyInitialFavoriteOverrides;
@@ -35,6 +40,8 @@ class ComicDetailSessionController extends ChangeNotifier {
 
   bool _disposed = false;
   final _sourceUi = SourceUiOwner();
+  final SourceTaskOwner _progressTasks;
+  final SourceTaskOwner _progressWatchTasks;
 
   late Future<ComicDetailsData> _future;
   Timer? _detailsTimeoutTimer;
@@ -56,7 +63,7 @@ class ComicDetailSessionController extends ChangeNotifier {
     unawaited(_sourceUi.runBackground(_warmupReaderImages));
     // Route return can precede the reader's asynchronous exit save.
     _readingProgressSubscription = _repository
-        .watchReadingProgressChanges()
+        .watchReadingProgressChanges(taskOrigin: _progressWatchTasks.origin())
         .listen(
           (_) => unawaited(loadReadingProgress()),
           onError: (Object _) {},
@@ -82,8 +89,10 @@ class ComicDetailSessionController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _sourceUi.dispose();
     _disposed = true;
+    _progressTasks.dispose();
+    _progressWatchTasks.dispose();
+    _sourceUi.dispose();
     unawaited(_readingProgressSubscription?.cancel());
     _detailsTimeoutTimer?.cancel();
     _detailsTimeoutTimer = null;
@@ -91,10 +100,16 @@ class ComicDetailSessionController extends ChangeNotifier {
   }
 
   Future<void> loadReadingProgress() async {
+    if (_disposed) return;
     final request = ++_readingRequestId;
     _lastReadProgress = null;
+    _progressTasks.restart();
+    final origin = _progressTasks.origin();
     try {
-      final progress = await _repository.loadReadingProgress(_comic.id);
+      final progress = await _repository.loadReadingProgress(
+        _comic.id,
+        taskOrigin: origin,
+      );
       if (_disposed || request != _readingRequestId) return;
       _lastReadProgress = progress;
       notifyListeners();

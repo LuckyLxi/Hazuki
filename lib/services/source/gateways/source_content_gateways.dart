@@ -315,5 +315,6 @@ abstract interface class SourceReadingProgressGateway {
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {
     required String sourceKey,
+    SourceTaskOrigin? taskOrigin,
   });
 }

@@ -32,6 +32,7 @@ enum SourceTaskStopReason {
   executionTimeout,
   runtimeClosed,
   downloadPaused,
+  accountChanged,
 }
 
 class SourceTaskCancelled implements Exception {
@@ -80,6 +81,7 @@ class SourceTaskOrigin {
     this.workTimeout,
     this.readerSession,
     this.downloadSession,
+    this.serviceLease,
     this.retainOnSourceChange = false,
   });
 
@@ -96,6 +98,7 @@ class SourceTaskOrigin {
   final Duration? workTimeout;
   final SourceReaderSession? readerSession;
   final SourceDownloadSession? downloadSession;
+  final SourceServiceRuntimeLease? serviceLease;
   final bool retainOnSourceChange;
 
   /// Observes result usefulness without changing execution or cancellation.
@@ -143,6 +146,11 @@ class SourceDownloadSession extends SourceReaderSession {
       throw SourceTaskCancelled(id, SourceTaskStopReason.runtimeClosed);
     }
   }
+}
+
+/// Host-only lease for already admitted service writes, including queue waits.
+class SourceServiceRuntimeLease extends SourceDownloadSession {
+  SourceServiceRuntimeLease(super.sourceKey, super.release, {super.resource});
 }
 
 class SourceTaskSnapshot {
