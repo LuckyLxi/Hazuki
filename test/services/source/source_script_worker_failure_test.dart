@@ -63,6 +63,28 @@ void main() {
     },
   );
 
+  test(
+    'calls racing the worker control shutdown still receive the typed failure',
+    () async {
+      final engine = SourceScriptEngine();
+      addTearDown(() => _closeQuietly(engine));
+      await engine.ready;
+      engine.debugInjectFault('internalJob');
+      // worker 发出 failed 后同步关闭控制表。主 isolate 同步占住，确保在处理
+      // failed 消息前（微任务先于端口消息）注册新命令的 token。
+      final clock = Stopwatch()..start();
+      while (clock.elapsedMilliseconds < 300) {}
+      final racing = engine.evaluate('1', execution: execution('race'));
+      await expectLater(
+        racing,
+        throwsA(
+          _failedWith(SourceRuntimeFailureKind.internalJob, taskId: 'race'),
+        ),
+      );
+      expect(engine.failure, isNotNull);
+    },
+  );
+
   test('normal close never reports a runtime failure', () async {
     final engine = SourceScriptEngine();
     await engine.ready;

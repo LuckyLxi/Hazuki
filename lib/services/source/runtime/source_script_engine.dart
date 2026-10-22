@@ -544,7 +544,20 @@ class SourceScriptEngine {
       _pending.remove(id);
       throw _stopped(context);
     }
-    final token = _control!.register();
+    final int token;
+    try {
+      token = _control!.register();
+    } on StateError {
+      // worker 发出 failed 后会同步关闭控制表；本侧尚未处理该消息时注册失败，
+      // 须等到故障或关闭结论再结算，不能以裸 StateError 绕过故障类型。
+      _pending.remove(id);
+      await Future.any<void>([
+        _failed.future.then((_) {}),
+        _closed.future.then((_) {}, onError: (Object _) {}),
+      ]);
+      _checkOpen(context);
+      throw StateError('source_script_engine_closed');
+    }
     _callExecutions[id] = context;
     _callTokens[id] = token;
     _tokenExecutions[token] = context;

@@ -251,6 +251,9 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   Future<void> _prewarmSourceRuntime(BuildContext context) async {
+    // start() 由首页 initState 调用，处于构建阶段；预热会在首个 await 前同步
+    // 发出运行时状态通知。帧内构建同步执行，微任务在其结束后才运行。
+    await Future<void>.microtask(() {});
     try {
       await _sourceService.prewarmInBackground();
     } catch (_) {

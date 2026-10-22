@@ -113,6 +113,28 @@ void main() {
   );
 
   test(
+    'repeated requests for an unchanged position do not prefetch again',
+    () async {
+      // 滚动通知按帧触发，位置未变时不应反复发起同一批预取。
+      for (var i = 0; i < 20; i++) {
+        scheduler.requestPrefetchAhead(0);
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(downloads, ['2', '3', '4', '5', '6', '7']);
+
+      scheduler.requestPrefetchAhead(1);
+      await Future<void>.delayed(Duration.zero);
+      expect(downloads.skip(6), ['4', '5', '6', '7', '8', '9']);
+
+      // 换章（新代次）后同一位置重新预取。
+      state.resetForImages(images);
+      scheduler.requestPrefetchAhead(1);
+      await Future<void>.delayed(Duration.zero);
+      expect(downloads, hasLength(18));
+    },
+  );
+
+  test(
     'local and blank URLs skip network prefetch and errors stay best effort',
     () async {
       images = ['0', '1', 'local:2', '', '4'];

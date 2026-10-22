@@ -22,6 +22,32 @@ class _Recommendations extends Mock
 
 class _Announcements extends Mock implements AnnouncementController {}
 
+class _RuntimeScope extends InheritedNotifier<ValueNotifier<int>> {
+  const _RuntimeScope({required super.notifier, required super.child});
+}
+
+class _StartOnInit extends StatefulWidget {
+  const _StartOnInit({required this.coordinator});
+  final HomeCoordinator coordinator;
+
+  @override
+  State<_StartOnInit> createState() => _StartOnInitState();
+}
+
+class _StartOnInitState extends State<_StartOnInit> {
+  @override
+  void initState() {
+    super.initState();
+    widget.coordinator.start(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    context.dependOnInheritedWidgetOfExactType<_RuntimeScope>();
+    return const SizedBox();
+  }
+}
+
 void main() {
   for (final publishReady in [true, false]) {
     testWidgets(
@@ -119,6 +145,61 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'starting from initState does not notify runtime listeners during build',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final source = _Source();
+      final recommendations = _Recommendations();
+      // 模拟真实预热：在首个 await 之前同步发出运行时状态通知。
+      final runtime = ValueNotifier<int>(0);
+      addTearDown(runtime.dispose);
+      when(() => source.addListener(any())).thenAnswer((_) {});
+      when(() => source.activeSourceKey).thenReturn('source');
+      when(() => source.isInitialized).thenReturn(true);
+      when(() => source.isLogged).thenReturn(false);
+      when(() => source.currentAccount).thenReturn(null);
+      when(() => source.isActiveDailyCheckInSource).thenReturn(false);
+      when(
+        () => source.runtimeState,
+      ).thenReturn(const SourceRuntimeState.idle());
+      when(source.loadActiveSourcePreference).thenAnswer((_) async {});
+      when(source.prewarmInBackground).thenAnswer((_) {
+        runtime.value++;
+        return Future.value();
+      });
+      when(recommendations.loadEnabled).thenAnswer((_) async => false);
+      when(() => recommendations.ensurePrepared(enabled: false)).thenAnswer(
+        (_) async => const DiscoverDailyRecommendationState.disabled(),
+      );
+      final coordinator = HomeCoordinator(
+        initialTabIndex: 0,
+        sourceService: source,
+        sourceSwitchService: _Switch(),
+        imageService: _Images(),
+        dailyRecommendationService: recommendations,
+        announcementService: _Announcements(),
+        taskControl: FakeSourceTaskControl(),
+      );
+      addTearDown(coordinator.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: _RuntimeScope(
+            notifier: runtime,
+            child: _StartOnInit(coordinator: coordinator),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      verify(source.prewarmInBackground).called(1);
+      expect(runtime.value, 1);
+      await tester.pump(const Duration(seconds: 4));
+    },
+  );
 
   for (final succeeds in [true, false]) {
     testWidgets('startup profile follows initialization success=$succeeds', (
