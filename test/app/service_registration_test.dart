@@ -10,6 +10,9 @@ import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/translation/manga_translation_provider_factory.dart';
+import 'package:hazuki/services/translation/manga_translation_settings_store.dart';
+import 'package:hazuki/services/translation/translation_response_parser.dart';
 
 void main() {
   test('registers the service graph in an isolated locator', () async {
@@ -22,6 +25,21 @@ void main() {
     expect(services.isRegistered<SourceSearchGateway>(), isTrue);
     expect(services.isRegistered<LocalFavoritesRepository>(), isTrue);
     expect(services.isRegistered<CloudSyncService>(), isTrue);
+    expect(services.isRegistered<MangaTranslationSettingsStore>(), isTrue);
+    expect(services.isRegistered<MangaTranslationProviderFactory>(), isTrue);
+    expect(services.isRegistered<TranslationResponseParser>(), isTrue);
+    expect(
+      services<MangaTranslationSettingsStore>(),
+      same(services<MangaTranslationSettingsStore>()),
+    );
+    expect(
+      services<MangaTranslationProviderFactory>(),
+      same(services<MangaTranslationProviderFactory>()),
+    );
+    expect(
+      services<TranslationResponseParser>(),
+      same(services<TranslationResponseParser>()),
+    );
     expect(
       services<CommentFilterSyncStore>(),
       same(services<CommentFilterService>()),
