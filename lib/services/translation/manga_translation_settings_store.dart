@@ -17,6 +17,9 @@ enum TranslationBubbleStyle { sampled, white }
 
 enum TranslationReasoningEffort { providerDefault, low, medium, high }
 
+/// 文字区域的定位方式：本地模型检测，或交给 AI 直接返回坐标。
+enum TranslationTextLocator { detector, ai }
+
 enum TranslationTargetLanguage {
   simplifiedChinese('zh-Hans', 'Simplified Chinese'),
   traditionalChinese('zh-Hant', 'Traditional Chinese'),
@@ -82,6 +85,8 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
   TranslationBubbleStyle _bubbleStyle = TranslationBubbleStyle.sampled;
   bool _translateSfx = false;
   String _customSystemPrompt = '';
+  TranslationTextLocator _textLocator = TranslationTextLocator.detector;
+  String? _detectorModelId;
   final _configurations = {
     for (final preset in TranslationProviderPreset.values)
       preset: TranslationProviderConfiguration(baseUrl: preset.defaultBaseUrl),
@@ -95,6 +100,8 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
   TranslationBubbleStyle get bubbleStyle => _bubbleStyle;
   bool get translateSfx => _translateSfx;
   String get customSystemPrompt => _customSystemPrompt;
+  TranslationTextLocator get textLocator => _textLocator;
+  String? get detectorModelId => _detectorModelId;
   TranslationProviderConfiguration configurationFor(
     TranslationProviderPreset preset,
   ) => _configurations[preset]!;
@@ -153,6 +160,11 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
     _translateSfx = prefs.getBool('${_prefix}translate_sfx') ?? false;
     _customSystemPrompt =
         prefs.getString('${_prefix}custom_system_prompt') ?? '';
+    _textLocator = TranslationTextLocator.values.firstWhere(
+      (value) => value.name == prefs.getString('${_prefix}text_locator'),
+      orElse: () => TranslationTextLocator.detector,
+    );
+    _detectorModelId = prefs.getString('${_prefix}detector_model');
     notifyListeners();
   }
 
@@ -269,6 +281,24 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
     await load();
     await _prefs.setBool('${_prefix}translate_sfx', value);
     _translateSfx = value;
+    notifyListeners();
+  }
+
+  Future<void> setTextLocator(TranslationTextLocator value) async {
+    await load();
+    await _prefs.setString('${_prefix}text_locator', value.name);
+    _textLocator = value;
+    notifyListeners();
+  }
+
+  Future<void> setDetectorModelId(String? value) async {
+    await load();
+    if (value == null) {
+      await _prefs.remove('${_prefix}detector_model');
+    } else {
+      await _prefs.setString('${_prefix}detector_model', value);
+    }
+    _detectorModelId = value;
     notifyListeners();
   }
 }

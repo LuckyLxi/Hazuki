@@ -69,6 +69,8 @@ dependencies:
   get_it: ^9.3.0
   flutter_secure_storage: ^10.3.4
   image: ^4.12.0
+  archive: ^4.5.2
+  onnxruntime_v2: 1.23.2+2
 
 dev_dependencies:
   flutter_test:

@@ -14,6 +14,7 @@ import '../../../../services/translation/translation_prompt.dart';
 import '../../../../shared/translation/translation_failure_message.dart';
 import '../../../../shared/translation/translation_confirmation_dialog.dart';
 import '../settings_group.dart';
+import 'translation_detector_group.dart';
 import 'translation_usage_group.dart';
 
 class MangaTranslationSettingsPage extends StatefulWidget {
@@ -47,6 +48,7 @@ class _MangaTranslationSettingsPageState
   Future<void> _load() async {
     try {
       await _settings.load();
+      await widget.dependencies.models.load();
       final bytes = await widget.dependencies.cache.sizeBytes();
       if (!mounted) return;
       _syncFields();
@@ -390,6 +392,10 @@ class _MangaTranslationSettingsPageState
                             ),
                           ),
                         ],
+                      ),
+                      TranslationDetectorGroup(
+                        settings: _settings,
+                        models: widget.dependencies.models,
                       ),
                       SettingsGroup(
                         children: [

@@ -5,10 +5,12 @@ import '../../services/translation/translation_glossary_store.dart';
 import '../../services/translation/translation_response_parser.dart';
 import '../../services/translation/translation_result_cache.dart';
 import '../../services/translation/translation_usage_store.dart';
+import '../../services/translation/detection/translation_detector_model_store.dart';
 
 class MangaTranslationDependencies {
   const MangaTranslationDependencies({
     required this.settings,
+    required this.models,
     required this.service,
     required this.providers,
     required this.cache,
@@ -17,6 +19,7 @@ class MangaTranslationDependencies {
     required this.usage,
   });
   final MangaTranslationSettingsStore settings;
+  final TranslationDetectorModelStore models;
   final MangaTranslationService service;
   final MangaTranslationProviderFactory providers;
   final TranslationResultCache cache;

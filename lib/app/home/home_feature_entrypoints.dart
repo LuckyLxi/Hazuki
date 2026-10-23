@@ -6,6 +6,7 @@ import '../../services/translation/translation_result_cache.dart';
 import '../../services/translation/translation_glossary_store.dart';
 import '../../services/translation/translation_response_parser.dart';
 import '../../services/translation/translation_usage_store.dart';
+import '../../services/translation/detection/translation_detector_model_store.dart';
 import 'package:hazuki/features/settings/view/plugins/source_plugins_page.dart';
 import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
@@ -119,6 +120,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
   final readerCommentsBuilder = readerCommentsWidgetBuilderFrom(buildComments);
   final translationDependencies = MangaTranslationDependencies(
     settings: sl<MangaTranslationSettingsStore>(),
+    models: sl<TranslationDetectorModelStore>(),
     service: sl<MangaTranslationService>(),
     providers: sl<MangaTranslationProviderFactory>(),
     cache: sl<TranslationResultCache>(),

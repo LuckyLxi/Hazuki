@@ -35,9 +35,18 @@ import '../../services/translation/manga_translation_service.dart';
 import '../../services/translation/imaging/bubble_snapper.dart';
 import '../../services/translation/imaging/translation_image_processor.dart';
 import '../../services/translation/translation_usage_store.dart';
+import '../../services/translation/detection/translation_detector_model_store.dart';
 
 /// Registers application services against their contract-level dependencies.
 void registerApplicationServices(GetIt services) {
+  if (!services.isRegistered<TranslationDetectorModelStore>()) {
+    services.registerLazySingleton<TranslationDetectorModelStore>(
+      () => TranslationDetectorModelStore(
+        settings: services<MangaTranslationSettingsStore>(),
+      ),
+      dispose: (store) => store.dispose(),
+    );
+  }
   if (!services.isRegistered<TranslationUsageStore>()) {
     services.registerLazySingleton<TranslationUsageStore>(
       TranslationUsageStore.new,

@@ -13,6 +13,7 @@ import 'package:hazuki/services/translation/translation_glossary_store.dart';
 import 'package:hazuki/services/translation/translation_response_parser.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:hazuki/services/translation/translation_usage_store.dart';
+import 'package:hazuki/services/translation/detection/translation_detector_model_store.dart';
 
 class _Usage extends TranslationUsageStore {
   @override
@@ -26,17 +27,42 @@ class _Cache extends TranslationResultCache {
   Future<int> sizeBytes() async => 0;
 }
 
+class _Models extends TranslationDetectorModelStore {
+  _Models(MangaTranslationSettingsStore settings) : super(settings: settings);
+
+  final states = <String, DetectorModelState>{};
+  final downloads = <String>[];
+
+  @override
+  Future<void> load() async {}
+
+  @override
+  DetectorModelState stateOf(String id) =>
+      states[id] ?? const DetectorModelState();
+
+  @override
+  Future<void> download(String id) async => downloads.add(id);
+
+  void set(String id, DetectorModelState state) {
+    states[id] = state;
+    notifyListeners();
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late MangaTranslationSettingsStore settings;
+  late _Models models;
   late MangaTranslationDependencies dependencies;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
     settings = MangaTranslationSettingsStore();
+    models = _Models(settings);
     dependencies = MangaTranslationDependencies(
       settings: settings,
+      models: models,
       service: _Service(),
       providers: MangaTranslationProviderFactory(),
       cache: _Cache(),
@@ -46,6 +72,7 @@ void main() {
     );
   });
   tearDown(() async {
+    models.dispose();
     settings.dispose();
     dependencies.providers.dispose();
     dependencies.usage.dispose();
@@ -110,26 +137,127 @@ void main() {
     },
   );
 
-  testWidgets('settings controls fit a narrow viewport', (tester) async {
-    tester.view.physicalSize = const Size(320, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await settings.load();
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
-        home: MangaTranslationSettingsPage(dependencies: dependencies),
+  for (final locale in const [Locale('en'), Locale('zh')]) {
+    testWidgets('settings controls fit a narrow viewport ($locale)', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await settings.load();
+      models.set(
+        'pp_ocrv5_mobile_det',
+        const DetectorModelState(
+          status: DetectorModelStatus.downloading,
+          progress: 0.4,
+          indeterminate: false,
+          speedBytesPerSecond: 1200000,
+        ),
+      );
+      models.set(
+        'pp_ocrv5_server_det',
+        const DetectorModelState(
+          status: DetectorModelStatus.failed,
+          failure: DetectorModelFailure.checksumMismatch,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: locale,
+          home: MangaTranslationSettingsPage(dependencies: dependencies),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      for (var index = 0; index < 4; index++) {
+        await tester.drag(find.byType(ListView), const Offset(0, -450));
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
+
+  testWidgets('detector models download, select and hide for AI locating', (
+    tester,
+  ) async {
+    await pump(tester);
+    final required = find.text('Download and select a detection model');
+    await tester.scrollUntilVisible(
+      required,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(required, findsOneWidget);
+    expect(find.text('95 MB · GPL-3.0'), findsOneWidget);
+
+    final ctd = find.byKey(
+      const ValueKey('translation-detector-comic_text_detector'),
+    );
+    final download = find.descendant(of: ctd, matching: find.text('Download'));
+    await tester.ensureVisible(download);
+    await tester.pumpAndSettle();
+    await tester.tap(download);
+    expect(models.downloads, ['comic_text_detector']);
+
+    models.set(
+      'comic_text_detector',
+      const DetectorModelState(
+        status: DetectorModelStatus.downloading,
+        progress: 0.5,
+        indeterminate: false,
+        speedBytesPerSecond: 2000000,
       ),
     );
-    await tester.pump();
-    await tester.pump();
-    expect(tester.takeException(), isNull);
-    await tester.drag(find.byType(ListView), const Offset(0, -450));
-    await tester.pump();
-    expect(tester.takeException(), isNull);
+    await tester.pumpAndSettle();
+    expect(find.text('50% · 2.0 MB/s'), findsOneWidget);
+
+    models.set(
+      'comic_text_detector',
+      const DetectorModelState(status: DetectorModelStatus.installed),
+    );
+    await tester.pumpAndSettle();
+    expect(settings.detectorModelId, isNull);
+    final use = find.descendant(of: ctd, matching: find.text('Use'));
+    await tester.ensureVisible(use);
+    await tester.pumpAndSettle();
+    await tester.tap(use);
+    await tester.pumpAndSettle();
+    expect(settings.detectorModelId, 'comic_text_detector');
+    expect(required, findsNothing);
+    expect(find.descendant(of: ctd, matching: find.text('Use')), findsNothing);
+
+    await tester.ensureVisible(find.text('AI'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AI'));
+    await tester.pumpAndSettle();
+    expect(settings.textLocator, TranslationTextLocator.ai);
+    expect(ctd, findsNothing);
+  });
+
+  testWidgets('shows a changed model source as a distinct failure', (
+    tester,
+  ) async {
+    models.set(
+      'pp_ocrv5_server_det',
+      const DetectorModelState(
+        status: DetectorModelStatus.failed,
+        failure: DetectorModelFailure.checksumMismatch,
+      ),
+    );
+    await pump(tester);
+    final message = find.text(
+      "The model source file has changed, so this model can't be used for now",
+    );
+    await tester.scrollUntilVisible(
+      message,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(message, findsOneWidget);
   });
 
   testWidgets('persists editing and explains missing connection configuration', (

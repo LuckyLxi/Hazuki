@@ -49,6 +49,8 @@ void main() {
     expect(store.translateSfx, isFalse);
     expect(store.customSystemPrompt, isEmpty);
     expect(store.reasoningEffort, TranslationReasoningEffort.providerDefault);
+    expect(store.textLocator, TranslationTextLocator.detector);
+    expect(store.detectorModelId, isNull);
     expect(store.isConfigured, isFalse);
     for (final preset in TranslationProviderPreset.values) {
       final config = store.configurationFor(preset);
@@ -236,5 +238,21 @@ void main() {
     expect(store.bubbleStyle, TranslationBubbleStyle.sampled);
     expect(store.prefetchAhead, 5);
     expect(store.reasoningEffort, TranslationReasoningEffort.providerDefault);
+  });
+
+  test('persists the text locator and detector model selection', () async {
+    final store = createStore();
+    await store.setTextLocator(TranslationTextLocator.ai);
+    await store.setDetectorModelId('pp_ocrv5_mobile_det');
+
+    final reloaded = createStore();
+    await reloaded.load();
+    expect(reloaded.textLocator, TranslationTextLocator.ai);
+    expect(reloaded.detectorModelId, 'pp_ocrv5_mobile_det');
+
+    await reloaded.setDetectorModelId(null);
+    final cleared = createStore();
+    await cleared.load();
+    expect(cleared.detectorModelId, isNull);
   });
 }
