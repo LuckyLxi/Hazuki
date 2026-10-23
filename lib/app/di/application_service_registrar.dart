@@ -29,9 +29,21 @@ import '../../services/storage/hazuki_database.dart';
 import '../../services/translation/manga_translation_provider_factory.dart';
 import '../../services/translation/manga_translation_settings_store.dart';
 import '../../services/translation/translation_response_parser.dart';
+import '../../services/translation/translation_result_cache.dart';
+import '../../services/translation/translation_glossary_store.dart';
 
 /// Registers application services against their contract-level dependencies.
 void registerApplicationServices(GetIt services) {
+  if (!services.isRegistered<TranslationResultCache>()) {
+    services.registerLazySingleton<TranslationResultCache>(
+      TranslationResultCache.new,
+    );
+  }
+  if (!services.isRegistered<TranslationGlossaryStore>()) {
+    services.registerLazySingleton<TranslationGlossaryStore>(
+      TranslationGlossaryStore.new,
+    );
+  }
   if (!services.isRegistered<MangaTranslationSettingsStore>()) {
     services.registerLazySingleton<MangaTranslationSettingsStore>(
       MangaTranslationSettingsStore.new,
