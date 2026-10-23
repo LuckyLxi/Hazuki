@@ -65,12 +65,15 @@ void main() {
   MangaTranslationProvider provider(
     TranslationProviderPreset preset, {
     String key = 'test-key',
+    TranslationReasoningEffort effort =
+        TranslationReasoningEffort.providerDefault,
   }) => factory.create(
     preset,
     TranslationProviderConfiguration(
       baseUrl: 'https://proxy.example/api/v1/',
       model: 'user-selected-model',
       apiKey: key,
+      reasoningEffort: effort,
     ),
   );
 
@@ -141,6 +144,8 @@ void main() {
         expect(body['model'], 'user-selected-model');
         final messages = body['messages'] as List;
         if (isClaude) {
+          expect(body.containsKey('thinking'), isFalse);
+          expect(body.containsKey('output_config'), isFalse);
           expect(request.uri.path, '/api/v1/messages');
           expect(body['system'], 'system prompt');
           expect(body['max_tokens'], 4096);
@@ -158,6 +163,7 @@ void main() {
             {'type': 'text', 'text': 'user prompt'},
           ]);
         } else {
+          expect(body.containsKey('reasoning_effort'), isFalse);
           expect(request.uri.path, '/api/v1/chat/completions');
           expect(messages.first, {
             'role': 'system',
@@ -182,6 +188,55 @@ void main() {
         }
       },
     );
+  }
+
+  for (final preset in TranslationProviderPreset.values) {
+    for (final effort in [
+      TranslationReasoningEffort.low,
+      TranslationReasoningEffort.medium,
+      TranslationReasoningEffort.high,
+    ]) {
+      test(
+        '${preset.name} sends ${effort.name} effort using its own protocol',
+        () async {
+          final isClaude = preset == TranslationProviderPreset.claude;
+          setupClient(
+            (_) => _json(
+              isClaude
+                  ? {
+                      'content': [
+                        {'type': 'thinking', 'thinking': 'private reasoning'},
+                        {'type': 'text', 'text': '{}'},
+                      ],
+                    }
+                  : {
+                      'choices': [
+                        {
+                          'message': {'content': '{}'},
+                        },
+                      ],
+                    },
+            ),
+          );
+          final result = await provider(
+            preset,
+            effort: effort,
+          ).translateImage(image, 'system', 'user');
+          expect(result.text, '{}');
+          final body = adapter.requests.single.data as Map<String, dynamic>;
+          if (isClaude) {
+            expect(body['thinking'], {'type': 'adaptive'});
+            expect(body['output_config'], {'effort': effort.name});
+            expect(body['max_tokens'], greaterThan(4096));
+            expect(body.containsKey('reasoning_effort'), isFalse);
+          } else {
+            expect(body['reasoning_effort'], effort.name);
+            expect(body.containsKey('thinking'), isFalse);
+            expect(body.containsKey('output_config'), isFalse);
+          }
+        },
+      );
+    }
   }
 
   for (final preset in [

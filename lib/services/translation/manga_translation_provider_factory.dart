@@ -28,12 +28,14 @@ class MangaTranslationProviderFactory {
       baseUrl: configuration.baseUrl,
       apiKey: configuration.apiKey,
       model: configuration.model,
+      reasoningEffort: configuration.reasoningEffort,
     ),
     _ => OpenAiCompatibleProvider(
       dio: _dio,
       baseUrl: configuration.baseUrl,
       apiKey: configuration.apiKey,
       model: configuration.model,
+      reasoningEffort: configuration.reasoningEffort,
       jsonResponseFormat: preset != TranslationProviderPreset.custom,
     ),
   };

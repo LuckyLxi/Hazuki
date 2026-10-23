@@ -31,6 +31,7 @@ class _MangaTranslationSettingsPageState
   final _baseUrl = TextEditingController();
   final _apiKey = TextEditingController();
   final _model = TextEditingController();
+  final _systemPrompt = TextEditingController();
   final _token = CancelToken();
   bool _ready = false, _busy = false, _obscure = true;
   int _cacheBytes = 0;
@@ -49,6 +50,7 @@ class _MangaTranslationSettingsPageState
       final bytes = await widget.dependencies.cache.sizeBytes();
       if (!mounted) return;
       _syncFields();
+      _systemPrompt.text = _settings.customSystemPrompt;
       setState(() {
         _ready = true;
         _cacheBytes = bytes;
@@ -125,6 +127,7 @@ class _MangaTranslationSettingsPageState
           buildTranslationSystemPrompt(
             targetLanguage: _settings.targetLanguage,
             translateSfx: _settings.translateSfx,
+            customInstructions: _settings.customSystemPrompt,
           ),
           buildTranslationUserPrompt(),
           cancelToken: _token,
@@ -184,6 +187,7 @@ class _MangaTranslationSettingsPageState
     _baseUrl.dispose();
     _apiKey.dispose();
     _model.dispose();
+    _systemPrompt.dispose();
     super.dispose();
   }
 
@@ -317,6 +321,51 @@ class _MangaTranslationSettingsPageState
                               ),
                             ),
                           ),
+                          ListTile(
+                            title: Text(strings.translationReasoningEffort),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                DropdownButton<TranslationReasoningEffort>(
+                                  isExpanded: true,
+                                  value: _settings.reasoningEffort,
+                                  onChanged: _busy
+                                      ? null
+                                      : (value) {
+                                          if (value != null) {
+                                            unawaited(
+                                              _save(
+                                                _settings.updateProvider(
+                                                  preset: preset,
+                                                  reasoningEffort: value,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                  items: [
+                                    for (final value
+                                        in TranslationReasoningEffort.values)
+                                      DropdownMenuItem(
+                                        value: value,
+                                        child: Text(switch (value) {
+                                          TranslationReasoningEffort
+                                              .providerDefault =>
+                                            strings.translationReasoningDefault,
+                                          TranslationReasoningEffort.low =>
+                                            strings.translationReasoningLow,
+                                          TranslationReasoningEffort.medium =>
+                                            strings.translationReasoningMedium,
+                                          TranslationReasoningEffort.high =>
+                                            strings.translationReasoningHigh,
+                                        }),
+                                      ),
+                                  ],
+                                ),
+                                Text(strings.translationReasoningHint),
+                              ],
+                            ),
+                          ),
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: Wrap(
@@ -335,6 +384,64 @@ class _MangaTranslationSettingsPageState
                                       : () => _request(testConnection: true),
                                   child: Text(
                                     strings.translationTestConnection,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SettingsGroup(
+                        children: [
+                          ListTile(
+                            title: Text(strings.translationSystemPrompt),
+                            subtitle: Text(strings.translationSystemPromptHint),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: TextField(
+                              key: const ValueKey('translation-system-prompt'),
+                              controller: _systemPrompt,
+                              enabled: !_busy,
+                              minLines: 4,
+                              maxLines: 8,
+                              decoration: InputDecoration(
+                                labelText: strings.translationSystemPrompt,
+                                border: const OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
+                              children: [
+                                FilledButton(
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _save(
+                                          _settings.setCustomSystemPrompt(
+                                            _systemPrompt.text,
+                                          ),
+                                        ),
+                                  child: Text(strings.commonSave),
+                                ),
+                                TextButton(
+                                  onPressed: _busy
+                                      ? null
+                                      : () {
+                                          _systemPrompt.clear();
+                                          unawaited(
+                                            _save(
+                                              _settings.setCustomSystemPrompt(
+                                                '',
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                  child: Text(
+                                    strings.translationResetSystemPrompt,
                                   ),
                                 ),
                               ],

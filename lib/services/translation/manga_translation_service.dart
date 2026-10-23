@@ -59,12 +59,15 @@ class MangaTranslationService {
       final configuration = _settings.configuration;
       final targetLanguage = _settings.targetLanguage;
       final translateSfx = _settings.translateSfx;
+      final customSystemPrompt = _settings.customSystemPrompt;
       final key = await TranslationResultCache.keyFor(
         imageBytes: imageBytes,
         targetLanguage: targetLanguage.code,
         providerPreset: preset,
         model: configuration.model,
         translateSfx: translateSfx,
+        reasoningEffort: configuration.reasoningEffort,
+        customSystemPrompt: customSystemPrompt,
       );
       _checkCancelled(cancelToken);
       if (!bypassCache) {
@@ -78,6 +81,7 @@ class MangaTranslationService {
       final systemPrompt = buildTranslationSystemPrompt(
         targetLanguage: targetLanguage,
         translateSfx: translateSfx,
+        customInstructions: customSystemPrompt,
       );
       final userPrompt = buildTranslationUserPrompt(
         glossary: glossary.map((entry) => entry.term).toList(),

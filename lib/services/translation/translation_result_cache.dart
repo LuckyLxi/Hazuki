@@ -32,6 +32,9 @@ class TranslationResultCache {
     required TranslationProviderPreset providerPreset,
     required String model,
     required bool translateSfx,
+    TranslationReasoningEffort reasoningEffort =
+        TranslationReasoningEffort.providerDefault,
+    String customSystemPrompt = '',
   }) => Isolate.run(
     () => sha1
         .convert(
@@ -43,6 +46,8 @@ class TranslationResultCache {
               model,
               translateSfx,
               kTranslationPromptVersion,
+              reasoningEffort.name,
+              customSystemPrompt.trim(),
             ]),
           ),
         )

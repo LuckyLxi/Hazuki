@@ -139,6 +139,10 @@ void main() {
     await tester.enterText(find.byType(TextField).at(2), 'typed-model');
     await tester.pumpAndSettle();
     expect(settings.model, 'typed-model');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Test connection'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Test connection'));
     await tester.pumpAndSettle();
     expect(
@@ -148,4 +152,78 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'thinking effort switches with providers and custom instructions save and reset',
+    (tester) async {
+      await settings.updateProvider(
+        preset: TranslationProviderPreset.openai,
+        reasoningEffort: TranslationReasoningEffort.high,
+      );
+      await settings.updateProvider(
+        preset: TranslationProviderPreset.gemini,
+        reasoningEffort: TranslationReasoningEffort.low,
+      );
+      await pump(tester);
+      await tester.ensureVisible(
+        find.byType(DropdownButton<TranslationReasoningEffort>),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<DropdownButton<TranslationReasoningEffort>>(
+              find.byType(DropdownButton<TranslationReasoningEffort>),
+            )
+            .value,
+        TranslationReasoningEffort.high,
+      );
+      await tester.tap(find.byType(DropdownButton<TranslationReasoningEffort>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Medium').last);
+      await tester.pumpAndSettle();
+      expect(settings.reasoningEffort, TranslationReasoningEffort.medium);
+      await tester.ensureVisible(
+        find.byType(DropdownButton<TranslationProviderPreset>),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(DropdownButton<TranslationProviderPreset>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gemini').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byType(DropdownButton<TranslationReasoningEffort>),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<DropdownButton<TranslationReasoningEffort>>(
+              find.byType(DropdownButton<TranslationReasoningEffort>),
+            )
+            .value,
+        TranslationReasoningEffort.low,
+      );
+      final promptField = find.byKey(
+        const ValueKey('translation-system-prompt'),
+      );
+      await tester.scrollUntilVisible(
+        promptField,
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.enterText(promptField, 'Preserve honorifics.');
+      await tester.pumpAndSettle();
+      expect(settings.customSystemPrompt, isEmpty);
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(settings.customSystemPrompt, 'Preserve honorifics.');
+      await tester.tap(find.text('Restore default'));
+      await tester.pumpAndSettle();
+      expect(settings.customSystemPrompt, isEmpty);
+      expect(tester.widget<TextField>(promptField).controller!.text, isEmpty);
+    },
+  );
 }

@@ -191,6 +191,40 @@ void main() {
     );
   });
 
+  test(
+    'custom system instructions keep the JSON, coordinates, and glossary contract',
+    () {
+      final prompt = buildTranslationSystemPrompt(
+        targetLanguage: TranslationTargetLanguage.simplifiedChinese,
+        translateSfx: false,
+        customInstructions: 'Use informal dialogue and preserve honorifics.',
+      );
+      expect(
+        prompt,
+        contains('Use informal dialogue and preserve honorifics.'),
+      );
+      expect(prompt, contains('"regions":[{"box":[x1,y1,x2,y2]'));
+      expect(prompt, contains('Simplified Chinese'));
+      expect(prompt, contains('Do not output sfx or other regions.'));
+      expect(
+        prompt,
+        contains('Always preserve the JSON schema, normalized box coordinates'),
+      );
+      expect(prompt, contains('required glossary translations'));
+      expect(
+        buildTranslationSystemPrompt(
+          targetLanguage: TranslationTargetLanguage.english,
+          translateSfx: false,
+          customInstructions: '  ',
+        ),
+        buildTranslationSystemPrompt(
+          targetLanguage: TranslationTargetLanguage.english,
+          translateSfx: false,
+        ),
+      );
+    },
+  );
+
   test('prompts use English language names and inject required glossary', () {
     for (final language in TranslationTargetLanguage.values) {
       expect(

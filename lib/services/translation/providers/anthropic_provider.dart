@@ -4,6 +4,7 @@ import 'dart:isolate';
 import 'package:dio/dio.dart';
 
 import '../manga_translation_provider.dart';
+import '../manga_translation_settings_store.dart';
 import '../models/translation_models.dart';
 import '../translation_failure.dart';
 
@@ -13,7 +14,10 @@ class AnthropicProvider extends HttpMangaTranslationProvider {
     required super.baseUrl,
     required super.apiKey,
     required super.model,
+    this.reasoningEffort = TranslationReasoningEffort.providerDefault,
   });
+
+  final TranslationReasoningEffort reasoningEffort;
 
   @override
   Map<String, String> get headers => {
@@ -38,7 +42,15 @@ class AnthropicProvider extends HttpMangaTranslationProvider {
         'messages',
         data: {
           'model': model,
-          'max_tokens': 4096,
+          'max_tokens':
+              reasoningEffort == TranslationReasoningEffort.providerDefault
+              ? 4096
+              : 16384,
+          if (reasoningEffort !=
+              TranslationReasoningEffort.providerDefault) ...{
+            'thinking': {'type': 'adaptive'},
+            'output_config': {'effort': reasoningEffort.name},
+          },
           'system': systemPrompt,
           'messages': [
             {

@@ -46,6 +46,8 @@ class ReaderTranslationController extends ChangeNotifier {
        _spreadSize = spreadSize,
        _onFailure = onFailure {
     settings.addListener(_settingsChanged);
+    _reasoningEffort = settings.reasoningEffort;
+    _customSystemPrompt = settings.customSystemPrompt;
   }
 
   final MangaTranslationService _service;
@@ -65,6 +67,8 @@ class ReaderTranslationController extends ChangeNotifier {
   Set<String> _window = {}, _visible = {};
   int _index = 0, _failures = 0;
   bool _disposed = false, _tripped = false;
+  late TranslationReasoningEffort _reasoningEffort;
+  late String _customSystemPrompt;
 
   bool get modeOn =>
       !_tripped &&
@@ -84,6 +88,12 @@ class ReaderTranslationController extends ChangeNotifier {
 
   void _settingsChanged() {
     if (_disposed) return;
+    if (_reasoningEffort != settings.reasoningEffort ||
+        _customSystemPrompt != settings.customSystemPrompt) {
+      _reasoningEffort = settings.reasoningEffort;
+      _customSystemPrompt = settings.customSystemPrompt;
+      reset();
+    }
     if (modeOn) {
       updateWindow(_index);
     } else {

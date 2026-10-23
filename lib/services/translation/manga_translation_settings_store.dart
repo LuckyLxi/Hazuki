@@ -15,6 +15,8 @@ enum TranslationProviderPreset {
 
 enum TranslationBubbleStyle { sampled, white }
 
+enum TranslationReasoningEffort { providerDefault, low, medium, high }
+
 enum TranslationTargetLanguage {
   simplifiedChinese('zh-Hans', 'Simplified Chinese'),
   traditionalChinese('zh-Hant', 'Traditional Chinese'),
@@ -37,11 +39,13 @@ class TranslationProviderConfiguration {
     required this.baseUrl,
     this.model = '',
     this.apiKey = '',
+    this.reasoningEffort = TranslationReasoningEffort.providerDefault,
   });
 
   final String baseUrl;
   final String model;
   final String apiKey;
+  final TranslationReasoningEffort reasoningEffort;
 
   bool get isConfigured =>
       baseUrl.trim().isNotEmpty &&
@@ -77,6 +81,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
   int _prefetchAhead = 3;
   TranslationBubbleStyle _bubbleStyle = TranslationBubbleStyle.sampled;
   bool _translateSfx = false;
+  String _customSystemPrompt = '';
   final _configurations = {
     for (final preset in TranslationProviderPreset.values)
       preset: TranslationProviderConfiguration(baseUrl: preset.defaultBaseUrl),
@@ -89,6 +94,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
   int get prefetchAhead => _prefetchAhead;
   TranslationBubbleStyle get bubbleStyle => _bubbleStyle;
   bool get translateSfx => _translateSfx;
+  String get customSystemPrompt => _customSystemPrompt;
   TranslationProviderConfiguration configurationFor(
     TranslationProviderPreset preset,
   ) => _configurations[preset]!;
@@ -97,6 +103,8 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
   String get baseUrl => configuration.baseUrl;
   String get model => configuration.model;
   String get apiKey => configuration.apiKey;
+  TranslationReasoningEffort get reasoningEffort =>
+      configuration.reasoningEffort;
   bool get isConfigured => configuration.isConfigured;
 
   Future<void> load() => _loadFuture ??= _load();
@@ -114,6 +122,12 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
         apiKey:
             await _secureStorage.read(key: '$_prefix${preset.name}_api_key') ??
             '',
+        reasoningEffort: TranslationReasoningEffort.values.firstWhere(
+          (value) =>
+              value.name ==
+              prefs.getString('$_prefix${preset.name}_reasoning_effort'),
+          orElse: () => TranslationReasoningEffort.providerDefault,
+        ),
       );
     }
     _prefs = prefs;
@@ -137,6 +151,8 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
       orElse: () => TranslationBubbleStyle.sampled,
     );
     _translateSfx = prefs.getBool('${_prefix}translate_sfx') ?? false;
+    _customSystemPrompt =
+        prefs.getString('${_prefix}custom_system_prompt') ?? '';
     notifyListeners();
   }
 
@@ -166,6 +182,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
     String? baseUrl,
     String? model,
     String? apiKey,
+    TranslationReasoningEffort? reasoningEffort,
   }) => _providerWrites.run(preset.name, () async {
     await load();
     if (baseUrl != null) {
@@ -175,6 +192,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
         baseUrl: baseUrl.trim(),
         model: current.model,
         apiKey: current.apiKey,
+        reasoningEffort: current.reasoningEffort,
       );
     }
     if (model != null) {
@@ -184,6 +202,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
         baseUrl: current.baseUrl,
         model: model.trim(),
         apiKey: current.apiKey,
+        reasoningEffort: current.reasoningEffort,
       );
     }
     if (apiKey != null) {
@@ -196,10 +215,33 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
         baseUrl: current.baseUrl,
         model: current.model,
         apiKey: apiKey.trim(),
+        reasoningEffort: current.reasoningEffort,
+      );
+    }
+    if (reasoningEffort != null) {
+      await _prefs.setString(
+        '$_prefix${preset.name}_reasoning_effort',
+        reasoningEffort.name,
+      );
+      final current = configurationFor(preset);
+      _configurations[preset] = TranslationProviderConfiguration(
+        baseUrl: current.baseUrl,
+        model: current.model,
+        apiKey: current.apiKey,
+        reasoningEffort: reasoningEffort,
       );
     }
     notifyListeners();
   });
+
+  Future<void> setCustomSystemPrompt(String value) =>
+      _providerWrites.run('system_prompt', () async {
+        await load();
+        final prompt = value.trim();
+        await _prefs.setString('${_prefix}custom_system_prompt', prompt);
+        _customSystemPrompt = prompt;
+        notifyListeners();
+      });
 
   Future<void> setTargetLanguage(TranslationTargetLanguage value) async {
     await load();

@@ -47,14 +47,70 @@ void main() {
     expect(store.prefetchAhead, 3);
     expect(store.bubbleStyle, TranslationBubbleStyle.sampled);
     expect(store.translateSfx, isFalse);
+    expect(store.customSystemPrompt, isEmpty);
+    expect(store.reasoningEffort, TranslationReasoningEffort.providerDefault);
     expect(store.isConfigured, isFalse);
     for (final preset in TranslationProviderPreset.values) {
       final config = store.configurationFor(preset);
       expect(config.baseUrl, preset.defaultBaseUrl);
       expect(config.model, isEmpty);
       expect(config.apiKey, isEmpty);
+      expect(
+        config.reasoningEffort,
+        TranslationReasoningEffort.providerDefault,
+      );
     }
   });
+
+  test(
+    'persists thinking effort per provider and preserves it when credentials change',
+    () async {
+      final store = createStore();
+      for (final preset in TranslationProviderPreset.values) {
+        await store.updateProvider(
+          preset: preset,
+          reasoningEffort: TranslationReasoningEffort.values[preset.index],
+        );
+        await store.updateProvider(
+          preset: preset,
+          model: '${preset.name}-model',
+          apiKey: 'secret',
+          baseUrl: 'https://${preset.name}.example',
+        );
+      }
+      final restored = createStore();
+      await restored.load();
+      for (final preset in TranslationProviderPreset.values) {
+        await restored.setProviderPreset(preset);
+        expect(
+          restored.reasoningEffort,
+          TranslationReasoningEffort.values[preset.index],
+        );
+      }
+    },
+  );
+
+  test(
+    'saves custom instructions globally and clears them to restore defaults',
+    () async {
+      final store = createStore();
+      await store.setCustomSystemPrompt(
+        '  Keep character names consistent.\nUse natural dialogue.  ',
+      );
+      final restored = createStore();
+      await restored.load();
+      expect(
+        restored.customSystemPrompt,
+        'Keep character names consistent.\nUse natural dialogue.',
+      );
+      await restored.setProviderPreset(TranslationProviderPreset.claude);
+      expect(restored.customSystemPrompt, store.customSystemPrompt);
+      await restored.setCustomSystemPrompt('');
+      final cleared = createStore();
+      await cleared.load();
+      expect(cleared.customSystemPrompt, isEmpty);
+    },
+  );
 
   test('persists settings and notifies after changes', () async {
     final store = createStore();
@@ -171,6 +227,7 @@ void main() {
       'manga_translation_target_language': 'unknown',
       'manga_translation_bubble_style': 'unknown',
       'manga_translation_prefetch_ahead': 99,
+      'manga_translation_openai_reasoning_effort': 'unsupported',
     });
     final store = createStore();
     await store.load();
@@ -178,5 +235,6 @@ void main() {
     expect(store.targetLanguage, TranslationTargetLanguage.simplifiedChinese);
     expect(store.bubbleStyle, TranslationBubbleStyle.sampled);
     expect(store.prefetchAhead, 5);
+    expect(store.reasoningEffort, TranslationReasoningEffort.providerDefault);
   });
 }

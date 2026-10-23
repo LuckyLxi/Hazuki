@@ -21,12 +21,17 @@ void main() {
     String model = 'vision',
     TranslationProviderPreset provider = TranslationProviderPreset.openai,
     bool sfx = false,
+    TranslationReasoningEffort effort =
+        TranslationReasoningEffort.providerDefault,
+    String prompt = '',
   }) => TranslationResultCache.keyFor(
     imageBytes: Uint8List.fromList([image]),
     targetLanguage: language,
     providerPreset: provider,
     model: model,
     translateSfx: sfx,
+    reasoningEffort: effort,
+    customSystemPrompt: prompt,
   );
   PageTranslationResult result() => PageTranslationResult(
     regions: [],
@@ -45,6 +50,8 @@ void main() {
         key(model: 'other'),
         key(provider: TranslationProviderPreset.custom),
         key(sfx: true),
+        key(effort: TranslationReasoningEffort.high),
+        key(prompt: 'Use informal dialogue.'),
       ]) {
         expect(await changed, isNot(baseline));
       }
@@ -55,6 +62,7 @@ void main() {
         TranslationTerm(source: 'A', target: '甲'),
       ]);
       expect(await key(), baseline);
+      expect(await key(prompt: '  '), baseline);
     },
   );
 

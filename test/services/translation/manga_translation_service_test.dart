@@ -22,6 +22,8 @@ import 'package:hazuki/services/translation/translation_usage_store.dart';
 class _Provider implements MangaTranslationProvider {
   int calls = 0;
   final prompts = <String>[];
+  final systemPrompts = <String>[];
+  TranslationProviderConfiguration? configuration;
   Future<ProviderRawResponse> Function(int call)? respond;
 
   @override
@@ -35,6 +37,7 @@ class _Provider implements MangaTranslationProvider {
     CancelToken? cancelToken,
   }) async {
     prompts.add(userPrompt);
+    systemPrompts.add(systemPrompt);
     calls++;
     return respond?.call(calls) ??
         const ProviderRawResponse(
@@ -51,7 +54,10 @@ class _Providers extends MangaTranslationProviderFactory {
   MangaTranslationProvider create(
     TranslationProviderPreset preset,
     TranslationProviderConfiguration configuration,
-  ) => provider;
+  ) {
+    provider.configuration = configuration;
+    return provider;
+  }
 }
 
 class _Images extends TranslationImageProcessor {
@@ -153,6 +159,32 @@ void main() {
       expect(stats.pages, 2);
       expect(stats.requests, 2);
       expect(stats.inputTokens, 40);
+    },
+  );
+
+  test(
+    'changing effort or custom instructions misses old caches and reaches the request',
+    () async {
+      await translate();
+      await settings.setCustomSystemPrompt('Keep the dialogue concise.');
+      await translate();
+      expect(provider.calls, 2);
+      expect(
+        provider.systemPrompts.last,
+        contains('Keep the dialogue concise.'),
+      );
+      await settings.updateProvider(
+        preset: TranslationProviderPreset.openai,
+        reasoningEffort: TranslationReasoningEffort.high,
+      );
+      await translate();
+      expect(provider.calls, 3);
+      expect(
+        provider.configuration!.reasoningEffort,
+        TranslationReasoningEffort.high,
+      );
+      await translate();
+      expect(provider.calls, 3);
     },
   );
 

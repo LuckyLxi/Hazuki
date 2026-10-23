@@ -218,6 +218,31 @@ void main() {
     },
   );
 
+  test(
+    'new prompt and effort discard old results and cancel old requests',
+    () async {
+      await settings.setPrefetchAhead(0);
+      await tick();
+      service.pending[0].complete(empty);
+      await tick();
+      expect(
+        controller.pageState('0').value.status,
+        PageTranslationStatus.done,
+      );
+      await settings.setCustomSystemPrompt('Use natural dialogue.');
+      await tick();
+      expect(service.calls, hasLength(2));
+      expect(controller.pageState('0').value.result, isNull);
+      await settings.updateProvider(
+        preset: TranslationProviderPreset.openai,
+        reasoningEffort: TranslationReasoningEffort.high,
+      );
+      await tick();
+      expect(service.calls[1].$2.isCancelled, isTrue);
+      expect(service.calls, hasLength(3));
+    },
+  );
+
   test('single page state changes do not notify the entire reader', () async {
     var notifications = 0;
     controller.addListener(() => notifications++);

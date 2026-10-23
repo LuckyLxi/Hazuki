@@ -4,6 +4,7 @@ import 'dart:isolate';
 import 'package:dio/dio.dart';
 
 import '../manga_translation_provider.dart';
+import '../manga_translation_settings_store.dart';
 import '../models/translation_models.dart';
 import '../translation_failure.dart';
 
@@ -14,9 +15,11 @@ class OpenAiCompatibleProvider extends HttpMangaTranslationProvider {
     required super.apiKey,
     required super.model,
     required this.jsonResponseFormat,
+    this.reasoningEffort = TranslationReasoningEffort.providerDefault,
   });
 
   final bool jsonResponseFormat;
+  final TranslationReasoningEffort reasoningEffort;
 
   @override
   Map<String, String> get headers => {'Authorization': 'Bearer $apiKey'};
@@ -38,6 +41,8 @@ class OpenAiCompatibleProvider extends HttpMangaTranslationProvider {
         'chat/completions',
         data: {
           'model': model,
+          if (reasoningEffort != TranslationReasoningEffort.providerDefault)
+            'reasoning_effort': reasoningEffort.name,
           if (jsonResponseFormat) 'response_format': {'type': 'json_object'},
           'messages': [
             {'role': 'system', 'content': systemPrompt},
