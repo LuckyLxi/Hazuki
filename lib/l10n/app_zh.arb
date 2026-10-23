@@ -52,6 +52,8 @@
   "displayPureBlackSubtitle": "深色模式下使用纯黑背景",
   "displayLiquidGlassTitle": "液态玻璃效果",
   "displayLiquidGlassSubtitle": "关闭后全局使用旧版界面样式",
+  "displayHomeTabCutTransitionTitle": "分镜切页动画",
+  "displayHomeTabCutTransitionSubtitle": "发现与收藏切换时使用斜切分镜过渡，开启液态玻璃时可能卡顿",
   "displayDynamicColorTitle": "动态取色",
   "displayDynamicColorSubtitle": "根据系统壁纸自动提取主题色（Android 12+）",
   "displayComicDynamicColorTitle": "漫画详情页动态取色",

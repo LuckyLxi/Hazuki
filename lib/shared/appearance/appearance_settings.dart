@@ -57,6 +57,7 @@ class AppearanceSettingsData {
     required this.comicDetailDynamicColor,
     required this.useSystemFont,
     this.liquidGlassEnabled = true,
+    this.homeTabCutTransition = false,
     this.discoverSectionLayout = DiscoverSectionLayout.horizontal,
     this.favoriteLayout = FavoriteLayout.list,
   });
@@ -69,6 +70,9 @@ class AppearanceSettingsData {
   final bool comicDetailDynamicColor;
   final bool useSystemFont;
   final bool liquidGlassEnabled;
+
+  /// 发现/收藏切页是否使用分镜斜切过渡；关闭时使用淡入滑动过渡。
+  final bool homeTabCutTransition;
   final DiscoverSectionLayout discoverSectionLayout;
   final FavoriteLayout favoriteLayout;
 
@@ -97,6 +101,7 @@ class AppearanceSettingsData {
     bool? comicDetailDynamicColor,
     bool? useSystemFont,
     bool? liquidGlassEnabled,
+    bool? homeTabCutTransition,
     DiscoverSectionLayout? discoverSectionLayout,
     FavoriteLayout? favoriteLayout,
   }) {
@@ -110,6 +115,7 @@ class AppearanceSettingsData {
           comicDetailDynamicColor ?? this.comicDetailDynamicColor,
       useSystemFont: useSystemFont ?? this.useSystemFont,
       liquidGlassEnabled: liquidGlassEnabled ?? this.liquidGlassEnabled,
+      homeTabCutTransition: homeTabCutTransition ?? this.homeTabCutTransition,
       discoverSectionLayout:
           discoverSectionLayout ?? this.discoverSectionLayout,
       favoriteLayout: favoriteLayout ?? this.favoriteLayout,
@@ -130,6 +136,7 @@ class AppearanceSettingsData {
         other.comicDetailDynamicColor == comicDetailDynamicColor &&
         other.useSystemFont == useSystemFont &&
         other.liquidGlassEnabled == liquidGlassEnabled &&
+        other.homeTabCutTransition == homeTabCutTransition &&
         other.discoverSectionLayout == discoverSectionLayout &&
         other.favoriteLayout == favoriteLayout;
   }
@@ -144,6 +151,7 @@ class AppearanceSettingsData {
     comicDetailDynamicColor,
     useSystemFont,
     liquidGlassEnabled,
+    homeTabCutTransition,
     discoverSectionLayout,
     favoriteLayout,
   );

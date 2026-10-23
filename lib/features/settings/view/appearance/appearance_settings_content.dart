@@ -477,6 +477,19 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
                 );
               },
             ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            SwitchListTile(
+              value: widget.settings.homeTabCutTransition,
+              title: Text(strings.displayHomeTabCutTransitionTitle),
+              subtitle: Text(strings.displayHomeTabCutTransitionSubtitle),
+              onChanged: (value) {
+                unawaited(
+                  widget.onApply(
+                    widget.settings.copyWith(homeTabCutTransition: value),
+                  ),
+                );
+              },
+            ),
           ],
         ),
         SettingsGroup(

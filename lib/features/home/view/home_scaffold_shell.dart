@@ -14,6 +14,7 @@ import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
+import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
 import 'package:hazuki/shared/discover_back_to_top_notification.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -312,12 +313,37 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
   late final _tabTransition = HomeTabCutTransition(
     vsync: this,
     initialIndex: widget.currentIndex,
-    onTransitionChanged: (animating) => _homeContentAnimating.value = animating,
+    onTransitionChanged: _setHomeContentAnimating,
   );
+
+  // 由显示设置控制，关闭时使用淡入滑动过渡。
+  bool _cutTransitionEnabled = false;
+
+  void _setHomeContentAnimating(bool animating) =>
+      _homeContentAnimating.value = animating;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled =
+        HazukiThemeControllerScope.maybeOf(
+          context,
+        )?.settings.homeTabCutTransition ??
+        false;
+    if (enabled == _cutTransitionEnabled) return;
+    _cutTransitionEnabled = enabled;
+    // 换用另一种过渡后，原过渡的结束回调不再触发，这里直接复位。
+    _tabTransition.jumpTo(widget.currentIndex);
+    _homeContentAnimating.value = false;
+  }
 
   @override
   void didUpdateWidget(HomeScaffoldShell oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!_cutTransitionEnabled) {
+      _tabTransition.jumpTo(widget.currentIndex);
+      return;
+    }
     // 在子树重建前切换，使应用栏与内容区在同一帧收到进度变化。
     _tabTransition.select(widget.currentIndex);
   }
@@ -427,6 +453,8 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
     final homeContent = HomeContentStack(
       currentIndex: currentIndex,
       transition: _tabTransition,
+      cutTransition: _cutTransitionEnabled,
+      onTransitionChanged: _setHomeContentAnimating,
       discoverChild: NotificationListener<DiscoverBackToTopNotification>(
         onNotification: (notification) {
           setState(() {
@@ -545,6 +573,15 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   builder: (context, leadingWidth, _) {
+                    // 属于某一页的应用栏组件仅在切口过渡开启时跟随裁剪。
+                    Widget cutClip(int index, Widget child) =>
+                        _cutTransitionEnabled
+                        ? HomeTabCutClip(
+                            transition: _tabTransition,
+                            index: index,
+                            child: child,
+                          )
+                        : child;
                     // overlay 为切页期间叠在上方的进入页应用栏：背景透明，
                     // 头像位只占位，确保组件位置与切换完成后的真实布局一致。
                     PreferredSizeWidget buildAppBar(
@@ -572,10 +609,9 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                       backgroundAlpha: overlay ? 0 : 0.72,
                       title: index == 1
                           ? null
-                          : HomeTabCutClip(
-                              transition: _tabTransition,
-                              index: 0,
-                              child: _HomeAppBarSearchBox(
+                          : cutClip(
+                              0,
+                              _HomeAppBarSearchBox(
                                 onOpenSearch: onOpenSearch,
                                 maxWidth: Platform.isWindows ? 320 : null,
                               ),
@@ -583,10 +619,9 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                       titleSpacing: Platform.isWindows ? null : 4,
                       centerTitle: Platform.isWindows,
                       actions: [
-                        HomeTabCutClip(
-                          transition: _tabTransition,
-                          index: 1,
-                          child: HomeAppBarActions(
+                        cutClip(
+                          1,
+                          HomeAppBarActions(
                             currentIndex: index,
                             discoverSearchMorphProgress:
                                 discoverSearchMorphProgress,
@@ -628,30 +663,34 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                                 ).scaffoldBackgroundColor,
                                 // 切页期间真实应用栏保持退出页布局，进入页组件
                                 // 由上层透明应用栏承载，两者按同一切口互补裁剪。
-                                child: AnimatedBuilder(
-                                  animation: _tabTransition.animation,
-                                  builder: (context, _) {
-                                    if (!_tabTransition.isAnimating) {
-                                      return Stack(children: [appBar]);
-                                    }
-                                    return Stack(
-                                      children: [
-                                        buildAppBar(_tabTransition.outgoing),
-                                        Positioned.fill(
-                                          child: IgnorePointer(
-                                            child: HeroMode(
-                                              enabled: false,
-                                              child: buildAppBar(
-                                                _tabTransition.incoming,
-                                                overlay: true,
+                                child: !_cutTransitionEnabled
+                                    ? Stack(children: [appBar])
+                                    : AnimatedBuilder(
+                                        animation: _tabTransition.animation,
+                                        builder: (context, _) {
+                                          if (!_tabTransition.isAnimating) {
+                                            return Stack(children: [appBar]);
+                                          }
+                                          return Stack(
+                                            children: [
+                                              buildAppBar(
+                                                _tabTransition.outgoing,
                                               ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
+                                              Positioned.fill(
+                                                child: IgnorePointer(
+                                                  child: HeroMode(
+                                                    enabled: false,
+                                                    child: buildAppBar(
+                                                      _tabTransition.incoming,
+                                                      overlay: true,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
                               ),
                             ),
                           ),

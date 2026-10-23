@@ -17,6 +17,8 @@ class HazukiAppSettingsStore {
       'appearance_comic_detail_dynamic_color';
   static const String _useSystemFontKey = 'appearance_use_system_font';
   static const String _liquidGlassEnabledKey = 'appearance_liquid_glass';
+  static const String _homeTabCutTransitionKey =
+      'appearance_home_tab_cut_transition';
   static const String _discoverSectionLayoutKey =
       'appearance_discover_section_layout';
   static const String _favoriteLayoutKey = 'appearance_favorite_layout';
@@ -45,6 +47,7 @@ class HazukiAppSettingsStore {
           prefs.getBool(_comicDetailDynamicColorKey) ?? false,
       useSystemFont: prefs.getBool(_useSystemFontKey) ?? true,
       liquidGlassEnabled: prefs.getBool(_liquidGlassEnabledKey) ?? true,
+      homeTabCutTransition: prefs.getBool(_homeTabCutTransitionKey) ?? false,
       discoverSectionLayout: DiscoverSectionLayout.decode(
         prefs.getString(_discoverSectionLayoutKey),
       ),
@@ -68,6 +71,7 @@ class HazukiAppSettingsStore {
     );
     await prefs.setBool(_useSystemFontKey, next.useSystemFont);
     await prefs.setBool(_liquidGlassEnabledKey, next.liquidGlassEnabled);
+    await prefs.setBool(_homeTabCutTransitionKey, next.homeTabCutTransition);
     await prefs.setString(
       _discoverSectionLayoutKey,
       next.discoverSectionLayout.name,

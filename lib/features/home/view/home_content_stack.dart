@@ -74,6 +74,19 @@ class HomeTabCutTransition {
     _transitionReported = true;
   }
 
+  /// 不播放过渡直接停在 [index]；切口过渡关闭时用于保持选中页同步。
+  void jumpTo(int index) {
+    _target = index;
+    _incoming = index;
+    if (_controller.value != 0 || _controller.isAnimating) {
+      _controller.value = 0;
+    }
+    if (_transitionReported) {
+      _transitionReported = false;
+      onTransitionChanged?.call(false);
+    }
+  }
+
   void _handleStatusChanged(AnimationStatus status) {
     if (!_transitionReported || status.isAnimating) {
       return;
@@ -97,6 +110,7 @@ class HomeContentStack extends StatefulWidget {
     required this.favoriteChild,
     this.transition,
     this.onTransitionChanged,
+    this.cutTransition = true,
   });
 
   final int currentIndex;
@@ -106,8 +120,12 @@ class HomeContentStack extends StatefulWidget {
   /// 与应用栏共享的过渡；为空时内部自建，此时由 [onTransitionChanged] 上报状态。
   final HomeTabCutTransition? transition;
 
-  /// 仅在内部自建过渡时使用；外部传入过渡时由其所有者负责上报。
+  /// 内部自建切口过渡或使用淡入滑动过渡时上报状态；
+  /// 外部传入切口过渡时由其所有者负责上报。
   final ValueChanged<bool>? onTransitionChanged;
+
+  /// 为 false 时使用淡入滑动过渡，不播放切口过渡。
+  final bool cutTransition;
 
   @override
   State<HomeContentStack> createState() => _HomeContentStackState();
@@ -129,6 +147,13 @@ class _HomeContentStackState extends State<HomeContentStack>
   void didUpdateWidget(HomeContentStack oldWidget) {
     super.didUpdateWidget(oldWidget);
     _ownTransition?.onTransitionChanged = widget.onTransitionChanged;
+    if (!widget.cutTransition) {
+      _transition.jumpTo(widget.currentIndex);
+      if (oldWidget.currentIndex != widget.currentIndex) {
+        widget.onTransitionChanged?.call(true);
+      }
+      return;
+    }
     // 外部过渡通常已由所有者先行切换，这里重复调用是空操作。
     _transition.select(widget.currentIndex);
   }
@@ -141,6 +166,9 @@ class _HomeContentStackState extends State<HomeContentStack>
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.cutTransition) {
+      return _buildSlideFade();
+    }
     final transition = _transition;
     final shadowColor = Theme.of(context).colorScheme.shadow;
     final screenSize = MediaQuery.sizeOf(context);
@@ -187,6 +215,63 @@ class _HomeContentStackState extends State<HomeContentStack>
           ],
         );
       },
+    );
+  }
+
+  /// 淡入滑动过渡：退出页淡出并向反方向轻移，进入页淡入归位。
+  Widget _buildSlideFade() {
+    final currentIndex = widget.currentIndex;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: HeroMode(
+            enabled: currentIndex == 0,
+            child: IgnorePointer(
+              ignoring: currentIndex != 0,
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                offset: currentIndex == 0
+                    ? Offset.zero
+                    : const Offset(-0.04, 0),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  opacity: currentIndex == 0 ? 1 : 0,
+                  child: RepaintBoundary(
+                    key: const ValueKey('home-discover-repaint-boundary'),
+                    child: widget.discoverChild,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: HeroMode(
+            enabled: currentIndex == 1,
+            child: IgnorePointer(
+              ignoring: currentIndex != 1,
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                // 两页的滑动同时结束且晚于淡入淡出，在此统一上报一次结束。
+                onEnd: () => widget.onTransitionChanged?.call(false),
+                offset: currentIndex == 1 ? Offset.zero : const Offset(0.04, 0),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  opacity: currentIndex == 1 ? 1 : 0,
+                  child: RepaintBoundary(
+                    key: const ValueKey('home-favorite-repaint-boundary'),
+                    child: widget.favoriteChild,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
