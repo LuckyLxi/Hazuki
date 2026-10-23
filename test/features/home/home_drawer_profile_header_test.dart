@@ -216,6 +216,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'cached background shows at once while a drawer route slides in',
+    (tester) async {
+      final images = _Images(cached: true);
+      await tester.pumpWidget(_wrap(images, _profile(loading: true)));
+      await tester.runAsync(
+        () => precacheImage(
+          MemoryImage(images.bytes),
+          tester.element(find.byType(HomeDrawerContent)),
+        ),
+      );
+      final drawerContent = Drawer(
+        width: 304,
+        child: HomeDrawerContent(
+          profile: _profile(),
+          actions: const HomeSidebarActions(),
+          activeSourceKey: 'source',
+        ),
+      );
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .push(
+            PageRouteBuilder<void>(
+              opaque: false,
+              transitionDuration: const Duration(milliseconds: 210),
+              pageBuilder: (_, _, _) => drawerContent,
+            ),
+          );
+      // 首帧为 Hero 测量的离屏构建，此后转场仍在进行。
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      final background = find.byKey(
+        const ValueKey('drawer-bg-$_avatarUrl'),
+        skipOffstage: false,
+      );
+      expect(background, findsOneWidget);
+      expect(
+        find.descendant(of: background, matching: find.byType(AnimatedOpacity)),
+        findsNothing,
+      );
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
+
   testWidgets('long usernames remain constrained during the transition', (
     tester,
   ) async {

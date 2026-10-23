@@ -1013,6 +1013,89 @@ class _HomeAppBarSearchBox extends StatelessWidget {
   }
 }
 
+/// 抽屉滑入/滑出期间把抽屉缓存为静态图。
+///
+/// 抽屉不透明，其中换源按钮的液态玻璃只折射抽屉自身的头部背景，缓存后画面一致；
+/// 否则玻璃会随抽屉位移每帧重新采样整屏背景，开启液态玻璃时转场明显掉帧。
+class _HomeProfileDrawerSnapshot extends StatefulWidget {
+  const _HomeProfileDrawerSnapshot({
+    required this.animation,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  State<_HomeProfileDrawerSnapshot> createState() =>
+      _HomeProfileDrawerSnapshotState();
+}
+
+class _HomeProfileDrawerSnapshotState
+    extends State<_HomeProfileDrawerSnapshot> {
+  final _snapshot = SnapshotController();
+  bool _snapshotScheduled = false;
+
+  bool get _shouldCache =>
+      HazukiLiquidGlass.isAvailable && widget.animation.status.isAnimating;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.animation.addStatusListener(_handleStatus);
+    HazukiLiquidGlass.changes.addListener(_updateSnapshotting);
+    _updateSnapshotting();
+  }
+
+  @override
+  void didUpdateWidget(_HomeProfileDrawerSnapshot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animation != widget.animation) {
+      oldWidget.animation.removeStatusListener(_handleStatus);
+      widget.animation.addStatusListener(_handleStatus);
+      _updateSnapshotting();
+    }
+  }
+
+  void _handleStatus(AnimationStatus status) => _updateSnapshotting();
+
+  void _updateSnapshotting() {
+    if (!_shouldCache) {
+      _snapshot.allowSnapshotting = false;
+      return;
+    }
+    if (_snapshot.allowSnapshotting || _snapshotScheduled) return;
+    _snapshotScheduled = true;
+    // 头像 Hero 在转场首帧之后才起飞并把抽屉内头像替换为占位，
+    // 等这次重建完成再截取，避免把第二个头像烘进缓存。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _snapshotScheduled = false;
+      if (mounted) _snapshot.allowSnapshotting = _shouldCache;
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.animation.removeStatusListener(_handleStatus);
+    HazukiLiquidGlass.changes.removeListener(_updateSnapshotting);
+    _snapshot.dispose();
+    super.dispose();
+  }
+
+  bool _handleRepaint(HomeDrawerRepaintNotification notification) {
+    // 已截取的缓存不会随内容更新，重新截取一次以免动画结束时画面突变。
+    if (_snapshot.allowSnapshotting) _snapshot.clear();
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<HomeDrawerRepaintNotification>(
+        onNotification: _handleRepaint,
+        child: GlassSnapshot(controller: _snapshot, child: widget.child),
+      );
+}
+
 class _HomeProfileDrawerRoute extends PageRoute<void> {
   _HomeProfileDrawerRoute({
     required this.drawerWidth,
@@ -1095,12 +1178,15 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
     return Align(
       alignment: Alignment.centerLeft,
       child: RepaintBoundary(
-        child: Drawer(
-          width: drawerWidth,
-          backgroundColor: drawerColor,
-          child: ValueListenableBuilder<Widget>(
-            valueListenable: drawerContentListenable,
-            builder: (context, drawerContent, _) => drawerContent,
+        child: _HomeProfileDrawerSnapshot(
+          animation: animation,
+          child: Drawer(
+            width: drawerWidth,
+            backgroundColor: drawerColor,
+            child: ValueListenableBuilder<Widget>(
+              valueListenable: drawerContentListenable,
+              builder: (context, drawerContent, _) => drawerContent,
+            ),
           ),
         ),
       ),
