@@ -14,6 +14,7 @@ import '../../../../services/translation/translation_prompt.dart';
 import '../../../../shared/translation/translation_failure_message.dart';
 import '../../../../shared/translation/translation_confirmation_dialog.dart';
 import '../settings_group.dart';
+import 'translation_usage_group.dart';
 
 class MangaTranslationSettingsPage extends StatefulWidget {
   const MangaTranslationSettingsPage({super.key, required this.dependencies});
@@ -441,6 +442,7 @@ class _MangaTranslationSettingsPageState
                           ),
                         ],
                       ),
+                      TranslationUsageGroup(store: widget.dependencies.usage),
                     ],
                   ),
                 );
