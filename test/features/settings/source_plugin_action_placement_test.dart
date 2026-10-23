@@ -737,7 +737,7 @@ void main() {
     ).thenAnswer((_) async {});
     await tester.pumpWidget(_app(ReadingSettingsPage(sourceService: settings)));
     await tester.pumpAndSettle();
-    final dropdown = find.byType(HazukiFrostedDropdown<String>);
+    final dropdown = find.byType(HazukiMenuSettingTile<String>);
     await tester.scrollUntilVisible(dropdown, 300);
     expect(find.text('Image quality'), findsOneWidget);
     expect(

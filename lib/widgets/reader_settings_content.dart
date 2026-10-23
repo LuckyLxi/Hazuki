@@ -560,34 +560,26 @@ class ReaderSettingsContent extends StatelessWidget {
   Widget _buildSourceImageQualityField() {
     return Builder(
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          child: InputDecorator(
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              labelText: sourceImageQuality.title,
-              isDense: true,
-            ),
-            child: HazukiFrostedDropdown<String>(
-              pluginMenu: SourcePluginMenuBinding(
-                menuId: 'reader.imageQuality',
-                sourceKey: sourceImageQuality.sourceKey.isEmpty
-                    ? null
-                    : sourceImageQuality.sourceKey,
-              ),
-              selected: sourceImageQuality.value,
-              tooltip: sourceImageQuality.title,
-              options: sourceImageQuality.options.entries
-                  .map(
-                    (entry) => HazukiFrostedMenuOption<String>(
-                      value: entry.key,
-                      label: entry.value,
-                    ),
-                  )
-                  .toList(),
-              onSelected: onSourceImageQualityChanged,
-            ),
+        return HazukiMenuSettingTile<String>(
+          leading: const Icon(Icons.high_quality_outlined),
+          title: sourceImageQuality.title,
+          subtitle: l10n(context).readingSourceImageQualitySubtitle,
+          pluginMenu: SourcePluginMenuBinding(
+            menuId: 'reader.imageQuality',
+            sourceKey: sourceImageQuality.sourceKey.isEmpty
+                ? null
+                : sourceImageQuality.sourceKey,
           ),
+          selected: sourceImageQuality.value,
+          options: sourceImageQuality.options.entries
+              .map(
+                (entry) => HazukiFrostedMenuOption<String>(
+                  value: entry.key,
+                  label: entry.value,
+                ),
+              )
+              .toList(),
+          onSelected: onSourceImageQualityChanged,
         );
       },
     );

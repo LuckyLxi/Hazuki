@@ -76,19 +76,7 @@ class HazukiFrostedDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String? selectedLabel(List<HazukiFrostedMenuOption<T>> entries) {
-      for (final option in entries) {
-        if (option.children.isEmpty) {
-          if (option.value == selected) return option.label;
-        } else {
-          final label = selectedLabel(option.children);
-          if (label != null) return label;
-        }
-      }
-      return null;
-    }
-
-    final label = selectedLabel(options) ?? '';
+    final label = _selectedLabel(options, selected) ?? '';
     return HazukiFrostedMenuButton<T>(
       options: options,
       selected: selected,
@@ -112,4 +100,113 @@ class HazukiFrostedDropdown<T> extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 单选类设置行：左侧图标、标题与说明，右侧胶囊显示当前取值，点整行弹出毛玻璃菜单。
+class HazukiMenuSettingTile<T> extends StatelessWidget {
+  const HazukiMenuSettingTile({
+    super.key,
+    required this.title,
+    required this.options,
+    required this.onSelected,
+    this.selected,
+    this.subtitle,
+    this.leading,
+    this.enabled = true,
+    this.pluginMenu,
+  });
+
+  final String title;
+  final List<HazukiFrostedMenuOption<T>> options;
+  final ValueChanged<T> onSelected;
+  final T? selected;
+  final String? subtitle;
+  final Widget? leading;
+  final bool enabled;
+  final SourcePluginMenuBinding<T>? pluginMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _selectedLabel(options, selected);
+    return SourcePluginInteraction<T>(
+      binding: pluginMenu,
+      options: options,
+      selected: selected,
+      onSelected: onSelected,
+      label: title,
+      enabled: enabled,
+      builder: (context, activate) => ListTile(
+        enabled: enabled,
+        leading: leading,
+        title: Text(title),
+        subtitle: subtitle == null ? null : Text(subtitle!),
+        trailing: label == null ? null : _MenuValuePill(label: label),
+        onTap: activate,
+      ),
+    );
+  }
+}
+
+class _MenuValuePill extends StatelessWidget {
+  const _MenuValuePill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return ConstrainedBox(
+      // 插件提供的文案长度不可控，限制宽度避免挤压标题。
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.4,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: scheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.expand_more_rounded,
+                size: 18,
+                color: scheme.onSecondaryContainer,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 在可能含子菜单的选项树中查找当前选中项的文案。
+String? _selectedLabel<T>(
+  List<HazukiFrostedMenuOption<T>> entries,
+  T? selected,
+) {
+  for (final option in entries) {
+    if (option.children.isEmpty) {
+      if (option.value == selected) return option.label;
+    } else {
+      final label = _selectedLabel(option.children, selected);
+      if (label != null) return label;
+    }
+  }
+  return null;
 }

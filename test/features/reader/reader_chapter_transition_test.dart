@@ -86,7 +86,7 @@ void main() {
           await tester.pumpAndSettle();
           _host(tester).onOpenSettingsDrawer();
           await tester.pumpAndSettle();
-          final dropdown = find.byType(HazukiFrostedDropdown<String>);
+          final dropdown = find.byType(HazukiMenuSettingTile<String>);
           await tester.scrollUntilVisible(
             dropdown,
             300,
@@ -95,6 +95,8 @@ void main() {
               matching: find.byType(Scrollable),
             ),
           );
+          await tester.ensureVisible(dropdown);
+          await tester.pumpAndSettle();
           await tester.tap(dropdown);
           await tester.pumpAndSettle();
           expect(

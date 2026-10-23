@@ -62,7 +62,7 @@ void main() {
 
   for (final brightness in Brightness.values) {
     testWidgets(
-      'submenus gently dim a shrinking parent and return one leaf value ($brightness)',
+      'submenus grow from the tapped row over a dimmed parent and return one leaf value ($brightness)',
       (tester) async {
         final values = <int>[];
         await _openMenu(
@@ -72,35 +72,39 @@ void main() {
           brightness: brightness,
         );
         final originalParent = tester.getRect(_surface);
+        final row = tester.getRect(find.text('Group'));
         await tester.tap(find.text('Group'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 70));
-        final opacity = find.byKey(
-          const ValueKey('hazuki-frosted-menu-submenu-opacity'),
+        final fade = find.byKey(
+          const ValueKey('hazuki-frosted-menu-content-fade'),
         );
-        expect(tester.widget<Opacity>(opacity).opacity, inExclusiveRange(0, 1));
-        expect(
-          tester.getRect(_surface).width,
-          inExclusiveRange(originalParent.width * 0.96, originalParent.width),
-        );
+        expect(tester.widget<Opacity>(fade).opacity, inExclusiveRange(0.5, 1));
+        expect(tester.getRect(_surface), originalParent);
         await tester.pumpAndSettle();
         expect(_surface, findsOneWidget);
-        expect(
-          tester.getRect(_surface).width,
-          closeTo(originalParent.width * 0.96, 0.01),
+        // 父菜单不再缩小，只压暗并淡化内容。
+        expect(tester.getRect(_surface), originalParent);
+        expect(tester.widget<Opacity>(fade).opacity, closeTo(0.5, 0.001));
+        final submenu = tester.getRect(
+          find.byKey(const ValueKey('hazuki-frosted-menu-submenu-surface')),
         );
-        expect(
-          tester.getRect(_surface).height,
-          closeTo(originalParent.height * 0.96, 0.01),
-        );
-        expect(
-          tester.getRect(_surface).center.dx,
-          closeTo(originalParent.center.dx, 0.01),
-        );
-        expect(
-          tester.getRect(_surface).center.dy,
-          closeTo(originalParent.center.dy, 0.01),
-        );
+        expect(submenu.width, greaterThan(originalParent.width));
+        // 右缘与父菜单对齐，只向左下方展开。
+        expect(submenu.right, closeTo(originalParent.right, 0.01));
+        // 父菜单底色淡出，子菜单的模糊才能采样到页面颜色。
+        final fill =
+            tester
+                    .widget<DecoratedBox>(
+                      find.byKey(const ValueKey('hazuki-frosted-menu-fill')),
+                    )
+                    .decoration
+                as BoxDecoration;
+        expect(fill.gradient!.colors.first.a, lessThan(0.2));
+        // 子菜单标题行落在被点击的那一行上。
+        final headers = find.text('Group');
+        expect(headers, findsNWidgets(2));
+        expect(tester.getRect(headers.last).top, closeTo(row.top, 0.01));
         expect(
           (tester.widget<DecoratedBox>(
             find.byKey(const ValueKey('hazuki-frosted-menu-dim')),
@@ -126,14 +130,8 @@ void main() {
         final originalMiddle = tester.getRect(middleSurface);
         await tester.tap(find.text('More'));
         await tester.pumpAndSettle();
-        expect(
-          tester.getRect(middleSurface).width,
-          closeTo(originalMiddle.width * 0.96, 0.01),
-        );
-        expect(
-          tester.getRect(_surface).width,
-          closeTo(originalParent.width * 0.96, 0.01),
-        );
+        expect(tester.getRect(middleSurface), originalMiddle);
+        expect(tester.getRect(_surface), originalParent);
         for (final prefix in [
           'hazuki-frosted-menu',
           'hazuki-frosted-menu-submenu',
@@ -175,9 +173,13 @@ void main() {
         }
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 70));
+        expect(tester.getRect(_surface), originalParent);
+        final closingDim = tester.widget<DecoratedBox>(
+          find.byKey(const ValueKey('hazuki-frosted-menu-dim')),
+        );
         expect(
-          tester.getRect(_surface).width,
-          inExclusiveRange(originalParent.width * 0.96, originalParent.width),
+          (closingDim.decoration as BoxDecoration).color!.a,
+          inExclusiveRange(0, 0.12),
         );
         await tester.pumpAndSettle();
         expect(_surface, findsOneWidget);
@@ -195,6 +197,22 @@ void main() {
       await tester.tap(find.text('Root option'));
       await tester.pumpAndSettle();
       expect(values, [2]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'submenu grows toward the bottom right without room on the left',
+    (tester) async {
+      await _openMenu(tester, alignment: Alignment.topLeft, options: nested);
+      final parent = tester.getRect(_surface);
+      await tester.tap(find.text('Group'));
+      await tester.pumpAndSettle();
+      final submenu = tester.getRect(
+        find.byKey(const ValueKey('hazuki-frosted-menu-submenu-surface')),
+      );
+      expect(submenu.left, closeTo(parent.left, 0.01));
+      expect(submenu.right, greaterThan(parent.right));
       expect(tester.takeException(), isNull);
     },
   );
@@ -330,4 +348,49 @@ void main() {
     expect(_surface, findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'setting tile shows the value pill and opens from the whole row',
+    (tester) async {
+      var selected = 'mid';
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => HazukiMenuSettingTile<String>(
+                leading: const Icon(Icons.high_quality_outlined),
+                title: 'Quality',
+                subtitle: 'From source',
+                selected: selected,
+                options: const [
+                  HazukiFrostedMenuOption(value: 'low', label: 'Low'),
+                  HazukiFrostedMenuOption(value: 'mid', label: 'Medium'),
+                  HazukiFrostedMenuOption(value: 'high', label: 'High'),
+                ],
+                onSelected: (value) => setState(() => selected = value),
+              ),
+            ),
+          ),
+        ),
+      );
+      final tile = find.byType(HazukiMenuSettingTile<String>);
+      expect(
+        find.descendant(of: tile, matching: find.text('Medium')),
+        findsOneWidget,
+      );
+      // 点标题区域（而非右侧胶囊）也应弹出菜单。
+      await tester.tap(find.text('From source'));
+      await tester.pumpAndSettle();
+      expect(_surface, findsOneWidget);
+      await tester.tap(find.text('High'));
+      await tester.pumpAndSettle();
+      expect(selected, 'high');
+      expect(_surface, findsNothing);
+      expect(
+        find.descendant(of: tile, matching: find.text('High')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
