@@ -1,6 +1,7 @@
 import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import '../../../shared/translation/manga_translation_dependencies.dart';
 
 class ReaderDependencies {
   const ReaderDependencies({
@@ -9,6 +10,7 @@ class ReaderDependencies {
     required this.readingProgressService,
     required this.downloader,
     this.taskControl,
+    this.translation,
   });
 
   final SourceReaderGateway sourceReader;
@@ -16,4 +18,5 @@ class ReaderDependencies {
   final ReadingProgressService readingProgressService;
   final MangaDownloadCommands downloader;
   final SourceTaskControlGateway? taskControl;
+  final MangaTranslationDependencies? translation;
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'translation_file_queue.dart';
 
 enum TranslationProviderPreset {
   openai('https://api.openai.com/v1'),
@@ -66,6 +67,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
   final FlutterSecureStorage _secureStorage;
   Future<void>? _loadFuture;
   late SharedPreferences _prefs;
+  final _providerWrites = TranslationFileQueue();
 
   bool _enabled = false;
   bool _readerModeOn = false;
@@ -164,7 +166,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
     String? baseUrl,
     String? model,
     String? apiKey,
-  }) async {
+  }) => _providerWrites.run(preset.name, () async {
     await load();
     if (baseUrl != null) {
       await _prefs.setString('$_prefix${preset.name}_base_url', baseUrl.trim());
@@ -197,7 +199,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
       );
     }
     notifyListeners();
-  }
+  });
 
   Future<void> setTargetLanguage(TranslationTargetLanguage value) async {
     await load();

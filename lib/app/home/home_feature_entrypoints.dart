@@ -1,3 +1,11 @@
+import '../../shared/translation/manga_translation_dependencies.dart';
+import '../../services/translation/manga_translation_settings_store.dart';
+import '../../services/translation/manga_translation_service.dart';
+import '../../services/translation/manga_translation_provider_factory.dart';
+import '../../services/translation/translation_result_cache.dart';
+import '../../services/translation/translation_glossary_store.dart';
+import '../../services/translation/translation_response_parser.dart';
+import '../../services/translation/translation_usage_store.dart';
 import 'package:hazuki/features/settings/view/plugins/source_plugins_page.dart';
 import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
@@ -109,6 +117,15 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
   }
 
   final readerCommentsBuilder = readerCommentsWidgetBuilderFrom(buildComments);
+  final translationDependencies = MangaTranslationDependencies(
+    settings: sl<MangaTranslationSettingsStore>(),
+    service: sl<MangaTranslationService>(),
+    providers: sl<MangaTranslationProviderFactory>(),
+    cache: sl<TranslationResultCache>(),
+    glossary: sl<TranslationGlossaryStore>(),
+    parser: sl<TranslationResponseParser>(),
+    usage: sl<TranslationUsageStore>(),
+  );
   final comicDetailDependencies = ComicDetailDependencies(
     source: sl<SourceComicDetailGateway>(),
     localFavorites: sl<LocalFavoritesRepository>(),
@@ -119,6 +136,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     taskControl: sl<SourceTaskControlGateway>(),
   );
   final settingsCoreDependencies = SettingsCoreDependencies(
+    translation: translationDependencies,
     sourcePlugins: sl<SourcePluginGateway>(),
     sourceSettings: sl<SourceSettingsGateway>(),
     sourceDebug: sl<SourceDebugGateway>(),
@@ -138,6 +156,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     sourceUpdate: sl<SourceUpdateGateway>(),
   );
   final readerDependencies = ReaderDependencies(
+    translation: translationDependencies,
     taskControl: sl<SourceTaskControlGateway>(),
     sourceReader: sl<SourceReaderGateway>(),
     sourceSettings: sl<SourceSettingsGateway>(),

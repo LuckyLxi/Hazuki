@@ -6,6 +6,7 @@ import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/password_lock_service.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import '../../../shared/translation/manga_translation_dependencies.dart';
 
 class SettingsCoreDependencies {
   const SettingsCoreDependencies({
@@ -24,6 +25,7 @@ class SettingsCoreDependencies {
     required this.sourceScript,
     required this.sourceUpdate,
     this.sourcePlugins,
+    this.translation,
   });
 
   final SourceSettingsGateway sourceSettings;
@@ -41,4 +43,5 @@ class SettingsCoreDependencies {
   final SourceScriptGateway sourceScript;
   final SourceUpdateGateway sourceUpdate;
   final SourcePluginGateway? sourcePlugins;
+  final MangaTranslationDependencies? translation;
 }

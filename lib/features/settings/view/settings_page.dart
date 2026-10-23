@@ -14,6 +14,7 @@ import 'reading_settings_page.dart';
 import 'plugins/source_plugins_page.dart';
 import 'security/privacy_settings_page.dart';
 import 'settings_group.dart';
+import 'translation/manga_translation_settings_page.dart';
 import '../support/settings_core_dependencies.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -147,6 +148,19 @@ class _SettingsPageState extends State<SettingsPage> {
                   );
                 },
               ),
+              if (widget.coreDependencies.translation case final translation?)
+                ListTile(
+                  leading: const Icon(Icons.translate_rounded),
+                  title: Text(strings.translationTitle),
+                  subtitle: Text(strings.translationPrivacy),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => MangaTranslationSettingsPage(
+                        dependencies: translation,
+                      ),
+                    ),
+                  ),
+                ),
               if (!Platform.isWindows)
                 ListTile(
                   leading: Icon(Icons.security_outlined),
