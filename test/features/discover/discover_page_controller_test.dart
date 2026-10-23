@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/discover/state/discover_page_controller.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import '../../support/test_service_locator.dart';
@@ -34,6 +35,49 @@ void main() {
     sl<SourceRuntimeAssembly>().testing.notifyRuntimeView();
 
     expect(notifications, 1);
+  });
+
+  for (final error in <Object>[
+    const SourceTaskCancelled('task', SourceTaskStopReason.sourceChanged),
+    const SourceUiCancelled('runtimeDisposed'),
+  ]) {
+    test(
+      'reloads instead of showing empty after lifecycle stop: $error',
+      () async {
+        final source = _DiscoverGateway(
+          section: ExploreSection(title: 'Comics', comics: _comics(0, 3)),
+          pages: const {},
+          failures: [error],
+        );
+        final controller = DiscoverPageController(
+          sourceService: source,
+          taskControl: FakeSourceTaskControl(),
+        );
+        addTearDown(controller.dispose);
+        addTearDown(source.dispose);
+        await _load(controller);
+        expect(source.exploreLoads, 2);
+        expect(controller.sections, hasLength(1));
+        expect(controller.errorMessage, isNull);
+      },
+    );
+  }
+
+  test('does not retry stops owned by the page itself', () async {
+    final source = _DiscoverGateway(
+      section: ExploreSection(title: 'Comics', comics: _comics(0, 3)),
+      pages: const {},
+      failures: [const SourceTaskCancelled('task', SourceTaskStopReason.user)],
+    );
+    final controller = DiscoverPageController(
+      sourceService: source,
+      taskControl: FakeSourceTaskControl(),
+    );
+    addTearDown(controller.dispose);
+    addTearDown(source.dispose);
+    await _load(controller);
+    expect(source.exploreLoads, 1);
+    expect(controller.sections, isEmpty);
   });
 
   for (final initialPage in [0, 1]) {
@@ -160,11 +204,17 @@ List<ExploreComic> _comics(int start, int count) => List.generate(
 );
 
 class _DiscoverGateway extends ChangeNotifier implements SourceDiscoverGateway {
-  _DiscoverGateway({required this.section, required this.pages});
+  _DiscoverGateway({
+    required this.section,
+    required this.pages,
+    List<Object> failures = const [],
+  }) : _failures = List.of(failures);
 
   final ExploreSection section;
   final Map<int, CategoryComicsResult> pages;
+  final List<Object> _failures;
   final requestedPages = <int>[];
+  var exploreLoads = 0;
 
   @override
   String get activeSourceKey => 'test';
@@ -182,7 +232,12 @@ class _DiscoverGateway extends ChangeNotifier implements SourceDiscoverGateway {
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
     SourceTaskOrigin? taskOrigin,
-  }) async => [section];
+  }) async {
+    exploreLoads++;
+    if (_failures.isNotEmpty) throw _failures.removeAt(0);
+    return [section];
+  }
+
   @override
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,

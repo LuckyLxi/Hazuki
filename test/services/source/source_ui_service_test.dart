@@ -159,6 +159,41 @@ void main() {
     },
   );
 
+  test(
+    'interaction cancellation keeps plain loads but stops browser authorization',
+    () async {
+      final service = SourceUiService();
+      final load = Completer<String>();
+      final browser = Completer<String>();
+      final plain = service.run(() => load.future);
+      final authorizing = service.run(() async {
+        final scope = SourceUiScope.current!..runtimeIds.add('engine');
+        return service.runBrowserAuthorization(
+          () => browser.future,
+          execution: execution(scope),
+          runtimeId: 'engine',
+          timeout: const Duration(seconds: 5),
+        );
+      });
+      final rejected = expectLater(
+        authorizing,
+        throwsA(
+          isA<SourceUiCancelled>().having(
+            (e) => e.reason,
+            'reason',
+            'ownerGone',
+          ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      service.cancelInteractions('ownerGone');
+      await rejected;
+      load.complete('sections');
+      expect(await plain, 'sections');
+      browser.complete('late');
+    },
+  );
+
   test('background callers can create an interaction scope', () async {
     final service = SourceUiService();
     await SourceUiScope.withoutInteraction(

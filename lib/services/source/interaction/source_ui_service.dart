@@ -504,6 +504,19 @@ class SourceUiService {
     }
   }
 
+  /// 只取消正在展示/排队插件弹窗或进行浏览器授权的作用域；
+  /// 常驻页面的普通加载不受影响，避免切页打断后台请求。
+  void cancelInteractions(String reason) {
+    final interactive = <SourceUiScope>{
+      for (final dialog in _dialogs.values)
+        if (!dialog.isClosed) dialog.scope,
+      ..._browserAuthorizations.keys,
+    };
+    for (final scope in interactive) {
+      scope.cancel(reason);
+    }
+  }
+
   void schedulePump() => scheduleMicrotask(() => unawaited(_pump()));
 
   Future<void> _pump() async {

@@ -33,7 +33,8 @@ class HomeShellController extends ChangeNotifier {
       return;
     }
     await HapticFeedback.lightImpact();
-    SourceUiService.instance.cancelAll('ownerGone');
+    // 发现/收藏两页常驻，切页只收起插件交互，不能中断两页仍在进行的加载。
+    SourceUiService.instance.cancelInteractions('ownerGone');
     _currentIndex = index;
     notifyListeners();
   }
