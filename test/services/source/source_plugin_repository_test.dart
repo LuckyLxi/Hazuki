@@ -16,6 +16,15 @@ const _indexUrls = {
       'https://ghproxy.net/https://raw.githubusercontent.com/LuckyLxi/Sources/main/plugins.json',
 };
 
+const _packageUrls = {
+  SoftwareUpdateSource.jsDelivr:
+      'https://cdn.jsdelivr.net/gh/LuckyLxi/Sources@main/fixture.js?token=abc%2Fdef&v=1',
+  SoftwareUpdateSource.github:
+      'https://raw.githubusercontent.com/LuckyLxi/Sources/main/fixture.js?token=abc%2Fdef&v=1',
+  SoftwareUpdateSource.ghproxy:
+      'https://ghproxy.net/https://raw.githubusercontent.com/LuckyLxi/Sources/main/fixture.js?token=abc%2Fdef&v=1',
+};
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
@@ -49,7 +58,7 @@ void main() {
 
   for (final source in SoftwareUpdateSource.values) {
     test(
-      '${source.name} routes only the index and preserves install/update download URLs',
+      '${source.name} routes the index and built-in install/update downloads',
       () async {
         const packageUrl =
             'https://cdn.jsdelivr.net/gh/LuckyLxi/Sources@main/fixture.js?token=abc%2Fdef&v=1';
@@ -75,8 +84,8 @@ void main() {
                 }),
               );
             }
-            if (url.toString() != packageUrl) {
-              throw StateError('Download URL was rewritten');
+            if (!_packageUrls.values.contains(url.toString())) {
+              throw StateError('Unexpected package URL: $url');
             }
             return utf8.encode(
               "Hazuki.registerSource({id:'fixture',name:'Fixture',version:'$version',search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({}),loadEp:async()=>({images:[]})}});",
@@ -93,7 +102,7 @@ void main() {
           sourcePluginsRepositoryUrl,
           manager.entriesFor(sourcePluginsRepositoryUrl).single,
         );
-        expect(requested.last, packageUrl);
+        expect(requested.last, _packageUrls[source]);
         expect(manager.installed.single.repository, sourcePluginsRepositoryUrl);
 
         final nextSource = SoftwareUpdateSource
@@ -107,9 +116,9 @@ void main() {
         await manager.installFromRepository(sourcePluginsRepositoryUrl, update);
         expect(requested, [
           _indexUrls[source],
-          packageUrl,
+          _packageUrls[source],
           _indexUrls[nextSource],
-          packageUrl,
+          _packageUrls[nextSource],
         ]);
         expect(manager.installed.single.manifest.version, '1.1.0');
         expect(manager.installed.single.repository, sourcePluginsRepositoryUrl);
@@ -150,6 +159,75 @@ void main() {
           expect(resolveSourcePluginIndexUrl(url, source), same(url));
         }
       }
+    },
+  );
+
+  test('package route resolver rewrites only built-in repository files', () {
+    for (final address in _packageUrls.values) {
+      for (final source in SoftwareUpdateSource.values) {
+        expect(
+          resolveSourcePluginPackageUrl(Uri.parse(address), source).toString(),
+          _packageUrls[source],
+        );
+      }
+    }
+    for (final address in [
+      'https://cdn.jsdelivr.net/gh/another/Sources@main/fixture.js',
+      'https://raw.githubusercontent.com/another/Sources/main/fixture.js',
+      'https://downloads.example/plugin.js?signature=a%2Fb',
+    ]) {
+      final url = Uri.parse(address);
+      for (final source in SoftwareUpdateSource.values) {
+        expect(resolveSourcePluginPackageUrl(url, source), same(url));
+      }
+    }
+  });
+
+  test(
+    'built-in package download falls back to the index URL when the route fails',
+    () async {
+      final original = _packageUrls[SoftwareUpdateSource.jsDelivr]!;
+      final requested = <String>[];
+      final manager = SourcePluginManager(
+        directory: () async => directory,
+        legacyDirectories: [],
+        download: (url) async {
+          requested.add(url.toString());
+          if (url.toString() == _indexUrls[SoftwareUpdateSource.github]) {
+            return utf8.encode(
+              jsonEncode({
+                'schemaVersion': 1,
+                'plugins': [
+                  {
+                    'id': 'fixture',
+                    'name': 'Fixture',
+                    'version': '1.0.0',
+                    'downloadUrl': original,
+                  },
+                ],
+              }),
+            );
+          }
+          if (url.toString() != original) throw StateError('route offline');
+          return utf8.encode(
+            "Hazuki.registerSource({id:'fixture',name:'Fixture',version:'1.0.0',search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({}),loadEp:async()=>({images:[]})}});",
+          );
+        },
+      );
+      addTearDown(manager.dispose);
+      await manager.setUpdateSource(SoftwareUpdateSource.github);
+      await manager.initialize();
+      await manager.refreshRepository(sourcePluginsRepositoryUrl);
+      await manager.installFromRepository(
+        sourcePluginsRepositoryUrl,
+        manager.entriesFor(sourcePluginsRepositoryUrl).single,
+      );
+      expect(requested, [
+        _indexUrls[SoftwareUpdateSource.github],
+        _packageUrls[SoftwareUpdateSource.github],
+        original,
+      ]);
+      expect(manager.installed.single.manifest.id, 'fixture');
     },
   );
 

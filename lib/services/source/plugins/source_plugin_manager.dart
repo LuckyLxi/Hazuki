@@ -134,6 +134,21 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   Future<List<int>> _downloadPluginIndexBytes(Uri url) async =>
       _download(resolveSourcePluginIndexUrl(url, await _loadUpdateSource()));
 
+  /// 内置仓库的插件包跟随更新源下载；所选线路失败时回退到索引原始地址。
+  Future<List<int>> _downloadPackage(String repository, Uri url) async {
+    if (repository != sourcePluginsRepositoryUrl) return _download(url);
+    final routed = resolveSourcePluginPackageUrl(
+      url,
+      await _loadUpdateSource(),
+    );
+    if (routed == url) return _download(url);
+    try {
+      return await _download(routed);
+    } catch (_) {
+      return _download(url);
+    }
+  }
+
   List<SourceCatalogEntry> get catalog => _installed.values
       .where(
         (plugin) =>
@@ -157,7 +172,25 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     p.join((await getApplicationSupportDirectory()).path, 'source_plugins'),
   );
 
+  /// 网络失败时带上底层原因，避免只显示 `DioException [unknown]: null`。
   static Future<List<int>> _downloadBytes(Uri url) async {
+    try {
+      return await _downloadBytesOnce(url);
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      final cause = error.error ?? error.message;
+      throw SourcePluginException(
+        'plugin_download_failed',
+        [
+          error.type.name,
+          if (status != null) 'HTTP $status',
+          if (cause != null) '$cause',
+        ].join(': '),
+      );
+    }
+  }
+
+  static Future<List<int>> _downloadBytesOnce(Uri url) async {
     final dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 20),
@@ -492,7 +525,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     }
     // Downloads are independent; catalog changes and registry writes must
     // still commit one at a time.
-    final bytes = await _download(entry.downloadUrl);
+    final bytes = await _downloadPackage(repository, entry.downloadUrl);
     await _serialize(() async {
       if (!_repositories.contains(repository)) {
         throw const SourcePluginException('plugin_repository_not_added');

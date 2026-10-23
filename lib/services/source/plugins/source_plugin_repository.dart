@@ -25,6 +25,22 @@ String canonicalSourcePluginUrl(String url) {
   return url;
 }
 
+/// 将内置仓库的插件包地址切换到所选更新源，保留相对路径与查询参数。
+Uri resolveSourcePluginPackageUrl(Uri url, SoftwareUpdateSource source) {
+  final address = url.toString();
+  for (final base in [_githubRawBase, _jsDelivrBase, _ghproxyBase]) {
+    if (!address.startsWith(base)) continue;
+    final path = address.substring(base.length);
+    if (path.isEmpty) return url;
+    return Uri.parse(switch (source) {
+      SoftwareUpdateSource.jsDelivr => '$_jsDelivrBase$path',
+      SoftwareUpdateSource.github => '$_githubRawBase$path',
+      SoftwareUpdateSource.ghproxy => '$_ghproxyBase$path',
+    });
+  }
+  return url;
+}
+
 Uri resolveSourcePluginIndexUrl(Uri url, SoftwareUpdateSource source) {
   final canonical = canonicalSourcePluginUrl(url.toString());
   if (canonical != sourcePluginsRepositoryUrl) return url;
