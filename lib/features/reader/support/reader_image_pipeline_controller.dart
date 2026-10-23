@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:hazuki/shared/source_task_owner.dart';
 
 import 'package:flutter/material.dart';
@@ -218,6 +219,13 @@ class ReaderImagePipelineController {
   Set<String> get retryingImageUrls => _pipelineState.retryingImageUrls;
 
   ImageProvider? cachedProviderFor(String url) => providerCache[url];
+
+  Future<Uint8List?> resolveImageBytes(String url) async {
+    final provider = await getImageProvider(url);
+    if (provider is MemoryImage) return provider.bytes;
+    if (provider is FileImage) return provider.file.readAsBytes();
+    return null;
+  }
 
   bool isRetrying(String url) => retryingImageUrls.contains(url);
 
