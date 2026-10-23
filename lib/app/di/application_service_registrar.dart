@@ -31,9 +31,41 @@ import '../../services/translation/manga_translation_settings_store.dart';
 import '../../services/translation/translation_response_parser.dart';
 import '../../services/translation/translation_result_cache.dart';
 import '../../services/translation/translation_glossary_store.dart';
+import '../../services/translation/manga_translation_service.dart';
+import '../../services/translation/imaging/bubble_snapper.dart';
+import '../../services/translation/imaging/translation_image_processor.dart';
+import '../../services/translation/translation_usage_store.dart';
 
 /// Registers application services against their contract-level dependencies.
 void registerApplicationServices(GetIt services) {
+  if (!services.isRegistered<TranslationUsageStore>()) {
+    services.registerLazySingleton<TranslationUsageStore>(
+      TranslationUsageStore.new,
+      dispose: (store) => store.dispose(),
+    );
+  }
+  if (!services.isRegistered<TranslationImageProcessor>()) {
+    services.registerLazySingleton<TranslationImageProcessor>(
+      TranslationImageProcessor.new,
+    );
+  }
+  if (!services.isRegistered<BubbleSnapper>()) {
+    services.registerLazySingleton<BubbleSnapper>(BubbleSnapper.new);
+  }
+  if (!services.isRegistered<MangaTranslationService>()) {
+    services.registerLazySingleton<MangaTranslationService>(
+      () => MangaTranslationService(
+        settings: services<MangaTranslationSettingsStore>(),
+        cache: services<TranslationResultCache>(),
+        glossary: services<TranslationGlossaryStore>(),
+        providers: services<MangaTranslationProviderFactory>(),
+        imageProcessor: services<TranslationImageProcessor>(),
+        snapper: services<BubbleSnapper>(),
+        parser: services<TranslationResponseParser>(),
+        usageStore: services<TranslationUsageStore>(),
+      ),
+    );
+  }
   if (!services.isRegistered<TranslationResultCache>()) {
     services.registerLazySingleton<TranslationResultCache>(
       TranslationResultCache.new,
