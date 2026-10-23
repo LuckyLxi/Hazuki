@@ -248,6 +248,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     return ReaderTranslationController(
       service: dependencies.service,
       settings: dependencies.settings,
+      models: dependencies.models,
       glossary: dependencies.glossary,
       resolveImageBytes: _imagePipelineController.resolveImageBytes,
       images: () => _noImageModeEnabled ? const [] : _runtimeState.images,
@@ -493,7 +494,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     final controller = _translationController;
     if (controller == null) return;
     try {
-      await controller.settings.load();
+      await controller.load();
       _updateTranslationWindow();
     } catch (_) {
       if (mounted) {
@@ -510,6 +511,12 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     if (!controller.settings.isConfigured) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n(context).translationConfigure)),
+      );
+      return;
+    }
+    if (!controller.ready) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).translationDetectorConfigure)),
       );
       return;
     }

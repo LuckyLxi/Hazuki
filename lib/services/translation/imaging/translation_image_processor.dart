@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:image/image.dart' as img;
 
 import '../manga_translation_provider.dart';
+import '../detection/translation_text_detector.dart';
 import '../models/translation_models.dart';
 
 class TranslationImageSlice {
@@ -15,6 +16,7 @@ class TranslationImageSlice {
     required this.bottom,
     required this.ownedTop,
     required this.ownedBottom,
+    this.detection,
   });
 
   final TranslationImagePayload payload;
@@ -22,6 +24,9 @@ class TranslationImageSlice {
   final double bottom;
   final double ownedTop;
   final double ownedBottom;
+
+  /// 与 [payload] 同一裁剪区域的检测输入；未启用本地检测时为 null。
+  final DetectionImage? detection;
 
   List<TranslationRegion> mapRegions(List<TranslationRegion> regions) {
     final output = <TranslationRegion>[];
@@ -70,7 +75,10 @@ class PreparedTranslationImage {
 class TranslationImageProcessor {
   const TranslationImageProcessor();
 
-  Future<PreparedTranslationImage> prepare(Uint8List bytes) async {
+  Future<PreparedTranslationImage> prepare(
+    Uint8List bytes, {
+    int? detectionMaxSide,
+  }) async {
     // dart:ui 解码由引擎异步完成；纯 Dart 的像素计算交给工作 isolate。
     final codec = await ui.instantiateImageCodec(bytes);
     try {
@@ -86,7 +94,14 @@ class TranslationImageProcessor {
         );
         final width = image.width;
         final height = image.height;
-        return await Isolate.run(() => prepareRgba(rgba, width, height));
+        return await Isolate.run(
+          () => prepareRgba(
+            rgba,
+            width,
+            height,
+            detectionMaxSide: detectionMaxSide,
+          ),
+        );
       } finally {
         image.dispose();
       }
@@ -98,8 +113,9 @@ class TranslationImageProcessor {
   static PreparedTranslationImage prepareRgba(
     Uint8List rgba,
     int width,
-    int height,
-  ) {
+    int height, {
+    int? detectionMaxSide,
+  }) {
     final original = img.Image.fromBytes(
       width: width,
       height: height,
@@ -128,6 +144,9 @@ class TranslationImageProcessor {
         height: bottom - top,
       );
       final resized = _resize(cropped, 1568);
+      final detection = detectionMaxSide == null
+          ? null
+          : _resize(cropped, detectionMaxSide);
       slices.add(
         TranslationImageSlice(
           payload: TranslationImagePayload(
@@ -141,6 +160,13 @@ class TranslationImageProcessor {
           ownedBottom: index == ranges.length - 1
               ? 1
               : (bottom + ranges[index + 1].$1) / 2 / height,
+          detection: detection == null
+              ? null
+              : DetectionImage(
+                  rgba: detection.getBytes(order: img.ChannelOrder.rgba),
+                  width: detection.width,
+                  height: detection.height,
+                ),
         ),
       );
     }

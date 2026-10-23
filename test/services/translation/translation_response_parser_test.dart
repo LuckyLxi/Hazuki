@@ -257,4 +257,132 @@ void main() {
     );
     expect(buildTranslationUserPrompt(), 'Translate this manga image.');
   });
+
+  group('numbered detector responses', () {
+    const boxes = {
+      '0-0': Rect.fromLTRB(0.1, 0.1, 0.3, 0.2),
+      '0-1': Rect.fromLTRB(0.1, 0.2, 0.4, 0.3),
+      '0-2': Rect.fromLTRB(0.6, 0.6, 0.8, 0.7),
+      '0-3': Rect.fromLTRB(0.5, 0.8, 0.9, 0.9),
+    };
+
+    PageTranslationResult parseNumbered(
+      Object regions, {
+      bool translateSfx = false,
+    }) => parser.parseNumbered(
+      jsonEncode({
+        'regions': regions,
+        'terms': [
+          {'src': 'Alice', 'dst': '爱丽丝'},
+        ],
+      }),
+      boxes: boxes,
+      translateSfx: translateSfx,
+    );
+
+    test('unions grouped ids and keeps the first claim of each id', () {
+      final result = parseNumbered([
+        {
+          'ids': ['0-0', '0-1'],
+          'kind': 'bubble',
+          'src': 'Hi there',
+          'dst': '你好',
+          'vertical': true,
+        },
+        {
+          'ids': ['0-1', '0-2'],
+          'kind': 'narration',
+          'dst': '旁白',
+        },
+        {
+          'ids': ['0-1'],
+          'kind': 'bubble',
+          'dst': '重复',
+        },
+      ]);
+      expect(result.regions, hasLength(2));
+      final first = result.regions[0];
+      expect(first.box, const Rect.fromLTRB(0.1, 0.1, 0.4, 0.3));
+      expect(first.sourceVertical, isTrue);
+      expect(first.boxSource, TranslationBoxSource.detector);
+      expect(result.regions[1].box, boxes['0-2']);
+      expect(result.regions[1].kind, TranslationRegionKind.narration);
+      expect(result.terms.single.target, '爱丽丝');
+    });
+
+    test('drops unknown ids, empty translations and unclaimed boxes', () {
+      final result = parseNumbered([
+        {
+          'ids': ['9-9'],
+          'dst': '未知',
+        },
+        {
+          'ids': ['0-0', 'x', 7],
+          'kind': 'bubble',
+          'dst': '保留',
+        },
+        {
+          'ids': ['0-1'],
+          'dst': '  ',
+        },
+        {'ids': 'bad', 'dst': '格式错误'},
+        'not a region',
+      ]);
+      expect(result.regions.single.translatedText, '保留');
+      expect(result.regions.single.box, boxes['0-0']);
+    });
+
+    test('filters scene text unless enabled', () {
+      final regions = [
+        {
+          'ids': ['0-3'],
+          'kind': 'sfx',
+          'dst': '砰',
+        },
+      ];
+      expect(parseNumbered(regions).regions, isEmpty);
+      expect(parseNumbered(regions, translateSfx: true).regions, hasLength(1));
+    });
+
+    test('only malformed JSON is a bad response', () {
+      expect(
+        () =>
+            parser.parseNumbered('not json', boxes: boxes, translateSfx: false),
+        throwsA(
+          isA<TranslationFailure>().having(
+            (error) => error.kind,
+            'kind',
+            TranslationFailureKind.badResponse,
+          ),
+        ),
+      );
+      final fenced = parser.parseNumbered(
+        '```json\n{"regions":[{"ids":["0-0"],"kind":"bubble","dst":"好"}],"terms":"bad"}\n```',
+        boxes: boxes,
+        translateSfx: false,
+      );
+      expect(fenced.regions, hasLength(1));
+      expect(fenced.terms, isEmpty);
+    });
+
+    test('detector prompts carry ids, coordinates and the custom tail', () {
+      final user = buildDetectorTranslationUserPrompt(
+        boxes: boxes,
+        glossary: const [TranslationTerm(source: 'Alice', target: '爱丽丝')],
+      );
+      expect(user, contains('0-0: [100,100,300,200]'));
+      expect(user, contains('0-3: [500,800,900,900]'));
+      expect(user, contains('Alice => 爱丽丝'));
+      final system = buildDetectorTranslationSystemPrompt(
+        targetLanguage: TranslationTargetLanguage.simplifiedChinese,
+        translateSfx: false,
+        customInstructions: 'Keep honorifics.',
+      );
+      expect(system, contains('"ids"'));
+      expect(system, contains('false detections'));
+      expect(system, contains('Keep honorifics.'));
+      expect(system, contains('box ids and grouping rules'));
+      expect(system, isNot(contains('normalized box coordinates')));
+    });
+  });
 }

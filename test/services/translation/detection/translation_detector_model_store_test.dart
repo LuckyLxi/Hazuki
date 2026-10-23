@@ -37,7 +37,9 @@ void main() {
     Uint8List bytes, {
     String? archiveEntry,
     String? digest,
+    Set<String>? keepOutputs,
   }) => TranslationDetectorModelSpec(
+    keepOutputs: keepOutputs,
     id: id,
     version: 1,
     kind: TranslationDetectorKind.paddleDb,
@@ -183,6 +185,27 @@ void main() {
     );
     expect(models.stateOf('broken').failure, DetectorModelFailure.loadFailed);
     expect(await installed('broken').exists(), isFalse);
+    expect(partial().listSync(), isEmpty);
+    models.dispose();
+  });
+
+  test('prunes models with kept outputs before installing them', () async {
+    // 只含 ir_version 字段的最小模型，裁剪后内容不变。
+    final minimal = Uint8List.fromList([0x08, 0x07]);
+    final truncated = Uint8List.fromList([0x3a, 0x10, 0x01]);
+    routes['/minimal.onnx'] = (response) => serve(response, minimal);
+    routes['/truncated.onnx'] = (response) => serve(response, truncated);
+    final models = store([
+      spec('minimal', '/minimal.onnx', minimal, keepOutputs: {'blk'}),
+      spec('truncated', '/truncated.onnx', truncated, keepOutputs: {'blk'}),
+    ]);
+    await models.download('minimal');
+    await models.download('truncated');
+    expect(await installed('minimal').readAsBytes(), minimal);
+    expect(
+      models.stateOf('truncated').failure,
+      DetectorModelFailure.invalidArchive,
+    );
     expect(partial().listSync(), isEmpty);
     models.dispose();
   });

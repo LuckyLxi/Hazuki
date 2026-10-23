@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/services/translation/detection/translation_detector_model_store.dart';
+import 'package:hazuki/services/translation/detection/translation_detector_models.dart';
+import 'package:hazuki/services/translation/detection/translation_text_detector.dart';
 import 'package:hazuki/services/translation/imaging/bubble_snapper.dart';
 import 'package:hazuki/services/translation/imaging/translation_image_processor.dart';
 import 'package:hazuki/services/translation/manga_translation_provider.dart';
@@ -60,12 +64,57 @@ class _Providers extends MangaTranslationProviderFactory {
   }
 }
 
+class _Models extends TranslationDetectorModelStore {
+  _Models(MangaTranslationSettingsStore settings) : super(settings: settings);
+
+  final installed = {'pp_ocrv5_mobile_det', 'comic_text_detector'};
+
+  @override
+  Future<void> load() async {}
+
+  @override
+  DetectorModelState stateOf(String id) => DetectorModelState(
+    status: installed.contains(id)
+        ? DetectorModelStatus.installed
+        : DetectorModelStatus.notInstalled,
+  );
+
+  @override
+  File? modelFile(String id) => isInstalled(id) ? File('$id.onnx') : null;
+}
+
+class _Detector implements TranslationTextDetector {
+  int calls = 0, releases = 0;
+  final models = <String>[];
+  Future<List<Rect>> Function(int call)? respond;
+
+  @override
+  Future<List<Rect>> detect(
+    DetectionImage image,
+    TranslationDetectorModelSpec spec,
+    File model, {
+    CancelToken? cancelToken,
+  }) async {
+    calls++;
+    models.add(spec.id);
+    return respond?.call(calls) ?? const [];
+  }
+
+  @override
+  Future<void> release() async => releases++;
+}
+
 class _Images extends TranslationImageProcessor {
   int sliceCount = 1;
   int calls = 0;
+  final detectionSides = <int?>[];
   @override
-  Future<PreparedTranslationImage> prepare(Uint8List bytes) async {
+  Future<PreparedTranslationImage> prepare(
+    Uint8List bytes, {
+    int? detectionMaxSide,
+  }) async {
     calls++;
+    detectionSides.add(detectionMaxSide);
     return PreparedTranslationImage(
       slices: List.generate(
         sliceCount,
@@ -79,6 +128,9 @@ class _Images extends TranslationImageProcessor {
           bottom: (index + 1) / sliceCount,
           ownedTop: index / sliceCount,
           ownedBottom: (index + 1) / sliceCount,
+          detection: detectionMaxSide == null
+              ? null
+              : DetectionImage(rgba: Uint8List(4), width: 1, height: 1),
         ),
       ),
       snapRgba: Uint8List.fromList([255, 255, 255, 255]),
@@ -98,6 +150,8 @@ void main() {
   late TranslationGlossaryStore glossary;
   late MangaTranslationService service;
   late TranslationUsageStore usage;
+  late _Models models;
+  late _Detector detector;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -106,6 +160,10 @@ void main() {
       'hazuki_translation_service_',
     );
     settings = MangaTranslationSettingsStore();
+    // 既有用例覆盖 AI 定位；本地检测用例各自切换定位方式。
+    await settings.setTextLocator(TranslationTextLocator.ai);
+    models = _Models(settings);
+    detector = _Detector();
     provider = _Provider();
     final providers = _Providers(provider);
     images = _Images();
@@ -123,8 +181,11 @@ void main() {
       snapper: const BubbleSnapper(),
       parser: const TranslationResponseParser(),
       usageStore: usage,
+      models: models,
+      detector: detector,
     );
     addTearDown(providers.dispose);
+    addTearDown(models.dispose);
     addTearDown(settings.dispose);
     addTearDown(usage.dispose);
   });
@@ -337,4 +398,151 @@ void main() {
       expect(await cache.sizeBytes(), 0);
     },
   );
+
+  test('AI locating keeps the first-version cache key', () async {
+    final key = await TranslationResultCache.keyFor(
+      imageBytes: Uint8List.fromList([1, 2, 3]),
+      targetLanguage: 'zh-Hans',
+      providerPreset: TranslationProviderPreset.openai,
+      model: 'gpt',
+      translateSfx: false,
+      reasoningEffort: TranslationReasoningEffort.low,
+      customSystemPrompt: 'style',
+    );
+    // 固定值由引入本地检测前的实现计算得出。
+    expect(key, '03bc8b4c9377746499e3bc5fe2becd28c6a69d53');
+  });
+
+  group('local detection', () {
+    const boxA = Rect.fromLTRB(0.1, 0.2, 0.3, 0.3);
+    const boxB = Rect.fromLTRB(0.1, 0.3, 0.35, 0.4);
+
+    setUp(() async {
+      await settings.setTextLocator(TranslationTextLocator.detector);
+      await settings.setDetectorModelId('pp_ocrv5_mobile_det');
+    });
+
+    test(
+      'numbers boxes per slice, unions grouped ids and skips empty slices',
+      () async {
+        images.sliceCount = 2;
+        detector.respond = (call) async => call == 1 ? [boxA, boxB] : [];
+        provider.respond = (_) async => const ProviderRawResponse(
+          text:
+              '{"regions":[{"ids":["0-0","0-1","9-9"],"kind":"bubble","src":"a","dst":"甲","vertical":false},'
+              '{"ids":["0-0"],"kind":"bubble","src":"b","dst":"重复"}],"terms":[]}',
+          usage: TranslationUsage(inputTokens: 10, outputTokens: 2),
+        );
+        final result = await translate();
+        expect(detector.calls, 2);
+        expect(detector.models, everyElement('pp_ocrv5_mobile_det'));
+        expect(images.detectionSides.single, 960);
+        expect(provider.calls, 1);
+        expect(provider.prompts.single, contains('0-0: [100,200,300,300]'));
+        expect(provider.prompts.single, contains('0-1: [100,300,350,400]'));
+        expect(provider.systemPrompts.single, contains('"ids"'));
+        final region = result.regions.single;
+        expect(region.translatedText, '甲');
+        expect(region.boxSource, TranslationBoxSource.detector);
+        // 第一片覆盖页面上半部分，纵向坐标按切片高度回映。
+        expect(region.box.left, closeTo(0.1, 1e-9));
+        expect(region.box.top, closeTo(0.1, 1e-9));
+        expect(region.box.right, closeTo(0.35, 1e-9));
+        expect(region.box.bottom, closeTo(0.2, 1e-9));
+        final stats = (await usage.load()).values.single;
+        expect(stats.requests, 1);
+      },
+    );
+
+    test(
+      'pages without detected text skip AI but are cached and counted',
+      () async {
+        final result = await translate();
+        expect(result.regions, isEmpty);
+        expect(provider.calls, 0);
+        final stats = (await usage.load()).values.single;
+        expect(stats.pages, 1);
+        expect(stats.requests, 0);
+        expect(stats.inputTokens, 0);
+        await translate();
+        expect(detector.calls, 1);
+      },
+    );
+
+    test('missing models fail before detection or AI', () async {
+      models.installed.remove('pp_ocrv5_mobile_det');
+      await expectLater(
+        translate(),
+        throwsA(
+          isA<TranslationFailure>().having(
+            (error) => error.kind,
+            'kind',
+            TranslationFailureKind.detectorUnavailable,
+          ),
+        ),
+      );
+      await settings.setDetectorModelId(null);
+      await expectLater(translate(), throwsA(isA<TranslationFailure>()));
+      expect(detector.calls, 0);
+      expect(provider.calls, 0);
+    });
+
+    test('locator and model changes use isolated caches', () async {
+      detector.respond = (_) async => [boxA];
+      provider.respond = (_) async => const ProviderRawResponse(
+        text: '{"regions":[{"ids":["0-0"],"dst":"甲"}],"terms":[]}',
+        usage: TranslationUsage(),
+      );
+      await translate();
+      expect(provider.calls, 1);
+      await settings.setTextLocator(TranslationTextLocator.ai);
+      provider.respond = null;
+      await translate();
+      expect(provider.calls, 2);
+      expect(provider.systemPrompts.last, isNot(contains('"ids"')));
+      await settings.setTextLocator(TranslationTextLocator.detector);
+      await translate();
+      expect(provider.calls, 2);
+      await settings.setDetectorModelId('comic_text_detector');
+      await translate();
+      expect(detector.models.last, 'comic_text_detector');
+      expect(images.detectionSides.last, 1024);
+      expect(provider.calls, 3);
+    });
+
+    test(
+      'cancelling during detection prevents AI requests and cache writes',
+      () async {
+        final started = Completer<void>();
+        final release = Completer<List<Rect>>();
+        detector.respond = (_) {
+          started.complete();
+          return release.future;
+        };
+        final token = CancelToken();
+        final assertion = expectLater(
+          translate(token: token),
+          throwsA(
+            isA<TranslationFailure>().having(
+              (error) => error.kind,
+              'kind',
+              TranslationFailureKind.cancelled,
+            ),
+          ),
+        );
+        await started.future;
+        token.cancel();
+        release.complete([boxA]);
+        await assertion;
+        expect(provider.calls, 0);
+        expect(await cache.sizeBytes(), 0);
+        expect(await usage.load(), isEmpty);
+      },
+    );
+
+    test('releases the detector on request', () async {
+      await service.releaseDetector();
+      expect(detector.releases, 1);
+    });
+  });
 }

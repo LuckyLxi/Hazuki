@@ -2,7 +2,7 @@ import 'dart:ui';
 
 enum TranslationRegionKind { bubble, narration, sfx, other }
 
-enum TranslationBoxSource { ai }
+enum TranslationBoxSource { ai, detector }
 
 class TranslationRegion {
   const TranslationRegion({

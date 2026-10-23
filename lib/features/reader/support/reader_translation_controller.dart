@@ -9,6 +9,8 @@ import '../../../services/translation/manga_translation_settings_store.dart';
 import '../../../services/translation/models/translation_models.dart';
 import '../../../services/translation/translation_failure.dart';
 import '../../../services/translation/translation_glossary_store.dart';
+import '../../../services/translation/translation_readiness.dart';
+import '../../../services/translation/detection/translation_detector_model_store.dart';
 
 enum PageTranslationStatus { idle, queued, translating, done, failed }
 
@@ -29,6 +31,7 @@ class ReaderTranslationController extends ChangeNotifier {
   ReaderTranslationController({
     required MangaTranslationService service,
     required this.settings,
+    required this.models,
     required this.glossary,
     required Future<Uint8List?> Function(String url) resolveImageBytes,
     required List<String> Function() images,
@@ -48,10 +51,13 @@ class ReaderTranslationController extends ChangeNotifier {
     settings.addListener(_settingsChanged);
     _reasoningEffort = settings.reasoningEffort;
     _customSystemPrompt = settings.customSystemPrompt;
+    _textLocator = settings.textLocator;
+    _detectorModelId = settings.detectorModelId;
   }
 
   final MangaTranslationService _service;
   final MangaTranslationSettingsStore settings;
+  final TranslationDetectorModelStore models;
   final TranslationGlossaryStore glossary;
   final Future<Uint8List?> Function(String url) _resolveImageBytes;
   final List<String> Function() _images;
@@ -69,18 +75,26 @@ class ReaderTranslationController extends ChangeNotifier {
   bool _disposed = false, _tripped = false;
   late TranslationReasoningEffort _reasoningEffort;
   late String _customSystemPrompt;
+  late TranslationTextLocator _textLocator;
+  late String? _detectorModelId;
 
+  /// 服务商已配置，且定位方式所需的检测模型可用。
+  bool get ready => isMangaTranslationReady(settings, models);
   bool get modeOn =>
-      !_tripped &&
-      settings.enabled &&
-      settings.readerModeOn &&
-      settings.isConfigured;
+      !_tripped && settings.enabled && settings.readerModeOn && ready;
   ValueListenable<PageTranslationView> pageState(String url) => _state(url);
   ValueNotifier<PageTranslationView> _state(String url) =>
       _states.putIfAbsent(url, () => ValueNotifier(PageTranslationView()));
 
+  /// 加载翻译设置与已安装模型，并按最新状态同步翻译窗口。
+  Future<void> load() async {
+    await settings.load();
+    await models.load();
+    _settingsChanged();
+  }
+
   Future<void> toggleMode() async {
-    if (!settings.isConfigured) return;
+    if (!ready) return;
     _failures = 0;
     _tripped = false;
     await settings.setReaderModeOn(!settings.readerModeOn);
@@ -89,15 +103,21 @@ class ReaderTranslationController extends ChangeNotifier {
   void _settingsChanged() {
     if (_disposed) return;
     if (_reasoningEffort != settings.reasoningEffort ||
-        _customSystemPrompt != settings.customSystemPrompt) {
+        _customSystemPrompt != settings.customSystemPrompt ||
+        _textLocator != settings.textLocator ||
+        _detectorModelId != settings.detectorModelId) {
       _reasoningEffort = settings.reasoningEffort;
       _customSystemPrompt = settings.customSystemPrompt;
+      _textLocator = settings.textLocator;
+      _detectorModelId = settings.detectorModelId;
       reset();
     }
     if (modeOn) {
       updateWindow(_index);
     } else {
       _cancelAll();
+      // 关闭翻译模式时释放检测模型；再次开启时按需重新加载。
+      unawaited(_service.releaseDetector());
     }
     notifyListeners();
   }
@@ -204,9 +224,11 @@ class ReaderTranslationController extends ChangeNotifier {
       _failures++;
       if (_failures >= 3 ||
           failure.kind == TranslationFailureKind.unauthorized ||
-          failure.kind == TranslationFailureKind.quotaExceeded) {
+          failure.kind == TranslationFailureKind.quotaExceeded ||
+          failure.kind == TranslationFailureKind.detectorUnavailable) {
         _tripped = true;
         _cancelAll();
+        unawaited(_service.releaseDetector());
         await settings.setReaderModeOn(false);
         if (!_disposed) _onFailure(failure);
       }
@@ -278,6 +300,7 @@ class ReaderTranslationController extends ChangeNotifier {
     _disposed = true;
     settings.removeListener(_settingsChanged);
     _cancelAll();
+    unawaited(_service.releaseDetector());
     for (final state in _states.values) {
       state.dispose();
     }

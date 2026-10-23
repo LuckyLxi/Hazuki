@@ -14,6 +14,20 @@ import 'models/translation_models.dart';
 import 'translation_file_queue.dart';
 import 'translation_prompt.dart';
 
+/// 本地检测前后处理的版本；改动检测参数或框编号规则时递增。
+const kDetectorProcessingVersion = 1;
+
+/// 本地检测模式下参与缓存键的模型信息。
+class TranslationDetectorCacheKey {
+  const TranslationDetectorCacheKey({
+    required this.modelId,
+    required this.modelSha256,
+  });
+
+  final String modelId;
+  final String modelSha256;
+}
+
 class TranslationResultCache {
   TranslationResultCache({
     Future<Directory> Function()? supportDirectory,
@@ -35,24 +49,38 @@ class TranslationResultCache {
     TranslationReasoningEffort reasoningEffort =
         TranslationReasoningEffort.providerDefault,
     String customSystemPrompt = '',
-  }) => Isolate.run(
-    () => sha1
-        .convert(
-          utf8.encode(
-            jsonEncode([
-              sha1.convert(imageBytes).toString(),
-              targetLanguage,
-              providerPreset.name,
-              model,
-              translateSfx,
-              kTranslationPromptVersion,
-              reasoningEffort.name,
-              customSystemPrompt.trim(),
-            ]),
-          ),
-        )
-        .toString(),
-  );
+    TranslationDetectorCacheKey? detector,
+  }) {
+    final modelId = detector?.modelId;
+    final modelSha256 = detector?.modelSha256;
+    return Isolate.run(
+      () => sha1
+          .convert(
+            utf8.encode(
+              jsonEncode([
+                sha1.convert(imageBytes).toString(),
+                targetLanguage,
+                providerPreset.name,
+                model,
+                translateSfx,
+                modelId == null
+                    ? kTranslationPromptVersion
+                    : kDetectorTranslationPromptVersion,
+                reasoningEffort.name,
+                customSystemPrompt.trim(),
+                // AI 定位不追加任何字段，保证第一版缓存键不变。
+                if (modelId != null) ...[
+                  'detector',
+                  modelId,
+                  modelSha256,
+                  kDetectorProcessingVersion,
+                ],
+              ]),
+            ),
+          )
+          .toString(),
+    );
+  }
 
   Future<Directory> _directory() async => Directory(
     p.join((await _supportDirectory()).path, 'manga_translation', 'cache'),

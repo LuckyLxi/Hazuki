@@ -26,6 +26,7 @@ class TranslationDetectorModelSpec {
     required this.license,
     required this.detectionMaxSide,
     this.archiveEntry,
+    this.keepOutputs,
     this.db = const DbPostProcessParams(),
   });
 
@@ -44,6 +45,9 @@ class TranslationDetectorModelSpec {
 
   /// tar 包内要提取的模型文件名；为 null 时下载文件即模型。
   final String? archiveEntry;
+
+  /// 安装时只保留这些图输出并裁掉其余分支；为 null 时保持原模型。
+  final Set<String>? keepOutputs;
   final DbPostProcessParams db;
 }
 
@@ -58,6 +62,8 @@ const kTranslationDetectorModels = [
     sha256: '1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f',
     license: 'GPL-3.0',
     detectionMaxSide: 1024,
+    // 只用 YOLO 文字块输出；分割与 DB 头的 ConvTranspose 在 CPU 上极慢。
+    keepOutputs: {'blk'},
   ),
   TranslationDetectorModelSpec(
     id: 'pp_ocrv5_mobile_det',

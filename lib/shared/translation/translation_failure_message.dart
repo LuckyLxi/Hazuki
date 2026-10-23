@@ -13,4 +13,7 @@ String translationFailureMessage(
   TranslationFailureKind.badResponse => strings.translationBadResponse,
   TranslationFailureKind.server => strings.translationServer,
   TranslationFailureKind.unknown => strings.translationUnknown,
+  TranslationFailureKind.detectorUnavailable =>
+    strings.translationDetectorUnavailable,
+  TranslationFailureKind.detectorFailed => strings.translationDetectorFailed,
 };

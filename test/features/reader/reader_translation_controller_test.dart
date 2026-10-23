@@ -10,6 +10,7 @@ import 'package:hazuki/services/translation/manga_translation_settings_store.dar
 import 'package:hazuki/services/translation/models/translation_models.dart';
 import 'package:hazuki/services/translation/translation_failure.dart';
 import 'package:hazuki/services/translation/translation_glossary_store.dart';
+import 'package:hazuki/services/translation/detection/translation_detector_model_store.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -37,11 +38,33 @@ class _Service extends Mock implements MangaTranslationService {
       ),
     ]);
   }
+
+  int releases = 0;
+
+  @override
+  Future<void> releaseDetector() async => releases++;
+}
+
+class _Models extends TranslationDetectorModelStore {
+  _Models(MangaTranslationSettingsStore settings) : super(settings: settings);
+
+  final installed = {'pp_ocrv5_mobile_det', 'comic_text_detector'};
+
+  @override
+  Future<void> load() async {}
+
+  @override
+  DetectorModelState stateOf(String id) => DetectorModelState(
+    status: installed.contains(id)
+        ? DetectorModelStatus.installed
+        : DetectorModelStatus.notInstalled,
+  );
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late MangaTranslationSettingsStore settings;
+  late _Models models;
   late _Service service;
   late ReaderTranslationController controller;
   late List<TranslationFailure> failures;
@@ -60,12 +83,15 @@ void main() {
       model: 'vision',
       apiKey: 'key',
     );
+    await settings.setDetectorModelId('pp_ocrv5_mobile_det');
+    models = _Models(settings);
     size = 1;
     service = _Service();
     failures = [];
     controller = ReaderTranslationController(
       service: service,
       settings: settings,
+      models: models,
       glossary: TranslationGlossaryStore(),
       resolveImageBytes: (url) async => Uint8List.fromList([int.parse(url)]),
       images: () => List.generate(10, (index) => '$index'),
@@ -80,6 +106,7 @@ void main() {
   });
   tearDown(() {
     controller.dispose();
+    models.dispose();
     settings.dispose();
   });
 
@@ -242,6 +269,115 @@ void main() {
       expect(service.calls, hasLength(3));
     },
   );
+
+  test(
+    'switching locator or detector model discards results and cancels requests',
+    () async {
+      await settings.setPrefetchAhead(0);
+      await tick();
+      service.pending[0].complete(empty);
+      await tick();
+      expect(
+        controller.pageState('0').value.status,
+        PageTranslationStatus.done,
+      );
+      await settings.setDetectorModelId('comic_text_detector');
+      await tick();
+      expect(controller.pageState('0').value.result, isNull);
+      expect(service.calls, hasLength(2));
+      await settings.setTextLocator(TranslationTextLocator.ai);
+      await tick();
+      expect(service.calls[1].$2.isCancelled, isTrue);
+      expect(service.calls, hasLength(3));
+    },
+  );
+
+  test(
+    'a missing detector model keeps the mode off until AI locating is chosen',
+    () async {
+      await settings.setPrefetchAhead(0);
+      await tick();
+      expect(controller.modeOn, isTrue);
+      final releasesBefore = service.releases;
+      models.installed.remove('pp_ocrv5_mobile_det');
+      await settings.setDetectorModelId('pp_ocrv5_mobile_det');
+      await settings.setTargetLanguage(TranslationTargetLanguage.english);
+      await tick();
+      expect(controller.ready, isFalse);
+      expect(controller.modeOn, isFalse);
+      expect(service.calls.single.$2.isCancelled, isTrue);
+      expect(service.releases, greaterThan(releasesBefore));
+      await controller.toggleMode();
+      expect(settings.readerModeOn, isTrue);
+
+      await settings.setTextLocator(TranslationTextLocator.ai);
+      await tick();
+      expect(controller.modeOn, isTrue);
+      expect(service.calls, hasLength(2));
+    },
+  );
+
+  test(
+    'unavailable detectors trip immediately and release the detector',
+    () async {
+      await settings.setPrefetchAhead(0);
+      await tick();
+      final releasesBefore = service.releases;
+      service.pending.single.completeError(
+        const TranslationFailure(TranslationFailureKind.detectorUnavailable),
+      );
+      await tick();
+      await tick();
+      expect(settings.readerModeOn, isFalse);
+      expect(failures.single.kind, TranslationFailureKind.detectorUnavailable);
+      expect(service.releases, greaterThan(releasesBefore));
+    },
+  );
+
+  test('detector inference failures count toward the breaker', () async {
+    await settings.setPrefetchAhead(0);
+    await tick();
+    service.pending.single.completeError(
+      const TranslationFailure(TranslationFailureKind.detectorFailed),
+    );
+    await tick();
+    expect(settings.readerModeOn, isTrue);
+    expect(
+      controller.pageState('0').value.failure?.kind,
+      TranslationFailureKind.detectorFailed,
+    );
+    service.respond = (_) async =>
+        throw const TranslationFailure(TranslationFailureKind.detectorFailed);
+    controller.updateWindow(1);
+    await tick();
+    controller.updateWindow(2);
+    await tick();
+    await tick();
+    expect(settings.readerModeOn, isFalse);
+    expect(failures.single.kind, TranslationFailureKind.detectorFailed);
+  });
+
+  test('disposing the reader releases the detector', () async {
+    final releasesBefore = service.releases;
+    controller.updateWindow(0);
+    await tick();
+    controller.dispose();
+    expect(service.releases, releasesBefore + 1);
+    controller = ReaderTranslationController(
+      service: service,
+      settings: settings,
+      models: models,
+      glossary: TranslationGlossaryStore(),
+      resolveImageBytes: (url) async => Uint8List.fromList([int.parse(url)]),
+      images: () => const [],
+      spreadImageIndices: (index) => [index],
+      spreadStartIndex: (index) => index,
+      spreadSize: () => 1,
+      sourceKey: 'source',
+      comicId: 'comic',
+      onFailure: failures.add,
+    );
+  });
 
   test('single page state changes do not notify the entire reader', () async {
     var notifications = 0;

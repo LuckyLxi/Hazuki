@@ -36,6 +36,8 @@ import '../../services/translation/imaging/bubble_snapper.dart';
 import '../../services/translation/imaging/translation_image_processor.dart';
 import '../../services/translation/translation_usage_store.dart';
 import '../../services/translation/detection/translation_detector_model_store.dart';
+import '../../services/translation/detection/onnx_translation_text_detector.dart';
+import '../../services/translation/detection/translation_text_detector.dart';
 
 /// Registers application services against their contract-level dependencies.
 void registerApplicationServices(GetIt services) {
@@ -43,8 +45,16 @@ void registerApplicationServices(GetIt services) {
     services.registerLazySingleton<TranslationDetectorModelStore>(
       () => TranslationDetectorModelStore(
         settings: services<MangaTranslationSettingsStore>(),
+        verifyLoadable: (spec, model) =>
+            OnnxTranslationTextDetector.verifyModel(model),
       ),
       dispose: (store) => store.dispose(),
+    );
+  }
+  if (!services.isRegistered<TranslationTextDetector>()) {
+    services.registerLazySingleton<TranslationTextDetector>(
+      OnnxTranslationTextDetector.new,
+      dispose: (detector) => detector.release(),
     );
   }
   if (!services.isRegistered<TranslationUsageStore>()) {
@@ -72,6 +82,8 @@ void registerApplicationServices(GetIt services) {
         snapper: services<BubbleSnapper>(),
         parser: services<TranslationResponseParser>(),
         usageStore: services<TranslationUsageStore>(),
+        models: services<TranslationDetectorModelStore>(),
+        detector: services<TranslationTextDetector>(),
       ),
     );
   }

@@ -12,6 +12,12 @@ enum TranslationFailureKind {
   badResponse,
   server,
   unknown,
+
+  /// 检测模型缺失或无法加载。
+  detectorUnavailable,
+
+  /// 检测模型推理失败。
+  detectorFailed,
 }
 
 class TranslationFailure implements Exception {

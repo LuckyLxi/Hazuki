@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../network/hazuki_network_factory.dart';
 import '../manga_translation_settings_store.dart';
+import 'onnx_model_pruner.dart';
 import 'translation_detector_models.dart';
 
 enum DetectorModelStatus { notInstalled, downloading, failed, installed }
@@ -159,6 +160,7 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     final partial = Directory(p.join(root.path, '.partial'));
     final downloaded = File(p.join(partial.path, '${spec.id}.download'));
     final extracted = File(p.join(partial.path, '${spec.id}.onnx'));
+    final pruned = File(p.join(partial.path, '${spec.id}.pruned.onnx'));
     try {
       await partial.create(recursive: true);
       final stopwatch = Stopwatch()..start();
@@ -200,11 +202,9 @@ class TranslationDetectorModelStore extends ChangeNotifier {
         );
       }
       _checkCancelled(token);
-      final File model;
+      var model = downloaded;
       final entry = spec.archiveEntry;
-      if (entry == null) {
-        model = downloaded;
-      } else {
+      if (entry != null) {
         final found = await _extractInIsolate(path, entry, extracted.path);
         if (!found) {
           throw const _ModelDownloadFailure(
@@ -212,6 +212,18 @@ class TranslationDetectorModelStore extends ChangeNotifier {
           );
         }
         model = extracted;
+      }
+      _checkCancelled(token);
+      final keep = spec.keepOutputs;
+      if (keep != null) {
+        try {
+          await _pruneInIsolate(model.path, pruned.path, keep);
+        } on FormatException {
+          throw const _ModelDownloadFailure(
+            DetectorModelFailure.invalidArchive,
+          );
+        }
+        model = pruned;
       }
       _checkCancelled(token);
       final verify = verifyLoadable;
@@ -252,7 +264,7 @@ class TranslationDetectorModelStore extends ChangeNotifier {
       };
     } finally {
       if (identical(_tokens[spec.id], token)) _tokens.remove(spec.id);
-      for (final file in [downloaded, extracted]) {
+      for (final file in [downloaded, extracted, pruned]) {
         try {
           if (await file.exists()) await file.delete();
         } on FileSystemException {
@@ -287,6 +299,17 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     String entry,
     String output,
   ) => Isolate.run(() => _extractTarEntry(archive, entry, output));
+
+  static Future<void> _pruneInIsolate(
+    String source,
+    String output,
+    Set<String> keep,
+  ) => Isolate.run(
+    () => File(output).writeAsBytesSync(
+      pruneOnnxGraphOutputs(File(source).readAsBytesSync(), keep),
+      flush: true,
+    ),
+  );
 
   /// 从 tar 包中只提取指定文件名的条目，忽略包内 `.cache` 等杂项。
   static bool _extractTarEntry(String archive, String entry, String output) {
