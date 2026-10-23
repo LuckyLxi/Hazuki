@@ -623,6 +623,8 @@
   "readingPinchToZoomSubtitle": "启用后可双指捏合对漫画图片进行放大查看",
   "readingLongPressSaveTitle": "长按保存图片",
   "readingLongPressSaveSubtitle": "启用后长按漫画图片可保存该图片",
+  "readingRestorePagePositionTitle": "恢复上次阅读页码",
+  "readingRestorePagePositionSubtitle": "继续阅读时跳转到上次退出时所在的页",
   "readerWindowsShortcutsTitle": "Windows 阅读器快捷键",
   "readerWindowsShortcutsIntro": "阅读时可以使用以下键盘和鼠标快捷键：",
   "readerWindowsShortcutsZoom": "按住 Alt 并滚动鼠标滚轮以放大或缩小",

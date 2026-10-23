@@ -595,6 +595,8 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   bool _entryReady = false;
   bool _entrySettingsReady = false;
   bool _entryStarted = false;
+  // 为空表示开关尚未读取，读取完成前不执行入口恢复。
+  bool? _restorePagePosition;
   int? _restoringImage;
 
   void _cancelEntryRestore() {
@@ -607,12 +609,13 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         !_entryReady ||
         !_entrySettingsReady ||
         _entryStarted ||
+        _restorePagePosition == null ||
         _runtimeState.imageCount == 0) {
       return;
     }
     _entryStarted = true;
     final position = _entryPosition;
-    if (position?['epId'] != widget.page.epId) {
+    if (_restorePagePosition != true || position?['epId'] != widget.page.epId) {
       _scheduleViewportReport();
       return;
     }
@@ -819,6 +822,21 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     super.didChangeDependencies();
     if (!_entryReady) {
       _entryReady = true;
+      unawaited(
+        _readerSettingsStore.loadRestorePagePosition().then(
+          (value) {
+            if (!mounted) return;
+            // 读取完成前用户可能已在侧栏切换，以用户操作为准。
+            _restorePagePosition ??= value;
+            _maybeRestoreEntry();
+          },
+          onError: (Object _) {
+            if (!mounted) return;
+            _restorePagePosition = false;
+            _maybeRestoreEntry();
+          },
+        ),
+      );
       _entryPosition = widget.restoreEntry
           ? ReaderEntryPosition.of(context)
           : null;
@@ -1052,6 +1070,12 @@ class _ReaderPageState extends State<_ReaderChapterPage>
           _settingsController.toggleVolumeButtonTurnPage,
       onPinchToZoomChanged: _settingsController.togglePinchToZoom,
       onLongPressToSaveChanged: _settingsController.toggleLongPressToSave,
+      // 只影响下次进入阅读器，本次已完成的入口恢复不会重新执行。
+      restorePagePosition: _restorePagePosition ?? false,
+      onRestorePagePositionChanged: (value) {
+        setState(() => _restorePagePosition = value);
+        unawaited(_readerSettingsStore.saveRestorePagePosition(value));
+      },
       onImmersiveModeChanged: _settingsController.toggleImmersiveMode,
       onKeepScreenOnChanged: _settingsController.toggleKeepScreenOn,
       onPageIndicatorChanged: _settingsController.togglePageIndicator,

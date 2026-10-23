@@ -37,6 +37,7 @@ class ReadingSettingsController extends ChangeNotifier {
   bool pageIndicator = ReaderSettingsStore.defaultPageIndicator;
   bool pinchToZoom = ReaderSettingsStore.defaultPinchToZoom;
   bool longPressToSave = ReaderSettingsStore.defaultLongPressToSave;
+  bool restorePagePosition = ReaderSettingsStore.defaultRestorePagePosition;
   late ReaderSourceImageQualitySnapshot sourceImageQuality;
 
   void _notify() {
@@ -47,6 +48,7 @@ class ReadingSettingsController extends ChangeNotifier {
 
   Future<void> loadSettings() async {
     final settings = await _settingsStore.load();
+    final restorePage = await _settingsStore.loadRestorePagePosition();
     final sourceSettings = ReaderSourceImageQualitySettings.load(
       _sourceService,
       (_sourceService.activeSourceKey ?? ''),
@@ -68,6 +70,7 @@ class ReadingSettingsController extends ChangeNotifier {
     pageIndicator = settings.pageIndicator;
     pinchToZoom = settings.pinchToZoom;
     longPressToSave = settings.longPressToSave;
+    restorePagePosition = restorePage;
     sourceImageQuality = sourceSettings;
     _notify();
   }
@@ -159,6 +162,12 @@ class ReadingSettingsController extends ChangeNotifier {
     longPressToSave = value;
     _notify();
     await _settingsStore.saveLongPressToSave(value);
+  }
+
+  Future<void> toggleRestorePagePosition(bool value) async {
+    restorePagePosition = value;
+    _notify();
+    await _settingsStore.saveRestorePagePosition(value);
   }
 
   Future<void> updateSourceImageQuality(String? value) async {

@@ -49,6 +49,8 @@ class ReaderSettingsContent extends StatelessWidget {
     this.onShowWindowsShortcuts,
     this.onClose,
     this.pageFooter,
+    this.restorePagePosition = false,
+    this.onRestorePagePositionChanged,
   });
 
   final ReaderSettingsSurface surface;
@@ -87,6 +89,10 @@ class ReaderSettingsContent extends StatelessWidget {
   final VoidCallback? onShowWindowsShortcuts;
   final VoidCallback? onClose;
   final Widget? pageFooter;
+  final bool restorePagePosition;
+
+  /// 为空时不显示该开关。
+  final ValueChanged<bool>? onRestorePagePositionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +147,16 @@ class ReaderSettingsContent extends StatelessWidget {
               value: longPressToSave,
               onChanged: onLongPressToSaveChanged,
             ),
+            if (onRestorePagePositionChanged != null)
+              SwitchListTile(
+                secondary: const Icon(Icons.bookmark_outline),
+                title: Text(l10n(context).readingRestorePagePositionTitle),
+                subtitle: Text(
+                  l10n(context).readingRestorePagePositionSubtitle,
+                ),
+                value: restorePagePosition,
+                onChanged: onRestorePagePositionChanged,
+              ),
           ],
         ),
         _PageSettingsGroup(
@@ -283,6 +299,18 @@ class ReaderSettingsContent extends StatelessWidget {
                 value: longPressToSave,
                 onChanged: onLongPressToSaveChanged,
               ),
+              if (onRestorePagePositionChanged != null) ...[
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.bookmark_outline),
+                  title: Text(l10n(context).readingRestorePagePositionTitle),
+                  subtitle: Text(
+                    l10n(context).readingRestorePagePositionSubtitle,
+                  ),
+                  value: restorePagePosition,
+                  onChanged: onRestorePagePositionChanged,
+                ),
+              ],
             ],
           ),
           _DrawerSettingsGroup(

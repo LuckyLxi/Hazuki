@@ -42,6 +42,8 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     required this.onSourceImageQualityChanged,
     required this.onShowWindowsShortcuts,
     required this.onClose,
+    this.restorePagePosition = false,
+    this.onRestorePagePositionChanged,
   });
 
   final ReaderMode readerMode;
@@ -78,6 +80,8 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   final ValueChanged<String?> onSourceImageQualityChanged;
   final VoidCallback? onShowWindowsShortcuts;
   final VoidCallback onClose;
+  final bool restorePagePosition;
+  final ValueChanged<bool>? onRestorePagePositionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +121,8 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
       onSourceImageQualityChanged: onSourceImageQualityChanged,
       onShowWindowsShortcuts: onShowWindowsShortcuts,
       onClose: onClose,
+      restorePagePosition: restorePagePosition,
+      onRestorePagePositionChanged: onRestorePagePositionChanged,
     );
   }
 }

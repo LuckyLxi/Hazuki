@@ -623,6 +623,8 @@
   "readingPinchToZoomSubtitle": "Allow two-finger pinch gestures to zoom comic images",
   "readingLongPressSaveTitle": "Long press to save images",
   "readingLongPressSaveSubtitle": "Allow saving the current comic image by long pressing it",
+  "readingRestorePagePositionTitle": "Restore last read page",
+  "readingRestorePagePositionSubtitle": "Jump to the page you left off when continuing reading",
   "readerWindowsShortcutsTitle": "Windows reader shortcuts",
   "readerWindowsShortcutsIntro": "Use these keyboard and mouse shortcuts while reading:",
   "readerWindowsShortcutsZoom": "Hold Alt and scroll the mouse wheel to zoom in or out",

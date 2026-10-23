@@ -58,6 +58,7 @@ class ReaderSettingsStore {
   static const String pageIndicatorKey = 'reader_page_indicator';
   static const String pinchToZoomKey = 'reader_pinch_to_zoom';
   static const String longPressToSaveKey = 'reader_long_press_save';
+  static const String restorePagePositionKey = 'reader_restore_page_position';
   static const String windowsShortcutsGuideSeenKey =
       'reader_windows_shortcuts_guide_seen';
 
@@ -75,6 +76,7 @@ class ReaderSettingsStore {
   static const bool defaultPageIndicator = false;
   static const bool defaultPinchToZoom = false;
   static const bool defaultLongPressToSave = false;
+  static const bool defaultRestorePagePosition = false;
 
   Future<ReaderSettingsSnapshot> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -157,6 +159,16 @@ class ReaderSettingsStore {
 
   Future<void> saveLongPressToSave(bool value) {
     return _saveBool(longPressToSaveKey, value);
+  }
+
+  /// 仅在进入阅读器时读取一次，不放入快照，避免影响阅读器内设置抽屉。
+  Future<bool> loadRestorePagePosition() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(restorePagePositionKey) ?? defaultRestorePagePosition;
+  }
+
+  Future<void> saveRestorePagePosition(bool value) {
+    return _saveBool(restorePagePositionKey, value);
   }
 
   Future<bool> hasSeenWindowsShortcutsGuide() async {

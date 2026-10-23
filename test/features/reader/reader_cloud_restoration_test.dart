@@ -86,6 +86,7 @@ void main() {
               ReaderSettingsStore.readingModeKey: mode,
               ReaderSettingsStore.doublePageModeKey: doublePage,
               ReaderSettingsStore.windowsShortcutsGuideSeenKey: true,
+              ReaderSettingsStore.restorePagePositionKey: true,
             });
             await ensureTestServiceLocator();
             final previous = hazukiNoImageModeNotifier.value;

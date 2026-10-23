@@ -84,6 +84,8 @@ Widget buildReaderSettingsDrawer({
   required ReaderSourceImageQualitySnapshot sourceImageQuality,
   required ValueChanged<String?> onSourceImageQualityChanged,
   required VoidCallback? onShowWindowsShortcuts,
+  bool restorePagePosition = false,
+  ValueChanged<bool>? onRestorePagePositionChanged,
 }) {
   final drawerWidth = math.min(MediaQuery.sizeOf(context).width * 0.88, 360.0);
 
@@ -141,6 +143,8 @@ Widget buildReaderSettingsDrawer({
                   onSourceImageQualityChanged: onSourceImageQualityChanged,
                   onShowWindowsShortcuts: onShowWindowsShortcuts,
                   onClose: () => Navigator.of(drawerContext).pop(),
+                  restorePagePosition: restorePagePosition,
+                  onRestorePagePositionChanged: onRestorePagePositionChanged,
                 ),
               ),
             ),
