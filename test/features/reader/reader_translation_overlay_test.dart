@@ -1,0 +1,252 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/features/reader/support/reader_translation_controller.dart';
+import 'package:hazuki/features/reader/view/reader_translation_overlay.dart';
+import 'package:hazuki/features/reader/view/reader_translation_actions_sheet.dart';
+import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
+import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/translation/manga_translation_settings_store.dart';
+import 'package:hazuki/services/translation/models/translation_models.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _Controller extends Mock implements ReaderTranslationController {}
+
+void main() {
+  final result = PageTranslationResult(
+    regions: const [
+      TranslationRegion(
+        id: 'r0',
+        box: Rect.fromLTRB(0.25, 0.25, 0.75, 0.75),
+        kind: TranslationRegionKind.bubble,
+        sourceText: 'Hello',
+        translatedText: '你好',
+        sourceVertical: false,
+      ),
+    ],
+    terms: [],
+  );
+  Widget app(Widget child) => MaterialApp(
+    theme: ThemeData(fontFamily: 'NotoSansSC'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    locale: const Locale('en'),
+    home: Scaffold(body: Center(child: child)),
+  );
+
+  testWidgets(
+    'maps letterboxed image coordinates and inherits the theme font',
+    (tester) async {
+      final controller = _Controller();
+      final settings = MangaTranslationSettingsStore();
+      final state = ValueNotifier(
+        PageTranslationView(status: PageTranslationStatus.done, result: result),
+      );
+      addTearDown(settings.dispose);
+      addTearDown(state.dispose);
+      when(() => controller.modeOn).thenReturn(true);
+      when(() => controller.settings).thenReturn(settings);
+      when(() => controller.pageState('page')).thenReturn(state);
+      await tester.pumpWidget(
+        app(
+          SizedBox(
+            width: 400,
+            height: 300,
+            child: ReaderTranslatedImage(
+              controller: controller,
+              url: 'page',
+              aspectRatio: () => 2,
+              contain: true,
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+      );
+      final imageBounds = tester.getRect(find.byType(ReaderTranslatedImage));
+      final region = tester.getRect(
+        find.byKey(const ValueKey('translation-region-r0')),
+      );
+      expect(
+        region,
+        Rect.fromLTWH(imageBounds.left + 100, imageBounds.top + 100, 200, 100),
+      );
+      expect(
+        tester.widget<Text>(find.text('你好')).style!.fontFamily,
+        'NotoSansSC',
+      );
+      expect(
+        readerTranslationImageRect(const Size(400, 300), 2),
+        const Rect.fromLTWH(0, 50, 400, 200),
+      );
+    },
+  );
+
+  testWidgets(
+    'list mode fills its aspect ratio and off mode builds no overlay',
+    (tester) async {
+      final controller = _Controller();
+      final settings = MangaTranslationSettingsStore();
+      final state = ValueNotifier(
+        PageTranslationView(status: PageTranslationStatus.done, result: result),
+      );
+      addTearDown(settings.dispose);
+      addTearDown(state.dispose);
+      when(() => controller.modeOn).thenReturn(true);
+      when(() => controller.settings).thenReturn(settings);
+      when(() => controller.pageState('page')).thenReturn(state);
+      Widget content() => SizedBox(
+        width: 200,
+        height: 400,
+        child: ReaderTranslatedImage(
+          controller: controller,
+          url: 'page',
+          aspectRatio: () => 0.5,
+          contain: false,
+          child: const SizedBox.expand(),
+        ),
+      );
+      await tester.pumpWidget(app(content()));
+      final imageBounds = tester.getRect(find.byType(ReaderTranslatedImage));
+      expect(
+        tester.getRect(find.byKey(const ValueKey('translation-region-r0'))),
+        Rect.fromLTWH(imageBounds.left + 50, imageBounds.top + 100, 100, 200),
+      );
+      when(() => controller.modeOn).thenReturn(false);
+      await tester.pumpWidget(app(content()));
+      expect(find.byType(ReaderTranslationOverlay), findsNothing);
+      state.value = PageTranslationView(
+        status: PageTranslationStatus.translating,
+      );
+      when(() => controller.modeOn).thenReturn(true);
+      await tester.pumpWidget(app(content()));
+      expect(find.byType(ReaderTranslationOverlay), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'long press inside toggles only and outside preserves image save',
+    (tester) async {
+      var saved = 0, toggled = 0;
+      final original = ValueNotifier(false);
+      addTearDown(original.dispose);
+      await tester.pumpWidget(
+        app(
+          GestureDetector(
+            onLongPress: () => saved++,
+            child: SizedBox(
+              width: 400,
+              height: 400,
+              child: ColoredBox(
+                color: Colors.grey,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: original,
+                  builder: (context, value, _) => ReaderTranslationOverlay(
+                    view: PageTranslationView(
+                      status: PageTranslationStatus.done,
+                      result: result,
+                      originalRegions: value ? {'r0'} : {},
+                    ),
+                    bubbleStyle: TranslationBubbleStyle.sampled,
+                    onToggleRegion: (_) {
+                      toggled++;
+                      original.value = !value;
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final center = tester.getCenter(
+        find.byKey(const ValueKey('translation-region-r0')),
+      );
+      await tester.longPressAt(center);
+      await tester.pump();
+      expect(toggled, 1);
+      expect(saved, 0);
+      expect(find.text('你好'), findsNothing);
+      await tester.longPressAt(center);
+      await tester.pump();
+      expect(toggled, 2);
+      expect(saved, 0);
+      expect(find.text('你好'), findsOneWidget);
+      final bounds = tester.getRect(find.byType(ReaderTranslationOverlay));
+      await tester.longPressAt(bounds.topLeft + const Offset(20, 20));
+      await tester.pump();
+      expect(saved, 1);
+      expect(toggled, 2);
+    },
+  );
+
+  testWidgets('bottom action is optional and forwards tap and long press', (
+    tester,
+  ) async {
+    final runtime = ReaderRuntimeState()
+      ..applyImages(['page'])
+      ..setControlsVisible(true);
+    addTearDown(runtime.dispose);
+    var taps = 0, presses = 0;
+    Widget controls(bool enabled) => Builder(
+      builder: (context) => buildReaderBottomControls(
+        context: context,
+        runtimeState: runtime,
+        readerTheme: Theme.of(context),
+        chapterPanelLoading: false,
+        maybeTriggerSliderHaptic: (_, {force = false}) {},
+        updateState: (update) => update(),
+        goToPage: (_) async {},
+        onResetZoom: () {},
+        onTranslation: enabled ? () => taps++ : null,
+        onTranslationLongPress: enabled ? () => presses++ : null,
+        translationSelected: enabled,
+      ),
+    );
+    await tester.pumpWidget(app(controls(false)));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.translate_rounded), findsNothing);
+    await tester.pumpWidget(app(controls(true)));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.translate_rounded), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.translate_rounded));
+    await tester.longPress(find.byIcon(Icons.translate_rounded));
+    expect(taps, 1);
+    expect(presses, 1);
+  });
+
+  for (final action in ReaderTranslationAction.values) {
+    testWidgets('translation menu returns ${action.name}', (tester) async {
+      ReaderTranslationAction? selected;
+      await tester.pumpWidget(
+        app(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                selected = await showModalBottomSheet<ReaderTranslationAction>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => const ReaderTranslationActionsSheet(),
+                );
+              },
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      const labels = [
+        'Translate this page again',
+        'Glossary for this comic',
+        'Clear glossary for this comic',
+      ];
+      for (final label in labels) {
+        expect(find.text(label), findsOneWidget);
+      }
+      await tester.tap(find.text(labels[action.index]));
+      await tester.pumpAndSettle();
+      expect(selected, action);
+    });
+  }
+}

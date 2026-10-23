@@ -42,6 +42,10 @@ import 'package:hazuki/features/reader/view/reader_windows_shortcuts_dialog.dart
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import '../state/reader_scroll_state.dart';
+import '../support/reader_translation_controller.dart';
+import 'reader_translation_actions_sheet.dart';
+import '../../../shared/translation/translation_failure_message.dart';
+import '../../../shared/translation/translation_confirmation_dialog.dart';
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
@@ -238,6 +242,33 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   final ReaderRuntimeState _runtimeState = ReaderRuntimeState();
   final ReaderImagePipelineState _imagePipelineState =
       ReaderImagePipelineState();
+  late final ReaderTranslationController? _translationController = () {
+    final dependencies = widget.page.dependencies.translation;
+    if (dependencies == null) return null;
+    return ReaderTranslationController(
+      service: dependencies.service,
+      settings: dependencies.settings,
+      glossary: dependencies.glossary,
+      resolveImageBytes: _imagePipelineController.resolveImageBytes,
+      images: () => _noImageModeEnabled ? const [] : _runtimeState.images,
+      spreadImageIndices: _runtimeState.spreadImageIndices,
+      spreadStartIndex: _runtimeState.spreadStartIndex,
+      spreadSize: () => _runtimeState.readerSpreadSize,
+      sourceKey: _pageContext.sourceKey,
+      comicId: widget.page.comicId,
+      onFailure: (failure) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                translationFailureMessage(l10n(context), failure.kind),
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }();
   late final ReaderPageContext _pageContext = ReaderPageContext(
     title: widget.page.title,
     chapterTitle: widget.page.chapterTitle,
@@ -324,7 +355,10 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   late final ReaderNavigationPrefetch _navigationPrefetch =
       ReaderNavigationPrefetch(
         noImageModeEnabled: () => _noImageModeEnabled,
-        prefetchAround: _imagePipelineController.prefetchAround,
+        prefetchAround: (index) {
+          _imagePipelineController.prefetchAround(index);
+          _translationController?.updateWindow(index);
+        },
         requestPrefetchAhead: _imagePipelineController.requestPrefetchAhead,
       );
   late final ReaderNavigationController _navigationController =
@@ -354,8 +388,11 @@ class _ReaderPageState extends State<_ReaderChapterPage>
           pageController: _pageController,
           focusNode: _readerKeyFocusNode,
           zoomController: _zoomController,
-          onNoImageModeChanged:
-              _imagePipelineController.handleNoImageModeChanged,
+          onNoImageModeChanged: () {
+            _imagePipelineController.handleNoImageModeChanged();
+            _translationController?.reset();
+            _updateTranslationWindow();
+          },
           onScrollPositionChanged:
               _navigationController.handleScrollPositionChanged,
           onZoomChanged: _readerZoomController.onZoomChanged,
@@ -421,6 +458,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         onChapterChanged: (chapter, {animate = true}) {
           _progressReporter.close('chapter');
           _imagePipelineController.retire();
+          _translationController?.reset();
           _actionsController.dispose(SourceTaskStopReason.superseded);
           widget.onChapterChanged(chapter, animate: animate);
         },
@@ -441,6 +479,90 @@ class _ReaderPageState extends State<_ReaderChapterPage>
 
   WindowTitleBarControl? _windowsTitleBarController;
 
+  void _translationModeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _updateTranslationWindow() {
+    if (mounted && !_noImageModeEnabled) {
+      _translationController?.updateWindow(_runtimeState.currentPageIndex);
+    }
+  }
+
+  Future<void> _loadTranslationSettings() async {
+    final controller = _translationController;
+    if (controller == null) return;
+    try {
+      await controller.settings.load();
+      _updateTranslationWindow();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n(context).translationSettingsFailed)),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleTranslation() async {
+    final controller = _translationController;
+    if (controller == null) return;
+    if (!controller.settings.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).translationConfigure)),
+      );
+      return;
+    }
+    try {
+      await controller.toggleMode();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n(context).translationSettingsFailed)),
+        );
+      }
+    }
+  }
+
+  Future<void> _translationMenu() async {
+    final controller = _translationController;
+    if (controller == null) return;
+    final action = await showModalBottomSheet<ReaderTranslationAction>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => const ReaderTranslationActionsSheet(),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case ReaderTranslationAction.retranslate:
+        controller.retranslateVisible();
+      case ReaderTranslationAction.glossary:
+        await showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          isScrollControlled: true,
+          builder: (_) =>
+              ReaderTranslationGlossarySheet(controller: controller),
+        );
+      case ReaderTranslationAction.clearGlossary:
+        if (await confirmTranslationClear(context)) {
+          try {
+            await controller.glossary.clear(
+              controller.sourceKey,
+              controller.comicId,
+            );
+          } catch (_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l10n(context).translationUnknown)),
+              );
+            }
+          }
+        }
+    }
+  }
+
   bool get _noImageModeEnabled => hazukiNoImageModeNotifier.value;
 
   ReaderImageViews get _imageViews => ReaderImageViews(
@@ -460,9 +582,11 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     blockPageScrolling: _inputState.blockPageScrolling,
     wrapImageWidget: _wrapImageWidget,
     noImageModeEnabled: _noImageModeEnabled,
+    translationController: _translationController,
     onFrameDisplayed: (index) {
       _displayedImages.add(index);
       _reportActualViewport();
+      _updateTranslationWindow();
     },
   );
 
@@ -676,6 +800,9 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _sessionController.initialize();
+    _translationController?.addListener(_translationModeChanged);
+    _runtimeState.pageIndexNotifier.addListener(_updateTranslationWindow);
+    unawaited(_loadTranslationSettings());
     _sourceImageQuality = ReaderSourceImageQualitySettings.load(
       _sourceSettings,
       (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
@@ -738,6 +865,8 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   @override
   void dispose() {
     _windowsTitleBarController?.releaseCustomTitleBarSuppression(this);
+    _runtimeState.pageIndexNotifier.removeListener(_updateTranslationWindow);
+    _translationController?.dispose();
     _resetAnimController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _cloudReadCancellation.cancel(SourceTaskStopReason.ownerDisposed);
@@ -830,6 +959,14 @@ class _ReaderPageState extends State<_ReaderChapterPage>
                   : () {
                       unawaited(_actionsController.openCommentsSheet());
                     },
+              onTranslation: _translationController?.settings.enabled == true
+                  ? _toggleTranslation
+                  : null,
+              onTranslationLongPress:
+                  _translationController?.settings.enabled == true
+                  ? _translationMenu
+                  : null,
+              translationSelected: _translationController?.modeOn ?? false,
               onNextChapter: () {
                 unawaited(_actionsController.jumpToAdjacentChapter(1));
               },

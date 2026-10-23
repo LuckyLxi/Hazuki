@@ -10,6 +10,8 @@ import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import '../support/reader_translation_controller.dart';
+import 'reader_translation_overlay.dart';
 
 class ReaderImageViews {
   const ReaderImageViews({
@@ -30,6 +32,7 @@ class ReaderImageViews {
     required this.blockPageScrolling,
     required this.wrapImageWidget,
     required this.noImageModeEnabled,
+    this.translationController,
   });
 
   final BuildContext context;
@@ -49,6 +52,19 @@ class ReaderImageViews {
   final bool blockPageScrolling;
   final Widget Function(Widget imageWidget, String url) wrapImageWidget;
   final bool noImageModeEnabled;
+  final ReaderTranslationController? translationController;
+
+  Widget _withTranslation(Widget child, String url, {required bool contain}) {
+    final controller = translationController;
+    if (controller == null) return child;
+    return ReaderTranslatedImage(
+      controller: controller,
+      url: url,
+      aspectRatio: () => imagePipelineState.imageAspectRatioCache[url],
+      contain: contain,
+      child: child,
+    );
+  }
 
   ThemeData resolveReaderTheme([BuildContext? buildContext]) {
     final targetContext = buildContext ?? context;
@@ -126,34 +142,38 @@ class ReaderImageViews {
 
     Widget buildImage(ImageProvider provider) {
       return wrapImageWidget(
-        ColoredBox(
-          color: readerSurfaceColor,
-          child: Center(
-            child: Image(
-              key: ValueKey('reader-page-$url'),
-              image: provider,
-              fit: BoxFit.contain,
-              width: double.infinity,
-              height: double.infinity,
-              filterQuality: FilterQuality.medium,
-              gaplessPlayback: false,
-              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                if (wasSynchronouslyLoaded || frame != null) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (context.mounted) onFrameDisplayed?.call(imageIndex);
-                  });
-                  return child;
-                }
-                return ColoredBox(color: readerSurfaceColor);
-              },
-              errorBuilder: (_, _, _) {
-                return _buildReaderImageErrorView(
-                  url,
-                  backgroundColor: readerPlaceholderColor,
-                );
-              },
+        _withTranslation(
+          ColoredBox(
+            color: readerSurfaceColor,
+            child: Center(
+              child: Image(
+                key: ValueKey('reader-page-$url'),
+                image: provider,
+                fit: BoxFit.contain,
+                width: double.infinity,
+                height: double.infinity,
+                filterQuality: FilterQuality.medium,
+                gaplessPlayback: false,
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (wasSynchronouslyLoaded || frame != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (context.mounted) onFrameDisplayed?.call(imageIndex);
+                    });
+                    return child;
+                  }
+                  return ColoredBox(color: readerSurfaceColor);
+                },
+                errorBuilder: (_, _, _) {
+                  return _buildReaderImageErrorView(
+                    url,
+                    backgroundColor: readerPlaceholderColor,
+                  );
+                },
+              ),
             ),
           ),
+          url,
+          contain: true,
         ),
         url,
       );
@@ -338,7 +358,10 @@ class ReaderImageViews {
                 child: image,
               ),
             );
-      return wrapImageWidget(stableImage, url);
+      return wrapImageWidget(
+        _withTranslation(stableImage, url, contain: false),
+        url,
+      );
     }
 
     if (cachedProvider != null) {

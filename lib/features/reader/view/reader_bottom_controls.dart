@@ -25,6 +25,10 @@ class ReaderBottomControls extends StatelessWidget {
     this.onPreviousChapter,
     this.onFavorite,
     this.onComments,
+    this.onTranslation,
+    this.onTranslationLongPress,
+    this.translationSelected = false,
+    this.translationTooltip = '',
     this.onNextChapter,
     required this.onResetZoom,
     required this.isZoomed,
@@ -51,6 +55,10 @@ class ReaderBottomControls extends StatelessWidget {
   final VoidCallback? onPreviousChapter;
   final VoidCallback? onFavorite;
   final VoidCallback? onComments;
+  final VoidCallback? onTranslation;
+  final VoidCallback? onTranslationLongPress;
+  final bool translationSelected;
+  final String translationTooltip;
   final VoidCallback? onNextChapter;
   final VoidCallback onResetZoom;
   final bool isZoomed;
@@ -159,6 +167,11 @@ class ReaderBottomControls extends StatelessWidget {
                                     onOpenChaptersPanel: onOpenChaptersPanel,
                                     onFavorite: onFavorite,
                                     onComments: onComments,
+                                    onTranslation: onTranslation,
+                                    onTranslationLongPress:
+                                        onTranslationLongPress,
+                                    translationSelected: translationSelected,
+                                    translationTooltip: translationTooltip,
                                     onNextChapter: onNextChapter,
                                     onResetZoom: onResetZoom,
                                     resetZoomTargetKey: resetZoomTargetKey,
@@ -489,6 +502,10 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
     required this.onOpenChaptersPanel,
     required this.onFavorite,
     required this.onComments,
+    this.onTranslation,
+    this.onTranslationLongPress,
+    this.translationSelected = false,
+    this.translationTooltip = '',
     required this.onNextChapter,
     required this.onResetZoom,
     required this.resetZoomTargetKey,
@@ -517,6 +534,10 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
   final VoidCallback? onOpenChaptersPanel;
   final VoidCallback? onFavorite;
   final VoidCallback? onComments;
+  final VoidCallback? onTranslation;
+  final VoidCallback? onTranslationLongPress;
+  final bool translationSelected;
+  final String translationTooltip;
   final VoidCallback? onNextChapter;
   final VoidCallback onResetZoom;
   final GlobalKey resetZoomTargetKey;
@@ -525,7 +546,10 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasTopActions =
-        onOpenChaptersPanel != null || onFavorite != null || onComments != null;
+        onOpenChaptersPanel != null ||
+        onFavorite != null ||
+        onComments != null ||
+        onTranslation != null;
     return ReaderControlSurface(
       borderRadius: 30,
       fallbackColor: Colors.black.withValues(alpha: 0.68),
@@ -600,6 +624,31 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
                     onPressed: onComments,
                     icon: Icons.mode_comment_outlined,
                   ),
+                if (onTranslation != null) ...[
+                  if (onOpenChaptersPanel != null ||
+                      onFavorite != null ||
+                      onComments != null)
+                    const SizedBox(
+                      width: ReaderOverlayLayout.bottomControlsIconGap,
+                    ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      border: translationSelected
+                          ? Border.all(
+                              color: readerTheme.colorScheme.primary,
+                              width: 2,
+                            )
+                          : null,
+                    ),
+                    child: _ReaderBarIconButton(
+                      tooltip: translationTooltip,
+                      onPressed: onTranslation,
+                      onLongPress: onTranslationLongPress,
+                      icon: Icons.translate_rounded,
+                    ),
+                  ),
+                ],
               ],
             ),
           if (hasTopActions)
@@ -808,12 +857,14 @@ class _ReaderBarIconButton extends StatelessWidget {
     required this.onPressed,
     required this.icon,
     this.loading = false,
+    this.onLongPress,
   });
 
   final String tooltip;
   final VoidCallback? onPressed;
   final IconData icon;
   final bool loading;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -829,6 +880,7 @@ class _ReaderBarIconButton extends StatelessWidget {
           padding: EdgeInsets.zero,
           visualDensity: VisualDensity.standard,
           onPressed: onPressed,
+          onLongPress: onLongPress,
           icon: loading
               ? SizedBox(
                   width: 18,

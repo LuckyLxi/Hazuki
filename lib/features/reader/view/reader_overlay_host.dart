@@ -25,6 +25,9 @@ class ReaderOverlayHost extends StatelessWidget {
     this.onPreviousChapter,
     this.onFavorite,
     this.onComments,
+    this.onTranslation,
+    this.onTranslationLongPress,
+    this.translationSelected = false,
     this.onNextChapter,
     required this.onResetZoom,
   });
@@ -43,6 +46,9 @@ class ReaderOverlayHost extends StatelessWidget {
   final VoidCallback? onPreviousChapter;
   final VoidCallback? onFavorite;
   final VoidCallback? onComments;
+  final VoidCallback? onTranslation;
+  final VoidCallback? onTranslationLongPress;
+  final bool translationSelected;
   final VoidCallback? onNextChapter;
   final VoidCallback onResetZoom;
 
@@ -112,6 +118,9 @@ class ReaderOverlayHost extends StatelessWidget {
           onPreviousChapter: onPreviousChapter,
           onFavorite: onFavorite,
           onComments: onComments,
+          onTranslation: onTranslation,
+          onTranslationLongPress: onTranslationLongPress,
+          translationSelected: translationSelected,
           onNextChapter: onNextChapter,
           onResetZoom: onResetZoom,
         ),
