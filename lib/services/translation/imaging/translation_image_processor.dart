@@ -1,0 +1,167 @@
+import 'dart:isolate';
+import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:image/image.dart' as img;
+
+import '../manga_translation_provider.dart';
+import '../models/translation_models.dart';
+
+class TranslationImageSlice {
+  const TranslationImageSlice({
+    required this.payload,
+    required this.top,
+    required this.bottom,
+    required this.ownedTop,
+    required this.ownedBottom,
+  });
+
+  final TranslationImagePayload payload;
+  final double top;
+  final double bottom;
+  final double ownedTop;
+  final double ownedBottom;
+
+  List<TranslationRegion> mapRegions(List<TranslationRegion> regions) {
+    final output = <TranslationRegion>[];
+    for (final region in regions) {
+      final box = ui.Rect.fromLTRB(
+        region.box.left,
+        top + region.box.top * (bottom - top),
+        region.box.right,
+        top + region.box.bottom * (bottom - top),
+      );
+      final center = box.center.dy;
+      if (center < ownedTop || center >= ownedBottom && ownedBottom < 1) {
+        continue;
+      }
+      output.add(
+        TranslationRegion(
+          id: region.id,
+          box: box,
+          kind: region.kind,
+          sourceText: region.sourceText,
+          translatedText: region.translatedText,
+          sourceVertical: region.sourceVertical,
+          backgroundColor: region.backgroundColor,
+          boxSource: region.boxSource,
+        ),
+      );
+    }
+    return output;
+  }
+}
+
+class PreparedTranslationImage {
+  const PreparedTranslationImage({
+    required this.slices,
+    required this.snapRgba,
+    required this.snapWidth,
+    required this.snapHeight,
+  });
+
+  final List<TranslationImageSlice> slices;
+  final Uint8List snapRgba;
+  final int snapWidth;
+  final int snapHeight;
+}
+
+class TranslationImageProcessor {
+  const TranslationImageProcessor();
+
+  Future<PreparedTranslationImage> prepare(Uint8List bytes) async {
+    // dart:ui 解码由引擎异步完成；纯 Dart 的像素计算交给工作 isolate。
+    final codec = await ui.instantiateImageCodec(bytes);
+    try {
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      try {
+        final data = (await image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        ))!;
+        final rgba = data.buffer.asUint8List(
+          data.offsetInBytes,
+          data.lengthInBytes,
+        );
+        final width = image.width;
+        final height = image.height;
+        return await Isolate.run(() => prepareRgba(rgba, width, height));
+      } finally {
+        image.dispose();
+      }
+    } finally {
+      codec.dispose();
+    }
+  }
+
+  static PreparedTranslationImage prepareRgba(
+    Uint8List rgba,
+    int width,
+    int height,
+  ) {
+    final original = img.Image.fromBytes(
+      width: width,
+      height: height,
+      bytes: rgba.buffer,
+      bytesOffset: rgba.offsetInBytes,
+      numChannels: 4,
+    );
+    final sliceHeight = height / width > 2
+        ? math.max(1, (width * 1.6).round())
+        : height;
+    final step = math.max(1, (sliceHeight * 0.9).round());
+    final ranges = <(int, int)>[];
+    for (var top = 0; top < height; top += step) {
+      final bottom = math.min(height, top + sliceHeight);
+      ranges.add((top, bottom));
+      if (bottom == height) break;
+    }
+    final slices = <TranslationImageSlice>[];
+    for (var index = 0; index < ranges.length; index++) {
+      final (top, bottom) = ranges[index];
+      final cropped = img.copyCrop(
+        original,
+        x: 0,
+        y: top,
+        width: width,
+        height: bottom - top,
+      );
+      final resized = _resize(cropped, 1568);
+      slices.add(
+        TranslationImageSlice(
+          payload: TranslationImagePayload(
+            jpegBytes: img.encodeJpg(resized, quality: 85),
+            width: resized.width,
+            height: resized.height,
+          ),
+          top: top / height,
+          bottom: bottom / height,
+          ownedTop: index == 0 ? 0 : (top + ranges[index - 1].$2) / 2 / height,
+          ownedBottom: index == ranges.length - 1
+              ? 1
+              : (bottom + ranges[index + 1].$1) / 2 / height,
+        ),
+      );
+    }
+    final snap = _resize(original, 1024);
+    return PreparedTranslationImage(
+      slices: slices,
+      snapRgba: snap.getBytes(order: img.ChannelOrder.rgba),
+      snapWidth: snap.width,
+      snapHeight: snap.height,
+    );
+  }
+
+  static img.Image _resize(img.Image image, int maximum) {
+    final longest = math.max(image.width, image.height);
+    if (longest <= maximum) return image;
+    final ratio = maximum / longest;
+    return img.copyResize(
+      image,
+      width: math.max(1, (image.width * ratio).round()),
+      height: math.max(1, (image.height * ratio).round()),
+      interpolation: img.Interpolation.linear,
+    );
+  }
+}
