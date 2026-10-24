@@ -31,59 +31,6 @@ abstract interface class SourceCloudReadingGateway {
 
 abstract interface class SourceCloudReadingEvents implements Listenable {}
 
-mixin SourceCloudReadingAdapter
-    implements SourceCloudReadingGateway, SourceCloudReadingEvents {
-  Object get cloudReadingDelegate;
-  @override
-  void addListener(VoidCallback listener) {
-    final delegate = cloudReadingDelegate;
-    if (delegate is SourceCloudReadingEvents) delegate.addListener(listener);
-  }
-
-  @override
-  void removeListener(VoidCallback listener) {
-    final delegate = cloudReadingDelegate;
-    if (delegate is SourceCloudReadingEvents) delegate.removeListener(listener);
-  }
-
-  @override
-  Future<bool> usesCloudReading(
-    String sourceKey, {
-    SourceTaskOrigin? taskOrigin,
-  }) async {
-    final delegate = cloudReadingDelegate;
-    return delegate is SourceCloudReadingGateway &&
-        await delegate.usesCloudReading(sourceKey, taskOrigin: taskOrigin);
-  }
-
-  @override
-  Future<Map<String, dynamic>?> loadCloudReadingProgress(
-    String sourceKey,
-    String comicId, {
-    SourceTaskOrigin? taskOrigin,
-  }) async {
-    final delegate = cloudReadingDelegate;
-    return delegate is SourceCloudReadingGateway
-        ? delegate.loadCloudReadingProgress(
-            sourceKey,
-            comicId,
-            taskOrigin: taskOrigin,
-          )
-        : null;
-  }
-
-  @override
-  Future<List<ExploreComic>> refreshCloudReadingHistory(
-    String sourceKey, {
-    SourceTaskOrigin? taskOrigin,
-  }) async {
-    final delegate = cloudReadingDelegate;
-    return delegate is SourceCloudReadingGateway
-        ? delegate.refreshCloudReadingHistory(sourceKey, taskOrigin: taskOrigin)
-        : const [];
-  }
-}
-
 class SourceCloudReadingCapability extends ChangeNotifier
     implements SourceCloudReadingGateway, SourceCloudReadingEvents {
   SourceCloudReadingCapability(

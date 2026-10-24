@@ -5,6 +5,7 @@ import '../../../models/hazuki_models.dart';
 import '../content/source_content_operations.dart';
 import '../debug/source_debug_operations.dart';
 import '../gateways/source_image_gateways.dart';
+import '../gateways/source_runtime_gateways.dart';
 import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
 import '../runtime/source_runtime_operations.dart';
@@ -12,45 +13,13 @@ import '../runtime/source_runtime_view.dart';
 import '../models/source_task.dart';
 import 'hazuki_source_adapter_base.dart';
 
-class HazukiSourceImageAdapter implements SourceImageGateway {
+/// 图片与诊断日志 Gateway 共用一个实现，推荐区同时依赖这两者。
+class HazukiSourceImageAdapter
+    implements
+        SourceImageGateway,
+        SourceDebugGateway,
+        SourceRecommendationGateway {
   const HazukiSourceImageAdapter({
-    required SourceRuntimeView runtime,
-    required SourceImageOperations image,
-  }) : _image = image,
-       _runtime = runtime;
-
-  final SourceImageOperations _image;
-  final SourceRuntimeView _runtime;
-
-  @override
-  String? get activeSourceKey => _runtime.activeSourceKey;
-  @override
-  Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) =>
-      _image.peekImageBytesFromMemory(url, sourceKey: sourceKey);
-  @override
-  Future<Uint8List> downloadImageBytes(
-    String url, {
-    String comicId = '',
-    String epId = '',
-    bool keepInMemory = false,
-    bool useDiskCache = true,
-    bool priority = false,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  }) => _image.downloadImageBytes(
-    url,
-    comicId: comicId,
-    epId: epId,
-    keepInMemory: keepInMemory,
-    useDiskCache: useDiskCache,
-    priority: priority,
-    sourceKey: sourceKey,
-    taskOrigin: taskOrigin,
-  );
-}
-
-class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
-  HazukiSourceRecommendationAdapter({
     required SourceRuntimeView runtime,
     required SourceImageOperations image,
     required SourceRuntimeOperations runtimeOperations,

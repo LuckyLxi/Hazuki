@@ -15,7 +15,6 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_image_adapters.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_runtime_adapters.dart';
-import 'package:hazuki/services/source/adapters/hazuki_source_sync_adapter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/test_service_locator.dart';
@@ -34,10 +33,10 @@ void main() {
     expect(sl<SourceFavoriteGateway>(), isA<HazukiSourceFavoriteAdapter>());
     expect(sl<SourceReaderGateway>(), isA<HazukiSourceReaderAdapter>());
     expect(sl<SourceSettingsGateway>(), isA<HazukiSourceSettingsAdapter>());
-    expect(sl<SourceAccountGateway>(), isA<HazukiSourceAccountAdapter>());
-    expect(sl<SourceDebugGateway>(), isA<HazukiSourceDebugAdapter>());
+    expect(sl<SourceAccountGateway>(), isA<HazukiSourceRuntimeAdapter>());
+    expect(sl<SourceDebugGateway>(), isA<HazukiSourceImageAdapter>());
     expect(sl<SourceImageGateway>(), isA<HazukiSourceImageAdapter>());
-    expect(sl<SourceSyncGateway>(), isA<HazukiSourceSyncAdapter>());
+    expect(sl<SourceSyncGateway>(), isA<HazukiSourceRuntimeAdapter>());
     expect(sl<SourceRuntimeGateway>(), isA<HazukiSourceRuntimeAdapter>());
     expect(sl<SourceCommentsGateway>(), isA<HazukiSourceCommentsAdapter>());
   });
@@ -56,11 +55,21 @@ void main() {
       assembly.testing.notifyRuntimeView();
 
       expect(notifications, 1);
-      expect(identical(gateways.runtimeGateway, gateways.selection), isTrue);
-      expect(
-        identical(gateways.runtimeGateway, gateways.switchGateway),
-        isTrue,
-      );
+      for (final gateway in <Object>[
+        gateways.selection,
+        gateways.switchGateway,
+        gateways.accountGateway,
+        gateways.home,
+        gateways.advanced,
+        gateways.script,
+        gateways.update,
+        gateways.sync,
+        gateways.bootstrap,
+      ]) {
+        expect(identical(gateways.runtimeGateway, gateway), isTrue);
+      }
+      expect(identical(gateways.imageGateway, gateways.debugGateway), isTrue);
+      expect(identical(gateways.imageGateway, gateways.recommendation), isTrue);
     },
   );
 
@@ -114,14 +123,15 @@ void main() {
   );
 
   test(
-    'favorite and sync adapters forward streams and runtime operations',
+    'favorite and runtime adapters forward streams and runtime operations',
     () async {
       final runtime = _FakeRuntimeView();
       final runtimeOperations = _FakeRuntimeOperations();
       final favorites = _FakeFavoritesOperations();
+      final account = _FakeAccountOperations();
       final favorite = HazukiSourceFavoriteAdapter(
         runtime: runtime,
-        account: _FakeAccountOperations(),
+        account: account,
         favorites: favorites,
         runtimeOperations: runtimeOperations,
       );
@@ -129,9 +139,11 @@ void main() {
       final subscription = favorite.cloudFavoritesChangedStream.listen(
         received.add,
       );
-      final sync = HazukiSourceSyncAdapter(
+      final SourceSyncGateway sync = HazukiSourceRuntimeAdapter(
         runtime: runtime,
         runtimeOperations: runtimeOperations,
+        account: account,
+        favorites: favorites,
       );
 
       favorites.emitChanged();
@@ -154,20 +166,22 @@ void main() {
     },
   );
 
-  test(
-    'bootstrap adapter forwards initialization callback and source key',
-    () async {
-      final operations = _FakeRuntimeOperations();
-      final adapter = HazukiSourceBootstrapAdapter(operations);
-      void onProgress(int _, int _) {}
+  test('runtime adapter forwards bootstrap callback and source key', () async {
+    final operations = _FakeRuntimeOperations();
+    final SourceBootstrapGateway adapter = HazukiSourceRuntimeAdapter(
+      runtime: _FakeRuntimeView(),
+      runtimeOperations: operations,
+      account: _FakeAccountOperations(),
+      favorites: _FakeFavoritesOperations(),
+    );
+    void onProgress(int _, int _) {}
 
-      await adapter.init(onProgress: onProgress);
-      await adapter.ensureInitialized(sourceKey: 'copy_manga');
+    await adapter.init(onProgress: onProgress);
+    await adapter.ensureInitialized(sourceKey: 'copy_manga');
 
-      expect(operations.initProgress, same(onProgress));
-      expect(operations.ensureSourceKeys, ['copy_manga']);
-    },
-  );
+    expect(operations.initProgress, same(onProgress));
+    expect(operations.ensureSourceKeys, ['copy_manga']);
+  });
 }
 
 class _FakeRuntimeView extends ChangeNotifier implements SourceRuntimeView {

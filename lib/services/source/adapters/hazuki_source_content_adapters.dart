@@ -18,6 +18,46 @@ import '../runtime/source_runtime_view.dart';
 import '../models/source_task.dart';
 import 'hazuki_source_adapter_base.dart';
 
+/// 把云端阅读能力转发给内容操作；放在 Adapter 层，避免 content 内部的循环依赖。
+mixin SourceCloudReadingAdapter
+    implements SourceCloudReadingGateway, SourceCloudReadingEvents {
+  SourceContentOperations get cloudReadingDelegate;
+  @override
+  void addListener(VoidCallback listener) =>
+      cloudReadingDelegate.addListener(listener);
+
+  @override
+  void removeListener(VoidCallback listener) =>
+      cloudReadingDelegate.removeListener(listener);
+
+  @override
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) =>
+      cloudReadingDelegate.usesCloudReading(sourceKey, taskOrigin: taskOrigin);
+
+  @override
+  Future<Map<String, dynamic>?> loadCloudReadingProgress(
+    String sourceKey,
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  }) => cloudReadingDelegate.loadCloudReadingProgress(
+    sourceKey,
+    comicId,
+    taskOrigin: taskOrigin,
+  );
+
+  @override
+  Future<List<ExploreComic>> refreshCloudReadingHistory(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) => cloudReadingDelegate.refreshCloudReadingHistory(
+    sourceKey,
+    taskOrigin: taskOrigin,
+  );
+}
+
 class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
     implements SourceSearchGateway {
   const HazukiSourceSearchAdapter({
@@ -294,7 +334,7 @@ class HazukiSourceComicDetailAdapter
     with SourceCloudReadingAdapter
     implements SourceComicDetailGateway {
   @override
-  Object get cloudReadingDelegate => _content;
+  SourceContentOperations get cloudReadingDelegate => _content;
   HazukiSourceComicDetailAdapter({
     required SourceRuntimeView runtime,
     required SourceAccountOperations account,
@@ -599,7 +639,7 @@ class HazukiSourceReaderAdapter
         SourceReaderSessionGateway,
         SourceDownloadSessionGateway {
   @override
-  Object get cloudReadingDelegate => _content;
+  SourceContentOperations get cloudReadingDelegate => _content;
   HazukiSourceReaderAdapter({
     required SourceContentOperations content,
     required SourceImagePreparationCapability imagePreparation,

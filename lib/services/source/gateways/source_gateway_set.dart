@@ -2,7 +2,6 @@ import '../account/source_account_operations.dart';
 import '../adapters/hazuki_source_content_adapters.dart';
 import '../adapters/hazuki_source_image_adapters.dart';
 import '../adapters/hazuki_source_runtime_adapters.dart';
-import '../adapters/hazuki_source_sync_adapter.dart';
 import '../comments/source_comments_operations.dart';
 import '../content/source_content_operations.dart';
 import '../debug/source_debug_operations.dart';
@@ -61,30 +60,19 @@ class SourceGatewaySet {
       settings: settings,
       image: image,
     );
-    accountGateway = HazukiSourceAccountAdapter(
-      runtime: runtime,
-      runtimeOperations: runtimeOperations,
-      account: account,
-    );
-    debugGateway = HazukiSourceDebugAdapter(
-      runtimeOperations: runtimeOperations,
-      debug: debug,
-    );
-    imageGateway = HazukiSourceImageAdapter(runtime: runtime, image: image);
-    recommendation = HazukiSourceRecommendationAdapter(
+    final imageAdapter = HazukiSourceImageAdapter(
       runtime: runtime,
       image: image,
       runtimeOperations: runtimeOperations,
       debug: debug,
     );
+    imageGateway = imageAdapter;
+    debugGateway = imageAdapter;
+    recommendation = imageAdapter;
     dailyRecommendation = HazukiSourceDailyRecommendationAdapter(
       runtime: runtime,
       image: image,
       content: content,
-    );
-    sync = HazukiSourceSyncAdapter(
-      runtime: runtime,
-      runtimeOperations: runtimeOperations,
     );
     final runtimeAdapter = HazukiSourceRuntimeAdapter(
       runtime: runtime,
@@ -92,19 +80,16 @@ class SourceGatewaySet {
       account: account,
       favorites: favorites,
     );
+    accountGateway = runtimeAdapter;
+    sync = runtimeAdapter;
     runtimeGateway = runtimeAdapter;
     selection = runtimeAdapter;
     switchGateway = runtimeAdapter;
-    home = HazukiSourceHomeAdapter(
-      runtime: runtime,
-      runtimeOperations: runtimeOperations,
-      account: account,
-      favorites: favorites,
-    );
-    advanced = HazukiSourceAdvancedAdapter(
-      runtime: runtime,
-      runtimeOperations: runtimeOperations,
-    );
+    home = runtimeAdapter;
+    advanced = runtimeAdapter;
+    bootstrap = runtimeAdapter;
+    update = runtimeAdapter;
+    script = runtimeAdapter;
     category = HazukiSourceCategoryAdapter(content: content, debug: debug);
     commentsGateway = HazukiSourceCommentsAdapter(
       comments: comments,
@@ -117,9 +102,6 @@ class SourceGatewaySet {
       content: content,
       image: image,
     );
-    bootstrap = HazukiSourceBootstrapAdapter(runtimeOperations, runtime);
-    update = HazukiSourceUpdateAdapter(runtimeOperations);
-    script = HazukiSourceScriptAdapter(runtimeOperations);
     localizationGateway = HazukiSourceLocalizationAdapter(localization);
   }
 
