@@ -338,12 +338,16 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // 深色下 surfaceContainerHigh 与页面反差过大，改用更暗的 Low 与弹窗保持一致。
+    final fillBase = scheme.brightness == Brightness.dark
+        ? scheme.surfaceContainerLow
+        : scheme.surfaceContainerHigh;
     final fill = LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [
-        scheme.surfaceContainerHigh.withValues(alpha: 0.82),
-        scheme.surfaceContainerHigh.withValues(alpha: 0.66),
+        fillBase.withValues(alpha: 0.82),
+        fillBase.withValues(alpha: 0.66),
       ],
     );
     final borderColor = scheme.outlineVariant.withValues(alpha: 0.45);

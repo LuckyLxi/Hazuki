@@ -94,7 +94,11 @@ Future<DownloadsComicMenuAction?> showDownloadsComicMenu({
               child: BackdropFilter(
                 filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
                 child: Material(
-                  color: scheme.surfaceContainerHigh.withValues(alpha: 0.78),
+                  // 跟随全局弹窗底色，未配置时回退 M3 默认值。
+                  color:
+                      (DialogTheme.of(context).backgroundColor ??
+                              scheme.surfaceContainerHigh)
+                          .withValues(alpha: 0.78),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -281,7 +285,10 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
             ),
           ),
           child: Material(
-            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            // 跟随全局弹窗底色，未配置时回退 M3 默认值。
+            color:
+                DialogTheme.of(context).backgroundColor ??
+                Theme.of(context).colorScheme.surfaceContainerHigh,
             elevation: confirmingRemoval ? 12 : 8,
             borderRadius: BorderRadius.circular(confirmingRemoval ? 48 : 28),
             clipBehavior: Clip.antiAlias,

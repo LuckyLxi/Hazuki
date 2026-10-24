@@ -26,14 +26,16 @@ class HazukiThemeFactory {
     AppearanceSettingsData settings, [
     ColorScheme? dynamicColorScheme,
   ]) {
+    final colorScheme = _resolveColorScheme(
+      settings,
+      Brightness.dark,
+      dynamicColorScheme,
+    );
     final base = ThemeData(
-      colorScheme: _resolveColorScheme(
-        settings,
-        Brightness.dark,
-        dynamicColorScheme,
-      ),
+      colorScheme: colorScheme,
       fontFamily: _resolveFontFamily(settings),
       useMaterial3: true,
+      dialogTheme: _darkDialogTheme(colorScheme),
     );
 
     if (!settings.oledPureBlack) {
@@ -54,7 +56,15 @@ class HazukiThemeFactory {
       canvasColor: Colors.black,
       colorScheme: pureBlackScheme,
       cardColor: Colors.black,
+      dialogTheme: _darkDialogTheme(pureBlackScheme),
     );
+  }
+
+  /// 深色弹窗统一使用 surfaceContainerLow。
+  ///
+  /// M3 默认的 surfaceContainerHigh 在深色下与页面背景反差过大，显得发灰偏亮。
+  static DialogThemeData _darkDialogTheme(ColorScheme colorScheme) {
+    return DialogThemeData(backgroundColor: colorScheme.surfaceContainerLow);
   }
 
   static ColorScheme _resolveColorScheme(

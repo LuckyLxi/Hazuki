@@ -291,9 +291,11 @@ class _AnnouncementMorphDialogState extends State<_AnnouncementMorphDialog> {
                 announcement.level == AnnouncementLevel.important
                 ? colorScheme.errorContainer
                 : colorScheme.primaryContainer;
+            // 展开后跟随全局弹窗底色，未配置时回退 M3 默认值。
             final shellColor = Color.lerp(
               launcherColor,
-              colorScheme.surfaceContainerHigh,
+              DialogTheme.of(context).backgroundColor ??
+                  colorScheme.surfaceContainerHigh,
               expandProgress,
             )!;
             return Stack(

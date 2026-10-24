@@ -269,9 +269,11 @@ class _DownloadsCategoryShellDialogState
             ).transform(progress);
             final launcherOpacity =
                 1 - const Interval(0.12, 0.42).transform(progress);
+            // 展开后跟随全局弹窗底色，未配置时回退 M3 默认值。
             final shellColor = Color.lerp(
               colorScheme.primaryContainer,
-              colorScheme.surfaceContainerHigh,
+              DialogTheme.of(context).backgroundColor ??
+                  colorScheme.surfaceContainerHigh,
               expandProgress,
             )!;
             final borderColor = Color.lerp(
