@@ -128,11 +128,10 @@ class FavoritePageController extends ChangeNotifier {
   bool get loadingFolders => _state.loadingFolders;
   FavoritePageMode get mode => _state.mode;
   bool get isLogged => _cloudFlow.isLogged;
-  SourceRuntimeState get sourceRuntimeState =>
-      _sourceService.sourceRuntimeState;
+  SourceRuntimeState get sourceRuntimeState => _sourceService.runtimeState;
 
   void retrySourceRuntime() {
-    if (_sourceService.sourceRuntimeState.canRetry) {
+    if (_sourceService.runtimeState.canRetry) {
       _sourceService.logRuntimeRetryRequested('favorite_page');
     }
   }

@@ -36,7 +36,7 @@ class _Source extends ChangeNotifier implements SourceSearchGateway {
     SourceCatalogEntry(key: 'two', name: 'Two', fileName: 'two.js'),
   ];
   @override
-  SourceRuntimeState get sourceRuntimeState => const SourceRuntimeState.idle();
+  SourceRuntimeState get runtimeState => const SourceRuntimeState.idle();
 
   @override
   Future<SearchComicsResult> searchComics({

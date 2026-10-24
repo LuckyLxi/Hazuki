@@ -10,7 +10,7 @@ abstract interface class SourceAccountGateway implements Listenable {
   bool get isInitialized;
   bool get isActiveDailyCheckInSource;
   String? get currentAccount;
-  SourceRuntimeState get sourceRuntimeState;
+  SourceRuntimeState get runtimeState;
 
   Future<void> ensureInitialized({String? sourceKey});
   Future<void> loadActiveSourcePreference();
@@ -79,7 +79,6 @@ abstract interface class SourceHomeGateway
   String? get sourceRevision;
   bool get supportsLegacyRanking;
   SourceMeta? get sourceMeta;
-  SourceRuntimeState get runtimeState;
 
   Future<void> prewarmInBackground();
   Future<void> warmUpFavoritesDebugInfo();
@@ -134,7 +133,6 @@ abstract interface class SourceRuntimeGateway
   bool get supportsDailyRecommendation;
   bool get supportsLegacyRanking;
   SourceMeta? get sourceMeta;
-  SourceRuntimeState get runtimeState;
   List<SourceCatalogEntry> get allowedSources;
 
   bool isLoggedForSource(String sourceKey);

@@ -84,8 +84,7 @@ class SearchResultsController extends ChangeNotifier {
   int? get searchMaxPage => _searchMaxPage;
   String get searchOrder => _searchOrder;
 
-  SourceRuntimeState get sourceRuntimeState =>
-      _sourceService.sourceRuntimeState;
+  SourceRuntimeState get sourceRuntimeState => _sourceService.runtimeState;
   bool get canRetry => sourceRuntimeState.canRetry;
 
   void logRuntimeRetryRequested(String source) =>

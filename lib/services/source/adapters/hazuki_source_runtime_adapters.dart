@@ -86,8 +86,6 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   @override
   SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
-  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
-  @override
   List<SourceCatalogEntry> get allowedSources =>
       runtime.runtimeRegistry.allowedSources;
   @override

@@ -10,7 +10,7 @@ abstract interface class SourceSearchGateway implements Listenable {
   String? get activeSourceKey;
   bool get supportsDirectComicId;
   DirectComicIdRules? directComicIdRulesForSource(String sourceKey);
-  SourceRuntimeState get sourceRuntimeState;
+  SourceRuntimeState get runtimeState;
   List<SourceCatalogEntry> get allowedSources;
 
   void logRuntimeRetryRequested(String source);
@@ -33,7 +33,7 @@ abstract interface class SourceDiscoverGateway implements Listenable {
   String? get sourceRevision;
   String? get activeSourceKey;
   bool get isLogged;
-  SourceRuntimeState get sourceRuntimeState;
+  SourceRuntimeState get runtimeState;
 
   void logRuntimeRetryRequested(String source);
   Future<List<ExploreSection>> loadExploreSections({
@@ -210,7 +210,7 @@ abstract interface class SourceFavoriteGateway implements Listenable {
   String get favoriteSortOrder;
   List<String> get favoriteSortOrders;
   Stream<void> get cloudFavoritesChangedStream;
-  SourceRuntimeState get sourceRuntimeState;
+  SourceRuntimeState get runtimeState;
 
   void logRuntimeRetryRequested(String source);
   Future<void> ensureInitialized();

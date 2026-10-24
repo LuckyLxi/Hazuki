@@ -44,8 +44,7 @@ class DiscoverPageController extends ChangeNotifier {
   /// 源切换时的回调，由外层 View 绑定以触发刷新
   final VoidCallback? onSourceSwitched;
 
-  SourceRuntimeState get sourceRuntimeState =>
-      _sourceService.sourceRuntimeState;
+  SourceRuntimeState get sourceRuntimeState => _sourceService.runtimeState;
 
   void _onSourceChanged() {
     final activeKey = _sourceService.activeSourceKey;
@@ -159,7 +158,7 @@ class DiscoverPageController extends ChangeNotifier {
       _notify();
       return;
     }
-    if (_sourceService.sourceRuntimeState.canRetry) {
+    if (_sourceService.runtimeState.canRetry) {
       _sourceService.logRuntimeRetryRequested('discover_page');
     }
 

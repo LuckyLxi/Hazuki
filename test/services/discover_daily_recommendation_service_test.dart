@@ -389,8 +389,6 @@ class _SearchCountingRuntimeView extends ChangeNotifier
   @override
   bool get isInitialized => true;
   @override
-  SourceRuntimeState get sourceRuntimeState => const SourceRuntimeState.idle();
-  @override
   SourceRuntimeState get runtimeState => const SourceRuntimeState.idle();
   @override
   SourceMeta? get sourceMeta => null;

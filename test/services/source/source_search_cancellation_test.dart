@@ -36,7 +36,7 @@ class _SearchGateway extends ChangeNotifier implements SourceSearchGateway {
   @override
   List<SourceCatalogEntry> get allowedSources => host.catalog;
   @override
-  SourceRuntimeState get sourceRuntimeState => const SourceRuntimeState.idle();
+  SourceRuntimeState get runtimeState => const SourceRuntimeState.idle();
   @override
   Future<SearchComicsResult> searchComics({
     required String keyword,

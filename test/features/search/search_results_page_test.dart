@@ -36,7 +36,7 @@ void main() {
           ).thenReturn([hazukiAllowedSourceCatalog.first]);
           when(() => source.supportsDirectComicId).thenReturn(false);
           when(
-            () => source.sourceRuntimeState,
+            () => source.runtimeState,
           ).thenReturn(const SourceRuntimeState.idle());
           when(
             () => source.directComicIdRulesForSource(any()),
@@ -135,9 +135,7 @@ void main() {
       () => source.allowedSources,
     ).thenReturn([hazukiAllowedSourceCatalog.first]);
     when(() => source.supportsDirectComicId).thenReturn(false);
-    when(
-      () => source.sourceRuntimeState,
-    ).thenReturn(const SourceRuntimeState.idle());
+    when(() => source.runtimeState).thenReturn(const SourceRuntimeState.idle());
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -198,7 +196,7 @@ void main() {
         ).thenReturn([hazukiAllowedSourceCatalog.first]);
         when(() => source.supportsDirectComicId).thenReturn(false);
         when(
-          () => source.sourceRuntimeState,
+          () => source.runtimeState,
         ).thenReturn(const SourceRuntimeState.idle());
         when(() => source.directComicIdRulesForSource(any())).thenReturn(null);
         when(

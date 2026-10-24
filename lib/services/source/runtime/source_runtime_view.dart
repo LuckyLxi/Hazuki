@@ -57,10 +57,9 @@ class SourceRuntimeView implements Listenable {
 
   SourceMeta? get sourceMeta =>
       _runtimeHost.optionalActiveHandle?.runtime.sourceMeta;
-  SourceRuntimeState get sourceRuntimeState =>
+  SourceRuntimeState get runtimeState =>
       _runtimeHost.optionalActiveHandle?.runtime.runtimeState ??
       const SourceRuntimeState.idle();
-  SourceRuntimeState get runtimeState => sourceRuntimeState;
 
   Future<void> loadActiveSourcePreference() =>
       runtimeRegistry.loadActiveSourcePreference();

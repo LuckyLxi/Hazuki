@@ -143,7 +143,7 @@ class HazukiSourceDailyRecommendationAdapter
     taskOrigin: taskOrigin,
   );
   @override
-  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
+  SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
   List<SourceCatalogEntry> get allowedSources =>
       runtime.runtimeRegistry.allowedSources;

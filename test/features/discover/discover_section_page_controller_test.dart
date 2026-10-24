@@ -166,7 +166,7 @@ class _FakeDiscoverGateway extends ChangeNotifier
   bool get isLogged => false;
 
   @override
-  SourceRuntimeState get sourceRuntimeState => const SourceRuntimeState.idle();
+  SourceRuntimeState get runtimeState => const SourceRuntimeState.idle();
 
   @override
   void logRuntimeRetryRequested(String source) {}

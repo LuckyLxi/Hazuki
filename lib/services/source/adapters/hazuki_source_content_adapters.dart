@@ -76,7 +76,7 @@ class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
   DirectComicIdRules? directComicIdRulesForSource(String sourceKey) =>
       runtime.directComicIdRulesForSource(sourceKey);
   @override
-  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
+  SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
   List<SourceCatalogEntry> get allowedSources =>
       runtime.runtimeRegistry.allowedSources;
@@ -143,7 +143,7 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
   @override
   bool get isLogged => _account.isLogged;
   @override
-  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
+  SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
   void logRuntimeRetryRequested(String value) =>
       runtime.logRuntimeRetryRequested(value);
@@ -552,7 +552,7 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   @override
   Stream<void> get cloudFavoritesChangedStream => _favorites.changedStream;
   @override
-  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
+  SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
   void logRuntimeRetryRequested(String value) =>
       runtime.logRuntimeRetryRequested(value);

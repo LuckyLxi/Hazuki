@@ -32,9 +32,7 @@ void main() {
     activeSource = 'test';
     when(() => source.activeSourceKey).thenAnswer((_) => activeSource);
     when(() => source.isLogged).thenReturn(true);
-    when(
-      () => source.sourceRuntimeState,
-    ).thenReturn(const SourceRuntimeState.idle());
+    when(() => source.runtimeState).thenReturn(const SourceRuntimeState.idle());
     when(() => source.supportFavoriteFolderRename).thenAnswer((_) => supported);
     when(() => source.supportFavoriteFolderLoad).thenReturn(true);
     when(() => source.supportFavoriteFolderDelete).thenReturn(false);

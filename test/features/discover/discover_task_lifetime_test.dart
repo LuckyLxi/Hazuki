@@ -21,7 +21,7 @@ class _Source extends ChangeNotifier implements SourceDiscoverGateway {
   @override
   bool get isLogged => false;
   @override
-  SourceRuntimeState get sourceRuntimeState => const SourceRuntimeState.idle();
+  SourceRuntimeState get runtimeState => const SourceRuntimeState.idle();
   @override
   void logRuntimeRetryRequested(String source) {}
   @override

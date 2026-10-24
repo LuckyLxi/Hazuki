@@ -76,9 +76,7 @@ Future<_Source> _pumpPage(
   final source = _Source();
   when(() => source.activeSourceKey).thenReturn('test');
   when(() => source.isLogged).thenReturn(true);
-  when(
-    () => source.sourceRuntimeState,
-  ).thenReturn(const SourceRuntimeState.idle());
+  when(() => source.runtimeState).thenReturn(const SourceRuntimeState.idle());
   when(() => source.supportFavoriteSortOrder).thenReturn(false);
   when(() => source.supportFavoriteFolderAdd).thenReturn(false);
   when(() => source.supportFavoriteFolderDelete).thenReturn(false);
