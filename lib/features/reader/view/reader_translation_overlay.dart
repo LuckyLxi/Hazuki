@@ -358,7 +358,10 @@ class ReaderTranslationOverlay extends StatelessWidget {
       area.right * imageSize.width,
       area.bottom * imageSize.height,
     );
-    var bounds = rect.expandToInclude(scale(region.box));
+    var bounds =
+        region.kind == TranslationRegionKind.caption && region.layoutBox != null
+        ? rect
+        : rect.expandToInclude(scale(region.box));
     final patches = region.textPatches;
     for (final patch in patches ?? const <TranslationTextPatch>[]) {
       bounds = bounds.expandToInclude(scale(patch.box));

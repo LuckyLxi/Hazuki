@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +7,89 @@ import 'package:hazuki/services/translation/models/translation_models.dart';
 import 'package:image/image.dart' as img;
 
 void main() {
+  for (final kind in [
+    TranslationRegionKind.bubble,
+    TranslationRegionKind.narration,
+    TranslationRegionKind.caption,
+  ]) {
+    test(
+      'finds the caption instead of adjacent white artwork with kind=$kind',
+      () {
+        final image = img.Image(width: 400, height: 300, numChannels: 4);
+        img.fill(image, color: img.ColorRgb8(70, 70, 70));
+        img.fillRect(
+          image,
+          x1: 110,
+          y1: 40,
+          x2: 300,
+          y2: 280,
+          color: img.ColorRgb8(255, 255, 255),
+        );
+        for (var x = 20; x < 380; x++) {
+          final shade = (1 - ((x - 200).abs() / 180)).clamp(0.0, 1.0);
+          final red = (215 + math.min(1, shade * 2) * 40).round();
+          final green = (230 + math.min(1, shade * 2) * 25).round();
+          final blue = (240 + math.min(1, shade * 2) * 15).round();
+          img.fillRect(
+            image,
+            x1: x,
+            y1: 80,
+            x2: x,
+            y2: 104,
+            color: img.ColorRgb8(red, green, blue),
+          );
+        }
+        img.fillRect(
+          image,
+          x1: 185,
+          y1: 87,
+          x2: 235,
+          y2: 97,
+          color: img.ColorRgb8(10, 10, 10),
+        );
+        final result = const BubbleSnapper().snap(
+          image.getBytes(order: img.ChannelOrder.rgba),
+          400,
+          300,
+          [
+            TranslationRegion(
+              id: 'huh',
+              box: const Rect.fromLTRB(
+                150 / 400,
+                84 / 300,
+                340 / 400,
+                275 / 300,
+              ),
+              kind: kind,
+              sourceText: '欸…！？',
+              translatedText: 'Huh...!?',
+              sourceVertical: true,
+            ),
+          ],
+        ).single;
+        expect(result.kind, TranslationRegionKind.caption);
+        expect(result.sourceVertical, isFalse);
+        final layout = result.layoutBox!;
+        expect(layout.left, lessThan(60 / 400));
+        expect(layout.right, greaterThan(350 / 400));
+        expect(layout.top, greaterThanOrEqualTo(80 / 300));
+        expect(layout.bottom, lessThanOrEqualTo(105 / 300));
+        expect(layout.height * 300, greaterThan(18));
+        expect(result.textPatches, isNotEmpty);
+        expect(
+          result.textPatches!.any(
+            (patch) => patch.box.contains(const Offset(210 / 400, 92 / 300)),
+          ),
+          isTrue,
+        );
+        for (final patch in result.textPatches!) {
+          expect(patch.box.top, greaterThanOrEqualTo(80 / 300));
+          expect(patch.box.bottom, lessThanOrEqualTo(105 / 300));
+        }
+      },
+    );
+  }
+
   test('repairs dense outlined text without filling an occluding object', () {
     final image = img.Image(width: 240, height: 260, numChannels: 4);
     img.fill(image, color: img.ColorRgb8(70, 70, 70));

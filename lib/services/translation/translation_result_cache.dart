@@ -18,7 +18,7 @@ import 'translation_prompt.dart';
 const kDetectorProcessingVersion = 4;
 
 /// 原文框、气泡排版范围及笔画修补数据的版本。
-const kTranslationLayoutVersion = 2;
+const kTranslationLayoutVersion = 3;
 
 /// 本地检测模式下参与缓存键的模型信息。
 class TranslationDetectorCacheKey {

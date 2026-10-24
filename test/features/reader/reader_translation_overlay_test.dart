@@ -15,6 +15,69 @@ import 'package:mocktail/mocktail.dart';
 class _Controller extends Mock implements ReaderTranslationController {}
 
 void main() {
+  testWidgets(
+    'English captions use the full bar height and ignore an oversized source frame',
+    (tester) async {
+      await tester.runAsync(() async {
+        final font = FontLoader('CaptionEnglish')
+          ..addFont(rootBundle.load('assets/fonts/NotoSansSC-VF.otf'));
+        await font.load();
+      });
+      const translated = "What's gotten into you all of a sudden?!";
+      const region = TranslationRegion(
+        id: 'english',
+        box: Rect.fromLTRB(.3, .5, .9, .8),
+        layoutBox: Rect.fromLTWH(.1, .5, .8, .035),
+        textPatches: [],
+        kind: TranslationRegionKind.caption,
+        sourceText: '突然怎麼了！？',
+        translatedText: translated,
+        sourceVertical: false,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(fontFamily: 'CaptionEnglish'),
+          home: Center(
+            child: SizedBox(
+              width: 400,
+              height: 400,
+              child: ReaderTranslationOverlay(
+                view: PageTranslationView(
+                  status: PageTranslationStatus.done,
+                  result: PageTranslationResult(regions: [region], terms: []),
+                ),
+                bubbleStyle: TranslationBubbleStyle.sampled,
+                onToggleRegion: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      final frame = find.byKey(const ValueKey('translation-region-english'));
+      expect(tester.getSize(frame).width, closeTo(320, .01));
+      expect(tester.getSize(frame).height, closeTo(14, .01));
+      final fitted = tester.renderObject<RenderFittedBox>(
+        find.descendant(of: frame, matching: find.byType(FittedBox)),
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: frame, matching: find.byType(RichText)),
+      );
+      final text = tester.widget<Text>(find.text(translated));
+      final transform = paragraph.getTransformTo(fitted);
+      final unit =
+          MatrixUtils.transformPoint(transform, const Offset(1, 0)) -
+          MatrixUtils.transformPoint(transform, Offset.zero);
+      final effectiveFont = text.style!.fontSize! * unit.distance;
+      expect(effectiveFont, greaterThanOrEqualTo(8));
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(
+        find.descendant(of: frame, matching: find.byType(DecoratedBox)),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final kind in [
     TranslationRegionKind.caption,
     TranslationRegionKind.narration,

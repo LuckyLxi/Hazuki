@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import '../models/translation_models.dart';
+import 'caption_bar_detector.dart';
 
 // 有色底允许明暗渐变，但白色描边不能把背景连到气泡外面。
 bool _matchesBackground(int r, int g, int b, int red, int green, int blue) {
@@ -52,13 +53,22 @@ class BubbleSnapper {
       (region.box.right * width).ceilToDouble().clamp(1.0, width.toDouble()),
       (region.box.bottom * height).ceilToDouble().clamp(1.0, height.toDouble()),
     );
+    final caption =
+        region.kind == TranslationRegionKind.sfx ||
+            region.kind == TranslationRegionKind.other
+        ? null
+        : const CaptionBarDetector().find(rgba, width, height, source);
     final sampleMargin = math.max(
       2.0,
       math.min(24.0, source.shortestSide * 0.3),
     );
-    final sample = source
-        .inflate(sampleMargin)
-        .intersect(Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()));
+    final sample =
+        caption ??
+        source
+            .inflate(sampleMargin)
+            .intersect(
+              Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+            );
     final histogram = <int, (int, int, int, int)>{};
     for (var y = sample.top.toInt(); y < sample.bottom; y++) {
       for (var x = sample.left.toInt(); x < sample.right; x++) {
@@ -87,14 +97,18 @@ class BubbleSnapper {
       (entry.$4 / entry.$1).round(),
     );
     var background = colorOf(colors.first);
-    _BubbleInterior? interior;
+    _BubbleInterior? interior = caption == null
+        ? null
+        : _BubbleInterior.caption(caption);
     final horizontalBar =
+        caption != null ||
         region.kind == TranslationRegionKind.caption ||
         region.kind == TranslationRegionKind.narration &&
             source.width > source.height * 4;
-    if (region.kind == TranslationRegionKind.bubble ||
-        region.kind == TranslationRegionKind.narration ||
-        horizontalBar) {
+    if (caption == null &&
+        (region.kind == TranslationRegionKind.bubble ||
+            region.kind == TranslationRegionKind.narration ||
+            horizontalBar)) {
       final margin = math.max(
         12.0,
         source.longestSide * (horizontalBar ? 3 : 2),
@@ -219,9 +233,9 @@ class BubbleSnapper {
         }
       }
     }
-    final layout = horizontalBar
-        ? interior?.captionBox(source)
-        : interior?.layoutBox();
+    final layout =
+        caption ??
+        (horizontalBar ? interior?.captionBox(source) : interior?.layoutBox());
     Rect normalize(Rect rect) => Rect.fromLTRB(
       rect.left / width,
       rect.top / height,
@@ -229,7 +243,9 @@ class BubbleSnapper {
       rect.bottom / height,
     );
     final eraseAreas = <Rect>[];
-    if (layout != null) {
+    if (caption != null) {
+      eraseAreas.add(caption);
+    } else if (layout != null) {
       for (final box
           in region.sourceBoxes.isEmpty ? [region.box] : region.sourceBoxes) {
         var area = Rect.fromLTRB(
@@ -271,7 +287,13 @@ class BubbleSnapper {
           ? null
           : eraseAreas
                 .expand(
-                  (area) => interior!.erase(rgba, width, area, background),
+                  (area) => interior!.erase(
+                    rgba,
+                    width,
+                    area,
+                    background,
+                    lightCaption: caption != null,
+                  ),
                 )
                 .map(
                   (patch) =>
@@ -285,6 +307,23 @@ class BubbleSnapper {
 /// 局部连通背景的逐行内边界。行内文字留下的孔洞属于气泡内部。
 class _BubbleInterior {
   _BubbleInterior(this.crop, this.lefts, this.rights, this.pixels, this.bounds);
+
+  factory _BubbleInterior.caption(Rect rect) {
+    final crop = Rect.fromLTRB(
+      rect.left.ceilToDouble(),
+      rect.top.ceilToDouble(),
+      rect.right.floorToDouble(),
+      rect.bottom.floorToDouble(),
+    );
+    final w = crop.width.toInt(), h = crop.height.toInt();
+    return _BubbleInterior(
+      crop,
+      Int32List(h),
+      Int32List(h)..fillRange(0, h, w - 1),
+      w * h,
+      crop,
+    );
+  }
 
   final Rect crop;
   final Int32List lefts;
@@ -477,6 +516,7 @@ class _BubbleInterior {
       right = math.min(right, rights[y]);
     }
     final h = bottom - top + 1;
+    if (h < math.min(source.height * .8, crop.width * .018)) return null;
     if (right - left + 1 < h * 4) return null;
     final margin = math.max(1.0, h * 0.06);
     final box = Rect.fromLTRB(
@@ -525,17 +565,20 @@ class _BubbleInterior {
     Uint8List rgba,
     int width,
     Rect source,
-    Color color,
-  ) {
+    Color color, {
+    bool lightCaption = false,
+  }) {
     final area = source
         .inflate(math.max(3.0, math.min(16.0, source.shortestSide * 0.12)))
         .intersect(crop);
+    if (area.isEmpty) return const [];
     final left = area.left.floor(), top = area.top.floor();
     final w = area.right.ceil() - left, h = area.bottom.ceil() - top;
     final mask = Uint8List(w * h);
     final r = (color.r * 255).round(), g = (color.g * 255).round();
     final b = (color.b * 255).round();
     bool cleanBackground(int red, int green, int blue) {
+      if (lightCaption) return red >= 180 && green >= 180 && blue >= 180;
       final chroma = math.max(r, math.max(g, b)) - math.min(r, math.min(g, b));
       final pixelChroma =
           math.max(red, math.max(green, blue)) -
