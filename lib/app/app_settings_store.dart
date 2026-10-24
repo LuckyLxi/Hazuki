@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'app_preferences.dart';
-import 'appearance_settings.dart';
-import 'display_mode.dart';
+import '../shared/preferences/hazuki_preference_keys.dart';
+import '../shared/appearance/appearance_settings.dart';
+import '../services/display_mode_service.dart';
 
 class HazukiAppSettingsStore {
   const HazukiAppSettingsStore();

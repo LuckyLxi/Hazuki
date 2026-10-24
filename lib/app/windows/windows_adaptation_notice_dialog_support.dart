@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../l10n/l10n.dart';
-import '../app_preferences.dart';
+import '../../shared/preferences/hazuki_preference_keys.dart';
 
 class WindowsAdaptationNoticeDialogSupport {
   const WindowsAdaptationNoticeDialogSupport();

@@ -1,7 +1,7 @@
 import '../support/fake_source_task_control.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/models/hazuki_models.dart';

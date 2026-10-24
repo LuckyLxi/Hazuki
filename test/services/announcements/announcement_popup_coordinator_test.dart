@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hazuki/services/announcement_service.dart';
+import '../../support/announcement_test_service.dart';
 import 'package:hazuki/services/announcements/announcement_popup_coordinator.dart';
 import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 
@@ -31,7 +31,7 @@ void main() {
         hazukiAnnouncementCachePreferenceKey: _cachedPopupManifest,
       });
       final remoteManifest = Completer<String?>();
-      final service = AnnouncementService(
+      final service = buildTestAnnouncementService(
         loadRemote: () => remoteManifest.future,
         now: () => DateTime.parse('2026-08-31T12:00:00+08:00'),
       );
@@ -63,7 +63,7 @@ void main() {
 
   test('presents validated popups in order and records them', () async {
     SharedPreferences.setMockInitialValues({});
-    final service = AnnouncementService(
+    final service = buildTestAnnouncementService(
       loadRemote: () async => '''
         {
           "announcements": [

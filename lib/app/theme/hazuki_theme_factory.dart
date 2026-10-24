@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 
-import '../appearance_settings.dart';
+import '../../shared/appearance/appearance_settings.dart';
 
 class HazukiThemeFactory {
   const HazukiThemeFactory._();

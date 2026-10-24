@@ -5,7 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import '../appearance_settings.dart';
+import '../../shared/appearance/appearance_settings.dart';
 import '../windows/windows_custom_title_bar.dart';
 import '../windows/windows_title_bar_controller.dart';
 

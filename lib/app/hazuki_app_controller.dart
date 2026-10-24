@@ -6,7 +6,7 @@ import '../shared/cloud_sync/cloud_sync_restore_handler.dart';
 export '../shared/cloud_sync/cloud_sync_restore_handler.dart';
 
 import 'app_settings_store.dart';
-import 'appearance_settings.dart';
+import '../shared/appearance/appearance_settings.dart';
 import 'theme/hazuki_theme_controller.dart';
 import 'windows/windows_title_bar_controller.dart';
 

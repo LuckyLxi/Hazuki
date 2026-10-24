@@ -11,7 +11,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'app/app_settings_store.dart';
 import 'app/app_startup_coordinator.dart';
-import 'app/appearance_settings.dart';
+import 'shared/appearance/appearance_settings.dart';
 import 'app/hazuki_app_controller.dart';
 import 'app/home/home_feature_entrypoints.dart';
 import 'app/service_locator.dart';

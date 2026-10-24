@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_comment_filter_participant.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_favorites_participant.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_participant.dart';

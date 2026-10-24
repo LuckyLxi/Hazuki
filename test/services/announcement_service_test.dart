@@ -2,7 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hazuki/services/announcement_service.dart';
+import 'package:hazuki/services/announcements/announcement.dart';
+import 'package:hazuki/services/announcements/announcement_manifest_parser.dart';
+import 'package:hazuki/services/announcements/announcement_remote_source.dart';
+import '../support/announcement_test_service.dart';
 import 'package:hazuki/shared/preferences/software_update_source.dart';
 import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 
@@ -76,7 +79,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         hazukiAnnouncementCachePreferenceKey: _manifest,
       });
-      final service = AnnouncementService(
+      final service = buildTestAnnouncementService(
         loadRemote: () async => throw DioException(
           requestOptions: RequestOptions(path: 'announcement.json'),
         ),
@@ -138,7 +141,7 @@ void main() {
         ]
       }
     ''';
-    final service = AnnouncementService(
+    final service = buildTestAnnouncementService(
       loadRemote: () async => manifest,
       now: () => DateTime.parse('2026-08-31T13:00:00+08:00'),
     );
@@ -182,7 +185,7 @@ void main() {
   test(
     'publishedAt is display metadata and does not delay visibility',
     () async {
-      final service = AnnouncementService(
+      final service = buildTestAnnouncementService(
         loadRemote: () async => '''
         {
           "announcements": [
@@ -207,7 +210,7 @@ void main() {
 
   test('optional visibleAt delays all visibility until its time', () async {
     var now = DateTime.parse('2026-08-31T11:59:00+08:00');
-    final service = AnnouncementService(
+    final service = buildTestAnnouncementService(
       loadRemote: () async => '''
         {
           "announcements": [
@@ -252,7 +255,7 @@ void main() {
 
   test('tracks read and one-time important presentation state', () async {
     final now = DateTime.parse('2026-08-31T12:00:00+08:00');
-    final service = AnnouncementService(
+    final service = buildTestAnnouncementService(
       loadRemote: () async => _manifest,
       now: () => now,
     );
@@ -272,7 +275,7 @@ void main() {
     await service.markRead(service.latestDiscoverCard!);
     expect(service.unreadCount, 0);
 
-    final restored = AnnouncementService(
+    final restored = buildTestAnnouncementService(
       loadRemote: () async => _manifest,
       now: () => now,
     );
@@ -282,7 +285,7 @@ void main() {
   });
 
   test('keeps expired announcements in notification history only', () async {
-    final service = AnnouncementService(
+    final service = buildTestAnnouncementService(
       loadRemote: () async => _manifest,
       now: () => DateTime.parse('2026-10-01T12:00:00+08:00'),
     );
@@ -319,7 +322,7 @@ void main() {
       }
     ''';
       final now = DateTime.parse('2026-08-31T12:00:00+08:00');
-      final service = AnnouncementService(
+      final service = buildTestAnnouncementService(
         loadRemote: () async => manifest,
         now: () => now,
       );
@@ -370,7 +373,7 @@ void main() {
         'normal-future-new',
       ]);
 
-      final restored = AnnouncementService(
+      final restored = buildTestAnnouncementService(
         loadRemote: () async => manifest,
         now: () => now,
       );

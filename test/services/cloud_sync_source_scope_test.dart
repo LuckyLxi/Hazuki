@@ -2,7 +2,7 @@ import '../support/source_catalog_fixtures.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';

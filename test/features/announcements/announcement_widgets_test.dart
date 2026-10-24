@@ -10,7 +10,8 @@ import 'package:hazuki/features/announcements/support/announcement_image_session
 import 'package:hazuki/features/announcements/view/announcement_content.dart';
 import 'package:hazuki/features/discover/view/discover_announcement_card.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/services/announcement_service.dart';
+import 'package:hazuki/services/announcements/announcement_service.dart';
+import '../../support/announcement_test_service.dart';
 
 const _manifest = '''
 {
@@ -33,7 +34,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    service = AnnouncementService(
+    service = buildTestAnnouncementService(
       loadRemote: () async => _manifest,
       now: () => DateTime.parse('2026-08-31T12:00:00+08:00'),
     );
@@ -283,7 +284,7 @@ void main() {
   testWidgets('discover stack switches cards and hides them without reading', (
     tester,
   ) async {
-    final stackService = AnnouncementService(
+    final stackService = buildTestAnnouncementService(
       loadRemote: () async => '''
         {
           "announcements": [
@@ -412,7 +413,7 @@ void main() {
   testWidgets('physical deck reveals its buffered bottom card while dragging', (
     tester,
   ) async {
-    final deckService = AnnouncementService(
+    final deckService = buildTestAnnouncementService(
       loadRemote: () async => '''
         {
           "announcements": [
@@ -851,7 +852,7 @@ void main() {
     tester,
   ) async {
     final remoteManifest = Completer<String?>();
-    final delayedService = AnnouncementService(
+    final delayedService = buildTestAnnouncementService(
       loadRemote: () => remoteManifest.future,
       now: () => DateTime.parse('2026-08-31T12:00:00+08:00'),
     );
@@ -884,7 +885,7 @@ void main() {
   testWidgets('notification page keeps expired cards with a gray badge', (
     tester,
   ) async {
-    final historyService = AnnouncementService(
+    final historyService = buildTestAnnouncementService(
       loadRemote: () async => '''
         {
           "announcements": [
@@ -931,7 +932,7 @@ void main() {
   testWidgets('notification page colors levels and connects timeline cards', (
     tester,
   ) async {
-    final timelineService = AnnouncementService(
+    final timelineService = buildTestAnnouncementService(
       loadRemote: () async => '''
         {
           "announcements": [

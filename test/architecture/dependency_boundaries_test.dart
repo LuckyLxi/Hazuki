@@ -175,8 +175,7 @@ void main() {
       for (final file in _dartFilesUnder(directory)) {
         for (final line in file.readAsLinesSync()) {
           if (!line.trimLeft().startsWith('import ')) continue;
-          if (line.contains('services/announcement_service.dart') ||
-              line.contains('announcements/announcement_service.dart') ||
+          if (line.contains('announcements/announcement_service.dart') ||
               line.contains('announcements/announcement_remote_source.dart') ||
               line.contains('announcements/announcement_store.dart')) {
             violations.add('${file.path}: $line');

@@ -95,7 +95,7 @@ The bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`) hosts features und
 
 ### Storage
 
-`lib/services/storage/hazuki_database.dart` is the Drift database (tables for read history, reading progress, search history, download groups), with generated code in `hazuki_database.g.dart` (never hand-edit). Tests use `HazukiDatabase.memory()`. App-level preference keys live in `lib/app/app_preferences.dart` and `lib/shared/preferences/hazuki_preference_keys.dart`.
+`lib/services/storage/hazuki_database.dart` is the Drift database (tables for read history, reading progress, search history, download groups), with generated code in `hazuki_database.g.dart` (never hand-edit). Tests use `HazukiDatabase.memory()`. App-level preference keys live in `lib/shared/preferences/hazuki_preference_keys.dart`.
 
 ### Navigation & theme
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app_settings_store.dart';
-import 'package:hazuki/app/appearance_settings.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/app/hazuki_app_controller.dart';
 import 'package:hazuki/app/theme/hazuki_theme_controller.dart';
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
