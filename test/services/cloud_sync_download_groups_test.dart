@@ -34,7 +34,7 @@ void main() {
       await groups.moveComicToGroup('comic-a', group.id);
 
       final participants = createCloudSyncParticipantSet(
-        source: source.gateways.sync,
+        source: source.gateways.script,
         readHistory: ReadHistoryService(database: database),
         readingProgress: ReadingProgressService(database: database),
         localFavorites: LocalFavoritesService(database: database),

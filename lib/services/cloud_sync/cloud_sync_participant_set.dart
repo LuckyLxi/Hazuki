@@ -30,7 +30,7 @@ class CloudSyncParticipantSet {
 }
 
 CloudSyncParticipantSet createCloudSyncParticipantSet({
-  required SourceSyncGateway source,
+  required SourceScriptGateway source,
   required ReadHistoryService readHistory,
   required ReadingProgressService readingProgress,
   required LocalFavoritesSyncStore localFavorites,

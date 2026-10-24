@@ -7,15 +7,15 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 
-class _MockSourceSwitchGateway extends Mock implements SourceSwitchGateway {}
+class _MockSourceRuntimeGateway extends Mock implements SourceRuntimeGateway {}
 
-Future<_MockSourceSwitchGateway> _openPicker(
+Future<_MockSourceRuntimeGateway> _openPicker(
   WidgetTester tester, {
   required int sourceCount,
   String activeSourceKey = 'source_1',
   double textScale = 1,
 }) async {
-  final gateway = _MockSourceSwitchGateway();
+  final gateway = _MockSourceRuntimeGateway();
   when(() => gateway.activeSourceKey).thenReturn(activeSourceKey);
   when(() => gateway.allowedSources).thenReturn([
     for (var index = 1; index <= sourceCount; index++)

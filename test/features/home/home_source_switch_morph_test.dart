@@ -14,7 +14,7 @@ import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 
-class _Gateway extends Mock implements SourceSwitchGateway {}
+class _Gateway extends Mock implements SourceRuntimeGateway {}
 
 void main() {
   for (final glassEnabled in [false, true]) {

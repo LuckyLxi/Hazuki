@@ -10,7 +10,7 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/hazuki_m3e_loading_indicator.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _Gateway extends Mock implements SourceSwitchGateway {}
+class _Gateway extends Mock implements SourceRuntimeGateway {}
 
 const _profile = HomeSidebarProfileState(
   isLogged: false,

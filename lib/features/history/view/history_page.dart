@@ -31,7 +31,7 @@ class HistoryPage extends StatefulWidget {
   });
 
   final ReadHistoryService readHistoryService;
-  final SourceSelectionGateway sourceService;
+  final SourceRuntimeGateway sourceService;
   final SourceReaderGateway? readerService;
   final SourceTaskControlGateway? taskControl;
   final SourceImageGateway imageGateway;

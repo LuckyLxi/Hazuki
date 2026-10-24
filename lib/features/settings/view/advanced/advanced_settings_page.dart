@@ -21,6 +21,7 @@ class AdvancedSettingsPage extends StatefulWidget {
     required this.restoreComicSource,
     this.redownloadComicSource,
     required this.sourceService,
+    required this.debugGateway,
     required this.softwareUpdateService,
     this.sourcePlugins,
   });
@@ -29,7 +30,8 @@ class AdvancedSettingsPage extends StatefulWidget {
   final WidgetBuilder comicSourceEditorPageBuilder;
   final Future<bool> Function(BuildContext context) restoreComicSource;
   final Future<bool> Function(BuildContext context)? redownloadComicSource;
-  final SourceAdvancedGateway sourceService;
+  final SourceScriptGateway sourceService;
+  final SourceDebugGateway debugGateway;
   final SoftwareUpdateService softwareUpdateService;
   final SourcePluginGateway? sourcePlugins;
 
@@ -38,7 +40,7 @@ class AdvancedSettingsPage extends StatefulWidget {
 }
 
 class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
-  SourceAdvancedGateway get _sourceService => widget.sourceService;
+  SourceScriptGateway get _sourceService => widget.sourceService;
   SoftwareUpdateService get _softwareUpdateService =>
       widget.softwareUpdateService;
   bool _noImageMode = false;
@@ -72,7 +74,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final hasSourceBackup = await _sourceService.hasActiveSourceBackup();
-    final softwareLogCaptureEnabled = await _sourceService
+    final softwareLogCaptureEnabled = await widget.debugGateway
         .loadSoftwareLogCaptureEnabled();
     final softwareUpdateSource = await _softwareUpdateService
         .loadUpdateSource();
@@ -98,7 +100,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   Future<void> _toggleSoftwareLogCaptureEnabled(bool value) async {
     setState(() => _softwareLogCaptureEnabled = value);
-    await _sourceService.setSoftwareLogCaptureEnabled(value);
+    await widget.debugGateway.setSoftwareLogCaptureEnabled(value);
   }
 
   Future<void> _setSoftwareUpdateSource(SoftwareUpdateSource value) async {

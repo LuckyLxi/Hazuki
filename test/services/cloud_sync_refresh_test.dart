@@ -28,7 +28,7 @@ const _config = CloudSyncConfig(
   password: 'pass',
 );
 
-class _Source extends Mock implements SourceSyncGateway {}
+class _Source extends Mock implements SourceScriptGateway {}
 
 class _Remote extends CloudSyncRemoteClient {
   _Remote(this.files) : super(_config, configStore: CloudSyncConfigStore());

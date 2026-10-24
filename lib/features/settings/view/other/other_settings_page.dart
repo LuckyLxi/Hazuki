@@ -31,8 +31,7 @@ class OtherSettingsPage extends StatefulWidget {
 
 class _OtherSettingsPageState extends State<OtherSettingsPage> {
   bool _updatingChineseConversion = false;
-  SourceSelectionGateway get _sourceService =>
-      widget.dependencies.sourceSelection;
+  SourceRuntimeGateway get _sourceService => widget.dependencies.sourceRuntime;
   late OtherSettingsSnapshot _snapshot = OtherSettingsSnapshot.initial(
     useSystemTitleBar: widget.initialUseSystemTitleBar,
   );

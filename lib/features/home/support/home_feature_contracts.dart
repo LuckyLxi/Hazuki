@@ -33,7 +33,7 @@ class HomeServices {
 
   final SourceHomeGateway sourceService;
   final SourcePluginGateway? sourcePlugins;
-  final SourceSwitchGateway sourceSwitchService;
+  final SourceRuntimeGateway sourceSwitchService;
   final SourceImageGateway imageService;
   final DiscoverDailyRecommendationService dailyRecommendationService;
   final AnnouncementController announcementService;

@@ -44,7 +44,7 @@ void main() {
         ];
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<SourceSelectionGateway>(),
+        sourceService: sl<SourceRuntimeGateway>(),
         readerService: reader,
       );
       addTearDown(controller.dispose);
@@ -77,7 +77,7 @@ void main() {
 
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<SourceSelectionGateway>(),
+        sourceService: sl<SourceRuntimeGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -114,7 +114,7 @@ void main() {
     final reader = _ControlledReaderGateway();
     final controller = HistoryPageController(
       readHistoryService: service,
-      sourceService: sl<SourceSelectionGateway>(),
+      sourceService: sl<SourceRuntimeGateway>(),
       readerService: reader,
       presentationFor:
           sl<SourceRuntimeAssembly>().runtimeRegistry.presentationFor,
@@ -157,7 +157,7 @@ void main() {
     final reader = _ControlledReaderGateway();
     final controller = HistoryPageController(
       readHistoryService: service,
-      sourceService: sl<SourceSelectionGateway>(),
+      sourceService: sl<SourceRuntimeGateway>(),
       readerService: reader,
       presentationFor:
           sl<SourceRuntimeAssembly>().runtimeRegistry.presentationFor,
@@ -186,7 +186,7 @@ void main() {
 
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<SourceSelectionGateway>(),
+        sourceService: sl<SourceRuntimeGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -211,7 +211,7 @@ void main() {
       final reader = _CloudHistoryReader();
       final controller = HistoryPageController(
         readHistoryService: sl<ReadHistoryService>(),
-        sourceService: sl<SourceSelectionGateway>(),
+        sourceService: sl<SourceRuntimeGateway>(),
         readerService: reader,
       );
       reader.waitForCancellation = true;
@@ -245,7 +245,7 @@ void main() {
 
     final controller = HistoryPageController(
       readHistoryService: service,
-      sourceService: sl<SourceSelectionGateway>(),
+      sourceService: sl<SourceRuntimeGateway>(),
     );
     addTearDown(controller.dispose);
 
@@ -281,7 +281,7 @@ void main() {
 
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<SourceSelectionGateway>(),
+        sourceService: sl<SourceRuntimeGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -305,7 +305,7 @@ void main() {
 
       final reenteredController = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<SourceSelectionGateway>(),
+        sourceService: sl<SourceRuntimeGateway>(),
       );
       addTearDown(reenteredController.dispose);
       await reenteredController.loadInitial();

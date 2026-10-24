@@ -17,7 +17,7 @@ export 'source_account_dialogs.dart';
 
 Future<void> showHomeSourceSwitchDialog(
   BuildContext context, {
-  required SourceSwitchGateway sourceService,
+  required SourceRuntimeGateway sourceService,
   Future<void> Function()? onSourceSwitched,
   FavoriteFoldersMorphOrigin? morphOrigin,
   VoidCallback? onDialogClosed,

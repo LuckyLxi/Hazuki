@@ -20,10 +20,7 @@ class SettingsCoreDependencies {
     required this.dailyRecommendation,
     required this.downloader,
     required this.sourceRuntime,
-    required this.sourceSelection,
-    required this.sourceAdvanced,
     required this.sourceScript,
-    required this.sourceUpdate,
     this.sourcePlugins,
     this.translation,
   });
@@ -38,10 +35,7 @@ class SettingsCoreDependencies {
   final DiscoverDailyRecommendationService dailyRecommendation;
   final MangaDownloadService downloader;
   final SourceRuntimeGateway sourceRuntime;
-  final SourceSelectionGateway sourceSelection;
-  final SourceAdvancedGateway sourceAdvanced;
   final SourceScriptGateway sourceScript;
-  final SourceUpdateGateway sourceUpdate;
   final SourcePluginGateway? sourcePlugins;
   final MangaTranslationDependencies? translation;
 }

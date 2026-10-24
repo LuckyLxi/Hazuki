@@ -260,7 +260,7 @@ void registerApplicationServices(GetIt services) {
   if (!services.isRegistered<CloudSyncParticipantSet>()) {
     services.registerLazySingleton<CloudSyncParticipantSet>(
       () => createCloudSyncParticipantSet(
-        source: services<SourceSyncGateway>(),
+        source: services<SourceScriptGateway>(),
         readHistory: services<ReadHistoryService>(),
         readingProgress: services<ReadingProgressService>(),
         localFavorites: services<LocalFavoritesSyncStore>(),

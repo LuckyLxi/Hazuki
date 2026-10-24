@@ -20,7 +20,7 @@ class SourceUpdateDialogSupport {
     required String skipPrefsKey,
     bool respectSkipPreference = true,
   }) async {
-    final check = await sl<SourceUpdateGateway>()
+    final check = await sl<SourceScriptGateway>()
         .checkActiveSourceVersionFromCloud();
     if (!isMounted() || check == null || !check.hasUpdate) {
       return null;

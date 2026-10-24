@@ -85,7 +85,7 @@ Widget _buildApp() {
       '/': (_) => const Scaffold(body: Text('Home')),
       '/history': (_) => HistoryPage(
         readHistoryService: sl<ReadHistoryService>(),
-        sourceService: sl<SourceSelectionGateway>(),
+        sourceService: sl<SourceRuntimeGateway>(),
         imageGateway: sl<SourceImageGateway>(),
         comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
         onFavoriteRequested: (_, _) async {},

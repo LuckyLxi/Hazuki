@@ -99,7 +99,7 @@ void main() {
       );
       await assembly.ensureSourceInitialized(_sourceId);
       expect(assembly.sourceMetadata(_sourceId)!.supportsAccount, isTrue);
-      expect(assembly.gateways.selection.runtimeState.isReady, isTrue);
+      expect(assembly.gateways.runtimeGateway.runtimeState.isReady, isTrue);
       expect(fixtures.requests, isEmpty);
     },
   );

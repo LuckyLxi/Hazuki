@@ -54,7 +54,7 @@ class _CloudSyncFixture {
       downloadGroups: downloadGroups,
       searchHistory: searchHistory,
       participants: createCloudSyncParticipantSet(
-        source: source.gateways.sync,
+        source: source.gateways.script,
         readHistory: readHistory,
         readingProgress: readingProgress,
         localFavorites: localFavorites,

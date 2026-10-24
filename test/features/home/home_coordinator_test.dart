@@ -13,7 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _Source extends Mock implements SourceHomeGateway {}
 
-class _Switch extends Mock implements SourceSwitchGateway {}
+class _Switch extends Mock implements SourceRuntimeGateway {}
 
 class _Images extends Mock implements SourceImageGateway {}
 

@@ -421,7 +421,7 @@ Future<_TestDevice> _createDevice(
   final readingProgress = ReadingProgressService(database: database);
   final searchHistory = SearchHistoryService(database: database);
   final participants = createCloudSyncParticipantSet(
-    source: source.gateways.sync,
+    source: source.gateways.script,
     readHistory: readHistory,
     readingProgress: readingProgress,
     localFavorites: favorites,

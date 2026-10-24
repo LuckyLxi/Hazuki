@@ -5,10 +5,8 @@ import '../../../models/hazuki_models.dart';
 import '../account/source_account_operations.dart';
 import '../favorites/source_favorites_operations.dart';
 import '../gateways/source_runtime_gateways.dart';
-import '../gateways/source_sync_gateway.dart';
 import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
-import '../runtime/source_runtime_diagnostics_operations.dart';
 import '../runtime/source_runtime_initialization_operations.dart';
 import '../runtime/source_runtime_recovery_operations.dart';
 import '../runtime/source_runtime_view.dart';
@@ -17,31 +15,23 @@ import '../runtime/source_settings_operations.dart';
 import '../runtime/source_update_operations.dart';
 import 'hazuki_source_adapter_base.dart';
 
-/// 运行时、账号与脚本相关的全部 Gateway 共用一个实现，各功能仍只依赖自己的窄接口。
+/// 运行时、账号与脚本三组 Gateway 共用一个实现。
 class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
     with _InteractiveAccountAdapter
     implements
         SourceRuntimeGateway,
-        SourceSelectionGateway,
-        SourceSwitchGateway,
         SourceAccountGateway,
         SourceHomeGateway,
-        SourceAdvancedGateway,
-        SourceScriptGateway,
-        SourceUpdateGateway,
-        SourceSyncGateway,
-        SourceBootstrapGateway {
+        SourceScriptGateway {
   HazukiSourceRuntimeAdapter({
     required SourceRuntimeView runtime,
     required SourceRuntimeInitializationOperations initialization,
-    required SourceRuntimeDiagnosticsOperations diagnostics,
     required SourceScriptEditingOperations scriptEditing,
     required SourceUpdateOperations updates,
     required SourceRuntimeRecoveryOperations recovery,
     required SourceAccountOperations account,
     required SourceFavoritesOperations favorites,
   }) : _initialization = initialization,
-       _diagnostics = diagnostics,
        _scriptEditing = scriptEditing,
        _updates = updates,
        _recovery = recovery,
@@ -50,7 +40,6 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
        super(runtime);
 
   final SourceRuntimeInitializationOperations _initialization;
-  final SourceRuntimeDiagnosticsOperations _diagnostics;
   final SourceScriptEditingOperations _scriptEditing;
   final SourceUpdateOperations _updates;
   final SourceRuntimeRecoveryOperations _recovery;
@@ -88,12 +77,6 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   @override
   List<SourceCatalogEntry> get allowedSources =>
       runtime.runtimeRegistry.allowedSources;
-  @override
-  bool isLoggedForSource(String sourceKey) =>
-      _account.isLoggedForSource(sourceKey);
-  @override
-  String? currentAccountForSource(String sourceKey) =>
-      _account.currentAccountForSource(sourceKey);
   @override
   Future<void> prepareSources() => runtime.loadActiveSourcePreference();
   @override
@@ -148,9 +131,6 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
     void Function(int received, int total)? onProgress,
   }) => _recovery.downloadSourceFile(sourceKey, onProgress: onProgress);
   @override
-  Future<void> deleteLocalSourceFile(String sourceKey) =>
-      _scriptEditing.deleteLocalSourceFile(sourceKey);
-  @override
   Future<String> loadEditableActiveSource() =>
       _scriptEditing.loadEditableActiveSource();
   @override
@@ -184,12 +164,6 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   @override
   Future<bool> refreshSourceOnNetworkRecovery() =>
       _recovery.refreshSourceOnNetworkRecovery();
-  @override
-  Future<bool> loadSoftwareLogCaptureEnabled() =>
-      _diagnostics.loadSoftwareLogCaptureEnabled();
-  @override
-  Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
-      _diagnostics.setSoftwareLogCaptureEnabled(enabled);
 }
 
 class HazukiSourceSettingsAdapter implements SourceSettingsGateway {

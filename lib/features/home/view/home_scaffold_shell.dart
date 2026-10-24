@@ -286,7 +286,7 @@ class HomeScaffoldShell extends StatefulWidget {
   final VoidCallback? onProfileTap;
   final FutureOr<void> Function()? onCheckInPressed;
   final VoidCallback? onSwitchSourcePressed;
-  final SourceSwitchGateway? sourceSwitchService;
+  final SourceRuntimeGateway? sourceSwitchService;
   final Future<void> Function()? onSourceSwitched;
   final VoidCallback onOpenHistory;
   final VoidCallback onOpenCategories;

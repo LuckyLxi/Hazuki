@@ -14,7 +14,7 @@ import 'history_page_state.dart';
 class HistoryPageController extends ChangeNotifier {
   HistoryPageController({
     required ReadHistoryService readHistoryService,
-    required SourceSelectionGateway sourceService,
+    required SourceRuntimeGateway sourceService,
     SourceReaderGateway? readerService,
     SourceTaskControlGateway? taskControl,
     SourcePresentationReader presentationFor = emptySourcePresentation,
@@ -40,7 +40,7 @@ class HistoryPageController extends ChangeNotifier {
   }
 
   final ReadHistoryService _readHistoryService;
-  final SourceSelectionGateway _sourceService;
+  final SourceRuntimeGateway _sourceService;
   final SourceReaderGateway? _readerService;
   final SourcePresentationReader _presentationFor;
   final HistoryPageData _state = HistoryPageData();

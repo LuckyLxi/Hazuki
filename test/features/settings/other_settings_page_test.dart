@@ -9,7 +9,7 @@ import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _MockSelection extends Mock implements SourceSelectionGateway {}
+class _MockSelection extends Mock implements SourceRuntimeGateway {}
 
 class _MockDependencies extends Mock implements SettingsCoreDependencies {}
 
@@ -25,7 +25,7 @@ void main() {
     when(() => selection.supportsDirectComicId).thenReturn(true);
     when(() => selection.supportsDailyRecommendation).thenReturn(false);
     dependencies = _MockDependencies();
-    when(() => dependencies.sourceSelection).thenReturn(selection);
+    when(() => dependencies.sourceRuntime).thenReturn(selection);
   });
 
   Widget app() => MaterialApp(

@@ -63,21 +63,11 @@ void registerSourceServices(GetIt services) {
     services,
     (a) => a.gateways.dailyRecommendation,
   );
-  _registerGateway<SourceSyncGateway>(services, (a) => a.gateways.sync);
   _registerGateway<SourceRuntimeGateway>(
     services,
     (a) => a.gateways.runtimeGateway,
   );
-  _registerGateway<SourceSelectionGateway>(
-    services,
-    (a) => a.gateways.selection,
-  );
   _registerGateway<SourceHomeGateway>(services, (a) => a.gateways.home);
-  _registerGateway<SourceSwitchGateway>(
-    services,
-    (a) => a.gateways.switchGateway,
-  );
-  _registerGateway<SourceAdvancedGateway>(services, (a) => a.gateways.advanced);
   _registerGateway<SourceCategoryGateway>(services, (a) => a.gateways.category);
   _registerGateway<SourceCommentsGateway>(
     services,
@@ -87,11 +77,6 @@ void registerSourceServices(GetIt services) {
     services,
     (a) => a.gateways.comicDetail,
   );
-  _registerGateway<SourceBootstrapGateway>(
-    services,
-    (a) => a.gateways.bootstrap,
-  );
-  _registerGateway<SourceUpdateGateway>(services, (a) => a.gateways.update);
   _registerGateway<SourceScriptGateway>(services, (a) => a.gateways.script);
   _registerGateway<SourceLocalizationGateway>(
     services,

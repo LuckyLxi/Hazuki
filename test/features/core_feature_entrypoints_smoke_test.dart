@@ -195,7 +195,7 @@ void main() {
     );
     final history = HistoryPage(
       readHistoryService: sl<ReadHistoryService>(),
-      sourceService: sl<SourceSelectionGateway>(),
+      sourceService: sl<SourceRuntimeGateway>(),
       imageGateway: sl<SourceImageGateway>(),
       comicDetailPageBuilder: buildDetail,
       onFavoriteRequested: (_, _) async {},
@@ -214,10 +214,7 @@ void main() {
         dailyRecommendation: sl<DiscoverDailyRecommendationService>(),
         downloader: sl<MangaDownloadService>(),
         sourceRuntime: sl<SourceRuntimeGateway>(),
-        sourceSelection: sl<SourceSelectionGateway>(),
-        sourceAdvanced: sl<SourceAdvancedGateway>(),
         sourceScript: sl<SourceScriptGateway>(),
-        sourceUpdate: sl<SourceUpdateGateway>(),
       ),
       appearanceSettings: const AppearanceSettingsData(
         themeMode: ThemeMode.system,
@@ -236,7 +233,8 @@ void main() {
       labSettingsPageBuilder: (_) =>
           LabSettingsPage(sourcePlugins: sl<SourcePluginGateway>()),
       advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
-        sourceService: sl<SourceAdvancedGateway>(),
+        sourceService: sl<SourceScriptGateway>(),
+        debugGateway: sl<SourceDebugGateway>(),
         softwareUpdateService: sl<SoftwareUpdateService>(),
         logsPageBuilder: (_) =>
             LogsPage(debugGateway: sl<SourceDebugGateway>()),

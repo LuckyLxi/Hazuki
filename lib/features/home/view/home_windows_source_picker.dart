@@ -11,7 +11,7 @@ Future<void> showHomeWindowsSourcePicker(
   BuildContext context, {
   required Rect sidebarBounds,
   required Rect anchorBounds,
-  required SourceSwitchGateway sourceService,
+  required SourceRuntimeGateway sourceService,
   Future<void> Function()? onSourceSwitched,
 }) async {
   await sourceService.loadActiveSourcePreference();
@@ -83,7 +83,7 @@ class _WindowsSourcePickerCard extends StatefulWidget {
     required this.onSourceSwitched,
   });
 
-  final SourceSwitchGateway sourceService;
+  final SourceRuntimeGateway sourceService;
   final Future<void> Function()? onSourceSwitched;
 
   @override

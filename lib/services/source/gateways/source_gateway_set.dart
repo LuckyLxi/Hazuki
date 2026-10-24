@@ -19,7 +19,6 @@ import '../runtime/source_settings_operations.dart';
 import 'source_content_gateways.dart';
 import 'source_image_gateways.dart';
 import 'source_runtime_gateways.dart';
-import 'source_sync_gateway.dart';
 import 'source_task_control_gateway.dart';
 
 /// Complete set of focused gateways created by the source composition root.
@@ -85,7 +84,6 @@ class SourceGatewaySet {
     final runtimeAdapter = HazukiSourceRuntimeAdapter(
       runtime: runtime,
       initialization: initialization,
-      diagnostics: diagnostics,
       scriptEditing: scriptEditing,
       updates: updates,
       recovery: recovery,
@@ -93,14 +91,8 @@ class SourceGatewaySet {
       favorites: favorites,
     );
     accountGateway = runtimeAdapter;
-    sync = runtimeAdapter;
     runtimeGateway = runtimeAdapter;
-    selection = runtimeAdapter;
-    switchGateway = runtimeAdapter;
     home = runtimeAdapter;
-    advanced = runtimeAdapter;
-    bootstrap = runtimeAdapter;
-    update = runtimeAdapter;
     script = runtimeAdapter;
     category = HazukiSourceCategoryAdapter(content: content, debug: debug);
     commentsGateway = HazukiSourceCommentsAdapter(
@@ -128,17 +120,11 @@ class SourceGatewaySet {
   late final SourceImageGateway imageGateway;
   late final SourceRecommendationGateway recommendation;
   late final SourceDailyRecommendationGateway dailyRecommendation;
-  late final SourceSyncGateway sync;
   late final SourceRuntimeGateway runtimeGateway;
-  late final SourceSelectionGateway selection;
-  late final SourceSwitchGateway switchGateway;
   late final SourceHomeGateway home;
-  late final SourceAdvancedGateway advanced;
   late final SourceCategoryGateway category;
   late final SourceCommentsGateway commentsGateway;
   late final SourceComicDetailGateway comicDetail;
-  late final SourceBootstrapGateway bootstrap;
-  late final SourceUpdateGateway update;
   late final SourceScriptGateway script;
   late final SourceLocalizationGateway localizationGateway;
 }

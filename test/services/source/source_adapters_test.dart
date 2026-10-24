@@ -9,7 +9,6 @@ import 'package:hazuki/services/source/account/source_account_operations.dart';
 import 'package:hazuki/services/source/content/source_content_operations.dart';
 import 'package:hazuki/services/source/favorites/source_favorites_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_diagnostics_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_recovery_operations.dart';
 import 'package:hazuki/services/source/runtime/source_script_editing_operations.dart';
@@ -40,7 +39,7 @@ void main() {
     expect(sl<SourceAccountGateway>(), isA<HazukiSourceRuntimeAdapter>());
     expect(sl<SourceDebugGateway>(), isA<HazukiSourceImageAdapter>());
     expect(sl<SourceImageGateway>(), isA<HazukiSourceImageAdapter>());
-    expect(sl<SourceSyncGateway>(), isA<HazukiSourceRuntimeAdapter>());
+    expect(sl<SourceScriptGateway>(), isA<HazukiSourceRuntimeAdapter>());
     expect(sl<SourceRuntimeGateway>(), isA<HazukiSourceRuntimeAdapter>());
     expect(sl<SourceCommentsGateway>(), isA<HazukiSourceCommentsAdapter>());
   });
@@ -60,15 +59,9 @@ void main() {
 
       expect(notifications, 1);
       for (final gateway in <Object>[
-        gateways.selection,
-        gateways.switchGateway,
         gateways.accountGateway,
         gateways.home,
-        gateways.advanced,
         gateways.script,
-        gateways.update,
-        gateways.sync,
-        gateways.bootstrap,
       ]) {
         expect(identical(gateways.runtimeGateway, gateway), isTrue);
       }
@@ -85,10 +78,10 @@ void main() {
       );
       addTearDown(assembly.dispose);
 
-      expect(assembly.gateways.sync.activeSourceKey, 'jm');
+      expect(assembly.gateways.script.activeSourceKey, 'jm');
       await assembly.runtimeRegistry.activateSource('copy_manga');
 
-      expect(assembly.gateways.sync.activeSourceKey, 'copy_manga');
+      expect(assembly.gateways.script.activeSourceKey, 'copy_manga');
     },
   );
 
@@ -145,10 +138,9 @@ void main() {
       final subscription = favorite.cloudFavoritesChangedStream.listen(
         received.add,
       );
-      final SourceSyncGateway sync = HazukiSourceRuntimeAdapter(
+      final SourceScriptGateway sync = HazukiSourceRuntimeAdapter(
         runtime: runtime,
         initialization: initialization,
-        diagnostics: _FakeDiagnosticsOperations(),
         scriptEditing: scriptEditing,
         updates: _FakeUpdateOperations(),
         recovery: recovery,
@@ -178,10 +170,9 @@ void main() {
 
   test('runtime adapter forwards bootstrap callback and source key', () async {
     final operations = _FakeInitializationOperations();
-    final SourceBootstrapGateway adapter = HazukiSourceRuntimeAdapter(
+    final SourceRuntimeGateway adapter = HazukiSourceRuntimeAdapter(
       runtime: _FakeRuntimeView(),
       initialization: operations,
-      diagnostics: _FakeDiagnosticsOperations(),
       scriptEditing: _FakeScriptEditingOperations(),
       updates: _FakeUpdateOperations(),
       recovery: _FakeRecoveryOperations(),
@@ -326,11 +317,6 @@ class _FakeRecoveryOperations implements SourceRuntimeRecoveryOperations {
     reloadCalls++;
   }
 
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _FakeDiagnosticsOperations implements SourceRuntimeDiagnosticsOperations {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -7,7 +7,7 @@ import 'package:hazuki/widgets/widgets.dart';
 
 Future<bool> showSourceEditorRestoreDialog(
   BuildContext context, {
-  required SourceUpdateGateway sourceService,
+  required SourceScriptGateway sourceService,
   SourceScriptGateway? backupService,
 }) async {
   final strings = l10n(context);

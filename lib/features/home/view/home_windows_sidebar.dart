@@ -28,7 +28,7 @@ class HomeWindowsSidebar extends StatefulWidget {
   final int currentIndex;
   final HomeDrawerDestination? selectedDestination;
   final int unreadAnnouncementCount;
-  final SourceSwitchGateway? sourceSwitchService;
+  final SourceRuntimeGateway? sourceSwitchService;
   final Future<void> Function()? onSourceSwitched;
 
   @override

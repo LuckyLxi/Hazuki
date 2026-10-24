@@ -50,13 +50,13 @@ class SourceBootstrapState {
 
 class SourceRuntimeCoordinator {
   SourceRuntimeCoordinator({
-    SourceBootstrapGateway? bootstrapGateway,
-    SourceUpdateGateway? updateGateway,
-  }) : _bootstrapGateway = bootstrapGateway ?? sl<SourceBootstrapGateway>(),
-       _updateGateway = updateGateway ?? sl<SourceUpdateGateway>();
+    SourceRuntimeGateway? bootstrapGateway,
+    SourceScriptGateway? updateGateway,
+  }) : _bootstrapGateway = bootstrapGateway ?? sl<SourceRuntimeGateway>(),
+       _updateGateway = updateGateway ?? sl<SourceScriptGateway>();
 
-  final SourceBootstrapGateway _bootstrapGateway;
-  final SourceUpdateGateway _updateGateway;
+  final SourceRuntimeGateway _bootstrapGateway;
+  final SourceScriptGateway _updateGateway;
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _hasConnectivity = true;

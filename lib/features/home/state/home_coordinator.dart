@@ -18,7 +18,7 @@ class HomeCoordinator extends ChangeNotifier {
     required SourceTaskControlGateway taskControl,
     required int initialTabIndex,
     required SourceHomeGateway sourceService,
-    required SourceSwitchGateway sourceSwitchService,
+    required SourceRuntimeGateway sourceSwitchService,
     required SourceImageGateway imageService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
     required AnnouncementController announcementService,
@@ -52,7 +52,7 @@ class HomeCoordinator extends ChangeNotifier {
 
   final SourceTaskControlGateway _taskControl;
   final SourceHomeGateway _sourceService;
-  final SourceSwitchGateway _sourceSwitchService;
+  final SourceRuntimeGateway _sourceSwitchService;
   final SourceImageGateway _imageService;
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
@@ -77,7 +77,7 @@ class HomeCoordinator extends ChangeNotifier {
   int get authVersion => _profileController.authVersion;
   bool get isLogged => _profileController.isLogged;
   SourceHomeGateway get sourceService => _sourceService;
-  SourceSwitchGateway get sourceSwitchService => _sourceSwitchService;
+  SourceRuntimeGateway get sourceSwitchService => _sourceSwitchService;
 
   int get currentIndex => _shellController.currentIndex;
   double get discoverSearchMorphProgress =>

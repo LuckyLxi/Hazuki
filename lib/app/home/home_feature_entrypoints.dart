@@ -75,7 +75,7 @@ HomeServices buildHazukiHomeServices() {
   return HomeServices(
     sourceService: sl<SourceHomeGateway>(),
     sourcePlugins: sl<SourcePluginGateway>(),
-    sourceSwitchService: sl<SourceSwitchGateway>(),
+    sourceSwitchService: sl<SourceRuntimeGateway>(),
     imageService: sl<SourceImageGateway>(),
     dailyRecommendationService: sl<DiscoverDailyRecommendationService>(),
     announcementService: sl<AnnouncementController>(),
@@ -152,10 +152,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     dailyRecommendation: sl<DiscoverDailyRecommendationService>(),
     downloader: sl<MangaDownloadService>(),
     sourceRuntime: sl<SourceRuntimeGateway>(),
-    sourceSelection: sl<SourceSelectionGateway>(),
-    sourceAdvanced: sl<SourceAdvancedGateway>(),
     sourceScript: sl<SourceScriptGateway>(),
-    sourceUpdate: sl<SourceUpdateGateway>(),
   );
   final readerDependencies = ReaderDependencies(
     translation: translationDependencies,
@@ -337,7 +334,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           return HistoryPage(
             taskControl: sl<SourceTaskControlGateway>(),
             readHistoryService: sl<ReadHistoryService>(),
-            sourceService: sl<SourceSelectionGateway>(),
+            sourceService: sl<SourceRuntimeGateway>(),
             readerService: sl<SourceReaderGateway>(),
             imageGateway: sl<SourceImageGateway>(),
             comicDetailPageBuilder: comicDetailPageBuilder,
@@ -407,7 +404,8 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             labSettingsPageBuilder: (_) =>
                 LabSettingsPage(sourcePlugins: sl<SourcePluginGateway>()),
             advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
-              sourceService: settingsCoreDependencies.sourceAdvanced,
+              sourceService: settingsCoreDependencies.sourceScript,
+              debugGateway: settingsCoreDependencies.sourceDebug,
               sourcePlugins: sl<SourcePluginGateway>(),
               softwareUpdateService: settingsCoreDependencies.softwareUpdate,
               logsPageBuilder: (_) =>
@@ -417,12 +415,12 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
               ),
               restoreComicSource: (context) => showComicSourceRestoreDialog(
                 context,
-                sourceService: settingsCoreDependencies.sourceUpdate,
+                sourceService: settingsCoreDependencies.sourceScript,
                 backupService: settingsCoreDependencies.sourceScript,
               ),
               redownloadComicSource: (context) => showComicSourceRestoreDialog(
                 context,
-                sourceService: settingsCoreDependencies.sourceUpdate,
+                sourceService: settingsCoreDependencies.sourceScript,
               ),
             ),
           );

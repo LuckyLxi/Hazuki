@@ -19,11 +19,13 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _MockSelection extends Mock implements SourceSelectionGateway {}
+class _MockSelection extends Mock implements SourceRuntimeGateway {}
 
 class _MockSettings extends Mock implements SourceSettingsGateway {}
 
-class _MockAdvanced extends Mock implements SourceAdvancedGateway {}
+class _MockAdvanced extends Mock implements SourceScriptGateway {}
+
+class _MockDebug extends Mock implements SourceDebugGateway {}
 
 class _MockSoftwareUpdate extends Mock implements SoftwareUpdateService {}
 
@@ -183,9 +185,10 @@ void main() {
         var restores = 0;
         var downloads = 0;
         final advanced = _MockAdvanced();
+        final debug = _MockDebug();
         when(advanced.hasActiveSourceBackup).thenAnswer((_) async => hasBackup);
         when(
-          advanced.loadSoftwareLogCaptureEnabled,
+          debug.loadSoftwareLogCaptureEnabled,
         ).thenAnswer((_) async => false);
         final software = _MockSoftwareUpdate();
         when(
@@ -205,6 +208,7 @@ void main() {
             withTestSourcePresentation(
               AdvancedSettingsPage(
                 sourceService: advanced,
+                debugGateway: debug,
                 sourcePlugins: plugins,
                 softwareUpdateService: software,
                 logsPageBuilder: (_) => const SizedBox.shrink(),
@@ -313,9 +317,10 @@ void main() {
       'advanced device uses its owner and original action (menu: $declared)',
       (tester) async {
         final advanced = _MockAdvanced();
+        final debug = _MockDebug();
         when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
         when(
-          advanced.loadSoftwareLogCaptureEnabled,
+          debug.loadSoftwareLogCaptureEnabled,
         ).thenAnswer((_) async => false);
         final softwareUpdate = _MockSoftwareUpdate();
         when(
@@ -334,6 +339,7 @@ void main() {
             withTestSourcePresentation(
               AdvancedSettingsPage(
                 sourceService: advanced,
+                debugGateway: debug,
                 sourcePlugins: plugins,
                 softwareUpdateService: softwareUpdate,
                 logsPageBuilder: (_) => const SizedBox.shrink(),
@@ -396,10 +402,9 @@ void main() {
     'advanced update route menu retains choices and saves selection',
     (tester) async {
       final advanced = _MockAdvanced();
+      final debug = _MockDebug();
       when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
-      when(
-        advanced.loadSoftwareLogCaptureEnabled,
-      ).thenAnswer((_) async => false);
+      when(debug.loadSoftwareLogCaptureEnabled).thenAnswer((_) async => false);
       final softwareUpdate = _MockSoftwareUpdate();
       when(
         softwareUpdate.loadUpdateSource,
@@ -413,6 +418,7 @@ void main() {
         _app(
           AdvancedSettingsPage(
             sourceService: advanced,
+            debugGateway: debug,
             softwareUpdateService: softwareUpdate,
             logsPageBuilder: (_) => const SizedBox.shrink(),
             comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
@@ -631,12 +637,13 @@ void main() {
           when(() => selection.supportsDailyRecommendation).thenReturn(false);
           when(() => selection.isActiveDailyCheckInSource).thenReturn(false);
           final dependencies = _MockDependencies();
-          when(() => dependencies.sourceSelection).thenReturn(selection);
+          when(() => dependencies.sourceRuntime).thenReturn(selection);
           when(() => dependencies.sourcePlugins).thenReturn(plugins);
           final advanced = _MockAdvanced();
+          final debug = _MockDebug();
           when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
           when(
-            advanced.loadSoftwareLogCaptureEnabled,
+            debug.loadSoftwareLogCaptureEnabled,
           ).thenAnswer((_) async => false);
           final softwareUpdate = _MockSoftwareUpdate();
           when(
@@ -659,6 +666,7 @@ void main() {
             ),
             SourcePluginActionLocation.advanced => AdvancedSettingsPage(
               sourceService: advanced,
+              debugGateway: debug,
               sourcePlugins: plugins,
               softwareUpdateService: softwareUpdate,
               logsPageBuilder: (_) => const SizedBox.shrink(),

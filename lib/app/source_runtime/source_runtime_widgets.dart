@@ -265,7 +265,7 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
       _indeterminate = true;
     });
 
-    final ok = await sl<SourceUpdateGateway>().downloadActiveSourceAndReload(
+    final ok = await sl<SourceScriptGateway>().downloadActiveSourceAndReload(
       onProgress: (received, total) {
         _updateDialogState(() {
           if (total > 0) {

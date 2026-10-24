@@ -437,7 +437,7 @@ class _HazukiAppState extends State<HazukiApp>
                   visible: false,
                   child: SourceImageGatewayScope(
                     gateway: sl<SourceImageGateway>(),
-                    sourceListenable: sl<SourceSelectionGateway>(),
+                    sourceListenable: sl<SourceRuntimeGateway>(),
                     child: SourcePresentationScope(
                       registry: sl<SourceRuntimeRegistry>(),
                       sourcePlugins: sl<SourcePluginGateway>(),
