@@ -29,7 +29,7 @@ class _Comic extends Mock implements SourceComicDetailsCapability {}
 class _SearchGateway extends ChangeNotifier implements SourceSearchGateway {
   _SearchGateway(this.host, this.content);
   final SourceRuntimeHost host;
-  final SourceContentOperationService content;
+  final SourceContentOperations content;
   @override
   String get activeSourceKey => host.activeSourceKey;
   @override
@@ -79,7 +79,7 @@ class _PendingHttp implements HttpClientAdapter {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
-  late SourceContentOperationService content;
+  late SourceContentOperations content;
   late _SearchGateway gateway;
   late SourceScriptEngine engine;
   late _PendingHttp http;
@@ -101,7 +101,7 @@ void main() {
     when(
       () => operations.ensureSourceInitialized(any()),
     ).thenAnswer((_) async {});
-    content = SourceContentOperationService(
+    content = SourceContentOperations(
       runtimeHost: host,
       runtimeOperations: operations,
       explore: _Explore(),

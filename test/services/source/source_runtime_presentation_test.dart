@@ -44,7 +44,7 @@ void main() {
       isLoggedForSource: (_) => false,
     );
     source = HazukiSourceSearchAdapter(
-      runtime: SourceRuntimeViewService(
+      runtime: SourceRuntimeView(
         runtimeHost: host,
         runtimeOperations: _Operations(),
       ),

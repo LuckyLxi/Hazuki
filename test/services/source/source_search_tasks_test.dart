@@ -29,7 +29,7 @@ class _Engine extends Mock implements SourceScriptEngine {}
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
-  late SourceContentOperationService content;
+  late SourceContentOperations content;
   late _Operations operations;
   late AppLogStore logs;
 
@@ -84,7 +84,7 @@ void main() {
       logStore: logs,
     );
     addTearDown(host.dispose);
-    content = SourceContentOperationService(
+    content = SourceContentOperations(
       runtimeHost: host,
       runtimeOperations: operations,
       explore: _Explore(),

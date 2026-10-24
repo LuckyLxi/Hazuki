@@ -514,19 +514,11 @@ mixin _InteractiveAccountAdapter implements SourceInteractiveAccountGateway {
   SourceAccountOperations get interactiveAccountOperations;
   @override
   void cancelPendingLogin() =>
-      (interactiveAccountOperations as SourceInteractiveAccountGateway)
-          .cancelPendingLogin();
+      interactiveAccountOperations.cancelPendingLogin();
   @override
   Future<List<SourceLoginMethod>> loadLoginMethods({
     SourceTaskOrigin? taskOrigin,
-  }) {
-    final account = interactiveAccountOperations;
-    return account is SourceInteractiveAccountGateway
-        ? (account as SourceInteractiveAccountGateway).loadLoginMethods(
-            taskOrigin: taskOrigin,
-          )
-        : Future.value(const []);
-  }
+  }) => interactiveAccountOperations.loadLoginMethods(taskOrigin: taskOrigin);
 
   @override
   Future<void> loginInteractive({
@@ -536,13 +528,12 @@ mixin _InteractiveAccountAdapter implements SourceInteractiveAccountGateway {
     required SourceLoginPresenter present,
     required SourceLoginCancellation cancellation,
     SourceTaskOrigin? taskOrigin,
-  }) => (interactiveAccountOperations as SourceInteractiveAccountGateway)
-      .loginInteractive(
-        account: account,
-        password: password,
-        method: method,
-        present: present,
-        cancellation: cancellation,
-        taskOrigin: taskOrigin,
-      );
+  }) => interactiveAccountOperations.loginInteractive(
+    account: account,
+    password: password,
+    method: method,
+    present: present,
+    cancellation: cancellation,
+    taskOrigin: taskOrigin,
+  );
 }

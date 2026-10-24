@@ -21,74 +21,12 @@ import '../debug/debug_log_internals.dart';
 import '../debug/source_task_log_recorder.dart';
 import '../gateways/source_content_gateways.dart';
 
-abstract interface class SourceContentOperations {
-  Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<List<ExploreSection>> loadExploreSections({
-    bool forceRefresh = false,
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<ComicDetailsData> loadComicDetails(
-    String comicId, {
-    String sourceKey = '',
-    bool forceRefresh = false,
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<List<String>> loadChapterImages({
-    required String comicId,
-    required String epId,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-  bool supportComicLikeForSource(String sourceKey);
-  Future<void> toggleComicLike({
-    required String comicId,
-    required bool isLike,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
-    bool forceRefresh = false,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<CategoryComicsResult> loadCategoryRankingComics({
-    required String rankingOption,
-    required int page,
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
-    required String viewMoreUrl,
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<CategoryComicsResult> loadCategoryComicsByViewMore({
-    required String viewMoreUrl,
-    required int page,
-    String order = '',
-    List<String>? orders,
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<SearchComicsResult> searchComics({
-    required String keyword,
-    required int page,
-    String order = '',
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-}
-
-class SourceContentOperationService
+class SourceContentOperations
     implements
-        SourceContentOperations,
         SourceReadingProgressGateway,
         SourceCloudReadingGateway,
         SourceCloudReadingEvents {
-  SourceContentOperationService({
+  SourceContentOperations({
     required SourceRuntimeHost runtimeHost,
     required SourceRuntimeOperations runtimeOperations,
     required SourceExploreCapability explore,
@@ -162,7 +100,6 @@ class SourceContentOperationService
     SourceTaskOrigin? taskOrigin,
   }) => _uploads.report(progress, sourceKey, origin: taskOrigin);
 
-  @override
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
@@ -250,12 +187,10 @@ class SourceContentOperationService
     });
   }
 
-  @override
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
     SourceTaskOrigin? taskOrigin,
   }) => _explore.load(forceRefresh: forceRefresh, taskOrigin: taskOrigin);
-  @override
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
@@ -267,7 +202,6 @@ class SourceContentOperationService
     forceRefresh: forceRefresh,
     taskOrigin: taskOrigin,
   );
-  @override
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
@@ -279,10 +213,8 @@ class SourceContentOperationService
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
   );
-  @override
   bool supportComicLikeForSource(String sourceKey) =>
       _comicDetails.supportComicLikeForSource(sourceKey);
-  @override
   Future<void> toggleComicLike({
     required String comicId,
     required bool isLike,
@@ -294,7 +226,6 @@ class SourceContentOperationService
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
   );
-  @override
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
@@ -304,11 +235,9 @@ class SourceContentOperationService
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
   );
-  @override
   Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
     SourceTaskOrigin? taskOrigin,
   }) => _category.loadRankingOptions(taskOrigin: taskOrigin);
-  @override
   Future<CategoryComicsResult> loadCategoryRankingComics({
     required String rankingOption,
     required int page,
@@ -318,7 +247,6 @@ class SourceContentOperationService
     page: page,
     taskOrigin: taskOrigin,
   );
-  @override
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
     SourceTaskOrigin? taskOrigin,
@@ -326,7 +254,6 @@ class SourceContentOperationService
     viewMoreUrl: viewMoreUrl,
     taskOrigin: taskOrigin,
   );
-  @override
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
@@ -341,7 +268,6 @@ class SourceContentOperationService
     taskOrigin: taskOrigin,
   );
 
-  @override
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,

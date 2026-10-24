@@ -226,28 +226,29 @@ class SourceRuntimeAssembly {
   late final SourceReloginCoordinator _reloginCoordinator;
   late final SourceRuntimeCapability _runtimeCapability;
   late final SourceRuntimeOperations _runtimeOperations =
-      SourceRuntimeOperationService(
+      SourceRuntimeOperations(
         _runtimeCapability.initialization,
         _runtimeCapability.diagnostics,
         _runtimeCapability.scriptEditing,
         _runtimeCapability.sourceUpdates,
         _runtimeCapability.sourceRecovery,
       );
-  late final SourceRuntimeView _runtimeView = SourceRuntimeViewService(
+  late final SourceRuntimeView _runtimeView = SourceRuntimeView(
     runtimeHost: _runtimeHost,
     runtimeOperations: _runtimeOperations,
   );
   late final SourceLocalizationOperations _localizationOperations =
       SourceLocalizationOperations(_runtimeHost);
-  late final SourceImageOperations _imageOperations =
-      SourceImageOperationService(_imageCacheForSourceRequest);
+  late final SourceImageOperations _imageOperations = SourceImageOperations(
+    _imageCacheForSourceRequest,
+  );
   late final SourceSettingsOperations _settingsOperations =
       SourceSettingsOperations(
         _runtimeHost,
         localRuntime: _runtimeCapability.localRuntime,
       );
   late final SourceAccountOperations _accountOperations =
-      SourceAccountOperationService(
+      SourceAccountOperations(
         accountSession: _accountCapability,
         dailyCheckIn: _dailyCheckInCapability,
       );
@@ -273,7 +274,7 @@ class SourceRuntimeAssembly {
   late final SourceImagePreparationCapability _imagePreparationCapability;
   late final SourceFavoritesCapability _favoritesCapability;
   late final SourceContentOperations _contentOperations =
-      SourceContentOperationService(
+      SourceContentOperations(
         loadCloudReadRuntime: _runtimeCapability.loadLoginRuntime,
         runtimeHost: _runtimeHost,
         runtimeOperations: _runtimeOperations,
@@ -282,7 +283,7 @@ class SourceRuntimeAssembly {
         comicDetails: _comicDetailsCapability,
       );
   late final SourceFavoritesOperations _favoritesOperations =
-      SourceFavoritesOperationService(
+      SourceFavoritesOperations(
         favorites: _favoritesCapability,
         debug: _favoritesDebugCapability,
         changedStream: _cloudFavoritesChangedController.stream,
@@ -470,16 +471,10 @@ class SourceRuntimeAssembly {
     return comics;
   }
 
-  Future<void> get whenSettled {
-    final content = _contentOperations;
-    return content is SourceContentOperationService
-        ? content.whenSettled
-        : Future.value();
-  }
+  Future<void> get whenSettled => _contentOperations.whenSettled;
 
   void dispose() {
-    final content = _contentOperations;
-    if (content is SourceContentOperationService) content.dispose();
+    _contentOperations.dispose();
     _applicationHandle.requestDispose();
     for (final handle in _retainedImageHandles.values) {
       handle.requestDispose();

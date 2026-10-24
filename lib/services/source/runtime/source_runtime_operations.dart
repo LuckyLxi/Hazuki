@@ -1,6 +1,3 @@
-// The implementation below intentionally mirrors the complete interface.
-// ignore_for_file: annotate_overrides
-
 import '../models/source_contract_models.dart';
 import 'source_runtime_diagnostics_operations.dart';
 import 'source_runtime_initialization_operations.dart';
@@ -11,42 +8,8 @@ import 'source_update_operations.dart';
 /// Script storage, initialization, and update operations exposed to source
 /// adapters. Keeping these forwards outside the composition root prevents the
 /// root from becoming a second runtime API surface.
-abstract interface class SourceRuntimeOperations {
-  Future<void> init({
-    void Function(int received, int total)? onSourceDownloadProgress,
-    bool prewarm = false,
-  });
-  Future<void> ensureInitialized({String? sourceKey});
-  Future<void> ensureSourceInitialized(String sourceKey);
-  Future<void> prewarmInBackground();
-  void logRuntimeRetryRequested(String source);
-  Future<bool> loadSoftwareLogCaptureEnabled();
-  Future<void> setSoftwareLogCaptureEnabled(bool enabled);
-  Future<bool> hasLocalJmSourceFile();
-  Future<bool> hasLocalSourceFile(String sourceKey);
-  Future<void> deleteLocalSourceFile(String sourceKey);
-  Future<void> downloadSourceFile(
-    String sourceKey, {
-    void Function(int received, int total)? onProgress,
-  });
-  Future<String?> readLocalActiveSourceIfExists();
-  Future<void> writeLocalActiveSource(String content);
-  Future<String> loadEditableActiveSource();
-  Future<void> saveEditedActiveSource(String content);
-  Future<bool> hasCustomEditedActiveSource();
-  Future<bool> hasActiveSourceBackup();
-  Future<bool> restoreActiveSourceBackup();
-  Future<bool> hasCustomEditedSource(String sourceKey);
-  Future<void> reloadFromLocalSourceFiles();
-  Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud();
-  Future<bool> downloadActiveSourceAndReload({
-    void Function(int received, int total)? onProgress,
-  });
-  Future<bool> refreshSourceOnNetworkRecovery();
-}
-
-class SourceRuntimeOperationService implements SourceRuntimeOperations {
-  const SourceRuntimeOperationService(
+class SourceRuntimeOperations {
+  const SourceRuntimeOperations(
     this._initialization,
     this._diagnostics,
     this._scripts,

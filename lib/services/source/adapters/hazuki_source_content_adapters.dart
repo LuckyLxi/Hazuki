@@ -628,16 +628,11 @@ class HazukiSourceReaderAdapter
     Map<String, Object> progress, {
     required String sourceKey,
     SourceTaskOrigin? taskOrigin,
-  }) {
-    final content = _content;
-    return content is SourceReadingProgressGateway
-        ? (content as SourceReadingProgressGateway).reportReadingProgress(
-            progress,
-            sourceKey: sourceKey,
-            taskOrigin: taskOrigin,
-          )
-        : Future<void>.value();
-  }
+  }) => _content.reportReadingProgress(
+    progress,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
 
   @override
   Future<ComicDetailsData> loadComicDetails(
