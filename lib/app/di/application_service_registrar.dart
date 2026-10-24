@@ -36,6 +36,7 @@ import '../../services/translation/imaging/bubble_snapper.dart';
 import '../../services/translation/imaging/translation_image_processor.dart';
 import '../../services/translation/translation_usage_store.dart';
 import '../../services/translation/detection/translation_detector_model_store.dart';
+import '../../services/translation/detection/onnx_runtime_library.dart';
 import '../../services/translation/detection/onnx_translation_text_detector.dart';
 import '../../services/translation/detection/translation_text_detector.dart';
 
@@ -45,8 +46,13 @@ void registerApplicationServices(GetIt services) {
     services.registerLazySingleton<TranslationDetectorModelStore>(
       () => TranslationDetectorModelStore(
         settings: services<MangaTranslationSettingsStore>(),
-        verifyLoadable: (spec, model) =>
-            OnnxTranslationTextDetector.verifyModel(model),
+        verifyLoadable: (spec, model, runtime) =>
+            OnnxTranslationTextDetector.verifyModel(model, runtime),
+        verifyRuntime: (library) => OnnxTranslationTextDetector.verifyRuntime(
+          library,
+          OnnxRuntimeLibrarySpec.version,
+        ),
+        releaseRuntime: () => services<TranslationTextDetector>().release(),
       ),
       dispose: (store) => store.dispose(),
     );

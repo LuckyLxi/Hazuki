@@ -20,11 +20,13 @@ class DetectionImage {
 }
 
 abstract interface class TranslationTextDetector {
-  /// 返回以切片为参照、归一化到 0–1 的轴对齐文字框。
+  /// 返回以切片为参照、归一化到 0–1 的轴对齐文字框；[runtime] 为下载的
+  /// ONNX Runtime 动态库。
   Future<List<Rect>> detect(
     DetectionImage image,
     TranslationDetectorModelSpec spec,
-    File model, {
+    File model,
+    File runtime, {
     CancelToken? cancelToken,
   });
 

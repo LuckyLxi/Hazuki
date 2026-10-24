@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/services/translation/detection/onnx_runtime_library.dart';
 import 'package:hazuki/services/translation/detection/translation_detector_model_store.dart';
 import 'package:hazuki/services/translation/detection/translation_detector_models.dart';
 import 'package:hazuki/services/translation/manga_translation_settings_store.dart';
@@ -51,19 +52,66 @@ void main() {
     archiveEntry: archiveEntry,
   );
 
+  final runtimeLibrary = Uint8List.fromList(
+    List.generate(2048, (index) => index % 7),
+  );
+  final runtimeZip = Uint8List.fromList(
+    ZipEncoder().encodeBytes(
+      Archive()
+        ..addFile(ArchiveFile.bytes('ort/README.md', [1]))
+        ..addFile(ArchiveFile.bytes('ort/lib/ort.dll', runtimeLibrary)),
+    ),
+  );
+
+  OnnxRuntimeLibrarySpec runtimeSpec({
+    List<String> paths = const ['/runtime.zip'],
+    String? digest,
+  }) => OnnxRuntimeLibrarySpec(
+    sources: [
+      for (final path in paths)
+        'http://${server.address.host}:${server.port}$path',
+    ],
+    archiveBytes: runtimeZip.length,
+    archiveEntry: 'ort/lib/ort.dll',
+    fileName: 'ort.dll',
+    sha256: digest ?? sha256.convert(runtimeLibrary).toString(),
+    entryCompressedBytes: runtimeZip.length,
+  );
+
   TranslationDetectorModelStore store(
     List<TranslationDetectorModelSpec> specs, {
     DetectorModelVerifier? verify,
+    OnnxRuntimeVerifier? verifyRuntime,
+    Future<void> Function()? releaseRuntime,
+    OnnxRuntimeLibrarySpec? runtime,
   }) => TranslationDetectorModelStore(
     settings: settings,
     supportDirectory: () async => directory,
     verifyLoadable: verify,
+    verifyRuntime: verifyRuntime,
+    releaseRuntime: releaseRuntime,
     specs: specs,
+    runtimeSpec: () => runtime ?? runtimeSpec(),
   );
 
   File installed(String id) => File(
     p.join(directory.path, 'manga_translation', 'models', id, 'v1.onnx'),
   );
+
+  File installedRuntime() => File(
+    p.join(
+      directory.path,
+      'manga_translation',
+      'runtime',
+      OnnxRuntimeLibrarySpec.version,
+      'ort.dll',
+    ),
+  );
+
+  Future<void> installRuntime() async {
+    await installedRuntime().parent.create(recursive: true);
+    await installedRuntime().writeAsBytes(runtimeLibrary);
+  }
 
   Directory partial() => Directory(
     p.join(directory.path, 'manga_translation', 'models', '.partial'),
@@ -113,6 +161,7 @@ void main() {
   });
 
   test('follows redirects and extracts only the tar model entry', () async {
+    await installRuntime();
     routes['/latest.tar'] = (response) async {
       response.statusCode = HttpStatus.found;
       response.headers.set(HttpHeaders.locationHeader, '/objects/model.tar');
@@ -122,7 +171,7 @@ void main() {
     File? verified;
     final models = store(
       [spec('tar', '/latest.tar', tar, archiveEntry: 'inference.onnx')],
-      verify: (spec, model) async {
+      verify: (spec, model, runtime) async {
         verified = model;
         expect(await model.readAsBytes(), onnx);
       },
@@ -161,6 +210,7 @@ void main() {
   });
 
   test('reports archives without the model entry and load failures', () async {
+    await installRuntime();
     final empty = Uint8List.fromList(
       TarEncoder().encodeBytes(
         Archive()..addFile(ArchiveFile.bytes('pkg/README.md', [1])),
@@ -173,7 +223,7 @@ void main() {
         spec('empty', '/empty.tar', empty, archiveEntry: 'inference.onnx'),
         spec('broken', '/model.tar', tar, archiveEntry: 'inference.onnx'),
       ],
-      verify: (spec, model) async {
+      verify: (spec, model, runtime) async {
         if (spec.id == 'broken') throw StateError('load');
       },
     );
@@ -274,5 +324,139 @@ void main() {
     expect(models.isInstalled('selected'), isFalse);
     expect(await installed('selected').exists(), isFalse);
     models.dispose();
+  });
+
+  group('runtime library', () {
+    Directory runtimePartial() => Directory(
+      p.join(directory.path, 'manga_translation', 'runtime', '.partial'),
+    );
+
+    test(
+      'falls back to the next source and verifies before installing',
+      () async {
+        routes['/runtime.zip'] = (response) => serve(response, runtimeZip);
+        final verified = <String>[];
+        final models = store(
+          const [],
+          runtime: runtimeSpec(paths: ['/offline.zip', '/runtime.zip']),
+          verifyRuntime: (library) async {
+            verified.add(library.path);
+            expect(await library.readAsBytes(), runtimeLibrary);
+          },
+        );
+        await models.load();
+        expect(models.isRuntimeInstalled, isFalse);
+        expect(models.runtimeFile, isNull);
+        await models.downloadRuntime();
+        expect(models.runtimeState.status, DetectorModelStatus.installed);
+        expect(verified, hasLength(1));
+        expect(models.runtimeFile!.path, installedRuntime().path);
+        expect(await installedRuntime().readAsBytes(), runtimeLibrary);
+        expect(await runtimePartial().exists(), isFalse);
+        models.dispose();
+      },
+    );
+
+    test('rejects a changed source and libraries that fail to load', () async {
+      routes['/runtime.zip'] = (response) => serve(response, runtimeZip);
+      final changed = store(const [], runtime: runtimeSpec(digest: '0' * 64));
+      await changed.downloadRuntime();
+      expect(
+        changed.runtimeState.failure,
+        DetectorModelFailure.checksumMismatch,
+      );
+      changed.dispose();
+
+      final broken = store(
+        const [],
+        verifyRuntime: (_) async => throw StateError('load'),
+      );
+      await broken.downloadRuntime();
+      expect(broken.runtimeState.failure, DetectorModelFailure.loadFailed);
+      expect(broken.isRuntimeInstalled, isFalse);
+      expect(await installedRuntime().exists(), isFalse);
+      expect(await runtimePartial().exists(), isFalse);
+      broken.dispose();
+    });
+
+    test('reports network failures when every source fails', () async {
+      final models = store(const [], runtime: runtimeSpec(paths: ['/a', '/b']));
+      await models.downloadRuntime();
+      expect(models.runtimeState.failure, DetectorModelFailure.network);
+      models.dispose();
+    });
+
+    test('model verification needs the installed runtime', () async {
+      routes['/model.onnx'] = (response) => serve(response, onnx);
+      final runtimes = <String>[];
+      Future<void> verify(spec, model, File runtime) async =>
+          runtimes.add(runtime.path);
+      final without = store([spec('a', '/model.onnx', onnx)], verify: verify);
+      await without.download('a');
+      expect(without.isInstalled('a'), isTrue);
+      expect(runtimes, isEmpty);
+      without.dispose();
+
+      await installRuntime();
+      final withRuntime = store([
+        spec('b', '/model.onnx', onnx),
+      ], verify: verify);
+      await withRuntime.download('b');
+      expect(runtimes, [installedRuntime().path]);
+      withRuntime.dispose();
+    });
+
+    test('deleting releases the detector and removes the library', () async {
+      await installRuntime();
+      var releases = 0;
+      final models = store(const [], releaseRuntime: () async => releases++);
+      await models.load();
+      expect(models.isRuntimeInstalled, isTrue);
+      await models.deleteRuntime();
+      expect(releases, 1);
+      expect(models.isRuntimeInstalled, isFalse);
+      expect(models.runtimeDeletePending, isFalse);
+      expect(await installedRuntime().exists(), isFalse);
+      models.dispose();
+    });
+
+    test(
+      'locked libraries are deleted on the next load',
+      () async {
+        await installRuntime();
+        final handle = await installedRuntime().open();
+        final models = store(const []);
+        await models.load();
+        await models.deleteRuntime();
+        expect(models.runtimeDeletePending, isTrue);
+        expect(models.isRuntimeInstalled, isFalse);
+        expect(() => models.downloadRuntime(), throwsStateError);
+        models.dispose();
+        await handle.close();
+
+        final restarted = store(const []);
+        await restarted.load();
+        expect(restarted.runtimeDeletePending, isFalse);
+        expect(restarted.isRuntimeInstalled, isFalse);
+        expect(await installedRuntime().exists(), isFalse);
+        restarted.dispose();
+      },
+      // 只有 Windows 会因文件被占用而删除失败。
+      skip: !Platform.isWindows,
+    );
+
+    test('unsupported platforms have no runtime', () async {
+      final models = TranslationDetectorModelStore(
+        settings: settings,
+        supportDirectory: () async => directory,
+        specs: const [],
+        runtimeSpec: () => null,
+      );
+      await models.load();
+      expect(models.runtime, isNull);
+      expect(models.isRuntimeInstalled, isFalse);
+      expect(() => models.downloadRuntime(), throwsUnsupportedError);
+      models.dispose();
+    });
   });
 }

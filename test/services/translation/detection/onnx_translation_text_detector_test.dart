@@ -16,15 +16,22 @@ void main() {
   final image = DetectionImage(rgba: Uint8List(16), width: 2, height: 2);
   final spec = kTranslationDetectorModels.first;
   final missing = File('missing-detector-model.onnx');
+  final runtime = File('missing-onnxruntime-library');
 
   test('removes cancelled jobs from the queue before they start', () async {
     final detector = OnnxTranslationTextDetector();
-    final first = detector.detect(image, spec, missing);
+    final first = detector.detect(image, spec, missing, runtime);
     final token = CancelToken();
-    final second = detector.detect(image, spec, missing, cancelToken: token);
+    final second = detector.detect(
+      image,
+      spec,
+      missing,
+      runtime,
+      cancelToken: token,
+    );
     token.cancel();
     await expectLater(second, _failure(TranslationFailureKind.cancelled));
-    // 宿主测试环境没有可加载的模型，排在前面的任务以模型不可用结束。
+    // 测试中的运行库与模型路径都不存在，排在前面的任务以检测器不可用结束。
     await expectLater(
       first,
       _failure(TranslationFailureKind.detectorUnavailable),
@@ -36,7 +43,7 @@ void main() {
     final detector = OnnxTranslationTextDetector();
     final token = CancelToken()..cancel();
     await expectLater(
-      detector.detect(image, spec, missing, cancelToken: token),
+      detector.detect(image, spec, missing, runtime, cancelToken: token),
       _failure(TranslationFailureKind.cancelled),
     );
     await detector.release();
@@ -45,11 +52,11 @@ void main() {
   test('release cancels running and queued work', () async {
     final detector = OnnxTranslationTextDetector();
     final first = expectLater(
-      detector.detect(image, spec, missing),
+      detector.detect(image, spec, missing, runtime),
       _failure(TranslationFailureKind.cancelled),
     );
     final second = expectLater(
-      detector.detect(image, spec, missing),
+      detector.detect(image, spec, missing, runtime),
       _failure(TranslationFailureKind.cancelled),
     );
     await detector.release();
@@ -57,7 +64,7 @@ void main() {
     await second;
     // 释放后仍可重新启动工作 isolate。
     await expectLater(
-      detector.detect(image, spec, missing),
+      detector.detect(image, spec, missing, runtime),
       _failure(TranslationFailureKind.detectorUnavailable),
     );
     await detector.release();

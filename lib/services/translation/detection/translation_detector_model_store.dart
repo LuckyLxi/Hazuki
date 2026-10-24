@@ -13,6 +13,8 @@ import 'package:path_provider/path_provider.dart';
 import '../../network/hazuki_network_factory.dart';
 import '../manga_translation_settings_store.dart';
 import 'onnx_model_pruner.dart';
+import 'onnx_runtime_library.dart';
+import 'remote_zip_entry.dart';
 import 'translation_detector_models.dart';
 
 enum DetectorModelStatus { notInstalled, downloading, failed, installed }
@@ -43,7 +45,14 @@ class DetectorModelState {
 
 /// 发布前校验模型能被推理运行时加载；抛出异常即视为加载失败。
 typedef DetectorModelVerifier =
-    Future<void> Function(TranslationDetectorModelSpec spec, File model);
+    Future<void> Function(
+      TranslationDetectorModelSpec spec,
+      File model,
+      File runtime,
+    );
+
+/// 发布前校验运行库可以加载且版本正确；抛出异常即视为加载失败。
+typedef OnnxRuntimeVerifier = Future<void> Function(File library);
 
 class _ModelDownloadFailure implements Exception {
   const _ModelDownloadFailure(this.kind);
@@ -56,8 +65,13 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     Future<Directory> Function()? supportDirectory,
     Dio? dio,
     this.verifyLoadable,
+    this.verifyRuntime,
+    this.releaseRuntime,
     this.specs = kTranslationDetectorModels,
+    OnnxRuntimeLibrarySpec? Function() runtimeSpec =
+        onnxRuntimeLibraryForCurrentPlatform,
   }) : _settings = settings,
+       runtime = runtimeSpec(),
        _supportDirectory = supportDirectory ?? getApplicationSupportDirectory,
        _dio =
            dio ??
@@ -77,12 +91,38 @@ class TranslationDetectorModelStore extends ChangeNotifier {
   final Future<Directory> Function() _supportDirectory;
   final Dio _dio;
   final DetectorModelVerifier? verifyLoadable;
+  final OnnxRuntimeVerifier? verifyRuntime;
+
+  /// 删除运行库前释放检测器会话与工作 isolate。
+  final Future<void> Function()? releaseRuntime;
   final List<TranslationDetectorModelSpec> specs;
+
+  /// 当前平台的运行库；为 null 表示不支持本地检测。
+  final OnnxRuntimeLibrarySpec? runtime;
   final _states = <String, DetectorModelState>{};
   final _tokens = <String, CancelToken>{};
   final _tasks = <String, Future<void>>{};
   Future<void>? _loadFuture;
   Directory? _root;
+  DetectorModelState _runtimeState = const DetectorModelState();
+  CancelToken? _runtimeToken;
+  Future<void>? _runtimeTask;
+  bool _runtimeDeletePending = false;
+
+  DetectorModelState get runtimeState => _runtimeState;
+  bool get isRuntimeInstalled =>
+      _runtimeState.status == DetectorModelStatus.installed;
+
+  /// Windows 上已加载的运行库无法删除，需要重启应用后才能完成删除。
+  bool get runtimeDeletePending => _runtimeDeletePending;
+
+  /// 已安装运行库的文件；未加载或未安装时返回 null。
+  File? get runtimeFile {
+    final root = _root;
+    final spec = runtime;
+    if (root == null || spec == null || !isRuntimeInstalled) return null;
+    return _runtimeFile(root, spec);
+  }
 
   DetectorModelState stateOf(String id) =>
       _states[id] ?? const DetectorModelState();
@@ -107,6 +147,20 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     // 应用重启前未完成的下载不再续传，统一清理。
     final partial = Directory(p.join(root.path, '.partial'));
     if (await partial.exists()) await partial.delete(recursive: true);
+    final runtimeDirectory = _runtimeDirectory(root);
+    final pending = File(p.join(runtimeDirectory.path, '.delete-pending'));
+    if (await pending.exists()) {
+      // 上次运行时运行库已被加载而无法删除，在本次加载前完成删除。
+      await runtimeDirectory.delete(recursive: true);
+    }
+    final runtimeSpec = runtime;
+    if (runtimeSpec != null && _runtimeTask == null) {
+      _runtimeState = DetectorModelState(
+        status: await _runtimeFile(root, runtimeSpec).exists()
+            ? DetectorModelStatus.installed
+            : DetectorModelStatus.notInstalled,
+      );
+    }
     for (final spec in specs) {
       if (_tasks.containsKey(spec.id)) continue;
       final installed = await _modelFile(root, spec).exists();
@@ -131,6 +185,169 @@ class TranslationDetectorModelStore extends ChangeNotifier {
   }
 
   void cancel(String id) => _tokens[id]?.cancel();
+
+  Future<void> downloadRuntime() {
+    final spec = runtime;
+    if (spec == null) throw UnsupportedError('No ONNX Runtime for platform');
+    if (_runtimeDeletePending) {
+      throw StateError('ONNX Runtime deletion is pending a restart');
+    }
+    final running = _runtimeTask;
+    if (running != null) return running;
+    final task = _downloadRuntime(spec);
+    _runtimeTask = task;
+    return task.whenComplete(() => _runtimeTask = null);
+  }
+
+  void cancelRuntime() => _runtimeToken?.cancel();
+
+  Future<void> deleteRuntime() async {
+    await load();
+    final spec = runtime;
+    if (spec == null) return;
+    cancelRuntime();
+    await _runtimeTask?.catchError((_) {});
+    await releaseRuntime?.call();
+    final directory = _runtimeDirectory(_root!);
+    try {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    } on FileSystemException {
+      // Windows 上已加载的 dll 被进程占用，记下标记，下次启动加载前删除。
+      await File(
+        p.join(directory.path, '.delete-pending'),
+      ).writeAsString('', flush: true);
+      _runtimeDeletePending = true;
+    }
+    _runtimeState = const DetectorModelState();
+    notifyListeners();
+  }
+
+  Future<void> _downloadRuntime(OnnxRuntimeLibrarySpec spec) async {
+    await load();
+    final root = _root!;
+    final token = CancelToken();
+    _runtimeToken = token;
+    _runtimeState = const DetectorModelState(
+      status: DetectorModelStatus.downloading,
+    );
+    notifyListeners();
+    final partial = Directory(p.join(_runtimeDirectory(root).path, '.partial'));
+    final extracted = File(p.join(partial.path, spec.fileName));
+    final scratch = File(p.join(partial.path, 'archive.download'));
+    try {
+      await partial.create(recursive: true);
+      Object? lastError;
+      for (final source in spec.sources) {
+        try {
+          await downloadZipEntry(
+            dio: _dio,
+            url: source,
+            archiveBytes: spec.archiveBytes,
+            entry: spec.archiveEntry,
+            output: extracted,
+            scratch: scratch,
+            cancelToken: token,
+            onProgress: _progressReporter(
+              spec.entryCompressedBytes,
+              (state) => _runtimeState = state,
+            ),
+          );
+          lastError = null;
+          break;
+        } on DioException catch (error) {
+          // 只有网络错误才换下一个下载源。
+          if (token.isCancelled) rethrow;
+          lastError = error;
+        }
+      }
+      if (lastError != null) throw lastError;
+      _checkCancelled(token);
+      if (await _digestInIsolate(extracted.path) != spec.sha256) {
+        throw const _ModelDownloadFailure(
+          DetectorModelFailure.checksumMismatch,
+        );
+      }
+      _checkCancelled(token);
+      final verify = verifyRuntime;
+      if (verify != null) {
+        try {
+          await verify(extracted);
+        } catch (_) {
+          throw const _ModelDownloadFailure(DetectorModelFailure.loadFailed);
+        }
+      }
+      _checkCancelled(token);
+      final target = _runtimeFile(root, spec);
+      await target.parent.create(recursive: true);
+      if (await target.exists()) await target.delete();
+      await extracted.rename(target.path);
+      _runtimeState = const DetectorModelState(
+        status: DetectorModelStatus.installed,
+      );
+    } catch (error) {
+      _runtimeState = _failureState(error, token);
+    } finally {
+      if (identical(_runtimeToken, token)) _runtimeToken = null;
+      try {
+        if (await partial.exists()) await partial.delete(recursive: true);
+      } on FileSystemException {
+        // 清理失败不影响结果；下次下载会覆盖临时文件。
+      }
+      notifyListeners();
+    }
+  }
+
+  /// 节流后的下载进度回调，按 [expectedBytes] 兜底未知总长度。
+  void Function(int received, int total) _progressReporter(
+    int expectedBytes,
+    void Function(DetectorModelState state) update,
+  ) {
+    final stopwatch = Stopwatch()..start();
+    var lastTick = 0, lastBytes = 0;
+    return (received, total) {
+      final elapsed = stopwatch.elapsedMilliseconds;
+      if (elapsed - lastTick < 250 && (total <= 0 || received < total)) {
+        return;
+      }
+      final speed =
+          math.max(received - lastBytes, 0) *
+          1000 /
+          math.max(elapsed - lastTick, 1);
+      lastTick = elapsed;
+      lastBytes = received;
+      final expected = total > 0 ? total : expectedBytes;
+      update(
+        DetectorModelState(
+          status: DetectorModelStatus.downloading,
+          progress: (received / expected).clamp(0.0, 1.0),
+          indeterminate: expected <= 0,
+          speedBytesPerSecond: speed,
+        ),
+      );
+      notifyListeners();
+    };
+  }
+
+  static DetectorModelState _failureState(Object error, CancelToken token) =>
+      switch (error) {
+        _ when token.isCancelled => const DetectorModelState(),
+        _ModelDownloadFailure(:final kind) => DetectorModelState(
+          status: DetectorModelStatus.failed,
+          failure: kind,
+        ),
+        DioException() => const DetectorModelState(
+          status: DetectorModelStatus.failed,
+          failure: DetectorModelFailure.network,
+        ),
+        ArchiveException() || FormatException() => const DetectorModelState(
+          status: DetectorModelStatus.failed,
+          failure: DetectorModelFailure.invalidArchive,
+        ),
+        _ => const DetectorModelState(
+          status: DetectorModelStatus.failed,
+          failure: DetectorModelFailure.storage,
+        ),
+      };
 
   Future<void> delete(String id) async {
     await load();
@@ -163,34 +380,15 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     final pruned = File(p.join(partial.path, '${spec.id}.pruned.onnx'));
     try {
       await partial.create(recursive: true);
-      final stopwatch = Stopwatch()..start();
-      var lastTick = 0, lastBytes = 0;
-      var speed = 0.0;
       await _dio.download(
         spec.url,
         downloaded.path,
         cancelToken: token,
         deleteOnError: true,
-        onReceiveProgress: (received, total) {
-          final elapsed = stopwatch.elapsedMilliseconds;
-          if (elapsed - lastTick < 250 && (total <= 0 || received < total)) {
-            return;
-          }
-          speed =
-              math.max(received - lastBytes, 0) *
-              1000 /
-              math.max(elapsed - lastTick, 1);
-          lastTick = elapsed;
-          lastBytes = received;
-          final expected = total > 0 ? total : spec.downloadBytes;
-          _states[spec.id] = DetectorModelState(
-            status: DetectorModelStatus.downloading,
-            progress: (received / expected).clamp(0.0, 1.0),
-            indeterminate: expected <= 0,
-            speedBytesPerSecond: speed,
-          );
-          notifyListeners();
-        },
+        onReceiveProgress: _progressReporter(
+          spec.downloadBytes,
+          (state) => _states[spec.id] = state,
+        ),
       );
       _checkCancelled(token);
       final path = downloaded.path;
@@ -226,10 +424,12 @@ class TranslationDetectorModelStore extends ChangeNotifier {
         model = pruned;
       }
       _checkCancelled(token);
+      // 运行库尚未安装时跳过加载校验，首次检测时再暴露加载失败。
       final verify = verifyLoadable;
-      if (verify != null) {
+      final runtimeLibrary = runtimeFile;
+      if (verify != null && runtimeLibrary != null) {
         try {
-          await verify(spec, model);
+          await verify(spec, model, runtimeLibrary);
         } catch (_) {
           throw const _ModelDownloadFailure(DetectorModelFailure.loadFailed);
         }
@@ -243,25 +443,7 @@ class TranslationDetectorModelStore extends ChangeNotifier {
         status: DetectorModelStatus.installed,
       );
     } catch (error) {
-      _states[spec.id] = switch (error) {
-        _ when token.isCancelled => const DetectorModelState(),
-        _ModelDownloadFailure(:final kind) => DetectorModelState(
-          status: DetectorModelStatus.failed,
-          failure: kind,
-        ),
-        DioException() => const DetectorModelState(
-          status: DetectorModelStatus.failed,
-          failure: DetectorModelFailure.network,
-        ),
-        ArchiveException() => const DetectorModelState(
-          status: DetectorModelStatus.failed,
-          failure: DetectorModelFailure.invalidArchive,
-        ),
-        _ => const DetectorModelState(
-          status: DetectorModelStatus.failed,
-          failure: DetectorModelFailure.storage,
-        ),
-      };
+      _states[spec.id] = _failureState(error, token);
     } finally {
       if (identical(_tokens[spec.id], token)) _tokens.remove(spec.id);
       for (final file in [downloaded, extracted, pruned]) {
@@ -284,6 +466,19 @@ class TranslationDetectorModelStore extends ChangeNotifier {
 
   static File _modelFile(Directory root, TranslationDetectorModelSpec spec) =>
       File(p.join(root.path, spec.id, 'v${spec.version}.onnx'));
+
+  // 运行库与模型分目录存放：manga_translation/runtime/<版本>/<文件名>。
+  static Directory _runtimeDirectory(Directory modelsRoot) =>
+      Directory(p.join(p.dirname(modelsRoot.path), 'runtime'));
+
+  static File _runtimeFile(Directory modelsRoot, OnnxRuntimeLibrarySpec spec) =>
+      File(
+        p.join(
+          _runtimeDirectory(modelsRoot).path,
+          OnnxRuntimeLibrarySpec.version,
+          spec.fileName,
+        ),
+      );
 
   static void _checkCancelled(CancelToken token) {
     if (token.isCancelled) throw StateError('cancelled');

@@ -43,8 +43,28 @@ class _Models extends TranslationDetectorModelStore {
   @override
   Future<void> download(String id) async => downloads.add(id);
 
+  DetectorModelState runtimeValue = const DetectorModelState(
+    status: DetectorModelStatus.installed,
+  );
+  int runtimeDownloads = 0;
+
+  @override
+  DetectorModelState get runtimeState => runtimeValue;
+
+  @override
+  bool get isRuntimeInstalled =>
+      runtimeValue.status == DetectorModelStatus.installed;
+
+  @override
+  Future<void> downloadRuntime() async => runtimeDownloads++;
+
   void set(String id, DetectorModelState state) {
     states[id] = state;
+    notifyListeners();
+  }
+
+  void setRuntime(DetectorModelState state) {
+    runtimeValue = state;
     notifyListeners();
   }
 }
@@ -236,6 +256,60 @@ void main() {
     await tester.pumpAndSettle();
     expect(settings.textLocator, TranslationTextLocator.ai);
     expect(ctd, findsNothing);
+  });
+
+  testWidgets('the runtime row gates model selection', (tester) async {
+    models.setRuntime(const DetectorModelState());
+    models.set(
+      'pp_ocrv5_mobile_det',
+      const DetectorModelState(status: DetectorModelStatus.installed),
+    );
+    await pump(tester);
+    final runtimeRequired = find.text('Download the detection runtime first');
+    await tester.scrollUntilVisible(
+      runtimeRequired,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(runtimeRequired, findsOneWidget);
+    expect(find.text('Download and select a detection model'), findsNothing);
+    final runtimeRow = find.byKey(
+      const ValueKey('translation-detector-runtime'),
+    );
+    expect(
+      find.descendant(
+        of: runtimeRow,
+        matching: find.text('ONNX Runtime 1.23.2'),
+      ),
+      findsOneWidget,
+    );
+    final mobile = find.byKey(
+      const ValueKey('translation-detector-pp_ocrv5_mobile_det'),
+    );
+    final use = find.descendant(
+      of: mobile,
+      matching: find.widgetWithText(FilledButton, 'Use'),
+    );
+    await tester.ensureVisible(use);
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(use).onPressed, isNull);
+
+    final download = find.descendant(
+      of: runtimeRow,
+      matching: find.text('Download'),
+    );
+    await tester.ensureVisible(download);
+    await tester.pumpAndSettle();
+    await tester.tap(download);
+    expect(models.runtimeDownloads, 1);
+
+    models.setRuntime(
+      const DetectorModelState(status: DetectorModelStatus.installed),
+    );
+    await tester.pumpAndSettle();
+    expect(runtimeRequired, findsNothing);
+    expect(find.text('Download and select a detection model'), findsOneWidget);
+    expect(tester.widget<FilledButton>(use).onPressed, isNotNull);
   });
 
   testWidgets('shows a changed model source as a distinct failure', (

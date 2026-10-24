@@ -59,6 +59,11 @@ class _Models extends TranslationDetectorModelStore {
         ? DetectorModelStatus.installed
         : DetectorModelStatus.notInstalled,
   );
+
+  bool runtimeInstalled = true;
+
+  @override
+  bool get isRuntimeInstalled => runtimeInstalled;
 }
 
 void main() {
@@ -314,6 +319,17 @@ void main() {
       await tick();
       expect(controller.modeOn, isTrue);
       expect(service.calls, hasLength(2));
+
+      // 本地检测还需要已安装的运行库。
+      models.installed.add('pp_ocrv5_mobile_det');
+      models.runtimeInstalled = false;
+      await settings.setTextLocator(TranslationTextLocator.detector);
+      await tick();
+      expect(controller.ready, isFalse);
+      models.runtimeInstalled = true;
+      await settings.setTargetLanguage(TranslationTargetLanguage.japanese);
+      await tick();
+      expect(controller.ready, isTrue);
     },
   );
 

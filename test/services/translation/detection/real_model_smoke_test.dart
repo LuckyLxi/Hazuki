@@ -1,12 +1,15 @@
-// 真实检测模型的加载与推理冒烟测试，需要预先下载三个模型。
+// 真实检测模型的加载与推理冒烟测试，需要预先下载三个模型和运行库；
+// 未提供参数时自动跳过。运行库按路径加载，因此直接在宿主机上运行即可。
 //
-// flutter test integration_test/translation_detector_smoke_test.dart -d windows \
-//   --dart-define=HAZUKI_DETECTOR_MODEL_DIR=<目录>
+// flutter test test/services/translation/detection/real_model_smoke_test.dart \
+//   --dart-define=HAZUKI_DETECTOR_MODEL_DIR=<目录> \
+//   --dart-define=HAZUKI_ORT_LIBRARY=<onnxruntime.dll 或 libonnxruntime.so>
 //
 // 目录内放置 comic_text_detector.onnx、pp_ocrv5_mobile_det.onnx、
 // pp_ocrv5_server_det.onnx（Paddle 为 tar 包内的 inference.onnx）。
 // 可选 HAZUKI_DETECTOR_SAMPLE 指定一张真实漫画页图片。
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,11 +18,11 @@ import 'package:hazuki/services/translation/detection/onnx_translation_text_dete
 import 'package:hazuki/services/translation/detection/translation_detector_models.dart';
 import 'package:hazuki/services/translation/imaging/translation_image_processor.dart';
 import 'package:image/image.dart' as img;
-import 'package:integration_test/integration_test.dart';
 import 'package:path/path.dart' as p;
 
 const _modelDirectory = String.fromEnvironment('HAZUKI_DETECTOR_MODEL_DIR');
 const _sample = String.fromEnvironment('HAZUKI_DETECTOR_SAMPLE');
+const _runtime = String.fromEnvironment('HAZUKI_ORT_LIBRARY');
 
 Uint8List _syntheticPage() {
   final page = img.Image(width: 800, height: 1200);
@@ -48,12 +51,12 @@ String _megabytes(int bytes) =>
     '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
   for (final spec in kTranslationDetectorModels) {
-    testWidgets(
+    test(
       'loads ${spec.id} and detects text',
-      (tester) async {
+      () async {
+        final runtime = File(_runtime);
+        expect(await runtime.exists(), isTrue, reason: runtime.path);
         final source = File(p.join(_modelDirectory, '${spec.id}.onnx'));
         expect(await source.exists(), isTrue, reason: source.path);
         // 与安装流程一致：需要裁剪的模型先只保留所用输出。
@@ -81,42 +84,38 @@ void main() {
           width = decoded.width;
           height = decoded.height;
         }
-        final prepared = await tester.runAsync(
-          () => compute(
-            (_) => TranslationImageProcessor.prepareRgba(
-              rgba,
-              width,
-              height,
-              detectionMaxSide: spec.detectionMaxSide,
-            ),
-            null,
+        final prepared = await Isolate.run(
+          () => TranslationImageProcessor.prepareRgba(
+            rgba,
+            width,
+            height,
+            detectionMaxSide: spec.detectionMaxSide,
           ),
         );
         final detector = OnnxTranslationTextDetector();
         final rssBefore = ProcessInfo.currentRss;
         final stopwatch = Stopwatch()..start();
-        await tester.runAsync(
-          () => OnnxTranslationTextDetector.verifyModel(model),
-        );
+        await OnnxTranslationTextDetector.verifyModel(model, runtime);
         final verifyMs = stopwatch.elapsedMilliseconds;
 
         stopwatch.reset();
-        final first = (await tester.runAsync(
-          () => detector.detect(prepared!.slices.first.detection!, spec, model),
-        ))!;
+        final first = await detector.detect(
+          prepared.slices.first.detection!,
+          spec,
+          model,
+          runtime,
+        );
         final firstMs = stopwatch.elapsedMilliseconds;
         final peakRss = ProcessInfo.maxRss;
         final residentRss = ProcessInfo.currentRss;
 
         stopwatch.reset();
-        for (final slice in prepared!.slices) {
-          await tester.runAsync(
-            () => detector.detect(slice.detection!, spec, model),
-          );
+        for (final slice in prepared.slices) {
+          await detector.detect(slice.detection!, spec, model, runtime);
         }
         final perSliceMs =
             stopwatch.elapsedMilliseconds / prepared.slices.length;
-        await tester.runAsync(detector.release);
+        await detector.release();
 
         debugPrint(
           '[detector-smoke] ${spec.id}: boxes=${first.length} '
@@ -139,7 +138,7 @@ void main() {
           expect(box.isEmpty, isFalse);
         }
       },
-      skip: _modelDirectory.isEmpty,
+      skip: _modelDirectory.isEmpty || _runtime.isEmpty,
       timeout: const Timeout(Duration(minutes: 5)),
     );
   }

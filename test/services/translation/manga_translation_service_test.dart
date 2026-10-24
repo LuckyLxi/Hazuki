@@ -81,6 +81,14 @@ class _Models extends TranslationDetectorModelStore {
 
   @override
   File? modelFile(String id) => isInstalled(id) ? File('$id.onnx') : null;
+
+  bool runtimeInstalled = true;
+
+  @override
+  bool get isRuntimeInstalled => runtimeInstalled;
+
+  @override
+  File? get runtimeFile => runtimeInstalled ? File('onnxruntime') : null;
 }
 
 class _Detector implements TranslationTextDetector {
@@ -92,7 +100,8 @@ class _Detector implements TranslationTextDetector {
   Future<List<Rect>> detect(
     DetectionImage image,
     TranslationDetectorModelSpec spec,
-    File model, {
+    File model,
+    File runtime, {
     CancelToken? cancelToken,
   }) async {
     calls++;
@@ -483,6 +492,19 @@ void main() {
       );
       await settings.setDetectorModelId(null);
       await expectLater(translate(), throwsA(isA<TranslationFailure>()));
+      models.installed.add('pp_ocrv5_mobile_det');
+      await settings.setDetectorModelId('pp_ocrv5_mobile_det');
+      models.runtimeInstalled = false;
+      await expectLater(
+        translate(),
+        throwsA(
+          isA<TranslationFailure>().having(
+            (error) => error.kind,
+            'kind',
+            TranslationFailureKind.detectorUnavailable,
+          ),
+        ),
+      );
       expect(detector.calls, 0);
       expect(provider.calls, 0);
     });

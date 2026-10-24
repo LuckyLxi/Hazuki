@@ -20,16 +20,34 @@ class OnnxTranslationTextDetector implements TranslationTextDetector {
   final _queue = Queue<_DetectJob>();
   _DetectJob? _running;
   Future<_DetectorWorker>? _worker;
+  String? _workerRuntime;
   var _pumping = false;
   var _nextId = 0;
 
   /// 在临时 isolate 中试加载模型，用于下载完成后、发布前的校验。
-  static Future<void> verifyModel(File model) {
-    final path = model.path;
+  static Future<void> verifyModel(File model, File runtime) {
+    final path = model.path, library = runtime.path;
     return Isolate.run(() async {
-      OrtEnv.instance.init();
+      setOnnxRuntimeLibraryPath(library);
+      _initEnv();
       try {
         await _loadSession(path).release();
+      } finally {
+        OrtEnv.instance.release();
+      }
+    });
+  }
+
+  /// 在临时 isolate 中加载下载的运行库并核对版本。
+  static Future<void> verifyRuntime(File library, String version) {
+    final path = library.path;
+    return Isolate.run(() {
+      setOnnxRuntimeLibraryPath(path);
+      _initEnv();
+      try {
+        if (OrtEnv.version != version) {
+          throw StateError('Unexpected ONNX Runtime ${OrtEnv.version}');
+        }
       } finally {
         OrtEnv.instance.release();
       }
@@ -40,7 +58,8 @@ class OnnxTranslationTextDetector implements TranslationTextDetector {
   Future<List<Rect>> detect(
     DetectionImage image,
     TranslationDetectorModelSpec spec,
-    File model, {
+    File model,
+    File runtime, {
     CancelToken? cancelToken,
   }) {
     if (cancelToken?.isCancelled ?? false) {
@@ -48,7 +67,7 @@ class OnnxTranslationTextDetector implements TranslationTextDetector {
         const TranslationFailure(TranslationFailureKind.cancelled),
       );
     }
-    final job = _DetectJob(_nextId++, image, spec, model.path);
+    final job = _DetectJob(_nextId++, image, spec, model.path, runtime.path);
     _queue.add(job);
     cancelToken?.whenCancel.then((_) => _cancel(job));
     unawaited(_pump());
@@ -61,8 +80,13 @@ class OnnxTranslationTextDetector implements TranslationTextDetector {
       _cancel(job);
     }
     _queue.clear();
+    await _closeWorker();
+  }
+
+  Future<void> _closeWorker() async {
     final worker = _worker;
     _worker = null;
+    _workerRuntime = null;
     if (worker == null) return;
     try {
       (await worker).close();
@@ -86,7 +110,11 @@ class OnnxTranslationTextDetector implements TranslationTextDetector {
         if (job.completer.isCompleted) continue;
         _running = job;
         try {
+          // 运行库在 isolate 内只能加载一次，路径变化时换一个工作 isolate。
+          if (_workerRuntime != job.runtimePath) await _closeWorker();
+          _workerRuntime = job.runtimePath;
           final worker = await (_worker ??= _DetectorWorker.spawn(
+            job.runtimePath,
             onExit: _workerExited,
           ));
           if (job.completer.isCompleted) continue;
@@ -121,12 +149,13 @@ class OnnxTranslationTextDetector implements TranslationTextDetector {
 }
 
 class _DetectJob {
-  _DetectJob(this.id, this.image, this.spec, this.modelPath);
+  _DetectJob(this.id, this.image, this.spec, this.modelPath, this.runtimePath);
 
   final int id;
   final DetectionImage image;
   final TranslationDetectorModelSpec spec;
   final String modelPath;
+  final String runtimePath;
   final completer = Completer<List<Rect>>();
 
   void fail(TranslationFailure failure) {
@@ -153,7 +182,8 @@ class _DetectorWorker {
   SendPort? _requests;
   bool _exited = false;
 
-  static Future<_DetectorWorker> spawn({
+  static Future<_DetectorWorker> spawn(
+    String runtimePath, {
     required void Function(_DetectorWorker worker) onExit,
   }) async {
     final responses = ReceivePort();
@@ -161,7 +191,7 @@ class _DetectorWorker {
     try {
       await Isolate.spawn(
         _detectorWorkerMain,
-        responses.sendPort,
+        (responses.sendPort, runtimePath),
         onExit: exits.sendPort,
         debugName: 'translation-detector',
       );
@@ -258,7 +288,9 @@ OrtSession _loadSession(String path) {
   }
 }
 
-void _detectorWorkerMain(SendPort replies) {
+void _detectorWorkerMain((SendPort, String) arguments) {
+  final (replies, runtimePath) = arguments;
+  setOnnxRuntimeLibraryPath(runtimePath);
   final requests = ReceivePort();
   replies.send(requests.sendPort);
   OrtSession? session;
@@ -284,7 +316,7 @@ void _detectorWorkerMain(SendPort replies) {
     final OrtSession active;
     try {
       if (!envReady) {
-        OrtEnv.instance.init();
+        _initEnv();
         envReady = true;
       }
       final path = message['model']! as String;
@@ -404,3 +436,6 @@ List<Rect> _runPaddleDb(
     runOptions.release();
   }
 }
+
+// 裁剪后的 CTD 加载时会对每个未用权重打印警告，只保留错误级日志。
+void _initEnv() => OrtEnv.instance.init(level: OrtLoggingLevel.error);

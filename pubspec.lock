@@ -395,11 +395,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.7.0"
-  flutter_driver:
-    dependency: transitive
-    description: flutter
-    source: sdk
-    version: "0.0.0"
   flutter_inappwebview_internal_annotations:
     dependency: transitive
     description:
@@ -494,11 +489,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  fuchsia_remote_debug_protocol:
-    dependency: transitive
-    description: flutter
-    source: sdk
-    version: "0.0.0"
   get_it:
     dependency: "direct main"
     description:
@@ -571,11 +561,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "4.12.0"
-  integration_test:
-    dependency: "direct dev"
-    description: flutter
-    source: sdk
-    version: "0.0.0"
   intl:
     dependency: "direct main"
     description:
@@ -778,10 +763,9 @@ packages:
   onnxruntime_v2:
     dependency: "direct main"
     description:
-      name: onnxruntime_v2
-      sha256: a3a1f7baf40c6a77b4d359489643232414a4ee2e934d865dd7d30b758abaeef7
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "third_party/pub_overrides/onnxruntime_v2"
+      relative: true
+    source: path
     version: "1.23.2+2"
   package_config:
     dependency: transitive
@@ -1295,14 +1279,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "3.0.3"
-  webdriver:
-    dependency: transitive
-    description:
-      name: webdriver
-      sha256: "28b82ec894fed45dd71c23ba62d1af973ed97dd59a4f5790a4d38b0b13e5657e"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "3.2.0"
   win32:
     dependency: transitive
     description:

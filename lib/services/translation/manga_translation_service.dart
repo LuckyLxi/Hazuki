@@ -76,7 +76,9 @@ class MangaTranslationService {
       if (_settings.textLocator == TranslationTextLocator.detector) {
         await _models.load();
         detectorSpec = translationDetectorModelSpec(_settings.detectorModelId);
-        if (detectorSpec == null || !_models.isInstalled(detectorSpec.id)) {
+        if (detectorSpec == null ||
+            !_models.isInstalled(detectorSpec.id) ||
+            !_models.isRuntimeInstalled) {
           throw const TranslationFailure(
             TranslationFailureKind.detectorUnavailable,
           );
@@ -143,8 +145,9 @@ class MangaTranslationService {
           );
         } else {
           final model = _models.modelFile(detectorSpec.id);
+          final runtime = _models.runtimeFile;
           final detection = slice.detection;
-          if (model == null) {
+          if (model == null || runtime == null) {
             throw const TranslationFailure(
               TranslationFailureKind.detectorUnavailable,
             );
@@ -158,6 +161,7 @@ class MangaTranslationService {
             detection,
             detectorSpec,
             model,
+            runtime,
             cancelToken: cancelToken,
           );
           _checkCancelled(cancelToken);

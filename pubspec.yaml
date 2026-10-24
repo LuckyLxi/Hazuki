@@ -76,8 +76,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  integration_test:
-    sdk: flutter
   # build_runner 2.17 requires build 5; drift_dev currently requires build <5.
   build_runner: ^2.16.2
   drift_dev: ^2.35.1
@@ -115,6 +113,9 @@ dependency_overrides:
     path: third_party/pub_overrides/shared_preferences_android
   url_launcher_android:
     path: third_party/pub_overrides/url_launcher_android
+  # Load ONNX Runtime from an on-demand download instead of bundling it.
+  onnxruntime_v2:
+    path: third_party/pub_overrides/onnxruntime_v2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
