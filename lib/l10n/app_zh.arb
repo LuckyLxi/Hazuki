@@ -10,6 +10,7 @@
   "translationModel": "模型",
   "translationReasoningEffort": "思考强度",
   "translationReasoningDefault": "默认（服务商）",
+  "translationReasoningOff": "关",
   "translationReasoningLow": "低",
   "translationReasoningMedium": "中",
   "translationReasoningHigh": "高",

@@ -42,14 +42,20 @@ class AnthropicProvider extends HttpMangaTranslationProvider {
         'messages',
         data: {
           'model': model,
-          'max_tokens':
-              reasoningEffort == TranslationReasoningEffort.providerDefault
-              ? 4096
-              : 16384,
-          if (reasoningEffort !=
-              TranslationReasoningEffort.providerDefault) ...{
-            'thinking': {'type': 'adaptive'},
-            'output_config': {'effort': reasoningEffort.name},
+          'max_tokens': switch (reasoningEffort) {
+            TranslationReasoningEffort.providerDefault ||
+            TranslationReasoningEffort.off => 4096,
+            _ => 16384,
+          },
+          ...switch (reasoningEffort) {
+            TranslationReasoningEffort.providerDefault => const {},
+            TranslationReasoningEffort.off => const {
+              'thinking': {'type': 'disabled'},
+            },
+            _ => {
+              'thinking': {'type': 'adaptive'},
+              'output_config': {'effort': reasoningEffort.name},
+            },
           },
           'system': systemPrompt,
           'messages': [

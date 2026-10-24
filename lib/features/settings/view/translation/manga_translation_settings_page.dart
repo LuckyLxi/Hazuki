@@ -354,6 +354,8 @@ class _MangaTranslationSettingsPageState
                                           TranslationReasoningEffort
                                               .providerDefault =>
                                             strings.translationReasoningDefault,
+                                          TranslationReasoningEffort.off =>
+                                            strings.translationReasoningOff,
                                           TranslationReasoningEffort.low =>
                                             strings.translationReasoningLow,
                                           TranslationReasoningEffort.medium =>

@@ -239,6 +239,42 @@ void main() {
     }
   }
 
+  for (final preset in TranslationProviderPreset.values) {
+    test('${preset.name} disables thinking when effort is off', () async {
+      final isClaude = preset == TranslationProviderPreset.claude;
+      setupClient(
+        (_) => _json(
+          isClaude
+              ? {
+                  'content': [
+                    {'type': 'text', 'text': '{}'},
+                  ],
+                }
+              : {
+                  'choices': [
+                    {
+                      'message': {'content': '{}'},
+                    },
+                  ],
+                },
+        ),
+      );
+      await provider(
+        preset,
+        effort: TranslationReasoningEffort.off,
+      ).translateImage(image, 'system', 'user');
+      final body = adapter.requests.single.data as Map<String, dynamic>;
+      if (isClaude) {
+        expect(body['thinking'], {'type': 'disabled'});
+        expect(body['max_tokens'], 4096);
+        expect(body.containsKey('output_config'), isFalse);
+      } else {
+        expect(body['reasoning_effort'], 'none');
+        expect(body.containsKey('thinking'), isFalse);
+      }
+    });
+  }
+
   for (final preset in [
     TranslationProviderPreset.openai,
     TranslationProviderPreset.claude,

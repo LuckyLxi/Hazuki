@@ -42,7 +42,11 @@ class OpenAiCompatibleProvider extends HttpMangaTranslationProvider {
         data: {
           'model': model,
           if (reasoningEffort != TranslationReasoningEffort.providerDefault)
-            'reasoning_effort': reasoningEffort.name,
+            // OpenAI 与 Gemini 兼容接口均以 none 表示关闭思考。
+            'reasoning_effort':
+                reasoningEffort == TranslationReasoningEffort.off
+                ? 'none'
+                : reasoningEffort.name,
           if (jsonResponseFormat) 'response_format': {'type': 'json_object'},
           'messages': [
             {'role': 'system', 'content': systemPrompt},

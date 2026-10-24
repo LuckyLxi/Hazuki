@@ -10,6 +10,7 @@
   "translationModel": "Model",
   "translationReasoningEffort": "Thinking effort",
   "translationReasoningDefault": "Default (provider)",
+  "translationReasoningOff": "Off",
   "translationReasoningLow": "Low",
   "translationReasoningMedium": "Medium",
   "translationReasoningHigh": "High",

@@ -15,7 +15,8 @@ enum TranslationProviderPreset {
 
 enum TranslationBubbleStyle { sampled, white }
 
-enum TranslationReasoningEffort { providerDefault, low, medium, high }
+/// 思考强度；[off] 显式关闭思考，[providerDefault] 不发送相关参数。
+enum TranslationReasoningEffort { providerDefault, off, low, medium, high }
 
 /// 文字区域的定位方式：本地模型检测，或交给 AI 直接返回坐标。
 enum TranslationTextLocator { detector, ai }
