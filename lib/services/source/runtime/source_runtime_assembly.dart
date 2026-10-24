@@ -40,7 +40,9 @@ import 'source_runtime_facade.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_health.dart';
 import 'source_runtime_host.dart';
-import 'source_runtime_operations.dart';
+import 'source_runtime_diagnostics_operations.dart';
+import 'source_runtime_initialization_operations.dart';
+import 'source_script_editing_operations.dart';
 import 'source_runtime_view.dart';
 import 'source_runtime_registry.dart';
 import 'source_runtime_state_controller.dart';
@@ -225,17 +227,10 @@ class SourceRuntimeAssembly {
   late final SourceAccountSessionCapability _accountCapability;
   late final SourceReloginCoordinator _reloginCoordinator;
   late final SourceRuntimeCapability _runtimeCapability;
-  late final SourceRuntimeOperations _runtimeOperations =
-      SourceRuntimeOperations(
-        _runtimeCapability.initialization,
-        _runtimeCapability.diagnostics,
-        _runtimeCapability.scriptEditing,
-        _runtimeCapability.sourceUpdates,
-        _runtimeCapability.sourceRecovery,
-      );
   late final SourceRuntimeView _runtimeView = SourceRuntimeView(
     runtimeHost: _runtimeHost,
-    runtimeOperations: _runtimeOperations,
+    initialization: _runtimeCapability.initialization,
+    diagnostics: _runtimeCapability.diagnostics,
   );
   late final SourceLocalizationOperations _localizationOperations =
       SourceLocalizationOperations(_runtimeHost);
@@ -277,7 +272,7 @@ class SourceRuntimeAssembly {
       SourceContentOperations(
         loadCloudReadRuntime: _runtimeCapability.loadLoginRuntime,
         runtimeHost: _runtimeHost,
-        runtimeOperations: _runtimeOperations,
+        initialization: _runtimeCapability.initialization,
         explore: _exploreCapability,
         category: _categoryCapability,
         comicDetails: _comicDetailsCapability,
@@ -291,7 +286,11 @@ class SourceRuntimeAssembly {
   late final SourceGatewaySet gateways = SourceGatewaySet(
     taskControl: _runtimeHost.tasks,
     runtime: _runtimeView,
-    runtimeOperations: _runtimeOperations,
+    initialization: _runtimeCapability.initialization,
+    diagnostics: _runtimeCapability.diagnostics,
+    scriptEditing: _runtimeCapability.scriptEditing,
+    updates: _runtimeCapability.sourceUpdates,
+    recovery: _runtimeCapability.sourceRecovery,
     localization: _localizationOperations,
     settings: _settingsOperations,
     account: _accountOperations,
@@ -315,7 +314,7 @@ class SourceRuntimeAssembly {
 
   SourceRuntimeRegistry get runtimeRegistry => _runtimeHost.runtimeRegistry;
   Future<void> ensureSourceInitialized(String id) =>
-      _runtimeOperations.ensureSourceInitialized(id);
+      _runtimeCapability.initialization.ensureSourceInitialized(id);
   SourceMeta? sourceMetadata(String id) =>
       _runtimeHost.handleFor(id).runtime.sourceMeta;
   Future<dynamic> runPluginAction(
@@ -348,7 +347,9 @@ class SourceRuntimeAssembly {
   @visibleForTesting
   late final SourceRuntimeTestAccess testing = SourceRuntimeTestAccess(
     runtime: _runtimeView,
-    runtimeOperations: _runtimeOperations,
+    initialization: _runtimeCapability.initialization,
+    diagnostics: _runtimeCapability.diagnostics,
+    scriptEditing: _runtimeCapability.scriptEditing,
     content: _contentOperations,
     comments: _commentsOperations,
     favorites: _favoritesOperations,
@@ -490,7 +491,9 @@ class SourceRuntimeAssembly {
 class SourceRuntimeTestAccess {
   SourceRuntimeTestAccess({
     required this.runtime,
-    required this.runtimeOperations,
+    required this.initialization,
+    required this.diagnostics,
+    required this.scriptEditing,
     required this.content,
     required this.comments,
     required this.favorites,
@@ -517,7 +520,9 @@ class SourceRuntimeTestAccess {
        _saveCookiesFromHeaders = saveCookiesFromHeaders;
 
   final SourceRuntimeView runtime;
-  final SourceRuntimeOperations runtimeOperations;
+  final SourceRuntimeInitializationOperations initialization;
+  final SourceRuntimeDiagnosticsOperations diagnostics;
+  final SourceScriptEditingOperations scriptEditing;
   final SourceContentOperations content;
   final SourceCommentsOperations comments;
   final SourceFavoritesOperations favorites;

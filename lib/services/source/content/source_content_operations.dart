@@ -12,7 +12,7 @@ import '../common/source_json_coerce.dart';
 import '../explore_capability.dart';
 import '../runtime/source_runtime_host.dart';
 import '../runtime/source_runtime_handle.dart';
-import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_initialization_operations.dart';
 import '../plugins/source_sort_options.dart';
 import '../models/source_contract_models.dart';
 import '../runtime/source_script_engine.dart';
@@ -28,13 +28,13 @@ class SourceContentOperations
         SourceCloudReadingEvents {
   SourceContentOperations({
     required SourceRuntimeHost runtimeHost,
-    required SourceRuntimeOperations runtimeOperations,
+    required SourceRuntimeInitializationOperations initialization,
     required SourceExploreCapability explore,
     required SourceCategoryCapability category,
     required SourceComicDetailsCapability comicDetails,
     this.loadCloudReadRuntime,
   }) : _runtimeHost = runtimeHost,
-       _runtimeOperations = runtimeOperations,
+       _initialization = initialization,
        _explore = explore,
        _category = category,
        _comicDetails = comicDetails {
@@ -43,7 +43,7 @@ class SourceContentOperations
   }
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceRuntimeOperations _runtimeOperations;
+  final SourceRuntimeInitializationOperations _initialization;
   final SourceExploreCapability _explore;
   final SourceCategoryCapability _category;
   final SourceComicDetailsCapability _comicDetails;
@@ -56,7 +56,7 @@ class SourceContentOperations
   final Future<void> Function(SourceRuntimeHandle)? loadCloudReadRuntime;
   late final _cloud = SourceCloudReadingCapability(
     _runtimeHost,
-    _runtimeOperations,
+    _initialization,
     loadReadRuntime: loadCloudReadRuntime,
   );
   Future<void> get whenCloudReadingSettled => _cloud.whenSettled;
@@ -126,7 +126,7 @@ class SourceContentOperations
     final key = sourceKey.trim().isEmpty
         ? _runtimeHost.activeSourceKey
         : _runtimeHost.normalize(sourceKey);
-    await _runtimeOperations.ensureSourceInitialized(key);
+    await _initialization.ensureSourceInitialized(key);
     final facade = _runtimeHost.handleFor(key).facade;
     return facade.handle.runOperation(() async {
       final engine = facade.js.engine;
@@ -300,7 +300,7 @@ class SourceContentOperations
       operation: (task) async {
         task.bindResource(capturedHandle);
         task.checkActive();
-        await _runtimeOperations.ensureSourceInitialized(resolvedSourceKey);
+        await _initialization.ensureSourceInitialized(resolvedSourceKey);
         task.checkActive();
         final handle = capturedHandle;
         // Acquire before any script execution, including synchronous checks.

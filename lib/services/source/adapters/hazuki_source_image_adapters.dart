@@ -8,7 +8,7 @@ import '../gateways/source_image_gateways.dart';
 import '../gateways/source_runtime_gateways.dart';
 import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
-import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_diagnostics_operations.dart';
 import '../runtime/source_runtime_view.dart';
 import '../models/source_task.dart';
 import 'hazuki_source_adapter_base.dart';
@@ -22,14 +22,14 @@ class HazukiSourceImageAdapter
   const HazukiSourceImageAdapter({
     required SourceRuntimeView runtime,
     required SourceImageOperations image,
-    required SourceRuntimeOperations runtimeOperations,
+    required SourceRuntimeDiagnosticsOperations diagnostics,
     required SourceDebugOperations debug,
   }) : _runtime = runtime,
        _image = image,
-       _runtimeOperations = runtimeOperations,
+       _diagnostics = diagnostics,
        _debug = debug;
 
-  final SourceRuntimeOperations _runtimeOperations;
+  final SourceRuntimeDiagnosticsOperations _diagnostics;
   final SourceDebugOperations _debug;
   final SourceRuntimeView _runtime;
   final SourceImageOperations _image;
@@ -66,10 +66,10 @@ class HazukiSourceImageAdapter
   Listenable get logChanges => _debug.logStore;
   @override
   Future<bool> loadSoftwareLogCaptureEnabled() =>
-      _runtimeOperations.loadSoftwareLogCaptureEnabled();
+      _diagnostics.loadSoftwareLogCaptureEnabled();
   @override
   Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
-      _runtimeOperations.setSoftwareLogCaptureEnabled(enabled);
+      _diagnostics.setSoftwareLogCaptureEnabled(enabled);
   @override
   void addApplicationLog({
     required String level,

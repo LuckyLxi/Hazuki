@@ -9,7 +9,11 @@ import '../favorites/source_favorites_operations.dart';
 import '../image/source_image_operations.dart';
 import '../image/source_image_preparation_capability.dart';
 import '../runtime/source_localization_operations.dart';
-import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_diagnostics_operations.dart';
+import '../runtime/source_runtime_initialization_operations.dart';
+import '../runtime/source_runtime_recovery_operations.dart';
+import '../runtime/source_script_editing_operations.dart';
+import '../runtime/source_update_operations.dart';
 import '../runtime/source_runtime_view.dart';
 import '../runtime/source_settings_operations.dart';
 import 'source_content_gateways.dart';
@@ -26,7 +30,11 @@ class SourceGatewaySet {
   SourceGatewaySet({
     required this.taskControl,
     required SourceRuntimeView runtime,
-    required SourceRuntimeOperations runtimeOperations,
+    required SourceRuntimeInitializationOperations initialization,
+    required SourceRuntimeDiagnosticsOperations diagnostics,
+    required SourceScriptEditingOperations scriptEditing,
+    required SourceUpdateOperations updates,
+    required SourceRuntimeRecoveryOperations recovery,
     required SourceLocalizationOperations localization,
     required SourceSettingsOperations settings,
     required SourceAccountOperations account,
@@ -47,7 +55,7 @@ class SourceGatewaySet {
       runtime: runtime,
       account: account,
       favorites: favorites,
-      runtimeOperations: runtimeOperations,
+      initialization: initialization,
     );
     reader = HazukiSourceReaderAdapter(
       content: content,
@@ -63,7 +71,7 @@ class SourceGatewaySet {
     final imageAdapter = HazukiSourceImageAdapter(
       runtime: runtime,
       image: image,
-      runtimeOperations: runtimeOperations,
+      diagnostics: diagnostics,
       debug: debug,
     );
     imageGateway = imageAdapter;
@@ -76,7 +84,11 @@ class SourceGatewaySet {
     );
     final runtimeAdapter = HazukiSourceRuntimeAdapter(
       runtime: runtime,
-      runtimeOperations: runtimeOperations,
+      initialization: initialization,
+      diagnostics: diagnostics,
+      scriptEditing: scriptEditing,
+      updates: updates,
+      recovery: recovery,
       account: account,
       favorites: favorites,
     );

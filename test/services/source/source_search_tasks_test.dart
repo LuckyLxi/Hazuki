@@ -10,13 +10,14 @@ import 'package:hazuki/services/source/content/source_content_operations.dart';
 import 'package:hazuki/services/source/explore_capability.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_handle.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _Operations extends Mock implements SourceRuntimeOperations {}
+class _Operations extends Mock
+    implements SourceRuntimeInitializationOperations {}
 
 class _Explore extends Mock implements SourceExploreCapability {}
 
@@ -86,7 +87,7 @@ void main() {
     addTearDown(host.dispose);
     content = SourceContentOperations(
       runtimeHost: host,
-      runtimeOperations: operations,
+      initialization: operations,
       explore: _Explore(),
       category: _Category(),
       comicDetails: _Comic(),

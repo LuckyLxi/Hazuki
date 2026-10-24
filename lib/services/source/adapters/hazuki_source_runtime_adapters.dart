@@ -8,9 +8,13 @@ import '../gateways/source_runtime_gateways.dart';
 import '../gateways/source_sync_gateway.dart';
 import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
-import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_diagnostics_operations.dart';
+import '../runtime/source_runtime_initialization_operations.dart';
+import '../runtime/source_runtime_recovery_operations.dart';
 import '../runtime/source_runtime_view.dart';
+import '../runtime/source_script_editing_operations.dart';
 import '../runtime/source_settings_operations.dart';
+import '../runtime/source_update_operations.dart';
 import 'hazuki_source_adapter_base.dart';
 
 /// 运行时、账号与脚本相关的全部 Gateway 共用一个实现，各功能仍只依赖自己的窄接口。
@@ -29,15 +33,27 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
         SourceBootstrapGateway {
   HazukiSourceRuntimeAdapter({
     required SourceRuntimeView runtime,
-    required SourceRuntimeOperations runtimeOperations,
+    required SourceRuntimeInitializationOperations initialization,
+    required SourceRuntimeDiagnosticsOperations diagnostics,
+    required SourceScriptEditingOperations scriptEditing,
+    required SourceUpdateOperations updates,
+    required SourceRuntimeRecoveryOperations recovery,
     required SourceAccountOperations account,
     required SourceFavoritesOperations favorites,
-  }) : _runtimeOperations = runtimeOperations,
+  }) : _initialization = initialization,
+       _diagnostics = diagnostics,
+       _scriptEditing = scriptEditing,
+       _updates = updates,
+       _recovery = recovery,
        _account = account,
        _favorites = favorites,
        super(runtime);
 
-  final SourceRuntimeOperations _runtimeOperations;
+  final SourceRuntimeInitializationOperations _initialization;
+  final SourceRuntimeDiagnosticsOperations _diagnostics;
+  final SourceScriptEditingOperations _scriptEditing;
+  final SourceUpdateOperations _updates;
+  final SourceRuntimeRecoveryOperations _recovery;
   final SourceAccountOperations _account;
   @override
   SourceAccountOperations get interactiveAccountOperations => _account;
@@ -87,10 +103,10 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
       runtime.loadActiveSourcePreference();
   @override
   Future<void> init({void Function(int received, int total)? onProgress}) =>
-      _runtimeOperations.init(onSourceDownloadProgress: onProgress);
+      _initialization.init(onSourceDownloadProgress: onProgress);
   @override
   Future<void> ensureInitialized({String? sourceKey}) =>
-      _runtimeOperations.ensureInitialized(sourceKey: sourceKey);
+      _initialization.ensureInitialized(sourceKey: sourceKey);
   @override
   Future<void> activateSource(String sourceKey) =>
       runtime.activateSource(sourceKey);
@@ -124,60 +140,58 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   }) => _account.performDailyCheckIn(taskOrigin: taskOrigin);
   @override
   Future<bool> hasLocalJmSourceFile() =>
-      _runtimeOperations.hasLocalJmSourceFile();
+      _scriptEditing.hasLocalActiveSourceFile();
   @override
   Future<bool> hasLocalSourceFile(String sourceKey) =>
-      _runtimeOperations.hasLocalSourceFile(sourceKey);
+      _scriptEditing.hasLocalSourceFile(sourceKey);
   @override
   Future<void> downloadSourceFile(
     String sourceKey, {
     void Function(int received, int total)? onProgress,
-  }) =>
-      _runtimeOperations.downloadSourceFile(sourceKey, onProgress: onProgress);
+  }) => _recovery.downloadSourceFile(sourceKey, onProgress: onProgress);
   @override
   Future<void> deleteLocalSourceFile(String sourceKey) =>
-      _runtimeOperations.deleteLocalSourceFile(sourceKey);
+      _scriptEditing.deleteLocalSourceFile(sourceKey);
   @override
   Future<String> loadEditableActiveSource() =>
-      _runtimeOperations.loadEditableActiveSource();
+      _scriptEditing.loadEditableActiveSource();
   @override
   Future<void> saveEditedActiveSource(String content) =>
-      _runtimeOperations.saveEditedActiveSource(content);
+      _scriptEditing.saveEditedActiveSource(content);
   @override
   Future<bool> hasCustomEditedActiveSource() =>
-      _runtimeOperations.hasCustomEditedActiveSource();
+      _scriptEditing.hasCustomEditedActiveSource();
   @override
   Future<bool> hasActiveSourceBackup() =>
-      _runtimeOperations.hasActiveSourceBackup();
+      _scriptEditing.hasActiveSourceBackup();
   @override
   Future<bool> restoreActiveSourceBackup() =>
-      _runtimeOperations.restoreActiveSourceBackup();
+      _scriptEditing.restoreActiveSourceBackup();
   @override
   Future<String?> readLocalActiveSourceIfExists() =>
-      _runtimeOperations.readLocalActiveSourceIfExists();
+      _scriptEditing.readLocalActiveSourceIfExists();
   @override
   Future<void> writeLocalActiveSource(String content) =>
-      _runtimeOperations.writeLocalActiveSource(content);
+      _scriptEditing.writeLocalActiveSource(content);
   @override
   Future<void> reloadFromLocalSourceFiles() =>
-      _runtimeOperations.reloadFromLocalSourceFiles();
+      _recovery.reloadFromLocalSourceFiles();
   @override
   Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud() =>
-      _runtimeOperations.checkActiveSourceVersionFromCloud();
+      _updates.checkActiveSourceVersion();
   @override
   Future<bool> downloadActiveSourceAndReload({
     void Function(int received, int total)? onProgress,
-  }) =>
-      _runtimeOperations.downloadActiveSourceAndReload(onProgress: onProgress);
+  }) => _updates.downloadActiveSource(onProgress: onProgress);
   @override
   Future<bool> refreshSourceOnNetworkRecovery() =>
-      _runtimeOperations.refreshSourceOnNetworkRecovery();
+      _recovery.refreshSourceOnNetworkRecovery();
   @override
   Future<bool> loadSoftwareLogCaptureEnabled() =>
-      _runtimeOperations.loadSoftwareLogCaptureEnabled();
+      _diagnostics.loadSoftwareLogCaptureEnabled();
   @override
   Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
-      _runtimeOperations.setSoftwareLogCaptureEnabled(enabled);
+      _diagnostics.setSoftwareLogCaptureEnabled(enabled);
 }
 
 class HazukiSourceSettingsAdapter implements SourceSettingsGateway {

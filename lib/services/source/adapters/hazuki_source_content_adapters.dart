@@ -13,7 +13,7 @@ import '../gateways/source_content_gateways.dart';
 import '../image/source_image_operations.dart';
 import '../image/source_image_preparation_capability.dart';
 import '../models/source_contract_models.dart';
-import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_initialization_operations.dart';
 import '../runtime/source_runtime_view.dart';
 import '../models/source_task.dart';
 import 'hazuki_source_adapter_base.dart';
@@ -514,15 +514,15 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
     required SourceRuntimeView runtime,
     required SourceAccountOperations account,
     required SourceFavoritesOperations favorites,
-    required SourceRuntimeOperations runtimeOperations,
+    required SourceRuntimeInitializationOperations initialization,
   }) : _account = account,
        _favorites = favorites,
-       _runtimeOperations = runtimeOperations,
+       _initialization = initialization,
        super(runtime);
 
   final SourceAccountOperations _account;
   final SourceFavoritesOperations _favorites;
-  final SourceRuntimeOperations _runtimeOperations;
+  final SourceRuntimeInitializationOperations _initialization;
 
   @override
   String? get activeSourceKey => runtime.activeSourceKey;
@@ -557,7 +557,7 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   void logRuntimeRetryRequested(String value) =>
       runtime.logRuntimeRetryRequested(value);
   @override
-  Future<void> ensureInitialized() => _runtimeOperations.ensureInitialized();
+  Future<void> ensureInitialized() => _initialization.ensureInitialized();
   @override
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,

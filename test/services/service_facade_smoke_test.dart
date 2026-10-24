@@ -370,8 +370,7 @@ void main() {
     final handle = SourceRuntimeHandle(
       sourceKey: hazukiDefaultSourceKey,
       secureStorage: secureStorage,
-      ensureInitialized:
-          service.testing.runtimeOperations.ensureSourceInitialized,
+      ensureInitialized: service.testing.initialization.ensureSourceInitialized,
       notifyRuntimeStateChanged: (_) {},
     );
     await handle.facade.ensurePrefs();
@@ -502,7 +501,7 @@ void main() {
 
   test('debug export data keeps full typed log content', () async {
     final service = sl<SourceRuntimeAssembly>();
-    await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
+    await service.testing.diagnostics.setSoftwareLogCaptureEnabled(true);
     final longMessage = 'avatar-${'x' * 520}';
 
     service.testing.debug.addApplicationLog(
@@ -523,7 +522,7 @@ void main() {
 
   test('application debug export data keeps full log content', () async {
     final service = sl<SourceRuntimeAssembly>();
-    await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
+    await service.testing.diagnostics.setSoftwareLogCaptureEnabled(true);
     final longMessage = 'picacg-${'u' * 520}';
 
     service.testing.debug.addApplicationLog(
@@ -542,7 +541,7 @@ void main() {
 
   test('network debug export data keeps failed response body', () async {
     final service = sl<SourceRuntimeAssembly>();
-    await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
+    await service.testing.diagnostics.setSoftwareLogCaptureEnabled(true);
     final longBody = '{"body":"${'y' * 1400}"}';
 
     service.testing.debug.appendNetworkLogEntry(

@@ -9,7 +9,7 @@ import 'source_cloud_reading_session.dart';
 import '../../../models/hazuki_models.dart';
 import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_host.dart';
-import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_initialization_operations.dart';
 
 /// Optional capability. No cloud position ever enters the local progress DB or
 /// the WebDAV participant. This account-scoped cache is for display only.
@@ -43,7 +43,7 @@ class SourceCloudReadingCapability extends ChangeNotifier
     scheduleMicrotask(_changed);
   }
   final SourceRuntimeHost host;
-  final SourceRuntimeOperations operations;
+  final SourceRuntimeInitializationOperations operations;
   final Future<void> Function(SourceRuntimeHandle)? loadReadRuntime;
   SourceCloudReadingSession? _session;
   SourceSharedRequest<List<ExploreComic>>? _importing;

@@ -961,9 +961,7 @@ Hazuki.registerSource({
       final backup = await manager.sourceFileFor('inactive');
       final content = await backup.readAsString();
 
-      await assembly.testing.runtimeOperations.deleteLocalSourceFile(
-        'inactive',
-      );
+      await assembly.testing.scriptEditing.deleteLocalSourceFile('inactive');
 
       expect(manager.pluginFor('inactive'), isNull);
       expect(assembly.runtimeRegistry.activeSourceKey, 'independent');

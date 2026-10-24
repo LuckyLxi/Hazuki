@@ -19,7 +19,7 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:hazuki/services/source/runtime/source_text_downloader.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hazuki/services/source/content/source_cloud_reading.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
 import 'package:hazuki/services/source/models/source_task.dart';
 
 void main() {
@@ -494,7 +494,8 @@ class _LoaderScriptStore implements SourceScriptStore {
   }
 }
 
-class _CloudOperations extends Fake implements SourceRuntimeOperations {
+class _CloudOperations extends Fake
+    implements SourceRuntimeInitializationOperations {
   @override
   Future<void> ensureSourceInitialized(String key) async {}
 }

@@ -4,18 +4,22 @@ import 'package:flutter/foundation.dart';
 import '../../../models/hazuki_models.dart';
 import '../models/source_contract_models.dart';
 import 'source_runtime_host.dart';
-import 'source_runtime_operations.dart';
+import 'source_runtime_diagnostics_operations.dart';
+import 'source_runtime_initialization_operations.dart';
 import 'source_runtime_registry.dart';
 
 class SourceRuntimeView implements Listenable {
   SourceRuntimeView({
     required SourceRuntimeHost runtimeHost,
-    required SourceRuntimeOperations runtimeOperations,
+    required SourceRuntimeInitializationOperations initialization,
+    required SourceRuntimeDiagnosticsOperations diagnostics,
   }) : _runtimeHost = runtimeHost,
-       _runtimeOperations = runtimeOperations;
+       _initialization = initialization,
+       _diagnostics = diagnostics;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceRuntimeOperations _runtimeOperations;
+  final SourceRuntimeInitializationOperations _initialization;
+  final SourceRuntimeDiagnosticsOperations _diagnostics;
 
   SourceRuntimeRegistry get runtimeRegistry => _runtimeHost.runtimeRegistry;
   String? get activeSourceKey =>
@@ -62,10 +66,9 @@ class SourceRuntimeView implements Listenable {
       runtimeRegistry.loadActiveSourcePreference();
   Future<void> activateSource(String sourceKey) =>
       _runtimeHost.activateSource(sourceKey);
-  Future<void> prewarmInBackground() =>
-      _runtimeOperations.prewarmInBackground();
+  Future<void> prewarmInBackground() => _initialization.prewarmInBackground();
   void logRuntimeRetryRequested(String source) =>
-      _runtimeOperations.logRuntimeRetryRequested(source);
+      _diagnostics.logRuntimeRetryRequested(source);
   @override
   void addListener(VoidCallback listener) => _runtimeHost.addListener(listener);
   @override

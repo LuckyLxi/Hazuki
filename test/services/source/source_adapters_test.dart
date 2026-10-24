@@ -9,7 +9,11 @@ import 'package:hazuki/services/source/account/source_account_operations.dart';
 import 'package:hazuki/services/source/content/source_content_operations.dart';
 import 'package:hazuki/services/source/favorites/source_favorites_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_diagnostics_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_recovery_operations.dart';
+import 'package:hazuki/services/source/runtime/source_script_editing_operations.dart';
+import 'package:hazuki/services/source/runtime/source_update_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_view.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.dart';
@@ -126,14 +130,16 @@ void main() {
     'favorite and runtime adapters forward streams and runtime operations',
     () async {
       final runtime = _FakeRuntimeView();
-      final runtimeOperations = _FakeRuntimeOperations();
+      final initialization = _FakeInitializationOperations();
+      final scriptEditing = _FakeScriptEditingOperations();
+      final recovery = _FakeRecoveryOperations();
       final favorites = _FakeFavoritesOperations();
       final account = _FakeAccountOperations();
       final favorite = HazukiSourceFavoriteAdapter(
         runtime: runtime,
         account: account,
         favorites: favorites,
-        runtimeOperations: runtimeOperations,
+        initialization: initialization,
       );
       final received = <void>[];
       final subscription = favorite.cloudFavoritesChangedStream.listen(
@@ -141,7 +147,11 @@ void main() {
       );
       final SourceSyncGateway sync = HazukiSourceRuntimeAdapter(
         runtime: runtime,
-        runtimeOperations: runtimeOperations,
+        initialization: initialization,
+        diagnostics: _FakeDiagnosticsOperations(),
+        scriptEditing: scriptEditing,
+        updates: _FakeUpdateOperations(),
+        recovery: recovery,
         account: account,
         favorites: favorites,
       );
@@ -158,8 +168,8 @@ void main() {
       );
 
       expect(received, hasLength(1));
-      expect(runtimeOperations.writtenSource, 'edited source');
-      expect(runtimeOperations.reloadCalls, 1);
+      expect(scriptEditing.writtenSource, 'edited source');
+      expect(recovery.reloadCalls, 1);
       expect(favorites.renameCalls, [('shelf', 'Renamed', 'picacg')]);
       await subscription.cancel();
       await favorites.dispose();
@@ -167,10 +177,14 @@ void main() {
   );
 
   test('runtime adapter forwards bootstrap callback and source key', () async {
-    final operations = _FakeRuntimeOperations();
+    final operations = _FakeInitializationOperations();
     final SourceBootstrapGateway adapter = HazukiSourceRuntimeAdapter(
       runtime: _FakeRuntimeView(),
-      runtimeOperations: operations,
+      initialization: operations,
+      diagnostics: _FakeDiagnosticsOperations(),
+      scriptEditing: _FakeScriptEditingOperations(),
+      updates: _FakeUpdateOperations(),
+      recovery: _FakeRecoveryOperations(),
       account: _FakeAccountOperations(),
       favorites: _FakeFavoritesOperations(),
     );
@@ -270,11 +284,10 @@ class _FakeAccountOperations implements SourceAccountOperations {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _FakeRuntimeOperations implements SourceRuntimeOperations {
+class _FakeInitializationOperations
+    implements SourceRuntimeInitializationOperations {
   void Function(int received, int total)? initProgress;
   final ensureSourceKeys = <String?>[];
-  String? writtenSource;
-  var reloadCalls = 0;
 
   @override
   Future<void> init({
@@ -290,15 +303,39 @@ class _FakeRuntimeOperations implements SourceRuntimeOperations {
   }
 
   @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeScriptEditingOperations implements SourceScriptEditingOperations {
+  String? writtenSource;
+
+  @override
   Future<void> writeLocalActiveSource(String content) async {
     writtenSource = content;
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeRecoveryOperations implements SourceRuntimeRecoveryOperations {
+  var reloadCalls = 0;
 
   @override
   Future<void> reloadFromLocalSourceFiles() async {
     reloadCalls++;
   }
 
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeDiagnosticsOperations implements SourceRuntimeDiagnosticsOperations {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeUpdateOperations implements SourceUpdateOperations {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

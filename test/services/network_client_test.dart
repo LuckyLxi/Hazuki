@@ -202,7 +202,7 @@ void main() {
         sourceKey: 'jm',
         secureStorage: secureStorage,
         ensureInitialized:
-            service.testing.runtimeOperations.ensureSourceInitialized,
+            service.testing.initialization.ensureSourceInitialized,
         notifyRuntimeStateChanged: (_) {},
       );
       await handle.facade.ensurePrefs();

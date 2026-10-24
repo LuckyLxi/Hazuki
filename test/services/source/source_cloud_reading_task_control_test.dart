@@ -5,13 +5,14 @@ import 'package:hazuki/services/source/content/source_cloud_reading.dart';
 import 'package:hazuki/services/source/content/source_reading_progress_uploads.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_handle.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _Operations extends Fake implements SourceRuntimeOperations {
+class _Operations extends Fake
+    implements SourceRuntimeInitializationOperations {
   @override
   Future<void> ensureSourceInitialized(String key) async {}
 }

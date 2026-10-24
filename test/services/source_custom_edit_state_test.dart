@@ -21,15 +21,13 @@ void main() {
 
     final sourceService = sl<SourceRuntimeAssembly>();
     expect(
-      await sourceService.testing.runtimeOperations
-          .hasCustomEditedActiveSource(),
+      await sourceService.testing.scriptEditing.hasCustomEditedActiveSource(),
       isFalse,
     );
 
     await sourceService.runtimeRegistry.activateSource('copy_manga');
     expect(
-      await sourceService.testing.runtimeOperations
-          .hasCustomEditedActiveSource(),
+      await sourceService.testing.scriptEditing.hasCustomEditedActiveSource(),
       isTrue,
     );
   });
@@ -41,11 +39,11 @@ void main() {
 
     final sourceService = sl<SourceRuntimeAssembly>();
     expect(
-      await sourceService.testing.runtimeOperations.hasCustomEditedSource('jm'),
+      await sourceService.testing.scriptEditing.hasCustomEditedSource('jm'),
       isTrue,
     );
     expect(
-      await sourceService.testing.runtimeOperations.hasCustomEditedSource(
+      await sourceService.testing.scriptEditing.hasCustomEditedSource(
         'copy_manga',
       ),
       isFalse,
