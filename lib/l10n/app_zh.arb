@@ -123,6 +123,8 @@
   "@translationPrefetchAhead": {"placeholders": {"count": {"type": "int"}}},
   "translationBubblePreview": "你在做什么？",
   "translationSfxHint": "如拟声词、招牌、手写字",
+  "translationVerticalText": "竖排显示",
+  "translationVerticalTextHint": "原文为竖排时，中文和日文译文按竖排显示",
   "translationUsageDetails": "热力图与每日明细",
   "translationAddTerm": "添加术语",
   "translationEditTerm": "编辑术语",

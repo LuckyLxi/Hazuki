@@ -168,6 +168,13 @@ void main() {
           translatedText: '你好',
           sourceVertical: false,
           backgroundColor: const Color(0xfff0e0d0),
+          layoutBox: const Rect.fromLTRB(0.05, 0.15, 0.5, 0.7),
+          textPatches: const [
+            TranslationTextPatch(
+              Rect.fromLTRB(0.12, 0.22, 0.15, 0.28),
+              Color(0xfff0e0d0),
+            ),
+          ],
         ),
       ],
       terms: const [TranslationTerm(source: 'Alice', target: '爱丽丝')],
@@ -179,6 +186,15 @@ void main() {
     expect(decoded.toJson(), result.toJson());
     expect(decoded.regions.single.backgroundColor, const Color(0xfff0e0d0));
     expect(decoded.regions.single.box, result.regions.single.box);
+    expect(decoded.regions.single.layoutBox, result.regions.single.layoutBox);
+    expect(
+      decoded.regions.single.textPatches!.single.box,
+      result.regions.single.textPatches!.single.box,
+    );
+    expect(
+      decoded.regions.single.textPatches!.single.color,
+      result.regions.single.textPatches!.single.color,
+    );
     final withoutColor = parser.parse(
       response([region()]),
       translateSfx: false,

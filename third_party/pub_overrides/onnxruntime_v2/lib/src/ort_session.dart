@@ -339,8 +339,7 @@ class OrtSession {
   /// Uses a persistent isolate that stays alive for reuse.
   /// If the isolate times out, it will be killed and recreated on next use.
   Future<List<OrtValue?>>? runAsyncWithTimeout(
-      OrtRunOptions runOptions, Map<String, OrtValue> inputs,
-      Duration timeout,
+      OrtRunOptions runOptions, Map<String, OrtValue> inputs, Duration timeout,
       [List<String>? outputNames]) {
     // Create or recreate persistent isolate session with custom timeout
     // Note: If timeout changes, we should recreate the isolate session
@@ -358,8 +357,7 @@ class OrtSession {
   /// The isolate will timeout after the specified duration.
   /// The isolate is automatically killed after completion or timeout.
   Future<List<OrtValue?>> runOnceAsyncWithTimeout(
-      OrtRunOptions runOptions, Map<String, OrtValue> inputs,
-      Duration timeout,
+      OrtRunOptions runOptions, Map<String, OrtValue> inputs, Duration timeout,
       [List<String>? outputNames]) async {
     // Create a new isolate session with custom timeout
     // This allows multiple concurrent timed inferences
@@ -443,8 +441,7 @@ class OrtSession {
   /// - **Batch inference**: Use runParallelAsync() with lower threads per isolate
   /// - **Stream of requests**: Use persistent runAsync() to avoid isolate overhead
   Future<List<List<OrtValue?>>> runParallelAsync(
-      List<Map<String, OrtValue>> inputsList,
-      OrtRunOptions runOptions,
+      List<Map<String, OrtValue>> inputsList, OrtRunOptions runOptions,
       [List<String>? outputNames,
       Duration timeout = const Duration(seconds: 5)]) async {
     // Create a list of futures for parallel execution
@@ -592,6 +589,25 @@ class OrtSessionOptions {
     OrtStatus.checkOrtStatus(statusPtr);
   }
 
+  /// Adds a session configuration entry, e.g.
+  /// `session.set_denormal_as_zero` = `1`.
+  void addConfigEntry(String key, String value) {
+    final keyPtr = key.toNativeUtf8().cast<ffi.Char>();
+    final valuePtr = value.toNativeUtf8().cast<ffi.Char>();
+    try {
+      final statusPtr = OrtEnv.instance.ortApiPtr.ref.AddSessionConfigEntry
+          .asFunction<
+              bg.OrtStatusPtr Function(
+                  ffi.Pointer<bg.OrtSessionOptions>,
+                  ffi.Pointer<ffi.Char>,
+                  ffi.Pointer<ffi.Char>)>()(_ptr, keyPtr, valuePtr);
+      OrtStatus.checkOrtStatus(statusPtr);
+    } finally {
+      calloc.free(keyPtr);
+      calloc.free(valuePtr);
+    }
+  }
+
   bool _appendExecutionProvider(OrtProvider provider, OrtFlags flags) {
     var result = false;
     bg.OrtStatusPtr? statusPtr;
@@ -624,8 +640,8 @@ class OrtSessionOptions {
         // ROCm uses the same pattern as CUDA but with ROCm bindings
         // If binding is not available, gracefully fail
         try {
-          statusPtr =
-              onnxRuntimeBinding.OrtSessionOptionsAppendExecutionProvider_MIGraphX(
+          statusPtr = onnxRuntimeBinding
+              .OrtSessionOptionsAppendExecutionProvider_MIGraphX(
                   _ptr, flags.value);
           result = true;
         } catch (e) {
@@ -639,8 +655,8 @@ class OrtSessionOptions {
         result = true;
         break;
       case OrtProvider.migraphx:
-        statusPtr =
-            onnxRuntimeBinding.OrtSessionOptionsAppendExecutionProvider_MIGraphX(
+        statusPtr = onnxRuntimeBinding
+            .OrtSessionOptionsAppendExecutionProvider_MIGraphX(
                 _ptr, flags.value);
         result = true;
         break;
@@ -784,23 +800,23 @@ class OrtSessionOptions {
   }
 
   /// Automatically selects and appends the best available execution provider.
-  /// 
+  ///
   /// **Priority order:**
   /// 1. **GPU**: CUDA/TensorRT (NVIDIA) > DirectML (Windows) > ROCm (AMD)
   /// 2. **NPU/Accelerators**: CoreML (Apple) > NNAPI (Android) > QNN (Qualcomm)
-/// 3. **Optimized CPU**: DNNL (Intel) > XNNPACK (cross-platform)
+  /// 3. **Optimized CPU**: DNNL (Intel) > XNNPACK (cross-platform)
   /// 4. **Fallback**: Standard CPU
-  /// 
+  ///
   /// This method tries providers in order and uses the first one that succeeds.
   /// Always includes CPU as a fallback to ensure models can run.
-  /// 
+  ///
   /// **Usage:**
   /// ```dart
   /// final options = OrtSessionOptions();
   /// await options.appendDefaultProviders(); // Auto-selects best available
   /// final session = OrtSession.fromBuffer(modelBytes, options);
   /// ```
-  /// 
+  ///
   /// **Note:** This method runs asynchronously to avoid blocking the UI thread
   /// during device capability detection. Make sure to await it before creating
   /// your session!
@@ -1031,6 +1047,7 @@ typedef OrtSessionGraphOptimizationLevel = GraphOptimizationLevel;
 enum OrtSessionExecutionMode {
   /// Run the graph in sequential mode - operations will run one at a time
   ortSequential(bg.ExecutionMode.ORT_SEQUENTIAL),
+
   /// Run the graph in parallel mode - operations may run in parallel
   ortParallel(bg.ExecutionMode.ORT_PARALLEL);
 

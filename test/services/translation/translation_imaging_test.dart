@@ -63,9 +63,18 @@ void main() {
         const Rect.fromLTRB(0.368, 0.32, 0.808, 0.68),
       ]) {
         final result = snapper.snap(bytes, 200, 200, [_region(box)]).single;
-        expect(result.box.left, closeTo(0.20, 0.02));
-        expect(result.box.right, closeTo(0.80, 0.02));
-        expect(result.box.top, closeTo(0.27, 0.02));
+        expect(result.box, box);
+        final layout = result.layoutBox!;
+        expect(layout.center.dx, closeTo(0.5, 0.02));
+        expect(layout.center.dy, closeTo(0.5, 0.02));
+        expect(layout.width, greaterThan(0.4));
+        for (final point in [layout.topLeft, layout.bottomRight]) {
+          expect(
+            (point.dx * 200 - 100) * (point.dx * 200 - 100) / (65 * 65) +
+                (point.dy * 200 - 100) * (point.dy * 200 - 100) / (50 * 50),
+            lessThan(1),
+          );
+        }
         expect(result.backgroundColor, const Color(0xffffffff));
       }
     },
@@ -89,14 +98,17 @@ void main() {
     const right = Rect.fromLTRB(88 / 200, 20 / 120, 133 / 200, 100 / 120);
     final single = snapper.snap(bytes, 200, 120, [_region(left)]).single;
     // 没有其他文字信息时会连成整片（对照）。
-    expect(single.box.right, greaterThan(right.center.dx));
+    expect(single.layoutBox!.right, greaterThan(right.center.dx));
     final both = snapper.snap(bytes, 200, 120, [_region(left), _region(right)]);
     expect(both[0].box, left);
     expect(both[1].box, right);
+    expect(both[0].layoutBox, isNull);
+    expect(both[1].layoutBox, isNull);
     final guarded = snapper
         .snap(bytes, 200, 120, [_region(left)], textBoxes: [right])
         .single;
     expect(guarded.box, left);
+    expect(guarded.layoutBox, isNull);
   });
 
   test('keeps AI box on a flat page and samples SFX without snapping', () {
@@ -166,22 +178,26 @@ void main() {
     },
   );
 
-  test('preserves normal pages and limits payload and analysis dimensions', () {
-    final image = img.Image(width: 1800, height: 1200, numChannels: 4);
-    final prepared = TranslationImageProcessor.prepareRgba(
-      image.getBytes(order: img.ChannelOrder.rgba),
-      image.width,
-      image.height,
-    );
-    expect(prepared.slices, hasLength(1));
-    expect(prepared.slices.single.payload.width, 1568);
-    expect(prepared.slices.single.payload.height, lessThanOrEqualTo(1568));
-    expect(prepared.snapWidth, 1024);
-    expect(
-      prepared.snapRgba.length,
-      prepared.snapWidth * prepared.snapHeight * 4,
-    );
-  });
+  test(
+    'limits payload dimensions and keeps original pixels for local analysis',
+    () {
+      final image = img.Image(width: 1800, height: 1200, numChannels: 4);
+      final prepared = TranslationImageProcessor.prepareRgba(
+        image.getBytes(order: img.ChannelOrder.rgba),
+        image.width,
+        image.height,
+      );
+      expect(prepared.slices, hasLength(1));
+      expect(prepared.slices.single.payload.width, 1568);
+      expect(prepared.slices.single.payload.height, lessThanOrEqualTo(1568));
+      expect(prepared.snapWidth, image.width);
+      expect(prepared.snapHeight, image.height);
+      expect(
+        prepared.snapRgba.length,
+        prepared.snapWidth * prepared.snapHeight * 4,
+      );
+    },
+  );
 
   test(
     'decodes an actual image and processes it in a worker isolate',

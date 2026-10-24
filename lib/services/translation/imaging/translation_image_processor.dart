@@ -54,6 +54,15 @@ class TranslationImageSlice {
           sourceVertical: region.sourceVertical,
           backgroundColor: region.backgroundColor,
           boxSource: region.boxSource,
+          layoutBox: region.layoutBox == null
+              ? null
+              : mapRect(region.layoutBox!),
+          textPatches: region.textPatches
+              ?.map(
+                (patch) =>
+                    TranslationTextPatch(mapRect(patch.box), patch.color),
+              )
+              .toList(),
         ),
       );
     }
@@ -173,12 +182,12 @@ class TranslationImageProcessor {
         ),
       );
     }
-    final snap = _resize(original, 1024);
+    // 吸附按区域读取原图，保留长图中的字边和气泡轮廓。
     return PreparedTranslationImage(
       slices: slices,
-      snapRgba: snap.getBytes(order: img.ChannelOrder.rgba),
-      snapWidth: snap.width,
-      snapHeight: snap.height,
+      snapRgba: rgba,
+      snapWidth: width,
+      snapHeight: height,
     );
   }
 

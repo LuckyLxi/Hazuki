@@ -117,6 +117,7 @@ class _Images extends TranslationImageProcessor {
   int sliceCount = 1;
   int calls = 0;
   final detectionSides = <int?>[];
+  PreparedTranslationImage? prepared;
   @override
   Future<PreparedTranslationImage> prepare(
     Uint8List bytes, {
@@ -124,6 +125,7 @@ class _Images extends TranslationImageProcessor {
   }) async {
     calls++;
     detectionSides.add(detectionMaxSide);
+    if (prepared != null) return prepared!;
     return PreparedTranslationImage(
       slices: List.generate(
         sliceCount,
@@ -408,7 +410,7 @@ void main() {
     },
   );
 
-  test('AI locating keeps the first-version cache key', () async {
+  test('layout processing invalidates pre-layout AI caches', () async {
     final key = await TranslationResultCache.keyFor(
       imageBytes: Uint8List.fromList([1, 2, 3]),
       targetLanguage: 'zh-Hans',
@@ -418,9 +420,69 @@ void main() {
       reasoningEffort: TranslationReasoningEffort.low,
       customSystemPrompt: 'style',
     );
-    // 固定值由引入本地检测前的实现计算得出。
-    expect(key, '03bc8b4c9377746499e3bc5fe2becd28c6a69d53');
+    // 旧结果把吸附后的框覆盖了原文框，不能作为新排版数据继续使用。
+    expect(key, isNot('03bc8b4c9377746499e3bc5fe2becd28c6a69d53'));
   });
+
+  test(
+    'keeps source coordinates and caches balloon layout and repairs',
+    () async {
+      final rgba = Uint8List(100 * 100 * 4);
+      for (var y = 0; y < 100; y++) {
+        for (var x = 0; x < 100; x++) {
+          final offset = (y * 100 + x) * 4;
+          final bubble = (x - 50) * (x - 50) + (y - 50) * (y - 50) < 40 * 40;
+          final ink = x >= 45 && x < 55 && y >= 30 && y < 70;
+          rgba[offset] = ink
+              ? 0
+              : bubble
+              ? 160
+              : 80;
+          rgba[offset + 1] = ink
+              ? 0
+              : bubble
+              ? 235
+              : 80;
+          rgba[offset + 2] = ink
+              ? 0
+              : bubble
+              ? 245
+              : 80;
+          rgba[offset + 3] = 255;
+        }
+      }
+      images.prepared = PreparedTranslationImage(
+        slices: [
+          TranslationImageSlice(
+            payload: TranslationImagePayload(
+              jpegBytes: Uint8List(1),
+              width: 100,
+              height: 100,
+            ),
+            top: 0,
+            bottom: 1,
+            ownedTop: 0,
+            ownedBottom: 1,
+          ),
+        ],
+        snapRgba: rgba,
+        snapWidth: 100,
+        snapHeight: 100,
+      );
+      provider.respond = (_) async => const ProviderRawResponse(
+        text:
+            '{"regions":[{"box":[450,300,550,700],"kind":"bubble","src":"原文","dst":"Hello there!","vertical":true}]}',
+        usage: TranslationUsage(),
+      );
+      final first = (await translate()).regions.single;
+      expect(first.box, const Rect.fromLTRB(0.45, 0.3, 0.55, 0.7));
+      expect(first.layoutBox!.width, greaterThan(first.box.width * 3));
+      expect(first.textPatches, isNotEmpty);
+      final cached = (await translate()).regions.single;
+      expect(cached.toJson(), first.toJson());
+      expect(provider.calls, 1);
+    },
+  );
 
   group('local detection', () {
     const boxA = Rect.fromLTRB(0.1, 0.2, 0.3, 0.3);

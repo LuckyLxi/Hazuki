@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/translation/detection/ctd_detector_pipeline.dart';
@@ -40,6 +41,41 @@ void main() {
     expect(boxes[0].bottom, closeTo(110 / 512, 1e-6));
     expect(boxes[1].top, closeTo(350 / 512, 1e-6));
     expect(boxes[1].bottom, closeTo(450 / 512, 1e-6));
+  });
+
+  test('recovers uncovered segmentation columns as extra boxes', () {
+    const size = 200;
+    final mask = Float32List(size * size);
+    void fill(int left, int top, int right, int bottom, double value) {
+      for (var y = top; y < bottom; y++) {
+        for (var x = left; x < right; x++) {
+          mask[y * size + x] = value;
+        }
+      }
+    }
+
+    // 竖排单列：字之间有 4 像素间隙，膨胀后连成一块。
+    for (var y = 20; y < 140; y += 14) {
+      fill(30, y, 40, y + 10, 0.9);
+    }
+    // 已有文字块覆盖的区域。
+    fill(120, 20, 150, 80, 0.9);
+    // 零星杂点。
+    fill(100, 170, 106, 176, 0.9);
+    // 低于阈值的弱响应。
+    fill(160, 120, 190, 190, 0.2);
+    final boxes = CtdDetectorPipeline.recoverFromSegmentation(
+      mask,
+      [1, 1, size, size],
+      size,
+      size,
+      [const Rect.fromLTRB(118 / size, 18 / size, 152 / size, 82 / size)],
+    );
+    expect(boxes, hasLength(1));
+    expect(boxes.single.left * size, closeTo(26, 1e-6));
+    expect(boxes.single.top * size, closeTo(16, 1e-6));
+    expect(boxes.single.right * size, closeTo(44, 1e-6));
+    expect(boxes.single.bottom * size, closeTo(146, 1e-6));
   });
 
   test('clamps boxes that extend past the content area', () {

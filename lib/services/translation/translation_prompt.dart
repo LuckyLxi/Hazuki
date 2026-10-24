@@ -36,7 +36,7 @@ String buildTranslationUserPrompt({List<TranslationTerm> glossary = const []}) {
 }
 
 /// 本地检测模式的提示词版本，与 AI 定位的 [kTranslationPromptVersion] 独立递增。
-const kDetectorTranslationPromptVersion = 3;
+const kDetectorTranslationPromptVersion = 5;
 
 /// 本地检测模式：文字框由检测模型给出，AI 只按编号认领、分组并翻译。
 String buildDetectorTranslationSystemPrompt({
@@ -49,8 +49,8 @@ String buildDetectorTranslationSystemPrompt({
 Each box is listed as id: [x1,y1,x2,y2], with integer coordinates normalized to 0–1000 relative to image width and height. Each box is also drawn on the image as a red outline with its id on a red label at its top-left corner; identify which text each id covers by reading these drawn labels, not by estimating positions from coordinates. The outlines and labels are annotations, not manga text, so never translate them. A box may cover a whole passage or a single line, so one speech bubble can contain several boxes.
 Output exactly one JSON object, without Markdown or explanations, with this schema:
 {"regions":[{"ids":["0-1","0-2"],"kind":"bubble","src":"source text","dst":"translation","vertical":true}],"terms":[{"src":"proper noun","dst":"translation"}]}
-Group all boxes belonging to the same bubble or passage into one region and list their ids in reading order. Never group boxes from different bubbles into one region, even when the bubbles touch or say related lines; give each bubble its own region. Use only ids from the list, each at most once, and never output coordinates.
-Kinds: bubble (dialogue bubble), narration (narration box), sfx (sound effect), other (signs, handwriting, or other scene text).
+Group all boxes belonging to the same bubble or passage into one region and list their ids in reading order. Only group boxes that lie inside the same balloon outline or narration frame in the image. Never group boxes from different bubbles into one region, even when the bubbles touch or say related lines; give each bubble its own region. When one sentence continues across several bubbles, split its translation at natural points so that each bubble's region contains only the part of the translation for the text in that bubble. Use only ids from the list, each at most once, and never output coordinates.
+Kinds: bubble (dialogue bubble), narration (narration box or caption bar, including quoted lines or dialogue shown in a caption bar), sfx (sound effect), other (text drawn as part of the scene, such as signs, labels on objects, or handwriting).
 ${translateSfx ? 'Include sound effects and scene text.' : 'Do not output sfx or other regions.'}
 Leave out boxes that are false detections, contain no readable text, are already in the target language, or are of a kind that should not be output. Set vertical to whether the source text is vertical.
 List proper nouns appearing on this page, including people, places, organizations, and special moves, in terms. Use empty arrays when there is nothing to translate.

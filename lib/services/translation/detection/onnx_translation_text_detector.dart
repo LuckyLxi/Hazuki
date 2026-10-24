@@ -282,6 +282,9 @@ OrtSession _loadSession(String path) {
   final bytes = File(path).readAsBytesSync();
   final options = OrtSessionOptions();
   try {
+    // CTD 分割解码器的激活中有大量非规格化浮点数，x86 上会慢一个数量级以上；
+    // 置零的误差远小于检测阈值，不影响结果。
+    options.addConfigEntry('session.set_denormal_as_zero', '1');
     return OrtSession.fromBuffer(bytes, options);
   } finally {
     options.release();
@@ -373,23 +376,43 @@ void _detectorWorkerMain((SendPort, String) arguments) {
 
 List<Rect> _runCtd(OrtSession session, DetectionImage image) {
   final input = CtdDetectorPipeline.preprocess(image);
-  final (data, shape) = _run(
+  // 旧版只保留文字块输出的模型没有分割图，此时只用文字块。
+  final hasSegmentation = session.outputNames.contains(
+    CtdDetectorPipeline.segmentationName,
+  );
+  final outputs = _run(
     session,
     session.inputNames.contains(CtdDetectorPipeline.inputName)
         ? CtdDetectorPipeline.inputName
         : session.inputNames.first,
-    session.outputNames.contains(CtdDetectorPipeline.outputName)
-        ? CtdDetectorPipeline.outputName
-        : session.outputNames.first,
+    [
+      session.outputNames.contains(CtdDetectorPipeline.outputName)
+          ? CtdDetectorPipeline.outputName
+          : session.outputNames.first,
+      if (hasSegmentation) CtdDetectorPipeline.segmentationName,
+    ],
     input.tensor,
     input.shape,
   );
-  return CtdDetectorPipeline.postprocess(
+  final (data, shape) = outputs.first;
+  final blocks = CtdDetectorPipeline.postprocess(
     data,
     shape,
     input.contentWidth,
     input.contentHeight,
   );
+  if (!hasSegmentation) return blocks;
+  final (mask, maskShape) = outputs.last;
+  return [
+    ...blocks,
+    ...CtdDetectorPipeline.recoverFromSegmentation(
+      mask,
+      maskShape,
+      input.contentWidth,
+      input.contentHeight,
+      blocks,
+    ),
+  ];
 }
 
 List<Rect> _runPaddleDb(
@@ -401,10 +424,10 @@ List<Rect> _runPaddleDb(
   final (data, shape) = _run(
     session,
     session.inputNames.first,
-    session.outputNames.first,
+    [session.outputNames.first],
     input.tensor,
     input.shape,
-  );
+  ).first;
   return PaddleDbDetectorPipeline.postprocess(
     data,
     shape.last,
@@ -413,19 +436,19 @@ List<Rect> _runPaddleDb(
   );
 }
 
-(Float32List, List<int>) _run(
+List<(Float32List, List<int>)> _run(
   OrtSession session,
   String inputName,
-  String outputName,
+  List<String> outputNames,
   Float32List tensor,
   List<int> shape,
 ) {
   final input = createFloatTensor(tensor, shape);
   final runOptions = OrtRunOptions();
   try {
-    final outputs = session.run(runOptions, {inputName: input}, [outputName]);
+    final outputs = session.run(runOptions, {inputName: input}, outputNames);
     try {
-      return readFloatTensor(outputs.first!);
+      return [for (final output in outputs) readFloatTensor(output!)];
     } finally {
       for (final output in outputs) {
         output?.release();

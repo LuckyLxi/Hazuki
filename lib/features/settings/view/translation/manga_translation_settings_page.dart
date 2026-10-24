@@ -281,6 +281,13 @@ class _MangaTranslationSettingsPageState
                             onChanged: (value) =>
                                 _save(_settings.setTranslateSfx(value)),
                           ),
+                          SwitchListTile(
+                            title: Text(strings.translationVerticalText),
+                            subtitle: Text(strings.translationVerticalTextHint),
+                            value: _settings.verticalText,
+                            onChanged: (value) =>
+                                _save(_settings.setVerticalText(value)),
+                          ),
                         ],
                       ),
                       _SectionLabel(strings.translationSectionData),

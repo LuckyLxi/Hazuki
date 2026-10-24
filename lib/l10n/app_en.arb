@@ -123,6 +123,8 @@
   "@translationPrefetchAhead": {"placeholders": {"count": {"type": "int"}}},
   "translationBubblePreview": "What are you doing?",
   "translationSfxHint": "Onomatopoeia, signs and handwriting",
+  "translationVerticalText": "Vertical text",
+  "translationVerticalTextHint": "Show Chinese and Japanese translations vertically when the source text is vertical",
   "translationUsageDetails": "Heatmap and daily details",
   "translationAddTerm": "Add term",
   "translationEditTerm": "Edit term",

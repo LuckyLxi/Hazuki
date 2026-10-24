@@ -163,7 +163,21 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     }
     for (final spec in specs) {
       if (_tasks.containsKey(spec.id)) continue;
-      final installed = await _modelFile(root, spec).exists();
+      final current = _modelFile(root, spec);
+      // 模型版本升级后旧文件不再使用，加载时一并删除以免长期占用空间。
+      final directory = current.parent;
+      if (await directory.exists()) {
+        await for (final entry in directory.list()) {
+          if (entry is File && entry.path != current.path) {
+            try {
+              await entry.delete();
+            } on FileSystemException {
+              // 删除失败不影响当前版本的状态判断，下次加载时再试。
+            }
+          }
+        }
+      }
+      final installed = await current.exists();
       _states[spec.id] = DetectorModelState(
         status: installed
             ? DetectorModelStatus.installed

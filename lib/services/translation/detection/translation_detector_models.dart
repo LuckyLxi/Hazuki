@@ -54,7 +54,8 @@ class TranslationDetectorModelSpec {
 const kTranslationDetectorModels = [
   TranslationDetectorModelSpec(
     id: 'comic_text_detector',
-    version: 1,
+    // v2 起保留分割输出，用于补回文字块漏掉的长竖排列和拟声词。
+    version: 2,
     kind: TranslationDetectorKind.ctd,
     url:
         'https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.2.1/comictextdetector.pt.onnx',
@@ -62,8 +63,8 @@ const kTranslationDetectorModels = [
     sha256: '1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f',
     license: 'GPL-3.0',
     detectionMaxSide: 1024,
-    // 只用 YOLO 文字块输出；分割与 DB 头的 ConvTranspose 在 CPU 上极慢。
-    keepOutputs: {'blk'},
+    // 用文字块与分割输出；DB 头不参与后处理，裁掉以省去其解码开销。
+    keepOutputs: {'blk', 'seg'},
   ),
   TranslationDetectorModelSpec(
     id: 'pp_ocrv5_mobile_det',

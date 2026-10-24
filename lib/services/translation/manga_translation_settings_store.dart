@@ -85,6 +85,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
   int _prefetchAhead = 3;
   TranslationBubbleStyle _bubbleStyle = TranslationBubbleStyle.sampled;
   bool _translateSfx = false;
+  bool _verticalText = true;
   String _customSystemPrompt = '';
   TranslationTextLocator _textLocator = TranslationTextLocator.detector;
   String? _detectorModelId;
@@ -100,6 +101,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
   int get prefetchAhead => _prefetchAhead;
   TranslationBubbleStyle get bubbleStyle => _bubbleStyle;
   bool get translateSfx => _translateSfx;
+  bool get verticalText => _verticalText;
   String get customSystemPrompt => _customSystemPrompt;
   TranslationTextLocator get textLocator => _textLocator;
   String? get detectorModelId => _detectorModelId;
@@ -159,6 +161,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
       orElse: () => TranslationBubbleStyle.sampled,
     );
     _translateSfx = prefs.getBool('${_prefix}translate_sfx') ?? false;
+    _verticalText = prefs.getBool('${_prefix}vertical_text') ?? true;
     _customSystemPrompt =
         prefs.getString('${_prefix}custom_system_prompt') ?? '';
     _textLocator = TranslationTextLocator.values.firstWhere(
@@ -282,6 +285,13 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
     await load();
     await _prefs.setBool('${_prefix}translate_sfx', value);
     _translateSfx = value;
+    notifyListeners();
+  }
+
+  Future<void> setVerticalText(bool value) async {
+    await load();
+    await _prefs.setBool('${_prefix}vertical_text', value);
+    _verticalText = value;
     notifyListeners();
   }
 

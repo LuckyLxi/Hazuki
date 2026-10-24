@@ -160,6 +160,20 @@ void main() {
     models.dispose();
   });
 
+  test('removes model files left by older versions on load', () async {
+    final current = installed('direct');
+    final stale = File(p.join(current.parent.path, 'v0.onnx'));
+    await current.parent.create(recursive: true);
+    await current.writeAsBytes(onnx);
+    await stale.writeAsBytes(onnx);
+    final models = store([spec('direct', '/model.onnx', onnx)]);
+    await models.load();
+    expect(models.isInstalled('direct'), isTrue);
+    expect(await current.exists(), isTrue);
+    expect(await stale.exists(), isFalse);
+    models.dispose();
+  });
+
   test('follows redirects and extracts only the tar model entry', () async {
     await installRuntime();
     routes['/latest.tar'] = (response) async {

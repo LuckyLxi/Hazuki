@@ -243,6 +243,8 @@ class MangaTranslationService {
               sourceVertical: snapped[index].sourceVertical,
               backgroundColor: snapped[index].backgroundColor,
               boxSource: snapped[index].boxSource,
+              layoutBox: snapped[index].layoutBox,
+              textPatches: snapped[index].textPatches,
             ),
         ],
         terms: terms,

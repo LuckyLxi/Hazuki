@@ -4,6 +4,14 @@ enum TranslationRegionKind { bubble, narration, sfx, other }
 
 enum TranslationBoxSource { ai, detector }
 
+/// 原文笔画的局部底色修补；颜色可逐行变化以保留气泡渐变。
+class TranslationTextPatch {
+  const TranslationTextPatch(this.box, this.color);
+
+  final Rect box;
+  final Color color;
+}
+
 class TranslationRegion {
   const TranslationRegion({
     required this.id,
@@ -14,6 +22,8 @@ class TranslationRegion {
     required this.sourceVertical,
     this.backgroundColor,
     this.boxSource = TranslationBoxSource.ai,
+    this.layoutBox,
+    this.textPatches,
   });
 
   final String id;
@@ -25,6 +35,12 @@ class TranslationRegion {
   final Color? backgroundColor;
   final TranslationBoxSource boxSource;
 
+  /// 气泡内部的安全排版范围；[box] 始终保留原文位置。
+  final Rect? layoutBox;
+
+  /// 需要修补的原文笔画，按行合并为整页归一化矩形。null 表示未识别出底色区域。
+  final List<TranslationTextPatch>? textPatches;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'box': [box.left, box.top, box.right, box.bottom],
@@ -34,10 +50,33 @@ class TranslationRegion {
     'vertical': sourceVertical,
     'backgroundColor': backgroundColor?.toARGB32(),
     'boxSource': boxSource.name,
+    if (layoutBox case final area?)
+      'layoutBox': [area.left, area.top, area.right, area.bottom],
+    if (textPatches case final patches?)
+      'textPatches': [
+        for (final patch in patches)
+          [
+            patch.box.left,
+            patch.box.top,
+            patch.box.right,
+            patch.box.bottom,
+            patch.color.toARGB32(),
+          ],
+      ],
   };
 
   factory TranslationRegion.fromJson(Map<String, dynamic> json) {
     final box = (json['box'] as List).cast<num>();
+    Rect rectFromJson(Object? value) {
+      final values = (value as List).cast<num>();
+      return Rect.fromLTRB(
+        values[0].toDouble(),
+        values[1].toDouble(),
+        values[2].toDouble(),
+        values[3].toDouble(),
+      );
+    }
+
     return TranslationRegion(
       id: json['id'] as String,
       box: Rect.fromLTRB(
@@ -56,6 +95,16 @@ class TranslationRegion {
       boxSource: TranslationBoxSource.values.byName(
         json['boxSource'] as String,
       ),
+      layoutBox: json['layoutBox'] == null
+          ? null
+          : rectFromJson(json['layoutBox']),
+      textPatches: (json['textPatches'] as List?)?.map((raw) {
+        final values = raw as List;
+        return TranslationTextPatch(
+          rectFromJson(values),
+          Color(values[4] as int),
+        );
+      }).toList(),
     );
   }
 }

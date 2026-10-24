@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/reader/support/reader_translation_controller.dart';
 import 'package:hazuki/features/reader/view/reader_translation_overlay.dart';
@@ -177,6 +178,262 @@ void main() {
       await tester.pump();
       expect(saved, 1);
       expect(toggled, 2);
+    },
+  );
+
+  test('vertical glyphs drop spaces and use vertical punctuation', () {
+    expect(verticalTranslationGlyphs('你好， 「世界」！…'), [
+      '你',
+      '好',
+      '︐',
+      '﹁',
+      '世',
+      '界',
+      '﹂',
+      '︕',
+      '︙',
+    ]);
+  });
+
+  testWidgets('vertical source regions paint vertically only when enabled', (
+    tester,
+  ) async {
+    final vertical = PageTranslationView(
+      status: PageTranslationStatus.done,
+      result: PageTranslationResult(
+        regions: const [
+          TranslationRegion(
+            id: 'r0',
+            box: Rect.fromLTRB(0.4, 0.1, 0.5, 0.9),
+            kind: TranslationRegionKind.bubble,
+            sourceText: 'ただいま',
+            translatedText: '我回来了',
+            sourceVertical: true,
+          ),
+        ],
+        terms: [],
+      ),
+    );
+    Widget overlay(bool verticalText) => app(
+      SizedBox(
+        width: 300,
+        height: 400,
+        child: ReaderTranslationOverlay(
+          view: vertical,
+          bubbleStyle: TranslationBubbleStyle.white,
+          verticalText: verticalText,
+          onToggleRegion: (_) {},
+        ),
+      ),
+    );
+    final region = find.byKey(const ValueKey('translation-region-r0'));
+    await tester.pumpWidget(overlay(true));
+    expect(find.text('我回来了'), findsNothing);
+    expect(
+      find.descendant(of: region, matching: find.byType(CustomPaint)),
+      findsWidgets,
+    );
+    await tester.pumpWidget(overlay(false));
+    expect(find.text('我回来了'), findsOneWidget);
+  });
+
+  testWidgets(
+    'horizontal text stays inside boxes without covering neighbours',
+    (tester) async {
+      TranslationRegion region(String id, Rect box) => TranslationRegion(
+        id: id,
+        box: box,
+        kind: TranslationRegionKind.narration,
+        sourceText: '最近怎麼樣？',
+        translatedText: 'How have you been lately?',
+        sourceVertical: false,
+      );
+      await tester.pumpWidget(
+        app(
+          SizedBox(
+            width: 400,
+            height: 400,
+            child: ReaderTranslationOverlay(
+              view: PageTranslationView(
+                status: PageTranslationStatus.done,
+                result: PageTranslationResult(
+                  regions: [
+                    region('flat', const Rect.fromLTRB(0.3, 0.5, 0.6, 0.55)),
+                    region('thin', const Rect.fromLTRB(0.45, 0.05, 0.5, 0.3)),
+                    // 紧贴右侧的邻框，限制 thin 的扩展。
+                    region('side', const Rect.fromLTRB(0.56, 0.05, 0.9, 0.3)),
+                  ],
+                  terms: const [],
+                ),
+              ),
+              bubbleStyle: TranslationBubbleStyle.white,
+              onToggleRegion: (_) {},
+            ),
+          ),
+        ),
+      );
+      final overlay = tester.getRect(find.byType(ReaderTranslationOverlay));
+      final flat = tester.getRect(
+        find.byKey(const ValueKey('translation-region-flat')),
+      );
+      final thin = tester.getRect(
+        find.byKey(const ValueKey('translation-region-thin')),
+      );
+      final side = tester.getRect(
+        find.byKey(const ValueKey('translation-region-side')),
+      );
+      expect(
+        flat,
+        Rect.fromLTWH(overlay.left + 120, overlay.top + 200, 120, 20),
+      );
+      expect(
+        thin,
+        Rect.fromLTWH(overlay.left + 180, overlay.top + 20, 20, 100),
+      );
+      expect(thin.overlaps(side), isFalse);
+    },
+  );
+
+  for (final verticalText in [false, true]) {
+    testWidgets(
+      'long text stays bounded with a readable font, vertical=$verticalText',
+      (tester) async {
+        const boxes = {
+          'banner': Rect.fromLTWH(0.1, 0.1, 0.7, 0.08),
+          'bubble': Rect.fromLTWH(0.4, 0.3, 0.06, 0.25),
+        };
+        final regions = [
+          for (final entry in boxes.entries)
+            TranslationRegion(
+              id: entry.key,
+              box: entry.value,
+              kind: entry.key == 'banner'
+                  ? TranslationRegionKind.narration
+                  : TranslationRegionKind.bubble,
+              sourceText: '原文',
+              translatedText: verticalText
+                  ? '这是需要完整显示在原有区域内的一段较长译文。' * 3
+                  : 'Reisa, do you really like manga and anime? ' * 3,
+              sourceVertical: entry.key == 'bubble',
+            ),
+        ];
+        await tester.pumpWidget(
+          app(
+            MediaQuery(
+              data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+              child: SizedBox(
+                width: 400,
+                height: 400,
+                child: ReaderTranslationOverlay(
+                  view: PageTranslationView(
+                    status: PageTranslationStatus.done,
+                    result: PageTranslationResult(regions: regions, terms: []),
+                  ),
+                  bubbleStyle: TranslationBubbleStyle.white,
+                  verticalText: verticalText,
+                  onToggleRegion: (_) {},
+                ),
+              ),
+            ),
+          ),
+        );
+        final overlay = tester.getRect(find.byType(ReaderTranslationOverlay));
+        for (final region in regions) {
+          final frameFinder = find.byKey(
+            ValueKey('translation-region-${region.id}'),
+          );
+          final frame = tester.getRect(frameFinder);
+          expect(
+            frame,
+            Rect.fromLTWH(
+              overlay.left + region.box.left * 400,
+              overlay.top + region.box.top * 400,
+              region.box.width * 400,
+              region.box.height * 400,
+            ),
+          );
+          if (verticalText && region.sourceVertical) continue;
+          final text = tester.widget<Text>(
+            find.descendant(of: frameFinder, matching: find.byType(Text)),
+          );
+          final painter = TextPainter(
+            text: TextSpan(text: text.data, style: text.style),
+            textDirection: TextDirection.ltr,
+            textAlign: text.textAlign!,
+            textScaler: const TextScaler.linear(2),
+            maxLines: text.maxLines,
+          )..layout(maxWidth: frame.width - 4);
+          expect(painter.height, lessThanOrEqualTo(frame.height - 4));
+          expect(text.style!.fontSize, greaterThanOrEqualTo(8));
+          expect(text.overflow, TextOverflow.ellipsis);
+          expect(painter.didExceedMaxLines, isTrue);
+          painter.dispose();
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'lays out across the balloon and paints only the source repairs',
+    (tester) async {
+      const region = TranslationRegion(
+        id: 'wide',
+        box: Rect.fromLTWH(0.47, 0.3, 0.06, 0.4),
+        layoutBox: Rect.fromLTWH(0.25, 0.25, 0.5, 0.5),
+        textPatches: [
+          TranslationTextPatch(
+            Rect.fromLTWH(0.48, 0.32, 0.02, 0.05),
+            Color(0xffa0ebf5),
+          ),
+        ],
+        backgroundColor: Color(0xffa0ebf5),
+        kind: TranslationRegionKind.bubble,
+        sourceText: '原文',
+        translatedText: 'The translation should use the whole balloon.',
+        sourceVertical: true,
+      );
+      Widget overlay(Set<String> originals) => app(
+        SizedBox(
+          width: 400,
+          height: 400,
+          child: ReaderTranslationOverlay(
+            view: PageTranslationView(
+              status: PageTranslationStatus.done,
+              result: PageTranslationResult(regions: [region], terms: []),
+              originalRegions: originals,
+            ),
+            bubbleStyle: TranslationBubbleStyle.sampled,
+            onToggleRegion: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpWidget(overlay({}));
+      final frame = find.byKey(const ValueKey('translation-region-wide'));
+      expect(tester.getSize(frame), const Size(200, 200));
+      final text = tester.widget<Text>(find.text(region.translatedText));
+      expect(text.style!.fontSize, greaterThan(12));
+      expect(text.style!.color, Colors.black);
+      expect(text.maxLines, greaterThan(1));
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: frame, matching: find.byType(RichText)),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(paragraph.size.height, greaterThan(text.style!.fontSize! * 2));
+      expect(
+        find.descendant(of: frame, matching: find.byType(DecoratedBox)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: frame, matching: find.byType(CustomPaint)),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(overlay({'wide'}));
+      expect(find.text(region.translatedText), findsNothing);
+      expect(
+        find.descendant(of: frame, matching: find.byType(CustomPaint)),
+        findsNothing,
+      );
     },
   );
 
