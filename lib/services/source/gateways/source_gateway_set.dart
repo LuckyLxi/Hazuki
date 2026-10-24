@@ -102,7 +102,7 @@ class SourceGatewaySet {
       content: content,
       image: image,
     );
-    localizationGateway = HazukiSourceLocalizationAdapter(localization);
+    localizationGateway = localization;
   }
 
   late final SourceSearchGateway search;

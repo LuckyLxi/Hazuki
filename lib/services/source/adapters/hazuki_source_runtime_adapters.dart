@@ -8,21 +8,10 @@ import '../gateways/source_runtime_gateways.dart';
 import '../gateways/source_sync_gateway.dart';
 import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
-import '../runtime/source_localization_operations.dart';
 import '../runtime/source_runtime_operations.dart';
 import '../runtime/source_runtime_view.dart';
 import '../runtime/source_settings_operations.dart';
 import 'hazuki_source_adapter_base.dart';
-
-class HazukiSourceLocalizationAdapter implements SourceLocalizationGateway {
-  const HazukiSourceLocalizationAdapter(this._localizationOperations);
-
-  final SourceLocalizationOperations _localizationOperations;
-
-  @override
-  void clearLocalizedSourceTextCaches() =>
-      _localizationOperations.clearLocalizedSourceTextCaches();
-}
 
 /// 运行时、账号与脚本相关的全部 Gateway 共用一个实现，各功能仍只依赖自己的窄接口。
 class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
