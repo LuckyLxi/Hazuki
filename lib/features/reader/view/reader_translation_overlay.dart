@@ -187,6 +187,32 @@ class ReaderTranslationOverlay extends StatelessWidget {
           ? Colors.black
           : Colors.white,
     );
+    final caption =
+        region.kind == TranslationRegionKind.caption ||
+        region.kind == TranslationRegionKind.narration &&
+            rect.width > rect.height * 4;
+    if (caption) {
+      return _frame(
+        region,
+        rect,
+        imageSize,
+        background,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            region.translatedText,
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.ltr,
+            style: style.copyWith(
+              fontSize: math.max(8.0, imageSize.width * 0.042),
+            ),
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.visible,
+          ),
+        ),
+      );
+    }
     if (verticalText && region.sourceVertical) {
       return _verticalRegion(
         region,
@@ -340,7 +366,12 @@ class ReaderTranslationOverlay extends StatelessWidget {
     final origin = bounds.topLeft;
     final text = ClipRect(
       child: Padding(
-        padding: EdgeInsets.all(region.layoutBox == null ? 2 : 0),
+        padding: EdgeInsets.all(
+          region.layoutBox == null &&
+                  region.kind != TranslationRegionKind.caption
+              ? 2
+              : 0,
+        ),
         child: child,
       ),
     );

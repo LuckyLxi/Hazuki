@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/reader/support/reader_translation_controller.dart';
 import 'package:hazuki/features/reader/view/reader_translation_overlay.dart';
@@ -14,6 +15,79 @@ import 'package:mocktail/mocktail.dart';
 class _Controller extends Mock implements ReaderTranslationController {}
 
 void main() {
+  for (final kind in [
+    TranslationRegionKind.caption,
+    TranslationRegionKind.narration,
+  ]) {
+    testWidgets(
+      'fits full Japanese caption glyphs horizontally with kind=$kind',
+      (tester) async {
+        await tester.runAsync(() async {
+          final font = FontLoader('RegressionJapanese')
+            ..addFont(rootBundle.load('assets/fonts/NotoSansSC-VF.otf'));
+          await font.load();
+        });
+        const translated = '「玲紗の好きな漫画、私も読んでみたいな」';
+        final region = TranslationRegion(
+          id: 'caption',
+          box: const Rect.fromLTWH(.4, .5, .1, .025),
+          layoutBox: const Rect.fromLTWH(.1, .5, .8, .025),
+          kind: kind,
+          sourceText: '玲紗喜歡的漫畫，真想讀讀看啊',
+          translatedText: translated,
+          sourceVertical: true,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(fontFamily: 'RegressionJapanese'),
+            home: MediaQuery(
+              data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+              child: Center(
+                child: SizedBox(
+                  width: 400,
+                  height: 400,
+                  child: ReaderTranslationOverlay(
+                    view: PageTranslationView(
+                      status: PageTranslationStatus.done,
+                      result: PageTranslationResult(
+                        regions: [region],
+                        terms: [],
+                      ),
+                    ),
+                    bubbleStyle: TranslationBubbleStyle.sampled,
+                    verticalText: true,
+                    onToggleRegion: (_) {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        final frame = find.byKey(const ValueKey('translation-region-caption'));
+        final fitted = tester.renderObject<RenderFittedBox>(
+          find.descendant(of: frame, matching: find.byType(FittedBox)),
+        );
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: frame, matching: find.byType(RichText)),
+        );
+        expect(paragraph.text.toPlainText(), translated);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final painted = MatrixUtils.transformRect(
+          paragraph.getTransformTo(fitted),
+          Offset.zero & paragraph.size,
+        );
+        expect(painted.left, greaterThanOrEqualTo(-.01));
+        expect(painted.top, greaterThanOrEqualTo(-.01));
+        expect(painted.right, lessThanOrEqualTo(fitted.size.width + .01));
+        expect(painted.bottom, lessThanOrEqualTo(fitted.size.height + .01));
+        expect(
+          find.descendant(of: frame, matching: find.byType(CustomPaint)),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   final result = PageTranslationResult(
     regions: const [
       TranslationRegion(
@@ -356,6 +430,28 @@ void main() {
           final text = tester.widget<Text>(
             find.descendant(of: frameFinder, matching: find.byType(Text)),
           );
+          if (region.kind == TranslationRegionKind.narration) {
+            final fittedFinder = find.descendant(
+              of: frameFinder,
+              matching: find.byType(FittedBox),
+            );
+            final fitted = tester.renderObject<RenderFittedBox>(fittedFinder);
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: frameFinder, matching: find.byType(RichText)),
+            );
+            final painted = MatrixUtils.transformRect(
+              paragraph.getTransformTo(fitted),
+              Offset.zero & paragraph.size,
+            );
+            expect(painted.width, lessThanOrEqualTo(fitted.size.width + 0.01));
+            expect(
+              painted.height,
+              lessThanOrEqualTo(fitted.size.height + 0.01),
+            );
+            expect(paragraph.didExceedMaxLines, isFalse);
+            expect(text.softWrap, isFalse);
+            continue;
+          }
           final painter = TextPainter(
             text: TextSpan(text: text.data, style: text.style),
             textDirection: TextDirection.ltr,

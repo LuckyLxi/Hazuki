@@ -22,23 +22,15 @@ class TranslationResponseParser {
         if (raw is! Map<String, dynamic>) continue;
         final dst = raw['dst'];
         if (dst is! String || dst.trim().isEmpty) continue;
-        final rawBox = raw['box'];
-        if (rawBox is! List ||
-            rawBox.length != 4 ||
-            rawBox.any((value) => value is! num || !value.isFinite)) {
-          continue;
+        final box = _box(raw['box']);
+        if (box == null) continue;
+        var rect = box;
+        final sourceBoxes = raw['boxes'] is List
+            ? [for (final value in raw['boxes'] as List) ?_box(value)]
+            : [box];
+        for (final sourceBox in sourceBoxes) {
+          rect = rect.expandToInclude(sourceBox);
         }
-        final box = rawBox
-            .cast<num>()
-            .map((value) => value.clamp(0, 1000) / 1000)
-            .toList();
-        final rect = Rect.fromLTRB(
-          math.min(box[0], box[2]),
-          math.min(box[1], box[3]),
-          math.max(box[0], box[2]),
-          math.max(box[1], box[3]),
-        );
-        if (rect.isEmpty) continue;
         final kind = _kind(raw['kind']);
         if (!translateSfx && _isSceneText(kind)) continue;
         regions.add(
@@ -48,7 +40,10 @@ class TranslationResponseParser {
             kind: kind,
             sourceText: raw['src'] is String ? raw['src'] as String : '',
             translatedText: dst.trim(),
-            sourceVertical: raw['vertical'] == true,
+            sourceVertical:
+                kind != TranslationRegionKind.caption &&
+                raw['vertical'] == true,
+            sourceBoxes: sourceBoxes,
           ),
         );
       }
@@ -62,11 +57,22 @@ class TranslationResponseParser {
     }
   }
 
-  /// 解析本地检测模式的编号响应；区域坐标取所认领检测框中相连一簇的并集。
-  ///
-  /// 采用宽松校验：未知编号丢弃，重复编号只保留首次归属，未被认领的框忽略；
-  /// 只有 JSON 本身无法解析时才视为响应错误。
+  /// 解析本地检测模式；不相连的分组不挂载到其中某一个气泡。
   PageTranslationResult parseNumbered(
+    String text, {
+    required Map<String, Rect> boxes,
+    required bool translateSfx,
+    TranslationUsage usage = const TranslationUsage(),
+  }) => parseNumberedWithPending(
+    text,
+    boxes: boxes,
+    translateSfx: translateSfx,
+    usage: usage,
+  ).result;
+
+  /// 未翻译且没有有效忽略原因的编号交给服务补译。
+  ({PageTranslationResult result, Map<String, Rect> pending})
+  parseNumberedWithPending(
     String text, {
     required Map<String, Rect> boxes,
     required bool translateSfx,
@@ -95,8 +101,8 @@ class TranslationResponseParser {
         members.add(id);
       }
       if (members.isEmpty) continue;
-      // 只认领相连的一簇，其余编号留给后续区域。
-      final cluster = _largestCluster([for (final id in members) boxes[id]!]);
+      final cluster = _connectedCluster([for (final id in members) boxes[id]!]);
+      if (cluster.length != members.length) continue;
       Rect? union;
       for (final member in cluster) {
         claimed.add(members[member]);
@@ -113,8 +119,11 @@ class TranslationResponseParser {
           kind: kind,
           sourceText: raw['src'] is String ? raw['src'] as String : '',
           translatedText: dst.trim(),
-          sourceVertical: raw['vertical'] == true,
+          sourceVertical:
+              kind != TranslationRegionKind.caption && raw['vertical'] == true,
           boxSource: TranslationBoxSource.detector,
+          sourceBoxes: [for (final id in members) boxes[id]!],
+          sourceIds: members,
         ),
       );
     }
@@ -124,17 +133,42 @@ class TranslationResponseParser {
     } catch (_) {
       terms = const [];
     }
-    return PageTranslationResult(regions: regions, terms: terms, usage: usage);
+    final ignored = json['ignored'];
+    if (ignored is List) {
+      for (final item in ignored) {
+        if (item is! Map || item['ids'] is! List) continue;
+        final reason = item['reason'];
+        if (reason != 'non_text' &&
+            reason != 'already_target' &&
+            !(reason == 'excluded_kind' && !translateSfx)) {
+          continue;
+        }
+        claimed.addAll(
+          (item['ids'] as List).whereType<String>().where(boxes.containsKey),
+        );
+      }
+    }
+    return (
+      result: PageTranslationResult(
+        regions: regions,
+        terms: terms,
+        usage: usage,
+      ),
+      pending: {
+        for (final entry in boxes.entries)
+          if (!claimed.contains(entry.key)) entry.key: entry.value,
+      },
+    );
   }
 
   /// 相邻框之间允许的最大间隙（相对切片尺寸）。
   static const _maxClusterGap = 0.04;
 
-  /// 把一组框按空间相邻聚簇，返回外接面积最大的一簇的下标。
+  /// 返回第一簇的下标，调用方检查整组是否相连。
   ///
   /// 模型偶尔把相距很远或相互挨着的不同气泡编成一组，直接取并集会遮住大片画面。
   /// 同一气泡内的行距通常小于行高，不同气泡的文字之间至少隔着两侧留白。
-  static List<int> _largestCluster(List<Rect> boxes) {
+  static List<int> _connectedCluster(List<Rect> boxes) {
     final parent = List<int>.generate(boxes.length, (index) => index);
     int find(int index) {
       while (parent[index] != index) {
@@ -152,14 +186,26 @@ class TranslationResponseParser {
     for (var index = 0; index < boxes.length; index++) {
       clusters.putIfAbsent(find(index), () => []).add(index);
     }
-    double area(List<int> cluster) {
-      final union = cluster
-          .map((index) => boxes[index])
-          .reduce((a, b) => a.expandToInclude(b));
-      return union.width * union.height;
-    }
+    return clusters.values.first;
+  }
 
-    return clusters.values.reduce((a, b) => area(b) > area(a) ? b : a);
+  static Rect? _box(Object? raw) {
+    if (raw is! List ||
+        raw.length != 4 ||
+        raw.any((value) => value is! num || !value.isFinite)) {
+      return null;
+    }
+    final values = raw
+        .cast<num>()
+        .map((value) => value.clamp(0, 1000) / 1000)
+        .toList();
+    final rect = Rect.fromLTRB(
+      math.min(values[0], values[2]),
+      math.min(values[1], values[3]),
+      math.max(values[0], values[2]),
+      math.max(values[1], values[3]),
+    );
+    return rect.isEmpty ? null : rect;
   }
 
   static bool _adjacent(Rect a, Rect b) {

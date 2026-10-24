@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-enum TranslationRegionKind { bubble, narration, sfx, other }
+enum TranslationRegionKind { bubble, narration, caption, sfx, other }
 
 enum TranslationBoxSource { ai, detector }
 
@@ -24,6 +24,8 @@ class TranslationRegion {
     this.boxSource = TranslationBoxSource.ai,
     this.layoutBox,
     this.textPatches,
+    this.sourceBoxes = const [],
+    this.sourceIds = const [],
   });
 
   final String id;
@@ -34,6 +36,10 @@ class TranslationRegion {
   final bool sourceVertical;
   final Color? backgroundColor;
   final TranslationBoxSource boxSource;
+
+  /// 本段原文的各行/列及检测编号，不能用排版框替代。
+  final List<Rect> sourceBoxes;
+  final List<String> sourceIds;
 
   /// 气泡内部的安全排版范围；[box] 始终保留原文位置。
   final Rect? layoutBox;
@@ -50,6 +56,12 @@ class TranslationRegion {
     'vertical': sourceVertical,
     'backgroundColor': backgroundColor?.toARGB32(),
     'boxSource': boxSource.name,
+    if (sourceBoxes.isNotEmpty)
+      'sourceBoxes': [
+        for (final area in sourceBoxes)
+          [area.left, area.top, area.right, area.bottom],
+      ],
+    if (sourceIds.isNotEmpty) 'sourceIds': sourceIds,
     if (layoutBox case final area?)
       'layoutBox': [area.left, area.top, area.right, area.bottom],
     if (textPatches case final patches?)
@@ -95,6 +107,10 @@ class TranslationRegion {
       boxSource: TranslationBoxSource.values.byName(
         json['boxSource'] as String,
       ),
+      sourceBoxes:
+          (json['sourceBoxes'] as List?)?.map(rectFromJson).toList() ??
+          const [],
+      sourceIds: (json['sourceIds'] as List?)?.cast<String>() ?? const [],
       layoutBox: json['layoutBox'] == null
           ? null
           : rectFromJson(json['layoutBox']),

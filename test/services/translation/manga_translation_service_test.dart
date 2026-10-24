@@ -525,6 +525,91 @@ void main() {
       },
     );
 
+    for (final merged in [false, true]) {
+      test('completes missing independent Japanese passages, merged=$merged', () async {
+        await settings.setTargetLanguage(TranslationTargetLanguage.japanese);
+        detector.respond = (_) async => const [
+          Rect.fromLTRB(.4, .1, .5, .35),
+          Rect.fromLTRB(.4, .6, .5, .85),
+        ];
+        provider.respond = (call) async => ProviderRawResponse(
+          text: call == 1
+              ? merged
+                    ? '{"regions":[{"ids":["0-0","0-1"],"kind":"bubble","dst":"一人で見てね！"}]}'
+                    : '{"regions":[{"ids":["0-0"],"kind":"bubble","dst":"一人で見てね！"}]}'
+              : merged
+              ? '{"regions":[{"ids":["0-0"],"kind":"bubble","dst":"一人で見てね！"},{"ids":["0-1"],"kind":"bubble","dst":"今は見ちゃだめ！"}]}'
+              : '{"regions":[{"ids":["0-1"],"kind":"bubble","dst":"今は見ちゃだめ！"}]}',
+          usage: TranslationUsage(inputTokens: call == 1 ? 10 : 7),
+        );
+        final result = await translate();
+        expect(provider.calls, 2);
+        expect(result.regions.map((region) => region.translatedText), [
+          '一人で見てね！',
+          '今は見ちゃだめ！',
+        ]);
+        expect(result.regions.map((region) => region.sourceIds), [
+          ['0-0'],
+          ['0-1'],
+        ]);
+        expect(result.usage.inputTokens, 17);
+        expect(provider.prompts.last, contains('0-1:'));
+        if (!merged) expect(provider.prompts.last, isNot(contains('0-0:')));
+        final cached = await translate();
+        expect(
+          cached.regions.map((region) => region.toJson()),
+          result.regions.map((region) => region.toJson()),
+        );
+        expect(provider.calls, 2);
+        expect((await usage.load()).values.single.requests, 2);
+      });
+    }
+
+    test(
+      'does not cache a successful page when completion is still missing',
+      () async {
+        detector.respond = (_) async => const [
+          Rect.fromLTRB(.4, .1, .5, .35),
+          Rect.fromLTRB(.4, .6, .5, .85),
+        ];
+        provider.respond = (_) async => const ProviderRawResponse(
+          text: '{"regions":[{"ids":["0-0"],"kind":"bubble","dst":"一人で見てね！"}]}',
+          usage: TranslationUsage(),
+        );
+        await expectLater(
+          translate(),
+          throwsA(
+            isA<TranslationFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              TranslationFailureKind.badResponse,
+            ),
+          ),
+        );
+        expect(provider.calls, 3);
+        expect(await cache.sizeBytes(), 0);
+        expect((await usage.load()).values.single.requests, 3);
+      },
+    );
+
+    test(
+      'explicit non-text detections do not trigger supplementary requests',
+      () async {
+        detector.respond = (_) async => const [
+          Rect.fromLTRB(.4, .1, .5, .35),
+          Rect.fromLTRB(.4, .6, .5, .85),
+        ];
+        provider.respond = (_) async => const ProviderRawResponse(
+          text:
+              '{"regions":[{"ids":["0-0"],"kind":"bubble","dst":"一人で見てね！"}],'
+              '"ignored":[{"ids":["0-1"],"reason":"non_text"}]}',
+          usage: TranslationUsage(),
+        );
+        expect((await translate()).regions, hasLength(1));
+        expect(provider.calls, 1);
+      },
+    );
+
     test(
       'pages without detected text skip AI but are cached and counted',
       () async {
@@ -587,6 +672,10 @@ void main() {
       await settings.setTextLocator(TranslationTextLocator.detector);
       await translate();
       expect(provider.calls, 2);
+      provider.respond = (_) async => const ProviderRawResponse(
+        text: '{"regions":[{"ids":["0-0"],"kind":"bubble","dst":"甲"}]}',
+        usage: TranslationUsage(),
+      );
       await settings.setDetectorModelId('comic_text_detector');
       await translate();
       expect(detector.models.last, 'comic_text_detector');

@@ -6,6 +6,231 @@ import 'package:hazuki/services/translation/models/translation_models.dart';
 import 'package:image/image.dart' as img;
 
 void main() {
+  test('repairs dense outlined text without filling an occluding object', () {
+    final image = img.Image(width: 240, height: 260, numChannels: 4);
+    img.fill(image, color: img.ColorRgb8(70, 70, 70));
+    img.fillRect(
+      image,
+      x1: 40,
+      y1: 40,
+      x2: 200,
+      y2: 220,
+      color: img.ColorRgb8(255, 210, 255),
+    );
+    img.fillRect(
+      image,
+      x1: 140,
+      y1: 95,
+      x2: 175,
+      y2: 165,
+      color: img.ColorRgb8(255, 255, 255),
+    );
+    img.fillRect(
+      image,
+      x1: 143,
+      y1: 98,
+      x2: 172,
+      y2: 162,
+      color: img.ColorRgb8(0, 0, 0),
+    );
+    img.fillRect(
+      image,
+      x1: 170,
+      y1: 110,
+      x2: 220,
+      y2: 150,
+      color: img.ColorRgb8(70, 70, 70),
+    );
+    final result = const BubbleSnapper().snap(
+      image.getBytes(order: img.ChannelOrder.rgba),
+      240,
+      260,
+      [
+        const TranslationRegion(
+          id: 'dense',
+          box: Rect.fromLTRB(143 / 240, 98 / 260, 167 / 240, 163 / 260),
+          kind: TranslationRegionKind.bubble,
+          sourceText: '挑戰書',
+          translatedText: '挑戦状',
+          sourceVertical: true,
+        ),
+      ],
+    ).single;
+    expect(result.layoutBox, isNotNull);
+    expect(
+      result.textPatches!.any(
+        (patch) => patch.box.contains(const Offset(160 / 240, 130 / 260)),
+      ),
+      isTrue,
+    );
+    expect(
+      result.textPatches!.any(
+        (patch) => patch.box.contains(const Offset(185 / 240, 130 / 260)),
+      ),
+      isFalse,
+    );
+  });
+
+  test(
+    'short caption text finds the surrounding wide banner and stays horizontal',
+    () {
+      final image = img.Image(width: 300, height: 160, numChannels: 4);
+      img.fill(image, color: img.ColorRgb8(70, 70, 70));
+      img.fillRect(
+        image,
+        x1: 25,
+        y1: 60,
+        x2: 275,
+        y2: 95,
+        color: img.ColorRgb8(225, 240, 245),
+      );
+      img.fillRect(
+        image,
+        x1: 145,
+        y1: 68,
+        x2: 160,
+        y2: 85,
+        color: img.ColorRgb8(0, 0, 0),
+      );
+      final result = const BubbleSnapper().snap(
+        image.getBytes(order: img.ChannelOrder.rgba),
+        300,
+        160,
+        [
+          const TranslationRegion(
+            id: 'caption',
+            box: Rect.fromLTRB(145 / 300, 68 / 160, 161 / 300, 86 / 160),
+            kind: TranslationRegionKind.caption,
+            sourceText: '欸！？',
+            translatedText: 'えっ！？',
+            sourceVertical: true,
+          ),
+        ],
+      ).single;
+      expect(result.kind, TranslationRegionKind.caption);
+      expect(result.sourceVertical, isFalse);
+      expect(result.layoutBox!.width * 300, greaterThan(220));
+      expect(result.layoutBox!.height * 160, inInclusiveRange(25, 36));
+    },
+  );
+
+  test(
+    'keeps both lobes and leaves an untranslated lower passage untouched',
+    () {
+      final image = img.Image(width: 200, height: 300, numChannels: 4);
+      img.fill(image, color: img.ColorRgb8(70, 70, 70));
+      for (final y in [95, 205]) {
+        img.fillCircle(
+          image,
+          x: 100,
+          y: y,
+          radius: 70,
+          color: img.ColorRgb8(170, 235, 245),
+        );
+      }
+      for (final y in [55, 165]) {
+        img.fillRect(
+          image,
+          x1: 90,
+          y1: y,
+          x2: 110,
+          y2: y + 79,
+          color: img.ColorRgb8(0, 0, 0),
+        );
+      }
+      const upper = TranslationRegion(
+        id: 'upper',
+        box: Rect.fromLTRB(.45, 55 / 300, .555, 135 / 300),
+        kind: TranslationRegionKind.bubble,
+        sourceText: '您自己一個人單獨看哦！',
+        translatedText: '一人で見てね！',
+        sourceVertical: true,
+      );
+      const lower = TranslationRegion(
+        id: 'lower',
+        box: Rect.fromLTRB(.45, 165 / 300, .555, 245 / 300),
+        kind: TranslationRegionKind.bubble,
+        sourceText: '現在不可以看啦！',
+        translatedText: '今は見ちゃだめ！',
+        sourceVertical: true,
+      );
+      final rgba = image.getBytes(order: img.ChannelOrder.rgba);
+      final both = const BubbleSnapper().snap(rgba, 200, 300, [upper, lower]);
+      expect(both[0].layoutBox, isNotNull);
+      expect(both[1].layoutBox, isNotNull);
+      expect(both[0].layoutBox!.overlaps(both[1].layoutBox!), isFalse);
+      expect(
+        both[0].textPatches!.any(
+          (patch) => patch.box.contains(lower.box.center),
+        ),
+        isFalse,
+      );
+      expect(
+        both[1].textPatches!.any(
+          (patch) => patch.box.contains(lower.box.center),
+        ),
+        isTrue,
+      );
+      final onlyUpper = const BubbleSnapper()
+          .snap(rgba, 200, 300, [upper], textBoxes: [lower.box])
+          .single;
+      expect(
+        onlyUpper.textPatches!.any(
+          (patch) => patch.box.contains(lower.box.center),
+        ),
+        isFalse,
+      );
+      expect(onlyUpper.layoutBox!.bottom, lessThan(lower.box.top));
+    },
+  );
+
+  test('erases the other source columns in the same passage', () {
+    final image = img.Image(width: 240, height: 240, numChannels: 4);
+    img.fill(image, color: img.ColorRgb8(70, 70, 70));
+    img.fillCircle(
+      image,
+      x: 120,
+      y: 120,
+      radius: 95,
+      color: img.ColorRgb8(255, 210, 255),
+    );
+    for (final x in [85, 120]) {
+      img.fillRect(
+        image,
+        x1: x,
+        y1: 65,
+        x2: x + 18,
+        y2: 175,
+        color: img.ColorRgb8(0, 0, 0),
+      );
+    }
+    const source = TranslationRegion(
+      id: 'columns',
+      box: Rect.fromLTRB(.5, 65 / 240, 139 / 240, 176 / 240),
+      kind: TranslationRegionKind.bubble,
+      sourceText: '雖然說是挑戰書',
+      translatedText: '挑戦状と言っても…',
+      sourceVertical: true,
+    );
+    final result = const BubbleSnapper().snap(
+      image.getBytes(order: img.ChannelOrder.rgba),
+      240,
+      240,
+      [source],
+    ).single;
+    expect(
+      result.textPatches!.any(
+        (patch) => patch.box.contains(const Offset(94 / 240, .5)),
+      ),
+      isTrue,
+    );
+    expect(
+      result.textPatches!.any(
+        (patch) => patch.box.contains(const Offset(130 / 240, .5)),
+      ),
+      isTrue,
+    );
+  });
   const snapper = BubbleSnapper();
   TranslationRegion snap(
     img.Image image,

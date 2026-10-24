@@ -54,6 +54,8 @@ class TranslationImageSlice {
           sourceVertical: region.sourceVertical,
           backgroundColor: region.backgroundColor,
           boxSource: region.boxSource,
+          sourceBoxes: region.sourceBoxes.map(mapRect).toList(),
+          sourceIds: region.sourceIds,
           layoutBox: region.layoutBox == null
               ? null
               : mapRect(region.layoutBox!),
@@ -86,6 +88,89 @@ class PreparedTranslationImage {
 
 class TranslationImageProcessor {
   const TranslationImageProcessor();
+
+  /// 检测器可能把连体气泡的上下两段合成一个框。只在明显的大段留白处分段，
+  /// 普通竖排的字距和横排的行距不作为分段依据。
+  static List<ui.Rect> splitDetectedPassages(
+    DetectionImage image,
+    List<ui.Rect> boxes,
+  ) {
+    final output = <ui.Rect>[];
+    for (final box in boxes) {
+      final left = (box.left * image.width).floor().clamp(0, image.width - 1);
+      final right = (box.right * image.width).ceil().clamp(
+        left + 1,
+        image.width,
+      );
+      final top = (box.top * image.height).floor().clamp(0, image.height - 1);
+      final bottom = (box.bottom * image.height).ceil().clamp(
+        top + 1,
+        image.height,
+      );
+      final width = right - left, height = bottom - top;
+      if (width < 6 || height < width * 1.5) {
+        output.add(box);
+        continue;
+      }
+      final rows = List<bool>.filled(height, false);
+      var bright = 0;
+      for (var y = top; y < bottom; y++) {
+        var ink = 0;
+        for (var x = left; x < right; x++) {
+          final offset = (y * image.width + x) * 4;
+          final r = image.rgba[offset],
+              g = image.rgba[offset + 1],
+              b = image.rgba[offset + 2];
+          if (r > 160 && g > 160 && b > 160) bright++;
+          if (r < 120 && g < 120 && b < 120) ink++;
+        }
+        rows[y - top] = ink >= math.max(2, width * 0.025);
+      }
+      if (bright < width * height * 0.2) {
+        output.add(box);
+        continue;
+      }
+      var start = 0, cursor = 0;
+      final parts = <ui.Rect>[];
+      while (cursor < height) {
+        if (rows[cursor]) {
+          cursor++;
+          continue;
+        }
+        final gap = cursor;
+        while (cursor < height && !rows[cursor]) {
+          cursor++;
+        }
+        if (gap - start >= width * 0.6 &&
+            height - cursor >= width * 0.6 &&
+            cursor - gap >= width * 0.6) {
+          parts.add(
+            ui.Rect.fromLTRB(
+              box.left,
+              (top + start) / image.height,
+              box.right,
+              (top + gap) / image.height,
+            ),
+          );
+          start = cursor;
+        }
+      }
+      if (parts.isEmpty) {
+        output.add(box);
+        continue;
+      }
+      parts.add(
+        ui.Rect.fromLTRB(
+          box.left,
+          (top + start) / image.height,
+          box.right,
+          box.bottom,
+        ),
+      );
+      output.addAll(parts);
+    }
+    return output;
+  }
 
   Future<PreparedTranslationImage> prepare(
     Uint8List bytes, {

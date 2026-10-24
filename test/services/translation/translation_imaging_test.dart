@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/translation/imaging/bubble_snapper.dart';
 import 'package:hazuki/services/translation/imaging/translation_image_processor.dart';
+import 'package:hazuki/services/translation/detection/translation_text_detector.dart';
 import 'package:hazuki/services/translation/models/translation_models.dart';
 import 'package:image/image.dart' as img;
 
@@ -19,6 +20,59 @@ TranslationRegion _region(
 );
 
 void main() {
+  test(
+    'splits separate passages inside one detector block, keeping normal glyph gaps',
+    () {
+      final image = img.Image(width: 160, height: 300, numChannels: 4);
+      img.fill(image, color: img.ColorRgb8(180, 235, 245));
+      for (final range in [(30, 110), (200, 260)]) {
+        img.fillRect(
+          image,
+          x1: 65,
+          y1: range.$1,
+          x2: 95,
+          y2: range.$2,
+          color: img.ColorRgb8(0, 0, 0),
+        );
+      }
+      const box = Rect.fromLTRB(65 / 160, 30 / 300, 96 / 160, 261 / 300);
+      final parts = TranslationImageProcessor.splitDetectedPassages(
+        DetectionImage(
+          rgba: image.getBytes(order: img.ChannelOrder.rgba),
+          width: 160,
+          height: 300,
+        ),
+        [box],
+      );
+      expect(parts, hasLength(2));
+      expect(parts[0].bottom, lessThan(parts[1].top));
+      expect(parts[0].contains(const Offset(.5, .2)), isTrue);
+      expect(parts[1].contains(const Offset(.5, .8)), isTrue);
+      final normal = img.Image(width: 160, height: 300, numChannels: 4);
+      img.fill(normal, color: img.ColorRgb8(180, 235, 245));
+      for (var y = 30; y < 260; y += 26) {
+        img.fillRect(
+          normal,
+          x1: 65,
+          y1: y,
+          x2: 95,
+          y2: y + 19,
+          color: img.ColorRgb8(0, 0, 0),
+        );
+      }
+      expect(
+        TranslationImageProcessor.splitDetectedPassages(
+          DetectionImage(
+            rgba: normal.getBytes(order: img.ChannelOrder.rgba),
+            width: 160,
+            height: 300,
+          ),
+          [box],
+        ),
+        [box],
+      );
+    },
+  );
   TestWidgetsFlutterBinding.ensureInitialized();
   const snapper = BubbleSnapper();
 
@@ -102,13 +156,14 @@ void main() {
     final both = snapper.snap(bytes, 200, 120, [_region(left), _region(right)]);
     expect(both[0].box, left);
     expect(both[1].box, right);
-    expect(both[0].layoutBox, isNull);
-    expect(both[1].layoutBox, isNull);
+    expect(both[0].layoutBox, isNotNull);
+    expect(both[1].layoutBox, isNotNull);
+    expect(both[0].layoutBox!.overlaps(both[1].layoutBox!), isFalse);
     final guarded = snapper
         .snap(bytes, 200, 120, [_region(left)], textBoxes: [right])
         .single;
     expect(guarded.box, left);
-    expect(guarded.layoutBox, isNull);
+    expect(guarded.layoutBox!.right, lessThan(right.left));
   });
 
   test('keeps AI box on a flat page and samples SFX without snapping', () {

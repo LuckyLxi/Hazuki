@@ -9,6 +9,87 @@ import 'package:hazuki/services/translation/translation_prompt.dart';
 import 'package:hazuki/services/translation/translation_response_parser.dart';
 
 void main() {
+  test(
+    'caption type overrides a vertical flag and retains all source columns',
+    () {
+      final result = const TranslationResponseParser()
+          .parse(
+            jsonEncode({
+              'regions': [
+                {
+                  'box': [100, 100, 140, 200],
+                  'boxes': [
+                    [100, 100, 140, 200],
+                    [160, 100, 200, 200],
+                  ],
+                  'kind': 'caption',
+                  'src': '具體講了什麼呢？',
+                  'dst': '具体的にどんな話？',
+                  'vertical': true,
+                },
+              ],
+            }),
+            translateSfx: false,
+          )
+          .regions
+          .single;
+      expect(result.kind, TranslationRegionKind.caption);
+      expect(result.sourceVertical, isFalse);
+      expect(result.sourceBoxes, hasLength(2));
+      expect(result.box, const Rect.fromLTRB(.1, .1, .2, .2));
+      expect(
+        TranslationRegion.fromJson(result.toJson()).sourceBoxes,
+        result.sourceBoxes,
+      );
+    },
+  );
+
+  test(
+    'only explicitly justified ignored ids are excluded from completion',
+    () {
+      const boxes = {
+        'a': Rect.fromLTWH(.1, .1, .1, .1),
+        'b': Rect.fromLTWH(.7, .7, .1, .1),
+      };
+      final parsed = const TranslationResponseParser().parseNumberedWithPending(
+        jsonEncode({
+          'regions': [
+            {
+              'ids': ['a'],
+              'kind': 'caption',
+              'dst': '待ってね',
+              'vertical': true,
+            },
+          ],
+          'ignored': [
+            {
+              'ids': ['b'],
+              'reason': 'non_text',
+            },
+          ],
+        }),
+        boxes: boxes,
+        translateSfx: false,
+      );
+      expect(parsed.pending, isEmpty);
+      expect(parsed.result.regions.single.sourceVertical, isFalse);
+      final invalid = const TranslationResponseParser()
+          .parseNumberedWithPending(
+            jsonEncode({
+              'regions': [],
+              'ignored': [
+                {
+                  'ids': ['b'],
+                  'reason': 'too_close',
+                },
+              ],
+            }),
+            boxes: boxes,
+            translateSfx: false,
+          );
+      expect(invalid.pending.keys, unorderedEquals(['a', 'b']));
+    },
+  );
   const parser = TranslationResponseParser();
 
   Map<String, dynamic> region({
@@ -321,47 +402,50 @@ void main() {
       expect(first.box, const Rect.fromLTRB(0.1, 0.1, 0.4, 0.3));
       expect(first.sourceVertical, isTrue);
       expect(first.boxSource, TranslationBoxSource.detector);
+      expect(first.sourceBoxes, [boxes['0-0'], boxes['0-1']]);
+      expect(first.sourceIds, ['0-0', '0-1']);
       expect(result.regions[1].box, boxes['0-2']);
       expect(result.regions[1].kind, TranslationRegionKind.narration);
       expect(result.terms.single.target, '爱丽丝');
     });
 
-    test('keeps only the largest adjacent cluster of a scattered group', () {
-      final scattered = parser.parseNumbered(
-        jsonEncode({
-          'regions': [
-            {
-              'ids': ['a', 'b', 'c'],
-              'kind': 'bubble',
-              'dst': '跨气泡',
-            },
-            {
-              'ids': ['c'],
-              'kind': 'bubble',
-              'dst': '右上',
-            },
-          ],
-        }),
-        boxes: const {
-          // a、b 为同一气泡内上下相邻的两行。
-          'a': Rect.fromLTRB(0.05, 0.80, 0.30, 0.84),
-          'b': Rect.fromLTRB(0.05, 0.86, 0.28, 0.90),
-          // c 在右上角，与前两行相距很远。
-          'c': Rect.fromLTRB(0.75, 0.05, 0.95, 0.09),
-        },
-        translateSfx: false,
-      );
-      expect(scattered.regions, hasLength(2));
-      expect(
-        scattered.regions[0].box,
-        const Rect.fromLTRB(0.05, 0.80, 0.30, 0.90),
-      );
-      expect(scattered.regions[1].translatedText, '右上');
-      expect(
-        scattered.regions[1].box,
-        const Rect.fromLTRB(0.75, 0.05, 0.95, 0.09),
-      );
-    });
+    test(
+      'keeps disconnected passages pending instead of discarding a cluster',
+      () {
+        final parsed = parser.parseNumberedWithPending(
+          jsonEncode({
+            'regions': [
+              {
+                'ids': ['a', 'b', 'c'],
+                'kind': 'bubble',
+                'dst': '跨气泡',
+              },
+              {
+                'ids': ['c'],
+                'kind': 'bubble',
+                'dst': '右上',
+              },
+            ],
+          }),
+          boxes: const {
+            // a、b 为同一气泡内上下相邻的两行。
+            'a': Rect.fromLTRB(0.05, 0.80, 0.30, 0.84),
+            'b': Rect.fromLTRB(0.05, 0.86, 0.28, 0.90),
+            // c 在右上角，与前两行相距很远。
+            'c': Rect.fromLTRB(0.75, 0.05, 0.95, 0.09),
+          },
+          translateSfx: false,
+        );
+        final scattered = parsed.result;
+        expect(scattered.regions, hasLength(1));
+        expect(scattered.regions.single.translatedText, '右上');
+        expect(
+          scattered.regions.single.box,
+          const Rect.fromLTRB(0.75, 0.05, 0.95, 0.09),
+        );
+        expect(parsed.pending.keys, unorderedEquals(['a', 'b']));
+      },
+    );
 
     test('drops unknown ids, empty translations and unclaimed boxes', () {
       final result = parseNumbered([

@@ -88,29 +88,93 @@ class BubbleSnapper {
     );
     var background = colorOf(colors.first);
     _BubbleInterior? interior;
+    final horizontalBar =
+        region.kind == TranslationRegionKind.caption ||
+        region.kind == TranslationRegionKind.narration &&
+            source.width > source.height * 4;
     if (region.kind == TranslationRegionKind.bubble ||
-        region.kind == TranslationRegionKind.narration) {
-      final horizontalBar =
-          region.kind == TranslationRegionKind.narration &&
-          source.width > source.height * 4;
+        region.kind == TranslationRegionKind.narration ||
+        horizontalBar) {
       final margin = math.max(
         12.0,
-        source.longestSide * (horizontalBar ? 3 : 1.5),
+        source.longestSide * (horizontalBar ? 3 : 2),
       );
+      var limits = Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble());
+      if (!horizontalBar) {
+        for (final text in texts) {
+          if (text.overlaps(region.box)) continue;
+          final other = Rect.fromLTRB(
+            text.left * width,
+            text.top * height,
+            text.right * width,
+            text.bottom * height,
+          );
+          if (other.left < source.right && other.right > source.left) {
+            if (other.top >= source.bottom) {
+              limits = Rect.fromLTRB(
+                limits.left,
+                limits.top,
+                limits.right,
+                math.min(
+                  limits.bottom,
+                  ((source.bottom + other.top) / 2).floorToDouble(),
+                ),
+              );
+            } else if (other.bottom <= source.top) {
+              limits = Rect.fromLTRB(
+                limits.left,
+                math.max(
+                  limits.top,
+                  ((source.top + other.bottom) / 2).ceilToDouble(),
+                ),
+                limits.right,
+                limits.bottom,
+              );
+            }
+          } else if (other.top < source.bottom && other.bottom > source.top) {
+            if (other.left >= source.right) {
+              limits = Rect.fromLTRB(
+                limits.left,
+                limits.top,
+                math.min(
+                  limits.right,
+                  ((source.right + other.left) / 2).floorToDouble(),
+                ),
+                limits.bottom,
+              );
+            } else if (other.right <= source.left) {
+              limits = Rect.fromLTRB(
+                math.max(
+                  limits.left,
+                  ((source.left + other.right) / 2).ceilToDouble(),
+                ),
+                limits.top,
+                limits.right,
+                limits.bottom,
+              );
+            }
+          }
+        }
+      }
       final crop = Rect.fromLTRB(
-        math.max(0, (source.left - margin).floorToDouble()),
+        horizontalBar ? 0 : math.max(0, (source.left - margin).floorToDouble()),
         math.max(
           0,
           (source.top - (horizontalBar ? source.height * 0.3 : margin))
               .floorToDouble(),
         ),
-        math.min(width.toDouble(), (source.right + margin).ceilToDouble()),
+        horizontalBar
+            ? width.toDouble()
+            : math.min(
+                width.toDouble(),
+                (source.right + margin).ceilToDouble(),
+              ),
         math.min(
           height.toDouble(),
           (source.bottom + (horizontalBar ? source.height * 0.3 : margin))
               .ceilToDouble(),
         ),
-      );
+      ).intersect(limits);
       final tried = <Color>[];
       for (final entry in colors) {
         final color = colorOf(entry);
@@ -133,13 +197,10 @@ class BubbleSnapper {
           crop,
           color,
           horizontalBar,
+          horizontalBar ? null : limits,
         );
         if (candidate == null) continue;
-        final bounds = candidate.bounds;
-        final intersection = bounds.intersect(source);
-        if (intersection.isEmpty ||
-            intersection.width * intersection.height <
-                source.width * source.height * 0.6) {
+        if (horizontalBar && candidate.captionBox(source) == null) {
           continue;
         }
         // 连到别的文字区域时不把两个气泡当成一个；检测框与本框重叠的除外。
@@ -158,27 +219,60 @@ class BubbleSnapper {
         }
       }
     }
-    final layout = interior?.layoutBox();
+    final layout = horizontalBar
+        ? interior?.captionBox(source)
+        : interior?.layoutBox();
     Rect normalize(Rect rect) => Rect.fromLTRB(
       rect.left / width,
       rect.top / height,
       rect.right / width,
       rect.bottom / height,
     );
+    final eraseAreas = <Rect>[];
+    if (layout != null) {
+      for (final box
+          in region.sourceBoxes.isEmpty ? [region.box] : region.sourceBoxes) {
+        var area = Rect.fromLTRB(
+          box.left * width,
+          box.top * height,
+          box.right * width,
+          box.bottom * height,
+        );
+        // 竖排原文的其他列也在同一段的高度范围内；相邻段已在搜索范围中隔开。
+        if (region.sourceVertical && !horizontalBar) {
+          area = Rect.fromLTRB(
+            interior!.bounds.left,
+            area.top,
+            interior.bounds.right,
+            area.bottom,
+          );
+        }
+        final overlap = eraseAreas.indexWhere((other) => other.overlaps(area));
+        if (overlap < 0) {
+          eraseAreas.add(area);
+        } else {
+          eraseAreas[overlap] = eraseAreas[overlap].expandToInclude(area);
+        }
+      }
+    }
     return TranslationRegion(
       id: region.id,
       box: region.box,
-      kind: region.kind,
+      kind: horizontalBar ? TranslationRegionKind.caption : region.kind,
       sourceText: region.sourceText,
       translatedText: region.translatedText,
-      sourceVertical: region.sourceVertical,
+      sourceVertical: !horizontalBar && region.sourceVertical,
       backgroundColor: background,
       boxSource: region.boxSource,
+      sourceBoxes: region.sourceBoxes,
+      sourceIds: region.sourceIds,
       layoutBox: layout == null ? null : normalize(layout),
       textPatches: layout == null
           ? null
-          : interior!
-                .erase(rgba, width, source, background)
+          : eraseAreas
+                .expand(
+                  (area) => interior!.erase(rgba, width, area, background),
+                )
                 .map(
                   (patch) =>
                       TranslationTextPatch(normalize(patch.box), patch.color),
@@ -207,6 +301,7 @@ class _BubbleInterior {
     Rect crop,
     Color color,
     bool horizontalBar,
+    Rect? passageLimits,
   ) {
     final red = (color.r * 255).round();
     final green = (color.g * 255).round();
@@ -223,11 +318,13 @@ class _BubbleInterior {
       );
     }
 
-    int? seedX, seedY;
-    var distance = double.infinity;
-    final seeds = sample.intersect(crop);
-    for (var y = seeds.top.toInt(); y < seeds.bottom; y++) {
-      for (var x = seeds.left.toInt(); x < seeds.right; x++) {
+    final w = crop.width.toInt(), h = crop.height.toInt();
+    final ox = crop.left.toInt(), oy = crop.top.toInt();
+    final seedArea = sample.intersect(crop);
+    final seeds = <(double, int)>[];
+    for (var y = seedArea.top.toInt(); y < seedArea.bottom; y++) {
+      for (var x = seedArea.left.toInt(); x < seedArea.right; x++) {
+        if (!matches(x, y)) continue;
         final d = (Offset(x.toDouble(), y.toDouble()) - source.center)
             .distanceSquared;
         final score =
@@ -235,77 +332,114 @@ class _BubbleInterior {
             (source.contains(Offset(x.toDouble(), y.toDouble()))
                 ? source.longestSide * source.longestSide * 4
                 : 0);
-        if (score < distance && matches(x, y)) {
-          seedX = x;
-          seedY = y;
-          distance = score;
-        }
+        seeds.add((score, (y - oy) * w + x - ox));
       }
     }
-    if (seedX == null || seedY == null) return null;
-    final w = crop.width.toInt(), h = crop.height.toInt();
-    final ox = crop.left.toInt(), oy = crop.top.toInt();
+    seeds.sort((a, b) => a.$1.compareTo(b.$1));
     final visited = Uint8List(w * h);
     final queue = Int32List(w * h);
-    final seed = (seedY - oy) * w + seedX - ox;
-    queue[0] = seed;
-    visited[seed] = 1;
-    var head = 0, tail = 1, outside = 0;
-    final lefts = Int32List(h)..fillRange(0, h, w);
-    final rights = Int32List(h)..fillRange(0, h, -1);
-    var minX = w, maxX = -1, minY = h, maxY = -1;
-    while (head < tail) {
-      final pixel = queue[head++], x = pixel % w, y = pixel ~/ w;
-      // 到达局部裁剪边缘说明尚未找到闭合边界；实际页边可截断气泡。
-      if ((x == 0 && ox > 0) ||
-          (y == 0 && oy > 0 && !horizontalBar) ||
-          (x == w - 1 && crop.right < width) ||
-          (y == h - 1 && crop.bottom < height && !horizontalBar)) {
-        return null;
+    // 最近的同色像素可能是字形孔洞，逐个检查不同连通区域。
+    for (final (_, seed) in seeds) {
+      if (visited[seed] != 0) continue;
+      queue[0] = seed;
+      visited[seed] = 1;
+      var head = 0, tail = 1, outside = 0;
+      final lefts = Int32List(h)..fillRange(0, h, w);
+      final rights = Int32List(h)..fillRange(0, h, -1);
+      var minX = w, maxX = -1, minY = h, maxY = -1;
+      var open = false;
+      while (head < tail) {
+        final pixel = queue[head++], x = pixel % w, y = pixel ~/ w;
+        // 到达局部裁剪边缘说明尚未找到闭合边界；实际页边可截断气泡。
+        if ((x == 0 && ox > 0 && crop.left != passageLimits?.left) ||
+            (y == 0 &&
+                oy > 0 &&
+                !horizontalBar &&
+                crop.top != passageLimits?.top) ||
+            (x == w - 1 &&
+                crop.right < width &&
+                crop.right != passageLimits?.right) ||
+            (y == h - 1 &&
+                crop.bottom < height &&
+                !horizontalBar &&
+                crop.bottom != passageLimits?.bottom)) {
+          open = true;
+        }
+        minX = math.min(minX, x);
+        maxX = math.max(maxX, x);
+        minY = math.min(minY, y);
+        maxY = math.max(maxY, y);
+        lefts[y] = math.min(lefts[y], x);
+        rights[y] = math.max(rights[y], x);
+        if (!source.contains(
+          Offset((x + ox).toDouble(), (y + oy).toDouble()),
+        )) {
+          outside++;
+        }
+        for (final next in [
+          if (x > 0) pixel - 1,
+          if (x + 1 < w) pixel + 1,
+          if (y > 0) pixel - w,
+          if (y + 1 < h) pixel + w,
+        ]) {
+          if (visited[next] != 0) continue;
+          visited[next] = 1;
+          if (matches(next % w + ox, next ~/ w + oy)) queue[tail++] = next;
+        }
       }
-      minX = math.min(minX, x);
-      maxX = math.max(maxX, x);
-      minY = math.min(minY, y);
-      maxY = math.max(maxY, y);
-      lefts[y] = math.min(lefts[y], x);
-      rights[y] = math.max(rights[y], x);
-      if (!source.contains(Offset((x + ox).toDouble(), (y + oy).toDouble()))) {
-        outside++;
-      }
-      for (final next in [
-        if (x > 0) pixel - 1,
-        if (x + 1 < w) pixel + 1,
-        if (y > 0) pixel - w,
-        if (y + 1 < h) pixel + w,
-      ]) {
-        if (visited[next] != 0) continue;
-        visited[next] = 1;
-        if (matches(next % w + ox, next ~/ w + oy)) queue[tail++] = next;
-      }
-    }
-    final sourceArea = source.width * source.height;
-    // 黑字或白色描边也会连通，但它们不会形成包围原文的大块背景。
-    if (tail < sourceArea * 0.5 ||
-        tail < (maxX - minX + 1) * (maxY - minY + 1) * 0.35 ||
-        outside < math.max(4, sourceArea * 0.08) ||
-        (minX + ox == 0 &&
-            minY + oy == 0 &&
-            maxX + ox == width - 1 &&
-            maxY + oy == height - 1)) {
-      return null;
-    }
-    return _BubbleInterior(
-      crop,
-      lefts,
-      rights,
-      tail,
-      Rect.fromLTRB(
+      final sourceArea = source.width * source.height;
+      final naturalEdges =
+          (minX > 0 ? 1 : 0) +
+          (minY > 0 ? 1 : 0) +
+          (maxX < w - 1 ? 1 : 0) +
+          (maxY < h - 1 ? 1 : 0);
+      final bounds = Rect.fromLTRB(
         (minX + ox).toDouble(),
         (minY + oy).toDouble(),
         (maxX + ox + 1).toDouble(),
         (maxY + oy + 1).toDouble(),
-      ),
-    );
+      );
+      final intersection = bounds.intersect(source);
+      // 黑字或白色描边也会连通，但它们不会形成包围原文的大块背景。
+      if (open ||
+          naturalEdges < (horizontalBar ? 1 : 2) ||
+          intersection.isEmpty ||
+          intersection.width * intersection.height < sourceArea * 0.6 ||
+          tail < sourceArea * 0.5 ||
+          tail < (maxX - minX + 1) * (maxY - minY + 1) * 0.35 ||
+          outside < math.max(4, sourceArea * 0.08) ||
+          (horizontalBar && minX + ox == 0 && maxX + ox == width - 1) ||
+          (minX + ox == 0 &&
+              minY + oy == 0 &&
+              maxX + ox == width - 1 &&
+              maxY + oy == height - 1)) {
+        continue;
+      }
+      if (!horizontalBar) {
+        // 粗体字和描边会隔开底色。只补齐原文框内、上下均有同一连通底色的孔洞。
+        final tops = Int32List(w)..fillRange(0, w, h);
+        final bottoms = Int32List(w)..fillRange(0, w, -1);
+        for (var index = 0; index < tail; index++) {
+          final x = queue[index] % w, y = queue[index] ~/ w;
+          tops[x] = math.min(tops[x], y);
+          bottoms[x] = math.max(bottoms[x], y);
+        }
+        for (
+          var x = math.max(0, source.left.toInt() - ox);
+          x < math.min(w, source.right.toInt() - ox);
+          x++
+        ) {
+          final top = math.max(tops[x], source.top.toInt() - oy);
+          final bottom = math.min(bottoms[x], source.bottom.toInt() - oy - 1);
+          for (var y = top; y <= bottom; y++) {
+            lefts[y] = math.min(lefts[y], x);
+            rights[y] = math.max(rights[y], x);
+          }
+        }
+      }
+      return _BubbleInterior(crop, lefts, rights, tail, bounds);
+    }
+    return null;
   }
 
   bool contains(Offset point) {
@@ -314,6 +448,44 @@ class _BubbleInterior {
         y < lefts.length &&
         point.dx >= crop.left + lefts[y] &&
         point.dx < crop.left + rights[y] + 1;
+  }
+
+  /// 取原文所在的连续长条行，利用横向边界的变化排除上下相连的白色画面。
+  Rect? captionBox(Rect source) {
+    final row = (source.center.dy - crop.top).floor().clamp(
+      0,
+      lefts.length - 1,
+    );
+    final referenceWidth = rights[row] - lefts[row] + 1;
+    if (referenceWidth < source.width || referenceWidth < source.height * 4) {
+      return null;
+    }
+    bool sameBar(int y) =>
+        rights[y] - lefts[y] + 1 >= referenceWidth * 0.85 &&
+        (lefts[y] - lefts[row]).abs() < referenceWidth * 0.15 &&
+        (rights[y] - rights[row]).abs() < referenceWidth * 0.15;
+    var top = row, bottom = row;
+    while (top > 0 && sameBar(top - 1)) {
+      top--;
+    }
+    while (bottom + 1 < lefts.length && sameBar(bottom + 1)) {
+      bottom++;
+    }
+    var left = lefts[row], right = rights[row];
+    for (var y = top; y <= bottom; y++) {
+      left = math.max(left, lefts[y]);
+      right = math.min(right, rights[y]);
+    }
+    final h = bottom - top + 1;
+    if (right - left + 1 < h * 4) return null;
+    final margin = math.max(1.0, h * 0.06);
+    final box = Rect.fromLTRB(
+      crop.left + left + margin,
+      crop.top + top + margin,
+      crop.left + right + 1 - margin,
+      crop.top + bottom + 1 - margin,
+    );
+    return box.isEmpty ? null : box;
   }
 
   /// 在轮廓内取面积最大的居中矩形，给气泡尖角、圆边及尾巴留出空间。

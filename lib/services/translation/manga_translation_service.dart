@@ -138,7 +138,7 @@ class MangaTranslationService {
       var inputTokens = 0, outputTokens = 0;
       for (var index = 0; index < prepared.slices.length; index++) {
         final slice = prepared.slices[index];
-        final PageTranslationResult result;
+        PageTranslationResult result;
         if (detectorSpec == null) {
           provider ??= _providers.create(preset, configuration);
           result = await _translateSlice(
@@ -164,12 +164,17 @@ class MangaTranslationService {
               TranslationFailureKind.detectorFailed,
             );
           }
-          final detected = await _detector.detect(
+          final detectedBlocks = await _detector.detect(
             detection,
             detectorSpec,
             model,
             runtime,
             cancelToken: cancelToken,
+          );
+          _checkCancelled(cancelToken);
+          final detected = await _splitPassagesInIsolate(
+            detection,
+            detectedBlocks,
           );
           _checkCancelled(cancelToken);
           textBoxes.addAll(detected.map(slice.mapRect));
@@ -190,6 +195,7 @@ class MangaTranslationService {
           final annotated = await _annotateInIsolate(slice.payload, boxes);
           _checkCancelled(cancelToken);
           provider ??= _providers.create(preset, configuration);
+          var pending = <String, Rect>{};
           result = await _translateSlice(
             provider,
             annotated,
@@ -199,25 +205,81 @@ class MangaTranslationService {
               glossary: glossary,
             ),
             (text, usage) {
-              final parsed = _parser.parseNumbered(
+              final parsed = _parser.parseNumberedWithPending(
                 text,
                 boxes: boxes,
                 translateSfx: translateSfx,
                 usage: usage,
               );
+              pending = parsed.pending;
               _logDetectorSlice(
                 detectorSpec!,
                 index,
                 prepared.slices.length,
                 boxes,
                 text,
-                parsed,
+                parsed.result,
                 translateSfx,
               );
-              return parsed;
+              return parsed.result;
             },
             cancelToken,
           );
+          if (pending.isNotEmpty) {
+            final missing = Map<String, Rect>.of(pending);
+            _log?.call('Translation passages need completion', {
+              'slice': index,
+              'ids': missing.keys.toList(),
+            });
+            final supplementImage = await _annotateInIsolate(
+              slice.payload,
+              missing,
+            );
+            _checkCancelled(cancelToken);
+            final supplement = await _translateSlice(
+              provider,
+              supplementImage,
+              systemPrompt,
+              '${buildDetectorTranslationUserPrompt(boxes: missing, glossary: glossary)}\n'
+              'These passages were missing or incorrectly grouped in the previous response. '
+              'Translate each independent passage separately, including every column and each lobe of a connected balloon. '
+              'Account for every supplied id in regions or ignored.',
+              (text, usage) {
+                final parsed = _parser.parseNumberedWithPending(
+                  text,
+                  boxes: missing,
+                  translateSfx: translateSfx,
+                  usage: usage,
+                );
+                _logDetectorSlice(
+                  detectorSpec!,
+                  index,
+                  prepared.slices.length,
+                  missing,
+                  text,
+                  parsed.result,
+                  translateSfx,
+                );
+                if (parsed.pending.isNotEmpty) {
+                  throw const TranslationFailure(
+                    TranslationFailureKind.badResponse,
+                  );
+                }
+                return parsed.result;
+              },
+              cancelToken,
+            );
+            result = PageTranslationResult(
+              regions: [...result.regions, ...supplement.regions],
+              terms: [...result.terms, ...supplement.terms],
+              usage: TranslationUsage(
+                inputTokens:
+                    result.usage.inputTokens + supplement.usage.inputTokens,
+                outputTokens:
+                    result.usage.outputTokens + supplement.usage.outputTokens,
+              ),
+            );
+          }
         }
         regions.addAll(slice.mapRegions(result.regions));
         terms.addAll(result.terms);
@@ -243,6 +305,8 @@ class MangaTranslationService {
               sourceVertical: snapped[index].sourceVertical,
               backgroundColor: snapped[index].backgroundColor,
               boxSource: snapped[index].boxSource,
+              sourceBoxes: snapped[index].sourceBoxes,
+              sourceIds: snapped[index].sourceIds,
               layoutBox: snapped[index].layoutBox,
               textPatches: snapped[index].textPatches,
             ),
@@ -393,6 +457,13 @@ class MangaTranslationService {
     Map<String, Rect> boxes,
   ) => Isolate.run(
     () => TranslationImageProcessor.annotateBoxes(payload, boxes),
+  );
+
+  static Future<List<Rect>> _splitPassagesInIsolate(
+    DetectionImage image,
+    List<Rect> boxes,
+  ) => Isolate.run(
+    () => TranslationImageProcessor.splitDetectedPassages(image, boxes),
   );
 
   static void _checkCancelled(CancelToken? token) {
