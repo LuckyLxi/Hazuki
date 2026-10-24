@@ -584,6 +584,41 @@
       "count": {}
     }
   },
+  "comicDetailChapterReadSummary": "共 {count} 话 · 已读 {read} 话",
+  "@comicDetailChapterReadSummary": {
+    "placeholders": {
+      "count": {},
+      "read": {}
+    }
+  },
+  "comicDetailChapterLastRead": "上次读到",
+  "comicDetailChapterContinue": "继续阅读",
+  "comicDetailChapterResumePage": "第 {page} 页",
+  "@comicDetailChapterResumePage": {
+    "placeholders": {
+      "page": {}
+    }
+  },
+  "comicDetailChapterSelectedCount": "已选 {count} 话",
+  "@comicDetailChapterSelectedCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "comicDetailChapterSelectHint": "点按切换 · 长按章节可直接进入多选",
+  "comicDetailChapterSelectUnread": "选择未读",
+  "comicDetailChapterSelectInvert": "反选",
+  "comicDetailChapterExitSelection": "退出多选",
+  "comicDetailChapterSortReversed": "倒序",
+  "comicDetailChapterSortOriginal": "正序",
+  "comicDetailChapterGridView": "网格视图",
+  "comicDetailChapterListView": "列表视图",
+  "comicDetailChapterDownloadCount": "下载 {count} 话",
+  "@comicDetailChapterDownloadCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "comicDetailLikesCount": "{count}点赞",
   "@comicDetailLikesCount": {
     "placeholders": {

@@ -584,6 +584,41 @@
       "count": {}
     }
   },
+  "comicDetailChapterReadSummary": "{count} chapters · {read} read",
+  "@comicDetailChapterReadSummary": {
+    "placeholders": {
+      "count": {},
+      "read": {}
+    }
+  },
+  "comicDetailChapterLastRead": "Last read",
+  "comicDetailChapterContinue": "Continue reading",
+  "comicDetailChapterResumePage": "Page {page}",
+  "@comicDetailChapterResumePage": {
+    "placeholders": {
+      "page": {}
+    }
+  },
+  "comicDetailChapterSelectedCount": "{count} selected",
+  "@comicDetailChapterSelectedCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "comicDetailChapterSelectHint": "Tap to toggle · long-press a chapter to start selecting",
+  "comicDetailChapterSelectUnread": "Unread",
+  "comicDetailChapterSelectInvert": "Invert",
+  "comicDetailChapterExitSelection": "Exit selection",
+  "comicDetailChapterSortReversed": "Newest first",
+  "comicDetailChapterSortOriginal": "Oldest first",
+  "comicDetailChapterGridView": "Grid view",
+  "comicDetailChapterListView": "List view",
+  "comicDetailChapterDownloadCount": "Download {count}",
+  "@comicDetailChapterDownloadCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "comicDetailLikesCount": "{count} likes",
   "@comicDetailLikesCount": {
     "placeholders": {

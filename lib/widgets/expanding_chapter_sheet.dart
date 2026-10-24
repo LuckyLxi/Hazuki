@@ -18,6 +18,16 @@ class ExpandingChapterSheet extends StatefulWidget {
   static Future<bool> expand(BuildContext context) =>
       context.findAncestorStateOfType<_ExpandingChapterSheetState>()!.expand();
 
+  /// 从面板内的某个元素（如继续阅读卡片）以圆角容器放大到全屏，面板本身保持不动。
+  static Future<bool> expandFrom(
+    BuildContext context, {
+    required BuildContext source,
+    required Color color,
+    required double radius,
+  }) => context.findAncestorStateOfType<_ExpandingChapterSheetState>()!.expand(
+    source: (source, color, radius),
+  );
+
   @override
   State<ExpandingChapterSheet> createState() => _ExpandingChapterSheetState();
 }
@@ -28,13 +38,27 @@ class _ExpandingChapterSheetState extends State<ExpandingChapterSheet>
   final _contentKey = GlobalKey();
   late final _controller = AnimationController(vsync: this);
   Size? _initialSize;
+  ({Rect rect, Color color, double radius})? _source;
 
-  Future<bool> expand() async {
+  Future<bool> expand({(BuildContext, Color, double)? source}) async {
     if (_initialSize != null) return false;
     final route = ModalRoute.of(context)!;
     if (!route.isCurrent) return false;
     final box = _sheetKey.currentContext!.findRenderObject()! as RenderBox;
-    setState(() => _initialSize = box.size);
+    final sourceBox = source?.$1.findRenderObject() as RenderBox?;
+    setState(() {
+      _initialSize = box.size;
+      // 记录源元素相对面板的位置，构建时再换算到全屏坐标
+      _source = sourceBox == null || !sourceBox.attached
+          ? null
+          : (
+              rect:
+                  sourceBox.localToGlobal(Offset.zero, ancestor: box) &
+                  sourceBox.size,
+              color: source!.$2,
+              radius: source.$3,
+            );
+    });
     _controller.duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 360);
@@ -89,6 +113,17 @@ class _ExpandingChapterSheetState extends State<ExpandingChapterSheet>
           final progress = Curves.easeInOutCubicEmphasized.transform(
             _controller.value,
           );
+          final source = _source;
+          if (source != null) {
+            return _buildSourceExpansion(
+              theme,
+              constraints.biggest,
+              initialSize,
+              source,
+              progress,
+              content,
+            );
+          }
           final width =
               initialSize.width +
               (constraints.maxWidth - initialSize.width) * progress;
@@ -129,6 +164,61 @@ class _ExpandingChapterSheetState extends State<ExpandingChapterSheet>
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSourceExpansion(
+    ThemeData theme,
+    Size full,
+    Size initialSize,
+    ({Rect rect, Color color, double radius}) source,
+    double progress,
+    Widget content,
+  ) {
+    final sheetOrigin = Offset(
+      (full.width - initialSize.width) / 2,
+      full.height - initialSize.height,
+    );
+    final rect = Rect.lerp(
+      source.rect.shift(sheetOrigin),
+      Offset.zero & full,
+      progress,
+    )!;
+    return PopScope(
+      canPop: false,
+      child: AbsorbPointer(
+        child: SizedBox.fromSize(
+          size: full,
+          child: Stack(
+            children: [
+              Positioned(
+                left: sheetOrigin.dx,
+                top: sheetOrigin.dy,
+                width: initialSize.width,
+                height: initialSize.height,
+                child: ExcludeFocus(child: content),
+              ),
+              // 圆角容器全程保持圆角，从卡片尺寸放大到全屏
+              Positioned.fromRect(
+                rect: rect,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Color.lerp(
+                      source.color,
+                      theme.colorScheme.surface,
+                      const Interval(0.15, 0.75).transform(progress),
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      source.radius +
+                          (widget.cornerRadius - source.radius) * progress,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

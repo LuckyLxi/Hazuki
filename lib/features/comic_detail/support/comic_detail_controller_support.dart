@@ -16,6 +16,8 @@ typedef ComicDetailChaptersPanelBuilder =
       required ValueChanged<Set<String>> onDownloadConfirm,
       required void Function(String epId, String chapterTitle, int index)
       onChapterTap,
+      Map<String, dynamic>? readingProgress,
+      void Function(BuildContext cardContext)? onResume,
     });
 
 typedef ComicDetailReaderPageBuilder =

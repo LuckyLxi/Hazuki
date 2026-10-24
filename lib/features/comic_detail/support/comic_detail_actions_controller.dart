@@ -171,6 +171,17 @@ class ComicDetailActionsController extends ChangeNotifier {
             safePadding: MediaQuery.paddingOf(context),
             builder: (sheetContext) => _chaptersPanelBuilder(
               details: details,
+              readingProgress: _lastReadProgressGetter(),
+              onResume: (cardContext) {
+                unawaited(
+                  _resumeFromChapterSheet(
+                    context,
+                    sheetContext,
+                    cardContext,
+                    details,
+                  ),
+                );
+              },
               onDownloadConfirm: (selectedEpIds) {
                 Navigator.of(sheetContext).pop();
                 unawaited(
@@ -227,6 +238,41 @@ class ComicDetailActionsController extends ChangeNotifier {
     await readerClosed;
   }
 
+  /// 继续阅读卡片：卡片以圆角放大到全屏后，按上次进度（含页码）打开阅读器。
+  Future<void> _resumeFromChapterSheet(
+    BuildContext context,
+    BuildContext sheetContext,
+    BuildContext cardContext,
+    ComicDetailsData details,
+  ) async {
+    final progress = _lastReadProgressGetter();
+    final epId = progress?['epId'];
+    if (epId is! String || !details.chapters.containsKey(epId)) return;
+    final navigator = Navigator.of(sheetContext);
+    final sheetRoute = ModalRoute.of(sheetContext)!;
+    if (!await ExpandingChapterSheet.expandFrom(
+          sheetContext,
+          source: cardContext,
+          color: Theme.of(cardContext).colorScheme.primaryContainer,
+          radius: 20,
+        ) ||
+        _disposed ||
+        !context.mounted) {
+      return;
+    }
+    final readerClosed = openReader(
+      context,
+      details,
+      epId: epId,
+      chapterTitle: resolveHazukiChapterTitle(context, details.chapters[epId]!),
+      chapterIndex: details.chapters.keys.toList().indexOf(epId),
+      fromExpandedChapterSheet: true,
+      entryProgress: progress,
+    );
+    navigator.removeRoute(sheetRoute);
+    await readerClosed;
+  }
+
   Future<void> openReader(
     BuildContext context,
     ComicDetailsData details, {
@@ -234,6 +280,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     String? chapterTitle,
     int? chapterIndex,
     bool fromExpandedChapterSheet = false,
+    Map<String, dynamic>? entryProgress,
   }) async {
     if (_disposed) return;
     final readerRequest = ++_readerOpenRequest;
@@ -333,7 +380,7 @@ class ComicDetailActionsController extends ChangeNotifier {
             ? _expandedReaderRouteBuilder
             : _destinationRouteBuilder)(
           (_) => ReaderEntryPosition(
-            progress: epId == null ? lastReadProgress : null,
+            progress: epId == null ? lastReadProgress : entryProgress,
             child: _readerPageBuilder(
               details: details,
               chapterTitle: initialChapterTitle,

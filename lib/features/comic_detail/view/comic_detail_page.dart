@@ -185,10 +185,14 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             required details,
             required onDownloadConfirm,
             required onChapterTap,
+            readingProgress,
+            onResume,
           }) => ComicDetailChaptersPanel(
             details: details,
             onDownloadConfirm: onDownloadConfirm,
             onChapterTap: onChapterTap,
+            readingProgress: readingProgress,
+            onResume: onResume,
           ),
       readerPageBuilder:
           ({

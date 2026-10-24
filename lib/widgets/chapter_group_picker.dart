@@ -17,6 +17,14 @@ class ChapterGroupPicker extends StatelessWidget {
   final String? selectedGroupId;
   final String? initialChapterId;
 
+  /// 章节分组菜单的插件绑定；插件自定义了该菜单时，调用方应始终使用下拉菜单。
+  static SourcePluginMenuBinding<String> menuBinding(
+    ComicDetailsData details,
+  ) => SourcePluginMenuBinding(
+    menuId: 'comic.chapterGroup',
+    sourceKey: details.sourceKey.isEmpty ? null : details.sourceKey,
+  );
+
   @override
   Widget build(BuildContext context) {
     final group =
@@ -26,10 +34,7 @@ class ChapterGroupPicker extends StatelessWidget {
         details.groupForChapter(initialChapterId ?? '') ??
         details.chapterGroups.first;
     return HazukiFrostedDropdown<String>(
-      pluginMenu: SourcePluginMenuBinding(
-        menuId: 'comic.chapterGroup',
-        sourceKey: details.sourceKey.isEmpty ? null : details.sourceKey,
-      ),
+      pluginMenu: menuBinding(details),
       selected: group.id,
       options: [
         for (final item in details.chapterGroups)

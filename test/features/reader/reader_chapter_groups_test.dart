@@ -154,11 +154,10 @@ void main() {
       expect(find.byType(ComicDetailChaptersPanel), findsOneWidget);
       expect(find.text('Alternative'), findsOneWidget);
       expect(find.text('First'), findsNothing);
-      final dropdown = find.byType(HazukiFrostedDropdown<String>);
-      expect(
-        tester.widget<HazukiFrostedDropdown<String>>(dropdown).selected,
-        'b',
-      );
+      // 两个分组使用平分标签，不再是下拉菜单
+      expect(find.byType(HazukiFrostedDropdown<String>), findsNothing);
+      final serialTab = find.textContaining('Serial', findRichText: true);
+      expect(serialTab, findsOneWidget);
       await tester.tap(find.text('Alternative'));
       await tester.pumpAndSettle();
       expect(changed, isEmpty);
@@ -166,9 +165,7 @@ void main() {
 
       await controller.openChaptersPanel();
       await tester.pumpAndSettle();
-      await tester.tap(dropdown);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Serial').last);
+      await tester.tap(serialTab);
       await tester.pumpAndSettle();
       expect(find.text('Alternative'), findsNothing);
       expect(find.text('Second'), findsOneWidget);
