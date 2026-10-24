@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:dio/dio.dart';
 
@@ -127,6 +128,7 @@ class MangaTranslationService {
             );
       MangaTranslationProvider? provider;
       final regions = <TranslationRegion>[];
+      final textBoxes = <Rect>[];
       final terms = <TranslationTerm>[];
       var inputTokens = 0, outputTokens = 0;
       for (var index = 0; index < prepared.slices.length; index++) {
@@ -165,6 +167,7 @@ class MangaTranslationService {
             cancelToken: cancelToken,
           );
           _checkCancelled(cancelToken);
+          textBoxes.addAll(detected.map(slice.mapRect));
           // 没有检测到文字的切片不调用 AI，也不计请求数和 token。
           if (detected.isEmpty) continue;
           // 框编号带切片序号，避免长图多切片之间重复。
@@ -196,7 +199,12 @@ class MangaTranslationService {
         outputTokens += result.usage.outputTokens;
       }
       _checkCancelled(cancelToken);
-      final snapped = await _snapInIsolate(_snapper, prepared, regions);
+      final snapped = await _snapInIsolate(
+        _snapper,
+        prepared,
+        regions,
+        textBoxes,
+      );
       final result = PageTranslationResult(
         regions: [
           for (var index = 0; index < snapped.length; index++)
@@ -299,11 +307,14 @@ class MangaTranslationService {
     BubbleSnapper snapper,
     PreparedTranslationImage prepared,
     List<TranslationRegion> regions,
+    List<Rect> textBoxes,
   ) {
     final rgba = prepared.snapRgba,
         width = prepared.snapWidth,
         height = prepared.snapHeight;
-    return Isolate.run(() => snapper.snap(rgba, width, height, regions));
+    return Isolate.run(
+      () => snapper.snap(rgba, width, height, regions, textBoxes: textBoxes),
+    );
   }
 
   static void _checkCancelled(CancelToken? token) {

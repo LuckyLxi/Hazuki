@@ -7,20 +7,27 @@ import '../models/translation_models.dart';
 class BubbleSnapper {
   const BubbleSnapper();
 
+  /// [textBoxes] 为页面上其他已知文字的位置（如全部检测框），与各区域框一起用于
+  /// 防止相连的气泡在填充时被合并成一个。
   List<TranslationRegion> snap(
     Uint8List rgba,
     int width,
     int height,
-    List<TranslationRegion> regions,
-  ) => regions
-      .map((region) => _snapRegion(rgba, width, height, region))
-      .toList();
+    List<TranslationRegion> regions, {
+    List<Rect> textBoxes = const [],
+  }) {
+    final texts = [for (final region in regions) region.box, ...textBoxes];
+    return regions
+        .map((region) => _snapRegion(rgba, width, height, region, texts))
+        .toList();
+  }
 
   TranslationRegion _snapRegion(
     Uint8List rgba,
     int width,
     int height,
     TranslationRegion region,
+    List<Rect> texts,
   ) {
     final left = (region.box.left * width).floor().clamp(0, width - 1);
     final top = (region.box.top * height).floor().clamp(0, height - 1);
@@ -127,10 +134,15 @@ class BubbleSnapper {
         final iou = intersectionArea / (area + originalArea - intersectionArea);
         final coversImage =
             minX == 0 && minY == 0 && maxX == width - 1 && maxY == height - 1;
+        // 填充区域包住了不属于本区域的文字，说明相邻气泡连在了一起。
+        final swallowsOtherText = texts.any(
+          (text) => !text.overlaps(box) && candidate.contains(text.center),
+        );
         if (area >= originalArea * 0.6 &&
             area <= originalArea * 3 &&
             iou >= 0.3 &&
-            !coversImage) {
+            !coversImage &&
+            !swallowsOtherText) {
           box = Rect.fromLTRB(
             candidate.left + candidate.width * 0.04,
             candidate.top + candidate.height * 0.04,

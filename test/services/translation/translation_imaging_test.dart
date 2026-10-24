@@ -71,6 +71,34 @@ void main() {
     },
   );
 
+  test('does not merge touching bubbles into one snapped box', () {
+    // 两个部分重叠的白色圆形气泡，填充时连成一片。
+    final image = img.Image(width: 200, height: 120, numChannels: 4);
+    img.fill(image, color: img.ColorRgba8(80, 80, 80, 255));
+    for (final x in [60, 110]) {
+      img.fillCircle(
+        image,
+        x: x,
+        y: 60,
+        radius: 40,
+        color: img.ColorRgba8(255, 255, 255, 255),
+      );
+    }
+    final bytes = image.getBytes(order: img.ChannelOrder.rgba);
+    const left = Rect.fromLTRB(38 / 200, 20 / 120, 83 / 200, 100 / 120);
+    const right = Rect.fromLTRB(88 / 200, 20 / 120, 133 / 200, 100 / 120);
+    final single = snapper.snap(bytes, 200, 120, [_region(left)]).single;
+    // 没有其他文字信息时会连成整片（对照）。
+    expect(single.box.right, greaterThan(right.center.dx));
+    final both = snapper.snap(bytes, 200, 120, [_region(left), _region(right)]);
+    expect(both[0].box, left);
+    expect(both[1].box, right);
+    final guarded = snapper
+        .snap(bytes, 200, 120, [_region(left)], textBoxes: [right])
+        .single;
+    expect(guarded.box, left);
+  });
+
   test('keeps AI box on a flat page and samples SFX without snapping', () {
     final flat = img.Image(width: 100, height: 100, numChannels: 4);
     img.fill(flat, color: img.ColorRgba8(240, 230, 220, 255));

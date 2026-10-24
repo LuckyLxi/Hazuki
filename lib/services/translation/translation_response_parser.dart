@@ -62,7 +62,7 @@ class TranslationResponseParser {
     }
   }
 
-  /// 解析本地检测模式的编号响应；区域坐标取所认领检测框的并集。
+  /// 解析本地检测模式的编号响应；区域坐标取所认领检测框中相连一簇的并集。
   ///
   /// 采用宽松校验：未知编号丢弃，重复编号只保留首次归属，未被认领的框忽略；
   /// 只有 JSON 本身无法解析时才视为响应错误。
@@ -88,11 +88,19 @@ class TranslationResponseParser {
       final dst = raw['dst'];
       final ids = raw['ids'];
       if (dst is! String || dst.trim().isEmpty || ids is! List) continue;
-      Rect? union;
+      final members = <String>[];
       for (final id in ids) {
-        if (id is! String) continue;
-        final box = boxes[id];
-        if (box == null || !claimed.add(id)) continue;
+        if (id is! String || !boxes.containsKey(id)) continue;
+        if (claimed.contains(id) || members.contains(id)) continue;
+        members.add(id);
+      }
+      if (members.isEmpty) continue;
+      // 只认领相连的一簇，其余编号留给后续区域。
+      final cluster = _largestCluster([for (final id in members) boxes[id]!]);
+      Rect? union;
+      for (final member in cluster) {
+        claimed.add(members[member]);
+        final box = boxes[members[member]]!;
         union = union?.expandToInclude(box) ?? box;
       }
       if (union == null || union.isEmpty) continue;
@@ -117,6 +125,51 @@ class TranslationResponseParser {
       terms = const [];
     }
     return PageTranslationResult(regions: regions, terms: terms, usage: usage);
+  }
+
+  /// 相邻框之间允许的最大间隙（相对切片尺寸）。
+  static const _maxClusterGap = 0.04;
+
+  /// 把一组框按空间相邻聚簇，返回外接面积最大的一簇的下标。
+  ///
+  /// 模型偶尔把相距很远或相互挨着的不同气泡编成一组，直接取并集会遮住大片画面。
+  /// 同一气泡内的行距通常小于行高，不同气泡的文字之间至少隔着两侧留白。
+  static List<int> _largestCluster(List<Rect> boxes) {
+    final parent = List<int>.generate(boxes.length, (index) => index);
+    int find(int index) {
+      while (parent[index] != index) {
+        index = parent[index] = parent[parent[index]];
+      }
+      return index;
+    }
+
+    for (var a = 0; a < boxes.length; a++) {
+      for (var b = a + 1; b < boxes.length; b++) {
+        if (_adjacent(boxes[a], boxes[b])) parent[find(a)] = find(b);
+      }
+    }
+    final clusters = <int, List<int>>{};
+    for (var index = 0; index < boxes.length; index++) {
+      clusters.putIfAbsent(find(index), () => []).add(index);
+    }
+    double area(List<int> cluster) {
+      final union = cluster
+          .map((index) => boxes[index])
+          .reduce((a, b) => a.expandToInclude(b));
+      return union.width * union.height;
+    }
+
+    return clusters.values.reduce((a, b) => area(b) > area(a) ? b : a);
+  }
+
+  static bool _adjacent(Rect a, Rect b) {
+    final limit = math.min(
+      _maxClusterGap,
+      math.min(a.shortestSide, b.shortestSide) * 0.8,
+    );
+    final gapX = math.max(a.left, b.left) - math.min(a.right, b.right);
+    final gapY = math.max(a.top, b.top) - math.min(a.bottom, b.bottom);
+    return gapX <= limit && gapY <= limit;
   }
 
   static Map<String, dynamic> _decode(String text) {

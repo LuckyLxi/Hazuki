@@ -310,6 +310,43 @@ void main() {
       expect(result.terms.single.target, '爱丽丝');
     });
 
+    test('keeps only the largest adjacent cluster of a scattered group', () {
+      final scattered = parser.parseNumbered(
+        jsonEncode({
+          'regions': [
+            {
+              'ids': ['a', 'b', 'c'],
+              'kind': 'bubble',
+              'dst': '跨气泡',
+            },
+            {
+              'ids': ['c'],
+              'kind': 'bubble',
+              'dst': '右上',
+            },
+          ],
+        }),
+        boxes: const {
+          // a、b 为同一气泡内上下相邻的两行。
+          'a': Rect.fromLTRB(0.05, 0.80, 0.30, 0.84),
+          'b': Rect.fromLTRB(0.05, 0.86, 0.28, 0.90),
+          // c 在右上角，与前两行相距很远。
+          'c': Rect.fromLTRB(0.75, 0.05, 0.95, 0.09),
+        },
+        translateSfx: false,
+      );
+      expect(scattered.regions, hasLength(2));
+      expect(
+        scattered.regions[0].box,
+        const Rect.fromLTRB(0.05, 0.80, 0.30, 0.90),
+      );
+      expect(scattered.regions[1].translatedText, '右上');
+      expect(
+        scattered.regions[1].box,
+        const Rect.fromLTRB(0.75, 0.05, 0.95, 0.09),
+      );
+    });
+
     test('drops unknown ids, empty translations and unclaimed boxes', () {
       final result = parseNumbered([
         {

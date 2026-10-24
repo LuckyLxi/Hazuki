@@ -28,15 +28,18 @@ class TranslationImageSlice {
   /// 与 [payload] 同一裁剪区域的检测输入；未启用本地检测时为 null。
   final DetectionImage? detection;
 
+  /// 把切片内的归一化坐标换算为整页坐标。
+  ui.Rect mapRect(ui.Rect box) => ui.Rect.fromLTRB(
+    box.left,
+    top + box.top * (bottom - top),
+    box.right,
+    top + box.bottom * (bottom - top),
+  );
+
   List<TranslationRegion> mapRegions(List<TranslationRegion> regions) {
     final output = <TranslationRegion>[];
     for (final region in regions) {
-      final box = ui.Rect.fromLTRB(
-        region.box.left,
-        top + region.box.top * (bottom - top),
-        region.box.right,
-        top + region.box.bottom * (bottom - top),
-      );
+      final box = mapRect(region.box);
       final center = box.center.dy;
       if (center < ownedTop || center >= ownedBottom && ownedBottom < 1) {
         continue;
