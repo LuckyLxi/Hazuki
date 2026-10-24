@@ -2,7 +2,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/local_favorites/local_favorite_sort.dart';
 import 'package:hazuki/services/source/plugins/source_favorite_menu.dart';
 
-import 'favorite_app_bar_actions_state.dart';
+import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'favorite_folder_state.dart';
 import 'favorite_sort_state.dart';
 

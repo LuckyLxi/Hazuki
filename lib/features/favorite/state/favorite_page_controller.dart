@@ -17,7 +17,7 @@ import '../support/favorite_change_coordinator.dart';
 import '../support/favorite_folder_coordinator.dart';
 import '../support/favorite_sort_flow.dart';
 
-import 'favorite_app_bar_actions_state.dart';
+import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'favorite_page_state.dart';
 import '../support/favorite_cloud_flow.dart';
 import '../support/favorite_local_flow.dart';

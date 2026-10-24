@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/features/reader/support/reader_callbacks.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/comments/comments_sort_scope.dart';

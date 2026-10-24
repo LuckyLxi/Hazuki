@@ -10,7 +10,7 @@ import '../../../services/source/source_capabilities.dart';
 import '../../../shared/navigation_tags.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
-import '../support/category_tag_navigation.dart';
+import 'package:hazuki/shared/category_tag_navigation.dart';
 import 'discover_section_page.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';

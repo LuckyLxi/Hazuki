@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/features/reader/support/reader_callbacks.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 
 export 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
