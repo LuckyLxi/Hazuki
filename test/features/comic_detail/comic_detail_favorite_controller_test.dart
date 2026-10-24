@@ -9,9 +9,12 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockRepository extends Mock implements ComicDetailFeatureFacade {}
+
+class _MockFolders extends Mock implements FavoriteFoldersRepository {}
 
 const _details = ComicDetailsData(
   id: 'comic-id',
@@ -33,12 +36,12 @@ void main() {
     testWidgets('confirmed save starts before dismissal and survives disposal '
         '(saveFails=$saveFails)', (tester) async {
       final repository = _MockRepository();
+      final folders = _MockFolders();
+      when(() => repository.favoriteFolders).thenReturn(folders);
+      when(() => folders.favoriteSingleFolderForSingleComic).thenReturn(false);
+      when(() => folders.isLogged).thenReturn(false);
       when(
-        () => repository.favoriteSingleFolderForSingleComic,
-      ).thenReturn(false);
-      when(() => repository.isLogged).thenReturn(false);
-      when(
-        () => repository.loadLocalFavoriteFolders(
+        () => folders.loadLocalFavoriteFolders(
           comicId: _details.id,
           sourceKey: '',
         ),
@@ -57,7 +60,7 @@ void main() {
       final saved = Completer<void>();
       var saveCalls = 0;
       when(
-        () => repository.toggleLocalFavorite(
+        () => folders.toggleLocalFavorite(
           details: _details,
           isAdding: true,
           folderId: 'local-folder',

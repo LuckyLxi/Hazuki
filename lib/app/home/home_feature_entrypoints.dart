@@ -46,6 +46,7 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/favorites/source_favorite_folders_repository.dart';
 import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -471,8 +472,8 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
   BuildContext context,
   ComicDetailsData details,
 ) async {
-  final repository = DefaultFavoriteFoldersRepository(
-    source: sl<SourceFavoriteGateway>(),
+  final repository = SourceFavoriteFoldersRepository(
+    source: sl<SourceComicDetailGateway>(),
     local: sl<LocalFavoritesRepository>(),
   );
   final singleFolderOnly = repository.favoriteSingleFolderForSingleComic;

@@ -122,11 +122,12 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     if (_busy) return;
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final singleFolderOnly = _repository.favoriteSingleFolderForSingleComic;
+    final folders = _repository.favoriteFolders;
+    final singleFolderOnly = folders.favoriteSingleFolderForSingleComic;
     _readTasks.restart();
     final viewModel = FavoriteFoldersViewModel(
       readTaskOrigin: _readTasks.origin(),
-      repository: _repository,
+      repository: folders,
       details: details,
       cloudFavoriteOverride: _cloudFavoriteOverride,
       initialIsFavorite: details.isFavorite,
@@ -234,7 +235,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
       try {
         final result = await _sourceUi.run(
           () => applyFavoriteFolderSelectionChanges(
-            repository: _repository,
+            repository: folders,
             details: details,
             selection: selection,
             singleFolderOnly: singleFolderOnly,

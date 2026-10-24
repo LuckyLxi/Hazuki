@@ -42,6 +42,8 @@ import 'package:hazuki/widgets/cached_image_widgets.dart';
 import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
+import 'package:hazuki/shared/favorites/source_favorite_folders_repository.dart';
 import '../../support/test_service_locator.dart';
 
 Widget _buildComments({
@@ -2147,6 +2149,36 @@ class _CompletingLikeDetailFacade extends _CompletingDesktopDetailFacade {
 }
 
 class _CompletingMobileDetailFacade extends _CompletingDesktopDetailFacade {
+  _CompletingMobileDetailFacade([FavoriteFoldersRepository? folders])
+    : _folders = folders ?? _MobileFavoriteFolders();
+
+  final FavoriteFoldersRepository _folders;
+
+  @override
+  FavoriteFoldersRepository get favoriteFolders => _folders;
+}
+
+class _MorphDismissalDetailFacade extends _CompletingMobileDetailFacade {
+  _MorphDismissalDetailFacade() : super(_MorphDismissalFavoriteFolders());
+}
+
+class _SlowMorphDetailFacade extends _CompletingMobileDetailFacade {
+  _SlowMorphDetailFacade() : this._(_SlowMorphFavoriteFolders());
+  _SlowMorphDetailFacade._(this._slowFolders) : super(_slowFolders);
+
+  final _SlowMorphFavoriteFolders _slowFolders;
+
+  void completeFolders() => _slowFolders.complete();
+}
+
+class _MobileFavoriteFolders extends SourceFavoriteFoldersRepository {
+  _MobileFavoriteFolders()
+    : super(
+        source: sl<SourceComicDetailGateway>(),
+        local: sl<LocalFavoritesRepository>(),
+        sourceKey: 'copy_manga',
+      );
+
   @override
   bool get isLogged => false;
 
@@ -2158,7 +2190,7 @@ class _CompletingMobileDetailFacade extends _CompletingDesktopDetailFacade {
       const FavoriteFoldersResult.success(folders: [], favoritedFolderIds: {});
 }
 
-class _MorphDismissalDetailFacade extends _CompletingMobileDetailFacade {
+class _MorphDismissalFavoriteFolders extends _MobileFavoriteFolders {
   @override
   Future<FavoriteFoldersResult> loadLocalFavoriteFolders({
     required String comicId,
@@ -2175,10 +2207,10 @@ class _MorphDismissalDetailFacade extends _CompletingMobileDetailFacade {
   );
 }
 
-class _SlowMorphDetailFacade extends _CompletingMobileDetailFacade {
+class _SlowMorphFavoriteFolders extends _MobileFavoriteFolders {
   final _folders = Completer<FavoriteFoldersResult>();
 
-  void completeFolders() => _folders.complete(
+  void complete() => _folders.complete(
     const FavoriteFoldersResult.success(folders: [], favoritedFolderIds: {}),
   );
 
