@@ -36,7 +36,7 @@ String buildTranslationUserPrompt({List<TranslationTerm> glossary = const []}) {
 }
 
 /// 本地检测模式的提示词版本，与 AI 定位的 [kTranslationPromptVersion] 独立递增。
-const kDetectorTranslationPromptVersion = 2;
+const kDetectorTranslationPromptVersion = 3;
 
 /// 本地检测模式：文字框由检测模型给出，AI 只按编号认领、分组并翻译。
 String buildDetectorTranslationSystemPrompt({
@@ -46,7 +46,7 @@ String buildDetectorTranslationSystemPrompt({
 }) {
   final prompt =
       '''You are a professional manga translator. A text detector has found numbered text boxes in the image. Translate the text inside them into ${targetLanguage.englishName}. Use natural, conversational language appropriate to each character's voice.
-Each box is listed as id: [x1,y1,x2,y2], with integer coordinates normalized to 0–1000 relative to image width and height. A box may cover a whole passage or a single line, so one speech bubble can contain several boxes.
+Each box is listed as id: [x1,y1,x2,y2], with integer coordinates normalized to 0–1000 relative to image width and height. Each box is also drawn on the image as a red outline with its id on a red label at its top-left corner; identify which text each id covers by reading these drawn labels, not by estimating positions from coordinates. The outlines and labels are annotations, not manga text, so never translate them. A box may cover a whole passage or a single line, so one speech bubble can contain several boxes.
 Output exactly one JSON object, without Markdown or explanations, with this schema:
 {"regions":[{"ids":["0-1","0-2"],"kind":"bubble","src":"source text","dst":"translation","vertical":true}],"terms":[{"src":"proper noun","dst":"translation"}]}
 Group all boxes belonging to the same bubble or passage into one region and list their ids in reading order. Never group boxes from different bubbles into one region, even when the bubbles touch or say related lines; give each bubble its own region. Use only ids from the list, each at most once, and never output coordinates.

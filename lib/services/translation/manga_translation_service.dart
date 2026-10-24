@@ -33,7 +33,9 @@ class MangaTranslationService {
     required TranslationUsageStore usageStore,
     required TranslationDetectorModelStore models,
     required TranslationTextDetector detector,
-  }) : _settings = settings,
+    void Function(String title, Map<String, Object?> content)? log,
+  }) : _log = log,
+       _settings = settings,
        _cache = cache,
        _glossary = glossary,
        _providers = providers,
@@ -54,6 +56,9 @@ class MangaTranslationService {
   final TranslationUsageStore _usageStore;
   final TranslationDetectorModelStore _models;
   final TranslationTextDetector _detector;
+
+  /// 本地检测模式的诊断日志，记录检测框与 AI 原始响应，用于排查漏翻与错位。
+  final void Function(String title, Map<String, Object?> content)? _log;
 
   /// 释放检测模型会话与工作 isolate；离开阅读器或关闭翻译模式时调用。
   Future<void> releaseDetector() => _detector.release();
@@ -169,27 +174,48 @@ class MangaTranslationService {
           _checkCancelled(cancelToken);
           textBoxes.addAll(detected.map(slice.mapRect));
           // 没有检测到文字的切片不调用 AI，也不计请求数和 token。
-          if (detected.isEmpty) continue;
+          if (detected.isEmpty) {
+            _log?.call('Translation detection found no text', {
+              'model': detectorSpec.id,
+              'slice': index,
+              'sliceCount': prepared.slices.length,
+            });
+            continue;
+          }
           // 框编号带切片序号，避免长图多切片之间重复。
           final boxes = {
             for (var box = 0; box < detected.length; box++)
               '$index-$box': detected[box],
           };
+          final annotated = await _annotateInIsolate(slice.payload, boxes);
+          _checkCancelled(cancelToken);
           provider ??= _providers.create(preset, configuration);
           result = await _translateSlice(
             provider,
-            slice.payload,
+            annotated,
             systemPrompt,
             buildDetectorTranslationUserPrompt(
               boxes: boxes,
               glossary: glossary,
             ),
-            (text, usage) => _parser.parseNumbered(
-              text,
-              boxes: boxes,
-              translateSfx: translateSfx,
-              usage: usage,
-            ),
+            (text, usage) {
+              final parsed = _parser.parseNumbered(
+                text,
+                boxes: boxes,
+                translateSfx: translateSfx,
+                usage: usage,
+              );
+              _logDetectorSlice(
+                detectorSpec!,
+                index,
+                prepared.slices.length,
+                boxes,
+                text,
+                parsed,
+                translateSfx,
+              );
+              return parsed;
+            },
             cancelToken,
           );
         }
@@ -316,6 +342,56 @@ class MangaTranslationService {
       () => snapper.snap(rgba, width, height, regions, textBoxes: textBoxes),
     );
   }
+
+  void _logDetectorSlice(
+    TranslationDetectorModelSpec spec,
+    int slice,
+    int sliceCount,
+    Map<String, Rect> boxes,
+    String response,
+    PageTranslationResult parsed,
+    bool translateSfx,
+  ) {
+    final log = _log;
+    if (log == null) return;
+    int scale(double value) => (value * 1000).round().clamp(0, 1000);
+    log('Translation detection slice', {
+      'model': spec.id,
+      'slice': slice,
+      'sliceCount': sliceCount,
+      'translateSfx': translateSfx,
+      'boxes': {
+        for (final MapEntry(key: id, value: box) in boxes.entries)
+          id: [
+            scale(box.left),
+            scale(box.top),
+            scale(box.right),
+            scale(box.bottom),
+          ],
+      },
+      'regions': [
+        for (final region in parsed.regions)
+          {
+            'kind': region.kind.name,
+            'box': [
+              scale(region.box.left),
+              scale(region.box.top),
+              scale(region.box.right),
+              scale(region.box.bottom),
+            ],
+            'dst': region.translatedText,
+          },
+      ],
+      'response': response,
+    });
+  }
+
+  static Future<TranslationImagePayload> _annotateInIsolate(
+    TranslationImagePayload payload,
+    Map<String, Rect> boxes,
+  ) => Isolate.run(
+    () => TranslationImageProcessor.annotateBoxes(payload, boxes),
+  );
 
   static void _checkCancelled(CancelToken? token) {
     if (token?.isCancelled ?? false) {

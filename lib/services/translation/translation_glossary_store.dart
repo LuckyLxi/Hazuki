@@ -116,6 +116,38 @@ class TranslationGlossaryStore {
     await _write(file, sorted.take(150));
   });
 
+  /// 手动新增或修改术语；传入 [previousSource] 时替换该条原文。
+  ///
+  /// 保存的译文此后不会被 [merge] 覆盖，并刷新 lastSeenAt 以免被容量上限淘汰。
+  Future<void> saveEntry(
+    String sourceKey,
+    String comicId, {
+    required String source,
+    required String target,
+    String? previousSource,
+  }) => _queue.run(_lockKey(sourceKey, comicId), () async {
+    source = source.trim();
+    target = target.trim();
+    if (source.isEmpty || target.isEmpty) {
+      throw ArgumentError('Glossary terms must not be empty');
+    }
+    final file = await _file(sourceKey, comicId);
+    final entries = {
+      for (final entry in await _read(file)) entry.source: entry,
+    };
+    final previous = entries.remove(previousSource) ?? entries[source];
+    final now = _now();
+    entries[source] = TranslationGlossaryEntry(
+      source: source,
+      target: target,
+      addedAt: previous?.addedAt ?? now,
+      lastSeenAt: now,
+    );
+    final sorted = entries.values.toList()
+      ..sort((a, b) => b.lastSeenAt.compareTo(a.lastSeenAt));
+    await _write(file, sorted.take(150));
+  });
+
   Future<void> removeEntry(String sourceKey, String comicId, String source) =>
       _queue.run(_lockKey(sourceKey, comicId), () async {
         final file = await _file(sourceKey, comicId);

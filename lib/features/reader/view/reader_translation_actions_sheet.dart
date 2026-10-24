@@ -99,58 +99,191 @@ class _ReaderTranslationGlossarySheetState
   late Future<List<TranslationGlossaryEntry>> _entries = _load();
   Future<List<TranslationGlossaryEntry>> _load() => widget.controller.glossary
       .load(widget.controller.sourceKey, widget.controller.comicId);
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    child: SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.6,
-      child: FutureBuilder<List<TranslationGlossaryEntry>>(
-        future: _entries,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text(l10n(context).translationUnknown));
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.data!.isEmpty) {
-            return Center(child: Text(l10n(context).translationGlossaryEmpty));
-          }
-          return ListView(
-            children: [
-              for (final entry in snapshot.data!)
-                ListTile(
-                  title: Text('${entry.source} → ${entry.target}'),
-                  trailing: IconButton(
-                    tooltip: l10n(context).translationDeleteTerm,
-                    icon: const Icon(Icons.delete_outline_rounded),
-                    onPressed: () async {
-                      try {
-                        await widget.controller.glossary.removeEntry(
-                          widget.controller.sourceKey,
-                          widget.controller.comicId,
-                          entry.source,
-                        );
-                        if (mounted) {
-                          setState(() {
-                            _entries = _load();
-                          });
-                        }
-                      } catch (_) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(l10n(context).translationUnknown),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                ),
-            ],
-          );
-        },
+
+  /// 执行一次术语写入并刷新列表，失败时提示。
+  Future<void> _mutate(Future<void> Function() action) async {
+    try {
+      await action();
+      if (mounted) {
+        setState(() {
+          _entries = _load();
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n(context).translationUnknown)),
+        );
+      }
+    }
+  }
+
+  Future<void> _edit([TranslationGlossaryEntry? entry]) async {
+    final result = await showDialog<(String, String)>(
+      context: context,
+      builder: (_) => _GlossaryTermDialog(entry: entry),
+    );
+    if (result == null) return;
+    await _mutate(
+      () => widget.controller.glossary.saveEntry(
+        widget.controller.sourceKey,
+        widget.controller.comicId,
+        source: result.$1,
+        target: result.$2,
+        previousSource: entry?.source,
       ),
-    ),
-  );
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = l10n(context);
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.6,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      strings.translationGlossary,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _edit(),
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(strings.translationAddTerm),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: FutureBuilder<List<TranslationGlossaryEntry>>(
+                future: _entries,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(child: Text(strings.translationUnknown));
+                  }
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Text(strings.translationGlossaryEmpty),
+                    );
+                  }
+                  return ListView(
+                    children: [
+                      for (final entry in snapshot.data!)
+                        ListTile(
+                          title: Text('${entry.source} → ${entry.target}'),
+                          onTap: () => _edit(entry),
+                          trailing: IconButton(
+                            tooltip: strings.translationDeleteTerm,
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            onPressed: () => _mutate(
+                              () => widget.controller.glossary.removeEntry(
+                                widget.controller.sourceKey,
+                                widget.controller.comicId,
+                                entry.source,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 新增或编辑一条术语；确认时返回去除首尾空白的（原文, 译文）。
+class _GlossaryTermDialog extends StatefulWidget {
+  const _GlossaryTermDialog({this.entry});
+  final TranslationGlossaryEntry? entry;
+
+  @override
+  State<_GlossaryTermDialog> createState() => _GlossaryTermDialogState();
+}
+
+class _GlossaryTermDialogState extends State<_GlossaryTermDialog> {
+  late final _source = TextEditingController(text: widget.entry?.source);
+  late final _target = TextEditingController(text: widget.entry?.target);
+
+  bool get _valid =>
+      _source.text.trim().isNotEmpty && _target.text.trim().isNotEmpty;
+
+  void _submit() {
+    if (_valid) {
+      Navigator.pop(context, (_source.text.trim(), _target.text.trim()));
+    }
+  }
+
+  @override
+  void dispose() {
+    _source.dispose();
+    _target.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = l10n(context);
+    return AlertDialog(
+      title: Text(
+        widget.entry == null
+            ? strings.translationAddTerm
+            : strings.translationEditTerm,
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            key: const ValueKey('glossary-term-source'),
+            controller: _source,
+            autofocus: widget.entry == null,
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+              labelText: strings.translationTermSource,
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey('glossary-term-target'),
+            controller: _target,
+            autofocus: widget.entry != null,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: strings.translationTermTarget,
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(strings.commonCancel),
+        ),
+        FilledButton(
+          onPressed: _valid ? _submit : null,
+          child: Text(strings.commonSave),
+        ),
+      ],
+    );
+  }
 }

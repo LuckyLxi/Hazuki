@@ -90,6 +90,13 @@ void registerApplicationServices(GetIt services) {
         usageStore: services<TranslationUsageStore>(),
         models: services<TranslationDetectorModelStore>(),
         detector: services<TranslationTextDetector>(),
+        log: (title, content) =>
+            services<SourceDebugGateway>().addApplicationLog(
+              level: 'info',
+              title: title,
+              content: content,
+              source: 'translation',
+            ),
       ),
     );
   }

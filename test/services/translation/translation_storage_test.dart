@@ -189,6 +189,50 @@ void main() {
     },
   );
 
+  test('manually saved glossary terms add, edit and survive merges', () async {
+    var now = DateTime(2026, 1, 1);
+    final store = TranslationGlossaryStore(
+      supportDirectory: () async => directory,
+      now: () => now,
+    );
+    await store.merge('source', 'comic', const [
+      TranslationTerm(source: 'A', target: '甲'),
+    ]);
+    now = DateTime(2026, 1, 2);
+    await store.saveEntry('source', 'comic', source: 'A', target: ' 乙 ');
+    await store.saveEntry('source', 'comic', source: ' B ', target: '丙');
+    await store.merge('source', 'comic', const [
+      TranslationTerm(source: 'A', target: '丁'),
+    ]);
+    var entries = {
+      for (final entry in await store.load('source', 'comic'))
+        entry.source: entry,
+    };
+    expect(entries.map((key, entry) => MapEntry(key, entry.target)), {
+      'A': '乙',
+      'B': '丙',
+    });
+    expect(entries['A']!.addedAt, DateTime(2026, 1, 1));
+
+    await store.saveEntry(
+      'source',
+      'comic',
+      source: 'C',
+      target: '戊',
+      previousSource: 'A',
+    );
+    entries = {
+      for (final entry in await store.load('source', 'comic'))
+        entry.source: entry,
+    };
+    expect(entries.keys, unorderedEquals(['B', 'C']));
+    expect(entries['C']!.addedAt, DateTime(2026, 1, 1));
+    await expectLater(
+      store.saveEntry('source', 'comic', source: ' ', target: '空'),
+      throwsArgumentError,
+    );
+  });
+
   test('glossary retains at most 150 recently seen terms', () async {
     var now = DateTime(2026, 1, 1);
     final store = TranslationGlossaryStore(

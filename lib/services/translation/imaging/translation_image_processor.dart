@@ -182,6 +182,73 @@ class TranslationImageProcessor {
     );
   }
 
+  /// 在发给 AI 的图上画出检测框和编号，让模型按画面上的标注认领框，
+  /// 不必自行把坐标换算回画面位置（模型这一步常把相邻框张冠李戴）。
+  static TranslationImagePayload annotateBoxes(
+    TranslationImagePayload payload,
+    Map<String, ui.Rect> boxes,
+  ) {
+    // 标注只是辅助认领，解码失败时退回原图，不让翻译因此失败。
+    img.Image? image;
+    try {
+      image = img.decodeJpg(payload.jpegBytes);
+    } catch (_) {}
+    if (image == null) return payload;
+    final outline = img.ColorRgb8(255, 0, 64);
+    final text = img.ColorRgb8(255, 255, 255);
+    final font = img.arial24;
+    for (final box in boxes.values) {
+      img.drawRect(
+        image,
+        x1: (box.left * image.width).round(),
+        y1: (box.top * image.height).round(),
+        x2: (box.right * image.width).round(),
+        y2: (box.bottom * image.height).round(),
+        color: outline,
+        thickness: 2,
+      );
+    }
+    // 编号后画，避免被其他框的描边压住。
+    for (final MapEntry(key: id, value: box) in boxes.entries) {
+      final labelWidth =
+          id.codeUnits.fold<int>(
+            0,
+            (sum, code) => sum + (font.characters[code]?.xAdvance ?? 0),
+          ) +
+          6;
+      final labelHeight = font.lineHeight + 2;
+      final left = math.max(
+        0,
+        math.min((box.left * image.width).round(), image.width - labelWidth),
+      );
+      // 优先放在框外上方，不遮挡框内文字；贴近顶边时放到框内。
+      var top = (box.top * image.height).round() - labelHeight;
+      if (top < 0) top = (box.top * image.height).round();
+      top = math.max(0, math.min(top, image.height - labelHeight));
+      img.fillRect(
+        image,
+        x1: left,
+        y1: top,
+        x2: left + labelWidth - 1,
+        y2: top + labelHeight - 1,
+        color: outline,
+      );
+      img.drawString(
+        image,
+        id,
+        font: font,
+        x: left + 3,
+        y: top + 1,
+        color: text,
+      );
+    }
+    return TranslationImagePayload(
+      jpegBytes: img.encodeJpg(image, quality: 85),
+      width: image.width,
+      height: image.height,
+    );
+  }
+
   static img.Image _resize(img.Image image, int maximum) {
     final longest = math.max(image.width, image.height);
     if (longest <= maximum) return image;

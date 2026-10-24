@@ -98,74 +98,130 @@ void main() {
     dependencies.usage.dispose();
   });
 
-  Future<void> pump(WidgetTester tester) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    Locale locale = const Locale('en'),
+  }) async {
     await tester.pumpWidget(
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
+        locale: locale,
         home: MangaTranslationSettingsPage(dependencies: dependencies),
       ),
     );
     await tester.pumpAndSettle();
   }
 
-  testWidgets(
-    'shows controls without app bar blur and switches preset fields',
-    (tester) async {
-      await settings.updateProvider(
-        preset: TranslationProviderPreset.openai,
-        baseUrl: 'https://openai.example/v1',
-        model: 'openai-model',
-        apiKey: 'openai-key',
-      );
-      await settings.updateProvider(
-        preset: TranslationProviderPreset.gemini,
-        baseUrl: 'https://gemini.example/openai',
-        model: 'gemini-model',
-        apiKey: 'gemini-key',
-      );
-      await pump(tester);
-      expect(find.text('Enable manga translation'), findsOneWidget);
-      expect(find.byType(BackdropFilter), findsNothing);
-      expect(
-        tester.widget<TextField>(find.byType(TextField).at(0)).controller!.text,
-        'https://openai.example/v1',
-      );
-      expect(
-        tester.widget<TextField>(find.byType(TextField).at(1)).obscureText,
-        isTrue,
-      );
+  Future<void> open(WidgetTester tester, Finder entry) async {
+    await tester.scrollUntilVisible(
+      entry,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(entry);
+    await tester.pumpAndSettle();
+  }
 
-      await tester.tap(find.byType(DropdownButton<TranslationProviderPreset>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Gemini').last);
-      await tester.pumpAndSettle();
-      expect(settings.providerPreset, TranslationProviderPreset.gemini);
-      expect(
-        tester.widget<TextField>(find.byType(TextField).at(0)).controller!.text,
-        'https://gemini.example/openai',
-      );
-      expect(
-        tester.widget<TextField>(find.byType(TextField).at(1)).controller!.text,
-        'gemini-key',
-      );
-      expect(
-        tester.widget<TextField>(find.byType(TextField).at(2)).controller!.text,
-        'gemini-model',
-      );
-    },
-  );
+  Future<void> openProvider(WidgetTester tester) =>
+      open(tester, find.text('Provider & model'));
+
+  Future<void> openLocator(WidgetTester tester) =>
+      open(tester, find.byKey(const ValueKey('translation-locator-entry')));
+
+  testWidgets('home summarizes status and toggles translation', (tester) async {
+    await pump(tester);
+    expect(find.byType(BackdropFilter), findsNothing);
+    expect(find.text('Translation is off'), findsOneWidget);
+    expect(find.text('Provider not configured'), findsOneWidget);
+    expect(find.text('On-device detection not ready'), findsOneWidget);
+    expect(find.text('On-device · No model selected'), findsOneWidget);
+
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    expect(settings.enabled, isTrue);
+    expect(find.text('Translation is on'), findsOneWidget);
+  });
+
+  testWidgets('home adjusts reading options in place', (tester) async {
+    await pump(tester);
+    final three = find.byKey(const ValueKey('translation-prefetch-3'));
+    await tester.scrollUntilVisible(
+      three,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(three);
+    await tester.pumpAndSettle();
+    expect(settings.prefetchAhead, 3);
+    expect(find.text('Next 3 pages'), findsOneWidget);
+
+    final white = find.byKey(const ValueKey('translation-bubble-white'));
+    await tester.ensureVisible(white);
+    await tester.pumpAndSettle();
+    await tester.tap(white);
+    await tester.pumpAndSettle();
+    expect(settings.bubbleStyle, TranslationBubbleStyle.white);
+
+    await tester.ensureVisible(find.text('Target language'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Target language'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('日本語'));
+    await tester.pumpAndSettle();
+    expect(settings.targetLanguage, TranslationTargetLanguage.japanese);
+  });
+
+  testWidgets('provider page switches preset fields', (tester) async {
+    await settings.updateProvider(
+      preset: TranslationProviderPreset.openai,
+      baseUrl: 'https://openai.example/v1',
+      model: 'openai-model',
+      apiKey: 'openai-key',
+    );
+    await settings.updateProvider(
+      preset: TranslationProviderPreset.gemini,
+      baseUrl: 'https://gemini.example/openai',
+      model: 'gemini-model',
+      apiKey: 'gemini-key',
+    );
+    await pump(tester);
+    expect(find.text('OpenAI · openai-model'), findsOneWidget);
+    await openProvider(tester);
+    expect(
+      tester.widget<TextField>(find.byType(TextField).at(0)).controller!.text,
+      'https://openai.example/v1',
+    );
+    expect(
+      tester.widget<TextField>(find.byType(TextField).at(1)).obscureText,
+      isTrue,
+    );
+
+    await tester.tap(find.byType(DropdownButton<TranslationProviderPreset>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gemini').last);
+    await tester.pumpAndSettle();
+    expect(settings.providerPreset, TranslationProviderPreset.gemini);
+    expect(
+      tester.widget<TextField>(find.byType(TextField).at(0)).controller!.text,
+      'https://gemini.example/openai',
+    );
+    expect(
+      tester.widget<TextField>(find.byType(TextField).at(1)).controller!.text,
+      'gemini-key',
+    );
+    expect(
+      tester.widget<TextField>(find.byType(TextField).at(2)).controller!.text,
+      'gemini-model',
+    );
+  });
 
   for (final locale in const [Locale('en'), Locale('zh')]) {
-    testWidgets('settings controls fit a narrow viewport ($locale)', (
-      tester,
-    ) async {
+    testWidgets('pages fit a narrow viewport ($locale)', (tester) async {
       tester.view.physicalSize = const Size(320, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await settings.load();
       models.set(
         'pp_ocrv5_mobile_det',
         const DetectorModelState(
@@ -182,19 +238,19 @@ void main() {
           failure: DetectorModelFailure.checksumMismatch,
         ),
       );
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          locale: locale,
-          home: MangaTranslationSettingsPage(dependencies: dependencies),
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
+      await pump(tester, locale: locale);
       expect(tester.takeException(), isNull);
       for (var index = 0; index < 4; index++) {
         await tester.drag(find.byType(ListView), const Offset(0, -450));
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      }
+      await tester.drag(find.byType(ListView), const Offset(0, 3000));
+      await tester.pumpAndSettle();
+      await openLocator(tester);
+      expect(tester.takeException(), isNull);
+      for (var index = 0; index < 4; index++) {
+        await tester.drag(find.byType(ListView).last, const Offset(0, -450));
         await tester.pump();
         expect(tester.takeException(), isNull);
       }
@@ -205,12 +261,8 @@ void main() {
     tester,
   ) async {
     await pump(tester);
+    await openLocator(tester);
     final required = find.text('Download and select a detection model');
-    await tester.scrollUntilVisible(
-      required,
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
     expect(required, findsOneWidget);
     expect(find.text('95 MB · GPL-3.0'), findsOneWidget);
 
@@ -241,21 +293,29 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(settings.detectorModelId, isNull);
-    final use = find.descendant(of: ctd, matching: find.text('Use'));
-    await tester.ensureVisible(use);
+    await tester.ensureVisible(ctd);
     await tester.pumpAndSettle();
-    await tester.tap(use);
+    await tester.tap(
+      find.descendant(of: ctd, matching: find.text('Comic Text Detector')),
+    );
     await tester.pumpAndSettle();
     expect(settings.detectorModelId, 'comic_text_detector');
     expect(required, findsNothing);
-    expect(find.descendant(of: ctd, matching: find.text('Use')), findsNothing);
 
-    await tester.ensureVisible(find.text('AI'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('AI'));
+    final ai = find.byKey(const ValueKey('translation-text-locator-ai'));
+    await tester.scrollUntilVisible(
+      ai,
+      -250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(ai);
     await tester.pumpAndSettle();
     expect(settings.textLocator, TranslationTextLocator.ai);
     expect(ctd, findsNothing);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('AI'), findsWidgets);
   });
 
   testWidgets('the runtime row gates model selection', (tester) async {
@@ -265,12 +325,8 @@ void main() {
       const DetectorModelState(status: DetectorModelStatus.installed),
     );
     await pump(tester);
+    await openLocator(tester);
     final runtimeRequired = find.text('Download the detection runtime first');
-    await tester.scrollUntilVisible(
-      runtimeRequired,
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
     expect(runtimeRequired, findsOneWidget);
     expect(find.text('Download and select a detection model'), findsNothing);
     final runtimeRow = find.byKey(
@@ -286,13 +342,15 @@ void main() {
     final mobile = find.byKey(
       const ValueKey('translation-detector-pp_ocrv5_mobile_det'),
     );
-    final use = find.descendant(
+    final mobileName = find.descendant(
       of: mobile,
-      matching: find.widgetWithText(FilledButton, 'Use'),
+      matching: find.text('PP-OCRv5 Mobile'),
     );
-    await tester.ensureVisible(use);
+    await tester.ensureVisible(mobileName);
     await tester.pumpAndSettle();
-    expect(tester.widget<FilledButton>(use).onPressed, isNull);
+    await tester.tap(mobileName);
+    await tester.pumpAndSettle();
+    expect(settings.detectorModelId, isNull);
 
     final download = find.descendant(
       of: runtimeRow,
@@ -309,7 +367,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(runtimeRequired, findsNothing);
     expect(find.text('Download and select a detection model'), findsOneWidget);
-    expect(tester.widget<FilledButton>(use).onPressed, isNotNull);
+    await tester.ensureVisible(mobileName);
+    await tester.pumpAndSettle();
+    await tester.tap(mobileName);
+    await tester.pumpAndSettle();
+    expect(settings.detectorModelId, 'pp_ocrv5_mobile_det');
   });
 
   testWidgets('shows a changed model source as a distinct failure', (
@@ -323,13 +385,14 @@ void main() {
       ),
     );
     await pump(tester);
+    await openLocator(tester);
     final message = find.text(
       "The model source file has changed, so this model can't be used for now",
     );
     await tester.scrollUntilVisible(
       message,
       250,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.byType(Scrollable).last,
     );
     expect(message, findsOneWidget);
   });
@@ -338,6 +401,7 @@ void main() {
     tester,
   ) async {
     await pump(tester);
+    await openProvider(tester);
     await tester.enterText(find.byType(TextField).at(2), 'typed-model');
     await tester.pumpAndSettle();
     expect(settings.model, 'typed-model');
@@ -355,77 +419,64 @@ void main() {
     );
   });
 
-  testWidgets(
-    'thinking effort switches with providers and custom instructions save and reset',
-    (tester) async {
-      await settings.updateProvider(
-        preset: TranslationProviderPreset.openai,
-        reasoningEffort: TranslationReasoningEffort.high,
-      );
-      await settings.updateProvider(
-        preset: TranslationProviderPreset.gemini,
-        reasoningEffort: TranslationReasoningEffort.low,
-      );
-      await pump(tester);
-      await tester.ensureVisible(
-        find.byType(DropdownButton<TranslationReasoningEffort>),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<DropdownButton<TranslationReasoningEffort>>(
-              find.byType(DropdownButton<TranslationReasoningEffort>),
-            )
-            .value,
-        TranslationReasoningEffort.high,
-      );
-      await tester.tap(find.byType(DropdownButton<TranslationReasoningEffort>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Medium').last);
-      await tester.pumpAndSettle();
-      expect(settings.reasoningEffort, TranslationReasoningEffort.medium);
-      await tester.ensureVisible(
-        find.byType(DropdownButton<TranslationProviderPreset>),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(DropdownButton<TranslationProviderPreset>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Gemini').last);
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byType(DropdownButton<TranslationReasoningEffort>),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<DropdownButton<TranslationReasoningEffort>>(
-              find.byType(DropdownButton<TranslationReasoningEffort>),
-            )
-            .value,
-        TranslationReasoningEffort.low,
-      );
-      final promptField = find.byKey(
-        const ValueKey('translation-system-prompt'),
-      );
-      await tester.scrollUntilVisible(
-        promptField,
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.enterText(promptField, 'Preserve honorifics.');
-      await tester.pumpAndSettle();
-      expect(settings.customSystemPrompt, isEmpty);
-      tester.testTextInput.hide();
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Save'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(settings.customSystemPrompt, 'Preserve honorifics.');
-      await tester.tap(find.text('Restore default'));
-      await tester.pumpAndSettle();
-      expect(settings.customSystemPrompt, isEmpty);
-      expect(tester.widget<TextField>(promptField).controller!.text, isEmpty);
-    },
-  );
+  testWidgets('thinking effort switches with providers', (tester) async {
+    await settings.updateProvider(
+      preset: TranslationProviderPreset.openai,
+      reasoningEffort: TranslationReasoningEffort.high,
+    );
+    await settings.updateProvider(
+      preset: TranslationProviderPreset.gemini,
+      reasoningEffort: TranslationReasoningEffort.low,
+    );
+    await pump(tester);
+    await openProvider(tester);
+    final effort = find.byType(DropdownButton<TranslationReasoningEffort>);
+    await tester.ensureVisible(effort);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<DropdownButton<TranslationReasoningEffort>>(effort).value,
+      TranslationReasoningEffort.high,
+    );
+    await tester.tap(effort);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Medium').last);
+    await tester.pumpAndSettle();
+    expect(settings.reasoningEffort, TranslationReasoningEffort.medium);
+    await tester.ensureVisible(
+      find.byType(DropdownButton<TranslationProviderPreset>),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButton<TranslationProviderPreset>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gemini').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(effort);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<DropdownButton<TranslationReasoningEffort>>(effort).value,
+      TranslationReasoningEffort.low,
+    );
+  });
+
+  testWidgets('custom instructions save and reset', (tester) async {
+    await pump(tester);
+    await open(tester, find.text('System prompt'));
+    final promptField = find.byKey(const ValueKey('translation-system-prompt'));
+    await tester.enterText(promptField, 'Preserve honorifics.');
+    await tester.pumpAndSettle();
+    expect(settings.customSystemPrompt, isEmpty);
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(settings.customSystemPrompt, 'Preserve honorifics.');
+    await tester.tap(find.text('Restore default'));
+    await tester.pumpAndSettle();
+    expect(settings.customSystemPrompt, isEmpty);
+    expect(tester.widget<TextField>(promptField).controller!.text, isEmpty);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Default'), findsOneWidget);
+  });
 }
