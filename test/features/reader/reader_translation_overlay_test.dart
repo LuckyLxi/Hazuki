@@ -262,6 +262,98 @@ void main() {
     },
   );
 
+  testWidgets('rebuilds reuse cached region layout', (tester) async {
+    final view = PageTranslationView(
+      status: PageTranslationStatus.done,
+      result: PageTranslationResult(
+        regions: const [
+          TranslationRegion(
+            id: 'h',
+            box: Rect.fromLTRB(0.1, 0.1, 0.5, 0.3),
+            kind: TranslationRegionKind.bubble,
+            sourceText: 'Hello',
+            translatedText: 'How have you been lately?',
+            sourceVertical: false,
+          ),
+          TranslationRegion(
+            id: 'v',
+            box: Rect.fromLTRB(0.6, 0.1, 0.7, 0.9),
+            kind: TranslationRegionKind.bubble,
+            sourceText: 'ただいま',
+            translatedText: '我回来了',
+            sourceVertical: true,
+          ),
+        ],
+        terms: [],
+      ),
+    );
+    Widget overlay() => app(
+      SizedBox(
+        width: 300,
+        height: 400,
+        child: ReaderTranslationOverlay(
+          view: view,
+          bubbleStyle: TranslationBubbleStyle.white,
+          verticalText: true,
+          onToggleRegion: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpWidget(overlay());
+    final computed = debugTranslationFitComputations;
+    final font = tester
+        .widget<Text>(find.text('How have you been lately?'))
+        .style!
+        .fontSize;
+    await tester.pumpWidget(overlay());
+    expect(debugTranslationFitComputations, computed);
+    expect(
+      tester
+          .widget<Text>(find.text('How have you been lately?'))
+          .style!
+          .fontSize,
+      font,
+    );
+  });
+
+  testWidgets('status changes keep the page image mounted', (tester) async {
+    final controller = _Controller();
+    final settings = MangaTranslationSettingsStore();
+    final state = ValueNotifier(PageTranslationView());
+    addTearDown(settings.dispose);
+    addTearDown(state.dispose);
+    when(() => controller.modeOn).thenReturn(true);
+    when(() => controller.settings).thenReturn(settings);
+    when(() => controller.pageState('page')).thenReturn(state);
+    await tester.pumpWidget(
+      app(
+        SizedBox(
+          width: 200,
+          height: 400,
+          child: ReaderTranslatedImage(
+            controller: controller,
+            url: 'page',
+            aspectRatio: () => 0.5,
+            contain: false,
+            child: const _Probe(),
+          ),
+        ),
+      ),
+    );
+    final before = tester.state(find.byType(_Probe));
+    state.value = PageTranslationView(
+      status: PageTranslationStatus.translating,
+    );
+    await tester.pump();
+    state.value = PageTranslationView(
+      status: PageTranslationStatus.done,
+      result: result,
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('translation-region-r0')), findsOneWidget);
+    expect(identical(tester.state(find.byType(_Probe)), before), isTrue);
+  });
+
   testWidgets(
     'long press inside toggles only and outside preserves image save',
     (tester) async {
@@ -665,4 +757,16 @@ void main() {
       expect(selected, action);
     });
   }
+}
+
+class _Probe extends StatefulWidget {
+  const _Probe();
+
+  @override
+  State<_Probe> createState() => _ProbeState();
+}
+
+class _ProbeState extends State<_Probe> {
+  @override
+  Widget build(BuildContext context) => const SizedBox.expand();
 }
