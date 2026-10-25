@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_storage_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class OtherSettingsSnapshot {
   const OtherSettingsSnapshot({
@@ -81,40 +80,31 @@ class OtherSettingsSnapshot {
 class OtherSettingsActions {
   const OtherSettingsActions._();
 
+  static const _preferences = HazukiGeneralPreferencesStore();
+
   static Future<({bool source, bool software})>
   loadUpdateCheckSettings() async {
-    final prefs = await SharedPreferences.getInstance();
     return (
-      source:
-          prefs.getBool(hazukiAutoSourceUpdateCheckEnabledPreferenceKey) ??
-          true,
-      software:
-          prefs.getBool(hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey) ??
-          true,
+      source: await _preferences.loadAutoSourceUpdateCheckEnabled(),
+      software: await _preferences.loadAutoSoftwareUpdateCheckEnabled(),
     );
   }
 
   static Future<OtherSettingsSnapshot> loadSettings({
     required bool initialUseSystemTitleBar,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
     final updateChecks = await loadUpdateCheckSettings();
     final mangaDownloadsRootPath =
-        await MangaDownloadAccess.loadDownloadsRootPath(prefs: prefs);
+        await MangaDownloadAccess.loadDownloadsRootPath();
     return OtherSettingsSnapshot(
-      autoCheckInEnabled:
-          prefs.getBool(hazukiAutoCheckInEnabledPreferenceKey) ?? false,
+      autoCheckInEnabled: await _preferences.loadAutoCheckInEnabled(),
       autoSourceUpdateCheckEnabled: updateChecks.source,
       autoSoftwareUpdateCheckEnabled: updateChecks.software,
-      aggregateSearchEnabled:
-          prefs.getBool(hazukiAggregateSearchEnabledPreferenceKey) ?? false,
-      comicIdSearchEnhanceEnabled:
-          prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) ?? false,
-      discoverDailyRecommendationEnabled:
-          prefs.getBool(
-            hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
-          ) ??
-          false,
+      aggregateSearchEnabled: await _preferences.loadAggregateSearchEnabled(),
+      comicIdSearchEnhanceEnabled: await _preferences
+          .loadComicIdSearchEnhanceEnabled(),
+      discoverDailyRecommendationEnabled: await _preferences
+          .loadDiscoverDailyRecommendationEnabled(),
       useSystemTitleBar: initialUseSystemTitleBar,
       mangaDownloadsRootPath: mangaDownloadsRootPath,
       loading: false,
@@ -131,27 +121,20 @@ class OtherSettingsActions {
     return HazukiWindowsTitleBarScope.of(context).useSystemTitleBar;
   }
 
-  static Future<void> toggleAutoCheckIn(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(hazukiAutoCheckInEnabledPreferenceKey, value);
-  }
+  static Future<void> toggleAutoCheckIn(bool value) =>
+      _preferences.saveAutoCheckInEnabled(value);
 
-  static Future<void> toggleAggregateSearch(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(hazukiAggregateSearchEnabledPreferenceKey, value);
-  }
+  static Future<void> toggleAggregateSearch(bool value) =>
+      _preferences.saveAggregateSearchEnabled(value);
 
-  static Future<void> toggleComicIdSearchEnhance(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(hazukiComicIdSearchEnhancePreferenceKey, value);
-  }
+  static Future<void> toggleComicIdSearchEnhance(bool value) =>
+      _preferences.saveComicIdSearchEnhanceEnabled(value);
 
   static Future<void> toggleAutoSourceUpdateCheck(
     BuildContext context,
     bool value,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(hazukiAutoSourceUpdateCheckEnabledPreferenceKey, value);
+    await _preferences.saveAutoSourceUpdateCheckEnabled(value);
     if (!context.mounted) {
       return;
     }
@@ -165,11 +148,7 @@ class OtherSettingsActions {
     BuildContext context,
     bool value,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(
-      hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey,
-      value,
-    );
+    await _preferences.saveAutoSoftwareUpdateCheckEnabled(value);
     if (!context.mounted) {
       return;
     }

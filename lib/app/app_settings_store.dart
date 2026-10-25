@@ -14,7 +14,7 @@ class HazukiAppSettingsStore {
   static const String _presetIndexKey = 'appearance_preset_index';
   static const String _displayModeKey = 'appearance_display_mode';
   static const String _comicDetailDynamicColorKey =
-      'appearance_comic_detail_dynamic_color';
+      hazukiComicDetailDynamicColorPreferenceKey;
   static const String _useSystemFontKey = 'appearance_use_system_font';
   static const String _liquidGlassEnabledKey = 'appearance_liquid_glass';
   static const String _homeTabCutTransitionKey =

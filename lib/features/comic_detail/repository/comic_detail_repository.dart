@@ -1,8 +1,6 @@
 import 'dart:typed_data';
 import 'package:hazuki/services/source/content/source_cloud_reading.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
@@ -11,6 +9,7 @@ import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 import 'package:hazuki/shared/favorites/source_favorite_folders_repository.dart';
+import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 
 class ComicDetailFeatureFacade {
   ComicDetailFeatureFacade({
@@ -20,11 +19,14 @@ class ComicDetailFeatureFacade {
     required ReadingProgressService readingProgress,
     required ReadHistoryService readHistory,
     String sourceKey = '',
+    HazukiGeneralPreferencesStore preferences =
+        const HazukiGeneralPreferencesStore(),
   }) : _source = source,
        _local = local,
        _downloader = downloader,
        _readingProgress = readingProgress,
        _readHistory = readHistory,
+       _preferences = preferences,
        _sourceKey = sourceKey.trim().isEmpty
            ? (source.activeSourceKey ?? '')
            : sourceKey.trim();
@@ -34,6 +36,7 @@ class ComicDetailFeatureFacade {
   final MangaDownloadCommands _downloader;
   final ReadingProgressService _readingProgress;
   final ReadHistoryService _readHistory;
+  final HazukiGeneralPreferencesStore _preferences;
   final String _sourceKey;
 
   /// 云端与本地收藏夹编辑，与详情页绑定同一个来源。
@@ -188,10 +191,8 @@ class ComicDetailFeatureFacade {
     yield* _readingProgress.changes;
   }
 
-  Future<bool> loadComicDynamicColorEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('appearance_comic_detail_dynamic_color') ?? false;
-  }
+  Future<bool> loadComicDynamicColorEnabled() =>
+      _preferences.loadComicDetailDynamicColorEnabled();
 
   Future<void> recordHistory({
     required ExploreComic comic,

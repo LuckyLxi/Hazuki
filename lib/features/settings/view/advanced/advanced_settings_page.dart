@@ -6,8 +6,8 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/ui_flags.dart';
+import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'advanced_settings_content.dart';
 import '../settings_group.dart';
 import '../../support/other_settings_actions.dart';
@@ -72,7 +72,8 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final noImageMode = await const HazukiGeneralPreferencesStore()
+        .loadNoImageModeEnabled();
     final hasSourceBackup = await _sourceService.hasActiveSourceBackup();
     final softwareLogCaptureEnabled = await widget.debugGateway
         .loadSoftwareLogCaptureEnabled();
@@ -83,7 +84,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
       return;
     }
     setState(() {
-      _noImageMode = prefs.getBool(hazukiNoImageModePreferenceKey) ?? false;
+      _noImageMode = noImageMode;
       _softwareLogCaptureEnabled = softwareLogCaptureEnabled;
       _hasSourceBackup = hasSourceBackup;
       _autoSourceUpdateCheckEnabled = updateChecks.source;

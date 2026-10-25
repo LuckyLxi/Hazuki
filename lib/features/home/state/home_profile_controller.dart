@@ -1,8 +1,7 @@
 import 'package:hazuki/shared/source_task_owner.dart';
 import 'package:flutter/widgets.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -13,10 +12,14 @@ class HomeProfileController extends ChangeNotifier {
   HomeProfileController({
     required SourceTaskControlGateway taskControl,
     required SourceHomeGateway sourceService,
+    HazukiGeneralPreferencesStore preferences =
+        const HazukiGeneralPreferencesStore(),
   }) : _readTasks = SourceTaskOwner(taskControl),
-       _sourceService = sourceService;
+       _sourceService = sourceService,
+       _preferences = preferences;
 
   final SourceHomeGateway _sourceService;
+  final HazukiGeneralPreferencesStore _preferences;
 
   bool _disposed = false;
   final _sourceUi = SourceUiOwner();
@@ -148,13 +151,7 @@ class HomeProfileController extends ChangeNotifier {
   }
 
   Future<void> loadFirstUseText(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    var firstUseRaw = prefs.getString(hazukiFirstUseDatePreferenceKey);
-
-    if (firstUseRaw == null || firstUseRaw.isEmpty) {
-      firstUseRaw = DateTime.now().toIso8601String();
-      await prefs.setString(hazukiFirstUseDatePreferenceKey, firstUseRaw);
-    }
+    final firstUseRaw = await _preferences.loadOrInitFirstUseDate();
 
     if (!context.mounted) {
       return;
@@ -171,9 +168,7 @@ class HomeProfileController extends ChangeNotifier {
   }
 
   Future<void> loadOtherSettings(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    _autoCheckInEnabled =
-        prefs.getBool(hazukiAutoCheckInEnabledPreferenceKey) ?? false;
+    _autoCheckInEnabled = await _preferences.loadAutoCheckInEnabled();
     _notify();
     if (_autoCheckInEnabled && context.mounted) {
       await maybeAutoCheckInOnStartup(context);

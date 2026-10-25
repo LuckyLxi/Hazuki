@@ -3,7 +3,6 @@ import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../models/hazuki_models.dart';
@@ -11,6 +10,7 @@ import '../../../services/source/source_capabilities.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
@@ -39,7 +39,7 @@ class _RankingPageState extends State<RankingPage> {
   final _sourceUi = SourceUiOwner();
   late final _readTasks = SourceTaskOwner(widget.taskControl);
   static const _loadTimeout = Duration(seconds: 25);
-  static const _comicLayoutPreferenceKey = 'ranking_comic_layout';
+  static const _preferences = HazukiGeneralPreferencesStore();
 
   SourceCategoryGateway get _sourceService => widget.sourceService;
   final ScrollController _scrollController = ScrollController();
@@ -86,8 +86,7 @@ class _RankingPageState extends State<RankingPage> {
   }
 
   Future<void> _restoreComicLayout() async {
-    final preferences = await SharedPreferences.getInstance();
-    final savedLayout = preferences.getString(_comicLayoutPreferenceKey);
+    final savedLayout = await _preferences.loadRankingComicLayoutName();
     final restoredLayout = _RankingComicLayout.values.firstWhere(
       (layout) => layout.name == savedLayout,
       orElse: () => _RankingComicLayout.list,
@@ -100,10 +99,8 @@ class _RankingPageState extends State<RankingPage> {
     });
   }
 
-  Future<void> _persistComicLayout() async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_comicLayoutPreferenceKey, _comicLayout.name);
-  }
+  Future<void> _persistComicLayout() =>
+      _preferences.saveRankingComicLayoutName(_comicLayout.name);
 
   @override
   void dispose() {
