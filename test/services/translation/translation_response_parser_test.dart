@@ -356,6 +356,38 @@ void main() {
   });
 
   group('numbered detector responses', () {
+    test(
+      'rejects nearby staggered passages but retains normal parallel columns',
+      () {
+        for (final staggered in [true, false]) {
+          final parsed = parser.parseNumberedWithPending(
+            jsonEncode({
+              'regions': [
+                {
+                  'ids': ['a', 'b'],
+                  'kind': 'bubble',
+                  'src': '効率が悪いと言えば',
+                  'dst': '说到效率低',
+                  'vertical': true,
+                },
+              ],
+            }),
+            boxes: {
+              'a': const Rect.fromLTRB(.40, .20, .44, .36),
+              'b': Rect.fromLTRB(
+                .46,
+                staggered ? .35 : .20,
+                .50,
+                staggered ? .51 : .36,
+              ),
+            },
+            translateSfx: false,
+          );
+          expect(parsed.pending.length, staggered ? 2 : 0);
+          expect(parsed.result.regions.length, staggered ? 0 : 1);
+        }
+      },
+    );
     const boxes = {
       '0-0': Rect.fromLTRB(0.1, 0.1, 0.3, 0.2),
       '0-1': Rect.fromLTRB(0.1, 0.2, 0.4, 0.3),

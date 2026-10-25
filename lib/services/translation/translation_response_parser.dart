@@ -215,6 +215,10 @@ class TranslationResponseParser {
     );
     final gapX = math.max(a.left, b.left) - math.min(a.right, b.right);
     final gapY = math.max(a.top, b.top) - math.min(a.bottom, b.bottom);
+    // 斜向两段即使靠近也不是同一段的并排列，交给补译分别认领编号。
+    if (gapX > 0 && -gapY < math.min(a.height, b.height) * .3) {
+      return false;
+    }
     return gapX <= limit && gapY <= limit;
   }
 

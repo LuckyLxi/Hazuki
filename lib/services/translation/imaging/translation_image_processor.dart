@@ -89,7 +89,7 @@ class PreparedTranslationImage {
 class TranslationImageProcessor {
   const TranslationImageProcessor();
 
-  /// 检测器可能把连体气泡的上下两段合成一个框。只在明显的大段留白处分段，
+  /// 检测器可能把连体气泡的上下或斜向两段合成一个框。只在明显的大段留白处分段，
   /// 普通竖排的字距和横排的行距不作为分段依据。
   static List<ui.Rect> splitDetectedPassages(
     DetectionImage image,
@@ -108,11 +108,55 @@ class TranslationImageProcessor {
         image.height,
       );
       final width = right - left, height = bottom - top;
-      if (width < 6 || height < width * 1.5) {
+      if (width < 6 || height < 6) {
         output.add(box);
         continue;
       }
+      // 斜向框会包进气泡外的黑色背景；与扩展框边缘相连的墨色不是文字。
+      // 先留出笔画余量，避免紧贴检测框边缘的正常字形被当成背景。
+      final padding = math.max(2, (math.min(width, height) * .12).ceil());
+      final scanLeft = math.max(0, left - padding);
+      final scanTop = math.max(0, top - padding);
+      final scanRight = math.min(image.width, right + padding);
+      final scanBottom = math.min(image.height, bottom + padding);
+      final scanWidth = scanRight - scanLeft, scanHeight = scanBottom - scanTop;
+      final inkMask = Uint8List(scanWidth * scanHeight);
+      for (var y = scanTop; y < scanBottom; y++) {
+        for (var x = scanLeft; x < scanRight; x++) {
+          final offset = (y * image.width + x) * 4;
+          if (image.rgba[offset] < 120 &&
+              image.rgba[offset + 1] < 120 &&
+              image.rgba[offset + 2] < 120) {
+            inkMask[(y - scanTop) * scanWidth + x - scanLeft] = 1;
+          }
+        }
+      }
+      final exterior = <int>[];
+      void visit(int x, int y) {
+        final index = y * scanWidth + x;
+        if (inkMask[index] == 0) return;
+        inkMask[index] = 0;
+        exterior.add(index);
+      }
+
+      for (var x = 0; x < scanWidth; x++) {
+        visit(x, 0);
+        visit(x, scanHeight - 1);
+      }
+      for (var y = 0; y < scanHeight; y++) {
+        visit(0, y);
+        visit(scanWidth - 1, y);
+      }
+      while (exterior.isNotEmpty) {
+        final index = exterior.removeLast();
+        final x = index % scanWidth, y = index ~/ scanWidth;
+        if (x > 0) visit(x - 1, y);
+        if (x + 1 < scanWidth) visit(x + 1, y);
+        if (y > 0) visit(x, y - 1);
+        if (y + 1 < scanHeight) visit(x, y + 1);
+      }
       final rows = List<bool>.filled(height, false);
+      final columnInk = List<int>.filled(width, 0);
       var bright = 0;
       for (var y = top; y < bottom; y++) {
         var ink = 0;
@@ -122,11 +166,83 @@ class TranslationImageProcessor {
               g = image.rgba[offset + 1],
               b = image.rgba[offset + 2];
           if (r > 160 && g > 160 && b > 160) bright++;
-          if (r < 120 && g < 120 && b < 120) ink++;
+          if (inkMask[(y - scanTop) * scanWidth + x - scanLeft] != 0) {
+            ink++;
+            final column = x - left;
+            columnInk[column]++;
+          }
         }
         rows[y - top] = ink >= math.max(2, width * 0.025);
       }
       if (bright < width * height * 0.2) {
+        output.add(box);
+        continue;
+      }
+      // 斜向连体气泡的两段在 Y 轴上可能重叠。先检查横向留白，
+      // 只有高度范围明显错开的竖列才拆开，普通并排文字列仍属于同一段。
+      final columns = <ui.Rect>[];
+      var columnStart = -1, lastColumn = -1;
+      void finishColumn() {
+        if (columnStart < 0) return;
+        var inkTop = height, inkBottom = 0;
+        for (var y = 0; y < height; y++) {
+          var count = 0;
+          for (var x = columnStart; x <= lastColumn; x++) {
+            count +=
+                inkMask[(top + y - scanTop) * scanWidth + left + x - scanLeft];
+          }
+          if (count >= math.max(3, (lastColumn - columnStart + 1) * .15)) {
+            inkTop = math.min(inkTop, y);
+            inkBottom = y + 1;
+          }
+        }
+        columns.add(
+          ui.Rect.fromLTRB(
+            columnStart.toDouble(),
+            inkTop.toDouble(),
+            (lastColumn + 1).toDouble(),
+            inkBottom.toDouble(),
+          ),
+        );
+        columnStart = -1;
+      }
+
+      for (var x = 0; x < width; x++) {
+        if (columnInk[x] < math.max(2, height * .015)) continue;
+        if (columnStart >= 0 && x - lastColumn > math.max(3, width * .12)) {
+          finishColumn();
+        }
+        if (columnStart < 0) columnStart = x;
+        lastColumn = x;
+      }
+      finishColumn();
+      if (columns.length == 2) {
+        final a = columns[0], b = columns[1];
+        final overlap = math.min(a.bottom, b.bottom) - math.max(a.top, b.top);
+        if (a.height > a.width * 1.5 &&
+            b.height > b.width * 1.5 &&
+            overlap < math.min(a.height, b.height) * .3) {
+          output.addAll([
+            for (final column in columns)
+              ui.Rect.fromLTRB(
+                (left + math.max(0, column.left - 1)) / image.width,
+                (top +
+                        (column.top == math.min(a.top, b.top)
+                            ? 0
+                            : math.max(0, column.top - 1))) /
+                    image.height,
+                (left + math.min(width, column.right + 1)) / image.width,
+                (top +
+                        (column.bottom == math.max(a.bottom, b.bottom)
+                            ? height
+                            : math.min(height, column.bottom + 1))) /
+                    image.height,
+              ),
+          ]);
+          continue;
+        }
+      }
+      if (height < width * 1.5) {
         output.add(box);
         continue;
       }

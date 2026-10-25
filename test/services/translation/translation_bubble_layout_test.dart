@@ -9,6 +9,70 @@ import 'package:image/image.dart' as img;
 void main() {
   for (final kind in [
     TranslationRegionKind.bubble,
+    TranslationRegionKind.caption,
+  ]) {
+    test(
+      'keeps a tall CJK passage vertical despite a wrong kind or flag: $kind',
+      () {
+        final image = img.Image(width: 400, height: 500, numChannels: 4);
+        img.fill(image, color: img.ColorRgb8(60, 60, 60));
+        img.fillRect(
+          image,
+          x1: 280,
+          y1: 30,
+          x2: 370,
+          y2: 450,
+          color: img.ColorRgb8(255, 255, 255),
+        );
+        // 横向白色装饰线会穿过这条竖列，不能把局部留白当作整段横幅。
+        img.fillRect(
+          image,
+          x1: 20,
+          y1: 240,
+          x2: 380,
+          y2: 264,
+          color: img.ColorRgb8(255, 255, 255),
+        );
+        for (var y = 70; y < 430; y += 40) {
+          img.fillRect(
+            image,
+            x1: 315,
+            y1: y,
+            x2: 335,
+            y2: y + 24,
+            color: img.ColorRgb8(0, 0, 0),
+          );
+        }
+        final result = const BubbleSnapper().snap(
+          image.getBytes(order: img.ChannelOrder.rgba),
+          400,
+          500,
+          [
+            TranslationRegion(
+              id: 'vertical',
+              box: const Rect.fromLTRB(
+                310 / 400,
+                65 / 500,
+                340 / 400,
+                435 / 500,
+              ),
+              kind: kind,
+              sourceText: 'お嫁さんになって',
+              translatedText: '成为我的新娘吧',
+              sourceVertical: false,
+            ),
+          ],
+        ).single;
+        expect(result.kind, isNot(TranslationRegionKind.caption));
+        expect(result.sourceVertical, isTrue);
+        if (result.layoutBox case final layout?) {
+          expect(layout.height * 500, greaterThan(layout.width * 400 * 2));
+        }
+      },
+    );
+  }
+  for (final kind in [
+    TranslationRegionKind.bubble,
     TranslationRegionKind.narration,
     TranslationRegionKind.caption,
   ]) {

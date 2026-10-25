@@ -21,6 +21,7 @@ import 'package:hazuki/services/translation/translation_glossary_store.dart';
 import 'package:hazuki/services/translation/translation_response_parser.dart';
 import 'package:hazuki/services/translation/translation_result_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image/image.dart' as img;
 import 'package:hazuki/services/translation/translation_usage_store.dart';
 
 class _Provider implements MangaTranslationProvider {
@@ -492,6 +493,77 @@ void main() {
       await settings.setTextLocator(TranslationTextLocator.detector);
       await settings.setDetectorModelId('pp_ocrv5_mobile_det');
     });
+
+    for (final merged in [false, true]) {
+      test(
+        'completes both staggered lobes from one detector box, merged=$merged',
+        () async {
+          final image = img.Image(width: 200, height: 240, numChannels: 4);
+          img.fill(image, color: img.ColorRgb8(255, 255, 255));
+          for (final column in [(60, 110), (85, 30)]) {
+            for (var y = column.$2; y < column.$2 + 90; y += 20) {
+              img.fillRect(
+                image,
+                x1: column.$1,
+                y1: y,
+                x2: column.$1 + 15,
+                y2: y + 13,
+                color: img.ColorRgb8(0, 0, 0),
+              );
+            }
+          }
+          final rgba = image.getBytes(order: img.ChannelOrder.rgba);
+          images.prepared = PreparedTranslationImage(
+            slices: [
+              TranslationImageSlice(
+                payload: TranslationImagePayload(
+                  jpegBytes: img.encodeJpg(image),
+                  width: 200,
+                  height: 240,
+                ),
+                detection: DetectionImage(rgba: rgba, width: 200, height: 240),
+                top: 0,
+                bottom: 1,
+                ownedTop: 0,
+                ownedBottom: 1,
+              ),
+            ],
+            snapRgba: rgba,
+            snapWidth: 200,
+            snapHeight: 240,
+          );
+          detector.respond = (_) async => const [
+            Rect.fromLTRB(58 / 200, 28 / 240, 103 / 200, 205 / 240),
+          ];
+          provider.respond = (call) async => ProviderRawResponse(
+            text: call == 1
+                ? merged
+                      ? '{"regions":[{"ids":["0-0","0-1"],"kind":"bubble","src":"効率が悪い","dst":"效率很低"}]}'
+                      : '{"regions":[{"ids":["0-1"],"kind":"bubble","src":"効率が悪い","dst":"效率很低"}]}'
+                : merged
+                ? '{"regions":[{"ids":["0-0"],"kind":"bubble","src":"と言えば","dst":"说起来"},{"ids":["0-1"],"kind":"bubble","src":"効率が悪い","dst":"效率很低"}]}'
+                : '{"regions":[{"ids":["0-0"],"kind":"bubble","src":"と言えば","dst":"说起来"}]}',
+            usage: const TranslationUsage(),
+          );
+          final result = await translate();
+          expect(provider.calls, 2);
+          expect(
+            result.regions.map((region) => region.translatedText),
+            unorderedEquals(['效率很低', '说起来']),
+          );
+          expect(
+            result.regions.every((region) => region.sourceVertical),
+            isTrue,
+          );
+          expect(
+            result.regions.map((region) => region.sourceIds.single),
+            unorderedEquals(['0-0', '0-1']),
+          );
+          expect((await translate()).regions, hasLength(2));
+          expect(provider.calls, 2);
+        },
+      );
+    }
 
     test(
       'numbers boxes per slice, unions grouped ids and skips empty slices',

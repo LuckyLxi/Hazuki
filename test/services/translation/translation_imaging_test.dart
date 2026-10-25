@@ -21,6 +21,52 @@ TranslationRegion _region(
 
 void main() {
   test(
+    'splits staggered connected lobes but keeps aligned passage columns',
+    () {
+      for (final staggered in [true, false]) {
+        final image = img.Image(width: 200, height: 240, numChannels: 4);
+        img.fill(image, color: img.ColorRgb8(255, 255, 255));
+        // 检测框角落包含连在框外的深色画面，不能把它当成通栏文字。
+        img.fillRect(
+          image,
+          x1: 115,
+          y1: 125,
+          x2: 199,
+          y2: 239,
+          color: img.ColorRgb8(0, 0, 0),
+        );
+        for (final column in [(60, staggered ? 110 : 30), (90, 30)]) {
+          for (var y = column.$2; y < column.$2 + 90; y += 20) {
+            img.fillRect(
+              image,
+              x1: column.$1,
+              y1: y,
+              x2: column.$1 + 15,
+              y2: y + 13,
+              color: img.ColorRgb8(0, 0, 0),
+            );
+          }
+        }
+        const box = Rect.fromLTRB(58 / 200, 28 / 240, 120 / 200, 205 / 240);
+        final parts = TranslationImageProcessor.splitDetectedPassages(
+          DetectionImage(
+            rgba: image.getBytes(order: img.ChannelOrder.rgba),
+            width: 200,
+            height: 240,
+          ),
+          [box],
+        );
+        expect(parts, hasLength(staggered ? 2 : 1));
+        if (staggered) {
+          expect(parts[0].contains(const Offset(67 / 200, 150 / 240)), isTrue);
+          expect(parts[1].contains(const Offset(97 / 200, 70 / 240)), isTrue);
+        } else {
+          expect(parts.single, box);
+        }
+      }
+    },
+  );
+  test(
     'splits separate passages inside one detector block, keeping normal glyph gaps',
     () {
       final image = img.Image(width: 160, height: 300, numChannels: 4);

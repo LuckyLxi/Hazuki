@@ -15,10 +15,10 @@ import 'translation_file_queue.dart';
 import 'translation_prompt.dart';
 
 /// 本地检测前后处理的版本；改动检测参数或框编号规则时递增。
-const kDetectorProcessingVersion = 4;
+const kDetectorProcessingVersion = 5;
 
 /// 原文框、气泡排版范围及笔画修补数据的版本。
-const kTranslationLayoutVersion = 3;
+const kTranslationLayoutVersion = 4;
 
 /// 本地检测模式下参与缓存键的模型信息。
 class TranslationDetectorCacheKey {

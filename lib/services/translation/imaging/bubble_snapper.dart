@@ -53,8 +53,17 @@ class BubbleSnapper {
       (region.box.right * width).ceilToDouble().clamp(1.0, width.toDouble()),
       (region.box.bottom * height).ceilToDouble().clamp(1.0, height.toDouble()),
     );
+    // 长竖列的字间留白不应被识别成横幅；模型偶尔也会漏报竖排方向。
+    final narrowVertical =
+        source.height > source.width * 2 &&
+        RegExp(
+              r'[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]',
+            ).allMatches(region.sourceText).length >=
+            2;
+    final sourceVertical = region.sourceVertical || narrowVertical;
     final caption =
-        region.kind == TranslationRegionKind.sfx ||
+        narrowVertical ||
+            region.kind == TranslationRegionKind.sfx ||
             region.kind == TranslationRegionKind.other
         ? null
         : const CaptionBarDetector().find(rgba, width, height, source);
@@ -102,12 +111,13 @@ class BubbleSnapper {
         : _BubbleInterior.caption(caption);
     final horizontalBar =
         caption != null ||
-        region.kind == TranslationRegionKind.caption ||
+        region.kind == TranslationRegionKind.caption && !narrowVertical ||
         region.kind == TranslationRegionKind.narration &&
             source.width > source.height * 4;
     if (caption == null &&
         (region.kind == TranslationRegionKind.bubble ||
             region.kind == TranslationRegionKind.narration ||
+            region.kind == TranslationRegionKind.caption ||
             horizontalBar)) {
       final margin = math.max(
         12.0,
@@ -255,7 +265,7 @@ class BubbleSnapper {
           box.bottom * height,
         );
         // 竖排原文的其他列也在同一段的高度范围内；相邻段已在搜索范围中隔开。
-        if (region.sourceVertical && !horizontalBar) {
+        if (sourceVertical && !horizontalBar) {
           area = Rect.fromLTRB(
             interior!.bounds.left,
             area.top,
@@ -274,10 +284,14 @@ class BubbleSnapper {
     return TranslationRegion(
       id: region.id,
       box: region.box,
-      kind: horizontalBar ? TranslationRegionKind.caption : region.kind,
+      kind: horizontalBar
+          ? TranslationRegionKind.caption
+          : region.kind == TranslationRegionKind.caption
+          ? TranslationRegionKind.narration
+          : region.kind,
       sourceText: region.sourceText,
       translatedText: region.translatedText,
-      sourceVertical: !horizontalBar && region.sourceVertical,
+      sourceVertical: !horizontalBar && sourceVertical,
       backgroundColor: background,
       boxSource: region.boxSource,
       sourceBoxes: region.sourceBoxes,
