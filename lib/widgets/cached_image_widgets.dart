@@ -608,8 +608,9 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         width: widget.width,
         height: widget.height,
       );
-    } else if (_loading ||
-        (widget.waitForFirstFrame && _error == null && widget.url.isNotEmpty)) {
+    } else if (_loading || (_error == null && widget.url.trim().isNotEmpty)) {
+      // 首次加载在首帧后才发起，此前尚未进入 loading；有地址且未出错时直接显示加载占位，
+      // 避免先闪出失败占位再切到加载动画
       currentWidget = _buildLoadingPlaceholder();
     } else if (_error != null) {
       currentWidget =
@@ -1068,7 +1069,8 @@ class _HazukiShimmerLoadingState extends State<HazukiShimmerLoading>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      // 扫程加长后同步拉长周期，保持原有扫光速度
+      duration: const Duration(milliseconds: 2300),
     )..repeat();
   }
 
@@ -1080,14 +1082,26 @@ class _HazukiShimmerLoadingState extends State<HazukiShimmerLoading>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final baseColor = theme.colorScheme.surfaceContainerHighest;
-    final highlightColor = theme.colorScheme.surface.withAlpha(128);
+    final colorScheme = Theme.of(context).colorScheme;
+    var baseColor = colorScheme.surfaceContainerHighest;
+    var highlightColor = colorScheme.surface.withAlpha(128);
+    // 纯黑模式下容器色与 surface 同为纯黑，扫光会退化成黑块；改用前景色叠加出层次
+    if (baseColor.toARGB32() == colorScheme.surface.toARGB32()) {
+      baseColor = Color.alphaBlend(
+        colorScheme.onSurface.withAlpha(20),
+        colorScheme.surface,
+      );
+      highlightColor = Color.alphaBlend(
+        colorScheme.onSurface.withAlpha(46),
+        colorScheme.surface,
+      );
+    }
 
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final x = -1.5 + _controller.value * 3.0;
+        // 起止点需让亮带完全位于区域之外，否则循环衔接时亮带会从右侧跳回左侧
+        final x = -2.5 + _controller.value * 5.0;
         return Container(
           width: widget.width,
           height: widget.height,

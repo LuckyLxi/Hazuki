@@ -242,7 +242,6 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
                             animateOnLoad: true,
                             filterQuality: FilterQuality.low,
                             deferLoadingWhileScrolling: true,
-                            useShimmerLoading: false,
                             loading: SizedBox(
                               width: coverWidth,
                               height: coverHeight,

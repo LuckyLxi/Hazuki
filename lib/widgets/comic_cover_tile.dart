@@ -58,7 +58,6 @@ class ComicCoverTile extends StatelessWidget {
                         animateOnLoad: true,
                         filterQuality: FilterQuality.low,
                         deferLoadingWhileScrolling: true,
-                        useShimmerLoading: false,
                         loading: SizedBox.expand(
                           child: ColoredBox(color: placeholderColor),
                         ),
