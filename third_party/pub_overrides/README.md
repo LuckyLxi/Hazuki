@@ -45,5 +45,6 @@ from 13.1.0; this is a pre-existing host-dependent test limitation.
 `onnxruntime_v2` 1.23.2+2 is kept as a pure Dart FFI package: the native
 plugin packaging is removed and the shared library is loaded from the path
 given to `setOnnxRuntimeLibraryPath`. Hazuki downloads ONNX Runtime on demand
-from the translation settings (1.23.2 on Android, the 1.23.0 DirectML build on
-Windows), so no runtime is bundled into the app.
+from the translation settings (1.23.2 on Android, its QNN build plus the QNN
+runtime on supported Snapdragon SoCs, the 1.23.0 DirectML build on Windows), so
+no runtime is bundled into the app.

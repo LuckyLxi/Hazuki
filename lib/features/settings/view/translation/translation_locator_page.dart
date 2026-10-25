@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../../l10n/l10n.dart';
-import '../../../../services/translation/detection/onnx_runtime_library.dart';
 import '../../../../services/translation/detection/translation_detector_model_store.dart';
 import '../../../../services/translation/detection/translation_detector_models.dart';
 import '../../../../services/translation/manga_translation_settings_store.dart';
@@ -212,7 +211,7 @@ class TranslationLocatorPage extends StatelessWidget {
             strings.translationRuntimeDescription,
           ],
           bytes: runtime.downloadBytes,
-          license: OnnxRuntimeLibrarySpec.license,
+          license: runtime.license,
           state: models.runtimeState,
           note: models.runtimeDeletePending
               ? strings.translationRuntimeDeletePending

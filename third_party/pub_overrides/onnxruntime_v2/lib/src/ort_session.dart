@@ -599,6 +599,22 @@ class OrtSessionOptions {
     OrtStatus.checkOrtStatus(statusPtr);
   }
 
+  /// Fixes the symbolic input dimension [name] to [value], which static-shape
+  /// execution providers such as QNN require.
+  void addFreeDimensionOverrideByName(String name, int value) {
+    final namePtr = name.toNativeUtf8().cast<ffi.Char>();
+    try {
+      final statusPtr = OrtEnv
+          .instance.ortApiPtr.ref.AddFreeDimensionOverrideByName
+          .asFunction<
+              bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtSessionOptions>,
+                  ffi.Pointer<ffi.Char>, int)>()(_ptr, namePtr, value);
+      OrtStatus.checkOrtStatus(statusPtr);
+    } finally {
+      calloc.free(namePtr);
+    }
+  }
+
   /// Adds a session configuration entry, e.g.
   /// `session.set_denormal_as_zero` = `1`.
   void addConfigEntry(String key, String value) {
@@ -696,6 +712,9 @@ class OrtSessionOptions {
         break;
       case OrtProvider.cann:
         providerName = 'CANN';
+        break;
+      case OrtProvider.qnn:
+        providerName = 'QNN';
         break;
       default:
         return false;
@@ -798,8 +817,8 @@ class OrtSessionOptions {
 
   /// Appends QNN provider (Qualcomm Neural Network).
   /// Optimized for Qualcomm Snapdragon chips with Hexagon DSP/NPU.
-  bool appendQnnProvider() {
-    return _appendExecutionProvider2(OrtProvider.qnn, {});
+  bool appendQnnProvider([Map<String, String>? options]) {
+    return _appendExecutionProvider2(OrtProvider.qnn, options ?? {});
   }
 
   /// Appends Xnnpack provider (Optimized CPU operations).

@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:ffi' show DynamicLibrary;
+import 'dart:ffi' show DynamicLibrary, DynamicLibraryExtension, Int32, Pointer;
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:dio/dio.dart';
+import 'package:ffi/ffi.dart';
 import 'package:onnxruntime_v2/onnxruntime_v2.dart';
+import 'package:path/path.dart' as p;
 
 import '../translation_failure.dart';
 import 'ctd_detector_pipeline.dart';
@@ -27,13 +29,30 @@ class OnnxTranslationTextDetector implements TranslationTextDetector {
   var _nextId = 0;
 
   /// 在临时 isolate 中试加载模型，用于下载完成后、发布前的校验。
-  static Future<void> verifyModel(File model, File runtime) {
+  ///
+  /// 骁龙 NPU 版运行库会在此时完成 NPU 编译并按 [spec] 写入缓存，
+  /// 首次检测时不必再等待编译。
+  static Future<void> verifyModel(
+    File model,
+    File runtime, {
+    TranslationDetectorModelSpec? spec,
+  }) {
     final path = model.path, library = runtime.path;
+    final cacheKey = spec == null ? null : _cacheKey(spec);
     return Isolate.run(() async {
-      setOnnxRuntimeLibraryPath(library);
+      final accelerator = _useRuntime(library);
       _initEnv();
       try {
-        await _loadSession(path).release();
+        final (session, _) = _loadSession(
+          path,
+          // DirectML 无需预热，校验只用 CPU。
+          accelerator: accelerator == _Accelerator.qnn
+              ? accelerator
+              : _Accelerator.none,
+          runtimePath: library,
+          cacheKey: cacheKey,
+        );
+        await session.release();
       } finally {
         OrtEnv.instance.release();
       }
@@ -167,6 +186,7 @@ class _DetectJob {
   Map<String, Object?> toMessage() => {
     'id': id,
     'model': modelPath,
+    'cacheKey': _cacheKey(spec),
     'kind': spec.kind.name,
     'thresh': spec.db.thresh,
     'boxThresh': spec.db.boxThresh,
@@ -279,17 +299,31 @@ class _DetectorWorker {
   }
 }
 
+/// 运行库所带的硬件加速方式，由运行库目录中的依赖库判断。
+enum _Accelerator { none, directMl, qnn }
+
+/// NPU 编译缓存的键，模型版本变化时自然失效。
+String _cacheKey(TranslationDetectorModelSpec spec) =>
+    '${spec.id}_v${spec.version}';
+
+/// 设置本 isolate 的运行库并准备硬件加速；必须在首次调用 ORT 之前执行。
+_Accelerator _useRuntime(String runtimePath) {
+  setOnnxRuntimeLibraryPath(runtimePath);
+  final directory = File(runtimePath).parent.path;
+  if (Platform.isWindows && _preloadDirectMl(directory)) {
+    return _Accelerator.directMl;
+  }
+  if (Platform.isAndroid && _prepareQnn(directory)) return _Accelerator.qnn;
+  return _Accelerator.none;
+}
+
 /// 按完整路径预加载运行库同目录的 DirectML.dll，返回能否启用 DirectML。
 ///
 /// DirectML 版运行库延迟加载 DirectML.dll，系统只在应用目录和 System32 中查找，
 /// 找不到时进程直接崩溃；预加载后延迟加载会复用已载入的同名模块。
 /// 预加载失败时不得追加 DirectML，否则会触发上述崩溃。
-bool _preloadDirectMl(String runtimePath) {
-  if (!Platform.isWindows) return false;
-  final library = File(
-    '${File(runtimePath).parent.path}${Platform.pathSeparator}'
-    '$directMlLibraryName',
-  );
+bool _preloadDirectMl(String directory) {
+  final library = File(p.join(directory, directMlLibraryName));
   if (!library.existsSync()) return false;
   try {
     DynamicLibrary.open(library.path);
@@ -299,20 +333,119 @@ bool _preloadDirectMl(String runtimePath) {
   }
 }
 
-OrtSession _loadSession(String path, {bool directMl = false}) {
+/// 准备骁龙 NPU 推理所需的 QNN 库，返回能否启用 QNN。
+///
+/// QNN 库按文件名互相加载，只会在应用安装目录中查找，而这些库下载在数据目录；
+/// 按完整路径预加载后，同名加载会复用已载入的库。NPU 侧的 Skel 库由 FastRPC
+/// 按 ADSP_LIBRARY_PATH 查找，需在 QNN 初始化前设置。
+bool _prepareQnn(String directory) {
+  final backend = File(p.join(directory, qnnHtpLibraryName));
+  if (!backend.existsSync()) return false;
+  final stub = Directory(directory)
+      .listSync()
+      .map((entry) => p.basename(entry.path))
+      .where((name) => RegExp(r'^libQnnHtpV\d+Stub\.so$').hasMatch(name))
+      .firstOrNull;
+  if (stub == null) return false;
+  try {
+    final setenv = DynamicLibrary.process()
+        .lookupFunction<
+          Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Int32),
+          int Function(Pointer<Utf8>, Pointer<Utf8>, int)
+        >('setenv');
+    final name = 'ADSP_LIBRARY_PATH'.toNativeUtf8();
+    final value =
+        '$directory;/vendor/lib/rfsa/adsp;/vendor/dsp/cdsp;'
+                '/system/lib/rfsa/adsp;/dsp'
+            .toNativeUtf8();
+    try {
+      if (setenv(name, value, 1) != 0) return false;
+    } finally {
+      calloc.free(name);
+      calloc.free(value);
+    }
+    for (final library in [
+      'libQnnSystem.so',
+      'libQnnHtpPrepare.so',
+      stub,
+      qnnHtpLibraryName,
+    ]) {
+      DynamicLibrary.open(p.join(directory, library));
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// 加载检测会话；返回值的第二项表示会话是否使用了硬件加速。
+///
+/// 硬件加速创建失败（没有可用的 GPU / NPU、驱动异常、缓存损坏等）时退回 CPU。
+(OrtSession, bool) _loadSession(
+  String path, {
+  _Accelerator accelerator = _Accelerator.none,
+  String? runtimePath,
+  String? cacheKey,
+}) {
+  if (accelerator == _Accelerator.qnn) {
+    try {
+      return (_loadQnnSession(path, runtimePath!, cacheKey), true);
+    } catch (_) {
+      // NPU 不可用时退回 CPU。
+    }
+  }
   // 插件的 fromFile 按 UTF-8 传路径，Windows 需要 UTF-16；统一读字节加载。
   final bytes = File(path).readAsBytesSync();
-  if (directMl) {
+  if (accelerator == _Accelerator.directMl) {
     try {
-      return _createSession(bytes, directMl: true);
+      return (_createSession(bytes, directMl: true), true);
     } catch (_) {
       // 没有支持 DirectX 12 的显卡或驱动异常时退回 CPU。
     }
   }
-  return _createSession(bytes, directMl: false);
+  return (_createSession(bytes), false);
 }
 
-OrtSession _createSession(Uint8List bytes, {required bool directMl}) {
+/// 加载 NPU 会话：优先读取编译缓存，没有缓存时在设备上编译并写入缓存。
+///
+/// 缓存放在运行库目录的 qnn_cache 下，运行库更换或删除时一并失效。
+OrtSession _loadQnnSession(String path, String runtimePath, String? cacheKey) {
+  final directory = File(runtimePath).parent.path;
+  final backend = p.join(directory, qnnHtpLibraryName);
+  final cache = cacheKey == null
+      ? null
+      : File(p.join(directory, 'qnn_cache', '$cacheKey.onnx'));
+  if (cache != null && cache.existsSync()) {
+    try {
+      return _createSession(cache.readAsBytesSync(), qnnBackend: backend);
+    } catch (_) {
+      // 缓存损坏或与当前驱动不兼容时删除后重新编译。
+      cache.deleteSync();
+    }
+  }
+  final temporary = cache == null ? null : File('${cache.path}.tmp');
+  if (temporary != null) {
+    temporary.parent.createSync(recursive: true);
+    if (temporary.existsSync()) temporary.deleteSync();
+  }
+  final session = _createSession(
+    File(path).readAsBytesSync(),
+    qnnBackend: backend,
+    qnnContextOutput: temporary?.path,
+  );
+  // 编译结果完整写出后再改名，进程中途被杀不会留下半个缓存。
+  if (temporary != null && temporary.existsSync()) {
+    temporary.renameSync(cache!.path);
+  }
+  return session;
+}
+
+OrtSession _createSession(
+  Uint8List bytes, {
+  bool directMl = false,
+  String? qnnBackend,
+  String? qnnContextOutput,
+}) {
   final options = OrtSessionOptions();
   try {
     // CTD 分割解码器的激活中有大量非规格化浮点数，x86 上会慢一个数量级以上；
@@ -324,6 +457,25 @@ OrtSession _createSession(Uint8List bytes, {required bool directMl}) {
       options.setSessionExecutionMode(OrtSessionExecutionMode.ortSequential);
       options.appendDirectMLProvider();
     }
+    if (qnnBackend != null) {
+      // NPU 只支持静态形状；CTD 本身是固定输入，覆盖不存在的维度名不受影响。
+      for (final MapEntry(:key, :value)
+          in PaddleDbDetectorPipeline.dynamicDimensions.entries) {
+        options.addFreeDimensionOverrideByName(key, value);
+      }
+      if (qnnContextOutput != null) {
+        // 编译结果嵌入单个文件，便于按字节读取缓存。
+        options.addConfigEntry('ep.context_enable', '1');
+        options.addConfigEntry('ep.context_embed_mode', '1');
+        options.addConfigEntry('ep.context_file_path', qnnContextOutput);
+      }
+      options.appendQnnProvider({
+        'backend_path': qnnBackend,
+        'htp_performance_mode': 'high_performance',
+        // 模型为 FP32，在 NPU 上以 FP16 精度运行，检测框与 CPU 结果一致。
+        'enable_htp_fp16_precision': '1',
+      });
+    }
     return OrtSession.fromBuffer(bytes, options);
   } finally {
     options.release();
@@ -332,12 +484,12 @@ OrtSession _createSession(Uint8List bytes, {required bool directMl}) {
 
 void _detectorWorkerMain((SendPort, String) arguments) {
   final (replies, runtimePath) = arguments;
-  setOnnxRuntimeLibraryPath(runtimePath);
-  var directMl = _preloadDirectMl(runtimePath);
+  var accelerator = _useRuntime(runtimePath);
   final requests = ReceivePort();
   replies.send(requests.sendPort);
   OrtSession? session;
   String? sessionPath;
+  var accelerated = false;
   var envReady = false;
   var chain = Future<void>.value();
 
@@ -345,7 +497,21 @@ void _detectorWorkerMain((SendPort, String) arguments) {
     final current = session;
     session = null;
     sessionPath = null;
+    accelerated = false;
     await current?.release();
+  }
+
+  Future<void> loadSession(String path, String? cacheKey) async {
+    await releaseSession();
+    final (loaded, usesAccelerator) = _loadSession(
+      path,
+      accelerator: accelerator,
+      runtimePath: runtimePath,
+      cacheKey: cacheKey,
+    );
+    session = loaded;
+    sessionPath = path;
+    accelerated = usesAccelerator;
   }
 
   Future<void> handle(Map<Object?, Object?> message) async {
@@ -357,16 +523,13 @@ void _detectorWorkerMain((SendPort, String) arguments) {
     }
     final id = message['id'];
     final path = message['model']! as String;
+    final cacheKey = message['cacheKey'] as String?;
     try {
       if (!envReady) {
         _initEnv();
         envReady = true;
       }
-      if (sessionPath != path) {
-        await releaseSession();
-        session = _loadSession(path, directMl: directMl);
-        sessionPath = path;
-      }
+      if (sessionPath != path) await loadSession(path, cacheKey);
     } catch (_) {
       replies.send({'id': id, 'error': 'unavailable'});
       return;
@@ -379,11 +542,10 @@ void _detectorWorkerMain((SendPort, String) arguments) {
         width: message['width']! as int,
         height: message['height']! as int,
       );
-      List<Rect> detect(OrtSession active) =>
-          message['kind'] == TranslationDetectorKind.ctd.name
-          ? _runCtd(active, image)
+      List<Rect> detect() => message['kind'] == TranslationDetectorKind.ctd.name
+          ? _runCtd(session!, image)
           : _runPaddleDb(
-              active,
+              session!,
               image,
               DbPostProcessParams(
                 thresh: message['thresh']! as double,
@@ -391,18 +553,17 @@ void _detectorWorkerMain((SendPort, String) arguments) {
                 unclipRatio: message['unclipRatio']! as double,
                 maxCandidates: message['maxCandidates']! as int,
               ),
+              fixedShape: accelerated && accelerator == _Accelerator.qnn,
             );
       List<Rect> boxes;
       try {
-        boxes = detect(session!);
+        boxes = detect();
       } catch (_) {
-        if (!directMl) rethrow;
-        // GPU 推理失败（如驱动重置）后，本工作 isolate 改用 CPU 并重试一次。
-        directMl = false;
-        await releaseSession();
-        session = _loadSession(path);
-        sessionPath = path;
-        boxes = detect(session!);
+        if (!accelerated) rethrow;
+        // GPU / NPU 推理失败（如驱动重置）后，本工作 isolate 改用 CPU 并重试一次。
+        accelerator = _Accelerator.none;
+        await loadSession(path, cacheKey);
+        boxes = detect();
       }
       replies.send({
         'id': id,
@@ -469,20 +630,38 @@ List<Rect> _runCtd(OrtSession session, DetectionImage image) {
 List<Rect> _runPaddleDb(
   OrtSession session,
   DetectionImage image,
-  DbPostProcessParams params,
-) {
+  DbPostProcessParams params, {
+  bool fixedShape = false,
+}) {
   final input = PaddleDbDetectorPipeline.preprocess(image);
+  // NPU 会话按固定形状编译：补边推理后裁回原尺寸，后处理与 CPU 一致。
+  final padded = fixedShape
+      ? PaddleDbDetectorPipeline.padToFixedSize(input)
+      : input;
   final (data, shape) = _run(
     session,
     session.inputNames.first,
     [session.outputNames.first],
-    input.tensor,
-    input.shape,
+    padded.tensor,
+    padded.shape,
   ).first;
+  if (!fixedShape) {
+    return PaddleDbDetectorPipeline.postprocess(
+      data,
+      shape.last,
+      shape[shape.length - 2],
+      params,
+    );
+  }
   return PaddleDbDetectorPipeline.postprocess(
-    data,
-    shape.last,
-    shape[shape.length - 2],
+    PaddleDbDetectorPipeline.cropProbability(
+      data,
+      shape.last,
+      input.width,
+      input.height,
+    ),
+    input.width,
+    input.height,
     params,
   );
 }

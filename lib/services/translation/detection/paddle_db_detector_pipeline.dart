@@ -50,6 +50,53 @@ abstract final class PaddleDbDetectorPipeline {
     return PaddleDbInput(tensor: tensor, width: width, height: height);
   }
 
+  /// NPU 只能运行固定形状；长边缩放到 960 再按 128 取整后最大为 1024。
+  static const fixedSize = 1024;
+
+  /// PaddleX 导出模型的动态输入维度名（批次、高、宽），固定形状时按名覆盖。
+  static const dynamicDimensions = {
+    'DynamicDimension.0': 1,
+    'DynamicDimension.1': fixedSize,
+    'DynamicDimension.2': fixedSize,
+  };
+
+  /// 把输入补到 [fixedSize] 见方，右侧与底部填充归一化后的白色（漫画底色）。
+  static PaddleDbInput padToFixedSize(PaddleDbInput input) {
+    const size = fixedSize, plane = size * size;
+    final tensor = Float32List(3 * plane);
+    for (var channel = 0; channel < 3; channel++) {
+      tensor.fillRange(
+        channel * plane,
+        (channel + 1) * plane,
+        (1 - _mean[channel]) / _std[channel],
+      );
+      final source = channel * input.width * input.height;
+      for (var y = 0; y < input.height; y++) {
+        tensor.setRange(
+          channel * plane + y * size,
+          channel * plane + y * size + input.width,
+          input.tensor,
+          source + y * input.width,
+        );
+      }
+    }
+    return PaddleDbInput(tensor: tensor, width: size, height: size);
+  }
+
+  /// 从补边后的 [mapWidth] 宽概率图左上角裁出 [width]×[height] 的原尺寸区域。
+  static Float32List cropProbability(
+    Float32List probability,
+    int mapWidth,
+    int width,
+    int height,
+  ) {
+    final output = Float32List(width * height);
+    for (var y = 0; y < height; y++) {
+      output.setRange(y * width, (y + 1) * width, probability, y * mapWidth);
+    }
+    return output;
+  }
+
   /// DB 后处理：二值化、8 连通域、得分过滤与 unclip 外扩，结果为轴对齐矩形。
   static List<Rect> postprocess(
     Float32List probability,

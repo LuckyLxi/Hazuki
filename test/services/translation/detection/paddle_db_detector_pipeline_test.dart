@@ -58,6 +58,48 @@ void main() {
     expect(boxes.single.bottom, closeTo((9 + distance) / height, 1e-6));
   });
 
+  test('pads to the fixed NPU size and crops the map back', () {
+    const width = 4, height = 2, plane = width * height;
+    final input = PaddleDbInput(
+      tensor: Float32List.fromList(List.generate(3 * plane, (i) => i + 1.0)),
+      width: width,
+      height: height,
+    );
+    final padded = PaddleDbDetectorPipeline.padToFixedSize(input);
+    const size = PaddleDbDetectorPipeline.fixedSize;
+    expect(padded.shape, [1, 3, size, size]);
+    // 原数据位于每个通道的左上角。
+    for (var channel = 0; channel < 3; channel++) {
+      for (var y = 0; y < height; y++) {
+        for (var x = 0; x < width; x++) {
+          expect(
+            padded.tensor[channel * size * size + y * size + x],
+            input.tensor[channel * plane + y * width + x],
+          );
+        }
+      }
+    }
+    // 补边为归一化后的白色。
+    expect(padded.tensor[width], closeTo((1 - 0.485) / 0.229, 1e-5));
+    expect(
+      padded.tensor[2 * size * size + size * size - 1],
+      closeTo((1 - 0.406) / 0.225, 1e-5),
+    );
+
+    final map = Float32List(size * size);
+    map[size + 3] = 0.5;
+    map[size + width] = 0.9;
+    final cropped = PaddleDbDetectorPipeline.cropProbability(
+      map,
+      size,
+      width,
+      height,
+    );
+    expect(cropped, hasLength(plane));
+    expect(cropped[width + 3], 0.5);
+    expect(cropped.where((value) => value == 0.9), isEmpty);
+  });
+
   test('stops after the maximum number of candidates', () {
     const width = 40, height = 4;
     final probability = Float32List(width * height);

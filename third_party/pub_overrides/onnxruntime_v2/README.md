@@ -4,8 +4,10 @@
 > `setOnnxRuntimeLibraryPath` with a downloaded library before using any API.
 > Besides `pubspec.yaml`, `lib/onnxruntime_v2.dart` and
 > `lib/src/bindings/bindings.dart`, `lib/src/ort_session.dart` adds
-> `OrtSessionOptions.addConfigEntry` and `OrtSessionOptions.disableMemPattern`
-> (required by the DirectML execution provider).
+> `OrtSessionOptions.addConfigEntry`, `OrtSessionOptions.disableMemPattern`
+> (required by the DirectML execution provider) and
+> `OrtSessionOptions.addFreeDimensionOverrideByName` (static shapes for QNN);
+> `appendQnnProvider` accepts provider options and actually registers the EP.
 
 <p align="center"><img width="50%" src="https://github.com/microsoft/onnxruntime/raw/main/docs/images/ONNX_Runtime_logo_dark.png" /></p>
 

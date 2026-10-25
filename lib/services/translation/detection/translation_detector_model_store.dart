@@ -506,7 +506,7 @@ class TranslationDetectorModelStore extends ChangeNotifier {
   ]) => File(
     p.join(
       _runtimeDirectory(modelsRoot).path,
-      spec.version,
+      spec.directoryName,
       (file ?? spec).fileName,
     ),
   );
@@ -521,7 +521,7 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     return true;
   }
 
-  /// 运行库换版本（如 Windows 改用 DirectML 版）后删除旧版本目录。
+  /// 运行库换版本或构建（如改用 DirectML 版、骁龙 NPU 版）后删除旧目录。
   static Future<void> _deleteStaleRuntimes(
     Directory runtimeDirectory,
     OnnxRuntimeLibrarySpec spec,
@@ -529,7 +529,9 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     if (!await runtimeDirectory.exists()) return;
     await for (final entry in runtimeDirectory.list()) {
       final name = p.basename(entry.path);
-      if (entry is! Directory || name == spec.version || name == '.partial') {
+      if (entry is! Directory ||
+          name == spec.directoryName ||
+          name == '.partial') {
         continue;
       }
       try {

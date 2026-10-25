@@ -46,7 +46,7 @@ void registerApplicationServices(GetIt services) {
       () => TranslationDetectorModelStore(
         settings: services<MangaTranslationSettingsStore>(),
         verifyLoadable: (spec, model, runtime) =>
-            OnnxTranslationTextDetector.verifyModel(model, runtime),
+            OnnxTranslationTextDetector.verifyModel(model, runtime, spec: spec),
         verifyRuntime: (spec, library) =>
             OnnxTranslationTextDetector.verifyRuntime(library, spec.version),
         releaseRuntime: () => services<TranslationTextDetector>().release(),
