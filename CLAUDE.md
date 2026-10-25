@@ -62,13 +62,13 @@ Source scripts are managed as installable plugins by `SourcePluginManager` ([lib
 
 **Task control / cancellation.** Every source operation runs under an explicit `SourceOperationContext` via `SourceOperationRunner` ([runtime/](lib/services/source/runtime/)), registered in `SourceTaskRegistry` and bound to the QuickJS engine's `task_control`. UI pages own requests through `SourceTaskOwner` ([lib/shared/source_task_owner.dart](lib/shared/source_task_owner.dart)); leaving a page cancels its reads, while already-admitted non-interactive writes may finish (`retainAdmittedWork`) without regaining UI scope. Cancellation must be recognized before fallback, auth retry, or generic error wrapping. Stopping tasks on source disable/uninstall/update belongs to the catalog paths — do not add blanket stops to generic `remove` / `recreateSourceRuntime`.
 
+The app-level **`SourceRuntimeCoordinator`** ([lib/app/source_runtime/source_runtime_coordinator.dart](lib/app/source_runtime/source_runtime_coordinator.dart)) is a separate UI orchestrator: bootstrap overlay, connectivity recovery, and source-update checks. Do not confuse it with the generic handle-lifecycle coordinator above.
+
 ### Manga translation
 
 `MangaTranslationService` ([lib/services/translation/](lib/services/translation/)) translates reader pages; the reader side is `ReaderTranslationController` + `reader_translation_overlay.dart`. Per page: settings → result cache (`TranslationResultCache`, bypassable) → `TranslationImageProcessor` slices the image → text location → LLM provider (`providers/`: Anthropic and OpenAI-compatible, built by `MangaTranslationProviderFactory`) → `TranslationResponseParser` → `BubbleSnapper` fits boxes to bubbles. Text location is either **AI** (the model returns boxes) or **detector** (`TranslationTextLocator.detector`): a local ONNX model (CTD or Paddle DB pipelines in `detection/`) runs in a worker isolate, and detected boxes are drawn onto the slice before it is sent to the model. Slices with no detected text skip the AI call.
 
 ONNX Runtime is **not bundled**: `onnx_runtime_library.dart` downloads the platform's runtime on demand (via the patched `onnxruntime_v2` override), picking DirectML on Windows and a QNN build for allow-listed Snapdragon SoCs, CPU otherwise. `translation_readiness.dart` defines when the reader may offer translation. Call `releaseDetector()` when leaving the reader or turning translation off.
-
-The app-level **`SourceRuntimeCoordinator`** ([lib/app/source_runtime/source_runtime_coordinator.dart](lib/app/source_runtime/source_runtime_coordinator.dart)) is a separate UI orchestrator: bootstrap overlay, connectivity recovery, and source-update checks. Do not confuse it with the generic handle-lifecycle coordinator above.
 
 ### Dependency injection
 
