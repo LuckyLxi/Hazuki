@@ -375,10 +375,14 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
       key: const PageStorageKey('installed-plugins'),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        if (_busyPage == _PluginOperationPage.installed) ...[
-          const LinearProgressIndicator(),
-          const SizedBox(height: 16),
-        ],
+        // 平滑收起进度条，避免卸载完成时列表上跳打断卡片退场动画。
+        _PluginRevealSection(
+          visible: _busyPage == _PluginOperationPage.installed,
+          child: const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: LinearProgressIndicator(),
+          ),
+        ),
         if (installed.length > 1)
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 8),
@@ -563,11 +567,6 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
       key: const PageStorageKey('available-plugins'),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        if (_busyPage == _PluginOperationPage.available ||
-            _manager.checkingIndex) ...[
-          const LinearProgressIndicator(),
-          const SizedBox(height: 12),
-        ],
         if (_manager.indexError case final error?) ...[
           _PluginError(message: error),
           const SizedBox(height: 12),
@@ -808,19 +807,17 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
               ),
             ),
             const SizedBox(width: 8),
-            IconButton(
+            _PluginRefreshButton(
               tooltip: s.pluginsRefresh,
-              style: IconButton.styleFrom(
-                backgroundColor: scheme.surfaceContainerLowest,
-                foregroundColor: scheme.primary,
-              ),
+              refreshing:
+                  _busyPage == _PluginOperationPage.available ||
+                  _manager.checkingIndex,
               onPressed: _hasOperations || _manager.checkingIndex
                   ? null
                   : () => _run(
                       () => _manager.refreshRepository(repository),
                       page: _PluginOperationPage.available,
                     ),
-              icon: const Icon(Icons.refresh),
             ),
           ],
         ),

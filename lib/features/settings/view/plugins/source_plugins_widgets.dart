@@ -49,6 +49,90 @@ class _PluginOperationLabel extends StatelessWidget {
   );
 }
 
+/// 仓库刷新按钮：刷新期间图标持续旋转并切换为强调色，结束时转完当前一圈再停下。
+class _PluginRefreshButton extends StatefulWidget {
+  const _PluginRefreshButton({
+    required this.tooltip,
+    required this.refreshing,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final bool refreshing;
+  final VoidCallback? onPressed;
+
+  @override
+  State<_PluginRefreshButton> createState() => _PluginRefreshButtonState();
+}
+
+class _PluginRefreshButtonState extends State<_PluginRefreshButton>
+    with SingleTickerProviderStateMixin {
+  static const _turn = Duration(milliseconds: 850);
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _turn,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.refreshing) _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PluginRefreshButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.refreshing == oldWidget.refreshing) return;
+    if (widget.refreshing) {
+      _controller.repeat();
+    } else if (_controller.isAnimating) {
+      _settle();
+    }
+  }
+
+  // 按剩余角度换算时长并减速，转回原位后归零，避免图标停在半圈。
+  void _settle() {
+    final remaining = 1 - _controller.value;
+    _controller
+        .animateTo(
+          1,
+          duration: _turn * (remaining * 1.6),
+          curve: Curves.easeOutCubic,
+        )
+        .whenCompleteOrCancel(() {
+          if (mounted && !widget.refreshing) _controller.value = 0;
+        });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final refreshing = widget.refreshing;
+    return IconButton(
+      tooltip: widget.tooltip,
+      style: IconButton.styleFrom(
+        backgroundColor: scheme.surfaceContainerLowest,
+        foregroundColor: scheme.primary,
+        disabledBackgroundColor: refreshing ? scheme.primary : null,
+        disabledForegroundColor: refreshing ? scheme.onPrimary : null,
+        animationDuration: const Duration(milliseconds: 220),
+      ),
+      onPressed: widget.onPressed,
+      icon: RotationTransition(
+        turns: _controller,
+        child: const Icon(Icons.refresh),
+      ),
+    );
+  }
+}
+
 class _PluginSurface extends StatelessWidget {
   const _PluginSurface({required this.child, this.color});
 
@@ -168,16 +252,29 @@ class _PluginGridSlot<T> {
          parent: controller,
          curve: Curves.easeOutCubic,
          reverseCurve: Curves.easeInCubic,
+       ),
+       // 退场分两段：控制器 1→0.4 时卡片侧滑淡出，0.45→0 时收起占位高度。
+       exitAnimation = CurvedAnimation(
+         parent: controller,
+         curve: const Interval(0.4, 1, curve: Curves.easeInOutCubic),
+       ),
+       collapseAnimation = CurvedAnimation(
+         parent: controller,
+         curve: const Interval(0, 0.45, curve: Curves.easeInOutCubic),
        );
 
   final String key;
   T item;
   final AnimationController controller;
   final CurvedAnimation animation;
+  final CurvedAnimation exitAnimation;
+  final CurvedAnimation collapseAnimation;
   bool removing = false;
 
   void dispose() {
     animation.dispose();
+    exitAnimation.dispose();
+    collapseAnimation.dispose();
     controller.dispose();
   }
 }
@@ -220,7 +317,7 @@ class _AnimatedPluginGridState<T> extends State<_AnimatedPluginGrid<T>>
           vsync: this,
           value: value,
           duration: const Duration(milliseconds: 320),
-          reverseDuration: const Duration(milliseconds: 260),
+          reverseDuration: const Duration(milliseconds: 480),
         ),
       );
 
@@ -286,6 +383,38 @@ class _AnimatedPluginGridState<T> extends State<_AnimatedPluginGrid<T>>
     super.dispose();
   }
 
+  static final _enterScale = Tween<double>(begin: 0.92, end: 1);
+  static final _exitScale = Tween<double>(begin: 0.9, end: 1);
+  static final _exitOffset = Tween<Offset>(
+    begin: const Offset(-0.18, 0),
+    end: Offset.zero,
+  );
+
+  // 进场与退场共用同一层级结构，只替换驱动动画，避免切换时重建卡片子树。
+  Widget _transition(BuildContext context, _PluginGridSlot<T> slot) {
+    final removing = slot.removing;
+    final visual = removing ? slot.exitAnimation : slot.animation;
+    return SizeTransition(
+      sizeFactor: removing ? slot.collapseAnimation : slot.animation,
+      alignment: Alignment.topCenter,
+      child: FadeTransition(
+        opacity: visual,
+        child: SlideTransition(
+          position: removing
+              ? _exitOffset.animate(visual)
+              : const AlwaysStoppedAnimation(Offset.zero),
+          child: ScaleTransition(
+            scale: (removing ? _exitScale : _enterScale).animate(visual),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: widget.itemBuilder(context, slot.item),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
@@ -302,23 +431,7 @@ class _AnimatedPluginGridState<T> extends State<_AnimatedPluginGrid<T>>
                 width: width,
                 child: IgnorePointer(
                   ignoring: slot.removing,
-                  child: SizeTransition(
-                    sizeFactor: slot.animation,
-                    alignment: Alignment.topCenter,
-                    child: FadeTransition(
-                      opacity: slot.animation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(
-                          begin: 0.92,
-                          end: 1,
-                        ).animate(slot.animation),
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: widget.itemBuilder(context, slot.item),
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: _transition(context, slot),
                 ),
               ),
             ),

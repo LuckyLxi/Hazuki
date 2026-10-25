@@ -262,7 +262,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('repository refresh only shows progress on the available tab', (
+  testWidgets('repository refresh spins the refresh button only', (
     tester,
   ) async {
     final pending = Completer<void>();
@@ -274,11 +274,21 @@ void main() {
     final s = AppLocalizations.of(
       tester.element(find.byType(SourcePluginsPage)),
     )!;
+    AnimationStatus refreshStatus() => tester
+        .widget<RotationTransition>(
+          find.descendant(
+            of: find.byTooltip(s.pluginsRefresh),
+            matching: find.byType(RotationTransition),
+          ),
+        )
+        .turns
+        .status;
     await tester.tap(find.widgetWithText(Tab, s.pluginsAvailable));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip(s.pluginsRefresh));
     await tester.pump();
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(refreshStatus(), AnimationStatus.forward);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
     await tester.tap(find.widgetWithText(Tab, s.pluginsInstalled));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -286,10 +296,10 @@ void main() {
     await tester.tap(find.widgetWithText(Tab, s.pluginsAvailable));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(refreshStatus(), AnimationStatus.forward);
     pending.complete();
     await tester.pumpAndSettle();
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(refreshStatus(), AnimationStatus.dismissed);
     expect(tester.takeException(), isNull);
   });
 
