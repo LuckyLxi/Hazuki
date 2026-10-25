@@ -1033,6 +1033,15 @@
   "cacheAutoCleanModeOverflowSummary": "超过上限自动清理",
   "cacheClearNowTitle": "立即清理缓存",
   "cacheClearNowSubtitle": "清空本地下载的所有图片缓存，释放存储空间",
+  "cachePolicySectionTitle": "缓存策略",
+  "cacheMaintenanceSectionTitle": "维护",
+  "cacheClearNowReleasable": "可释放 {size}",
+  "@cacheClearNowReleasable": {
+    "placeholders": {
+      "size": {}
+    }
+  },
+  "cacheClearing": "正在清理…",
   "cloudSyncIncompleteConfig": "请填写完整 URL、Username、Password",
   "cloudSyncInvalidUrl": "URL 格式无效，请包含 http/https",
   "cloudSyncStatusIncomplete": "配置不完整",

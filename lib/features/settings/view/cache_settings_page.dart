@@ -5,8 +5,9 @@ import 'package:hazuki/features/settings/state/cache_settings_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 import 'settings_group.dart';
+
+part 'cache_settings_widgets.dart';
 
 class CacheSettingsPage extends StatefulWidget {
   const CacheSettingsPage({super.key, required this.sourceService});
@@ -17,43 +18,39 @@ class CacheSettingsPage extends StatefulWidget {
   State<CacheSettingsPage> createState() => _CacheSettingsPageState();
 }
 
-class _CacheSettingsPageState extends State<CacheSettingsPage> {
+class _CacheSettingsPageState extends State<CacheSettingsPage>
+    with SingleTickerProviderStateMixin {
   late final CacheSettingsController _controller;
+  late final AnimationController _entranceController;
+  bool _clearCompleted = false;
+  Timer? _clearCompletedTimer;
 
   @override
   void initState() {
     super.initState();
     _controller = CacheSettingsController(sourceService: widget.sourceService);
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 720),
+    )..forward();
     unawaited(_controller.loadStatus());
   }
 
   @override
   void dispose() {
+    _clearCompletedTimer?.cancel();
+    _entranceController.dispose();
     _controller.dispose();
     super.dispose();
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) {
-      return '0 MB';
-    }
-    final mb = bytes / 1024 / 1024;
-    if (mb < 1024) {
-      return '${mb.toStringAsFixed(0)} MB';
-    }
-    final gb = mb / 1024;
-    return '${gb.toStringAsFixed(2)} GB';
-  }
-
-  String _formatAnimatedBytes(double bytes, int targetBytes) {
-    if (targetBytes >= 1024 * 1024 * 1024) {
-      return (bytes / 1024 / 1024 / 1024).toStringAsFixed(2);
-    }
-    return (bytes / 1024 / 1024).toStringAsFixed(0);
-  }
-
-  String _animatedBytesUnit(int targetBytes) {
-    return targetBytes >= 1024 * 1024 * 1024 ? 'GB' : 'MB';
+  /// 清理完成后在清理条目上短暂显示完成标记。
+  void _flashClearCompleted() {
+    _clearCompletedTimer?.cancel();
+    setState(() => _clearCompleted = true);
+    _clearCompletedTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _clearCompleted = false);
+    });
   }
 
   Future<void> _chooseCacheMaxSize() async {
@@ -295,6 +292,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
       if (!mounted) {
         return;
       }
+      _flashClearCompleted();
       unawaited(showHazukiPrompt(context, strings.cacheCleared));
     } catch (e) {
       if (!mounted) {
@@ -313,7 +311,6 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: hazukiFrostedAppBar(
@@ -324,218 +321,76 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
         child: ListenableBuilder(
           listenable: _controller,
           builder: (context, _) {
-            final maxBytes = _controller.maxBytes;
             final usedBytes = _controller.usedBytes;
-            final autoCleanMode = _controller.autoCleanMode;
-            final usageRatio = maxBytes > 0
-                ? (usedBytes / maxBytes).clamp(0.0, 1.0)
-                : 0.0;
-            final isUsageHigh = usageRatio > 0.9;
-            final usageColor = isUsageHigh
-                ? colorScheme.error
-                : colorScheme.primary;
+            final clearing = _controller.clearing;
 
             return ListView(
-              padding: const EdgeInsets.only(bottom: 32),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(24.0),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.45,
+                _CacheEntrance(
+                  animation: _entranceController,
+                  index: 0,
+                  child: _CacheUsageCard(
+                    title: strings.cacheSizeTitle,
+                    initialized: _controller.initialized,
+                    usedBytes: usedBytes,
+                    maxBytes: _controller.maxBytes,
+                  ),
+                ),
+                _CacheEntrance(
+                  animation: _entranceController,
+                  index: 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _CacheSectionHeader(strings.cachePolicySectionTitle),
+                      SettingsGroup(
+                        children: [
+                          _CacheSettingTile(
+                            icon: Icons.settings_overscan_outlined,
+                            title: strings.cacheMaxSizeTitle,
+                            value: _formatCacheBytes(_controller.maxBytes),
+                            onTap: _chooseCacheMaxSize,
+                          ),
+                          _CacheSettingTile(
+                            icon: Icons.auto_delete_outlined,
+                            title: strings.cacheAutoCleanTitle,
+                            value: _controller.autoCleanMode == 'seven_days'
+                                ? strings.cacheAutoCleanModeSummary
+                                : strings.cacheAutoCleanModeOverflowSummary,
+                            onTap: _chooseAutoCleanMode,
+                          ),
+                        ],
                       ),
-                      borderRadius: BorderRadius.circular(24.0),
-                      border: Border.all(
-                        color: colorScheme.outlineVariant.withValues(
-                          alpha: 0.5,
-                        ),
+                    ],
+                  ),
+                ),
+                _CacheEntrance(
+                  animation: _entranceController,
+                  index: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _CacheSectionHeader(strings.cacheMaintenanceSectionTitle),
+                      SettingsGroup(
+                        children: [
+                          _CacheClearTile(
+                            title: strings.cacheClearNowTitle,
+                            subtitle: usedBytes > 0
+                                ? strings.cacheClearNowReleasable(
+                                    _formatCacheBytes(usedBytes),
+                                  )
+                                : strings.cacheClearNowSubtitle,
+                            busySubtitle: strings.cacheClearing,
+                            completedSubtitle: strings.cacheCleared,
+                            busy: clearing,
+                            completed: _clearCompleted,
+                            onTap: clearing ? null : _clearCacheNow,
+                          ),
+                        ],
                       ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.sd_storage_rounded,
-                              color: usageColor,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              strings.cacheSizeTitle,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        AnimatedSize(
-                          alignment: Alignment.topCenter,
-                          duration: const Duration(milliseconds: 240),
-                          curve: Curves.easeOutCubic,
-                          child: _controller.loading
-                              ? SizedBox(
-                                  height: 64,
-                                  child: Row(
-                                    children: [
-                                      const SizedBox(
-                                        width: 36,
-                                        height: 36,
-                                        child: LoadingIndicatorM3E(),
-                                      ),
-                                      const Spacer(),
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 4.0,
-                                        ),
-                                        child: Text(
-                                          '/ ${_formatBytes(maxBytes)}',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : TweenAnimationBuilder<double>(
-                                  tween: Tween<double>(
-                                    begin: 0,
-                                    end: usedBytes.toDouble(),
-                                  ),
-                                  duration: const Duration(milliseconds: 700),
-                                  curve: Curves.easeOutCubic,
-                                  builder: (context, animatedUsedBytes, _) {
-                                    final animatedUsageRatio = maxBytes > 0
-                                        ? (animatedUsedBytes / maxBytes).clamp(
-                                            0.0,
-                                            1.0,
-                                          )
-                                        : 0.0;
-
-                                    return Column(
-                                      children: [
-                                        Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              _formatAnimatedBytes(
-                                                animatedUsedBytes,
-                                                usedBytes,
-                                              ),
-                                              style: TextStyle(
-                                                fontSize: 36,
-                                                fontWeight: FontWeight.w700,
-                                                color: colorScheme.onSurface,
-                                                height: 1.0,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                bottom: 4.0,
-                                              ),
-                                              child: Text(
-                                                _animatedBytesUnit(usedBytes),
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: colorScheme
-                                                      .onSurfaceVariant,
-                                                ),
-                                              ),
-                                            ),
-                                            const Spacer(),
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                bottom: 4.0,
-                                              ),
-                                              child: Text(
-                                                '/ ${_formatBytes(maxBytes)}',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: colorScheme
-                                                      .onSurfaceVariant,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8.0,
-                                          ),
-                                          child: LinearProgressIndicator(
-                                            value: animatedUsageRatio,
-                                            minHeight: 8,
-                                            backgroundColor: colorScheme
-                                                .surfaceContainerHighest,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                  usageColor,
-                                                ),
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.settings_overscan_outlined),
-                  title: Text(strings.cacheMaxSizeTitle),
-                  subtitle: Text(strings.cacheMaxSizeHint),
-                  onTap: _chooseCacheMaxSize,
-                ),
-                ListTile(
-                  leading: const Icon(Icons.auto_delete_outlined),
-                  title: Text(strings.cacheAutoCleanTitle),
-                  subtitle: Text(
-                    autoCleanMode == 'seven_days'
-                        ? strings.cacheAutoCleanModeSummary
-                        : strings.cacheAutoCleanModeOverflowSummary,
-                  ),
-                  onTap: _chooseAutoCleanMode,
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  child: Divider(
-                    height: 1,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                ),
-                ListTile(
-                  leading: Icon(
-                    Icons.delete_sweep_outlined,
-                    color: colorScheme.error,
-                  ),
-                  title: Text(
-                    strings.cacheClearNowTitle,
-                    style: TextStyle(
-                      color: colorScheme.error,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  subtitle: Text(strings.cacheClearNowSubtitle),
-                  onTap: _clearCacheNow,
                 ),
               ],
             );

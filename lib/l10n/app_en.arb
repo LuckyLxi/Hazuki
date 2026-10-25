@@ -1033,6 +1033,15 @@
   "cacheAutoCleanModeOverflowSummary": "Clean automatically when limit is exceeded",
   "cacheClearNowTitle": "Clear cache now",
   "cacheClearNowSubtitle": "Remove all locally downloaded image cache to free up storage space",
+  "cachePolicySectionTitle": "Cache policy",
+  "cacheMaintenanceSectionTitle": "Maintenance",
+  "cacheClearNowReleasable": "Frees up {size}",
+  "@cacheClearNowReleasable": {
+    "placeholders": {
+      "size": {}
+    }
+  },
+  "cacheClearing": "Clearing…",
   "cloudSyncIncompleteConfig": "Please fill in the complete URL, Username, and Password",
   "cloudSyncInvalidUrl": "Invalid URL format. Please include http/https",
   "cloudSyncStatusIncomplete": "Configuration incomplete",
