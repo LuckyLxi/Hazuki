@@ -47,7 +47,18 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
   void initState() {
     super.initState();
     _manager = widget.manager;
-    unawaited(_run(_manager.initialize));
+    unawaited(_initialize());
+  }
+
+  // 进页面的初始化通常已在启动时完成，不走 _run，避免加载条闪现后收起带动列表上移。
+  Future<void> _initialize() async {
+    try {
+      await _manager.initialize();
+    } catch (error) {
+      if (mounted) {
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+      }
+    }
   }
 
   Future<void> _run(

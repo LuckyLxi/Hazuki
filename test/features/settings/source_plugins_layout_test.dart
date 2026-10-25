@@ -471,7 +471,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('initialization disables actions and reports failure', (
+  testWidgets('initialization shows no progress and reports failure', (
     tester,
   ) async {
     final pending = Completer<void>();
@@ -481,16 +481,16 @@ void main() {
     final strings = AppLocalizations.of(
       tester.element(find.byType(SourcePluginsPage)),
     )!;
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
     final import = find.ancestor(
       of: find.byTooltip(strings.pluginsImportLocal),
       matching: find.byType(IconButton),
     );
-    expect(tester.widget<IconButton>(import).onPressed, isNull);
+    expect(tester.widget<IconButton>(import).onPressed, isNotNull);
     expect(
       tester
           .widgetList<Switch>(find.byType(Switch))
-          .every((s) => s.onChanged == null),
+          .every((s) => s.onChanged != null),
       isTrue,
     );
     pending.completeError(StateError('Unable to load plugins'));
