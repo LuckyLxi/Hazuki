@@ -44,7 +44,7 @@ import 'shared/text/chinese_conversion_scope.dart';
 import 'services/source/source_capabilities.dart';
 import 'widgets/hazuki_prompt.dart';
 import 'widgets/source_image_gateway_scope.dart';
-import 'features/password_lock/view/password_lock_widgets.dart';
+import 'features/password_lock/password_lock.dart';
 
 Future<void> main() async {
   final bootstrap = await bootstrapApp();

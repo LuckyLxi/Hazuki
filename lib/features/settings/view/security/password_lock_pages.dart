@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/password_lock_service.dart';
-import 'package:hazuki/features/password_lock/view/password_lock_widgets.dart';
+import 'package:hazuki/features/password_lock/password_lock.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class PasswordLockIntroPage extends StatefulWidget {
