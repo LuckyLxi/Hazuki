@@ -23,7 +23,6 @@ class SourceCatalogEntry {
     required this.key,
     required this.name,
     required this.fileName,
-    this.directUrls = const [],
     this.pluginVersion,
     this.pluginDirectory,
     this.presentation = const {},
@@ -32,7 +31,6 @@ class SourceCatalogEntry {
   final String key;
   final String name;
   final String fileName;
-  final List<String> directUrls;
   final String? pluginVersion;
   final String? pluginDirectory;
   final Map<String, dynamic> presentation;
@@ -42,32 +40,12 @@ class SourceCatalogEntry {
         key: key,
         name: name,
         fileName: fileName,
-        directUrls: directUrls,
         pluginVersion: pluginVersion,
         pluginDirectory: pluginDirectory,
         presentation: value,
       );
 
   String get normalizedKey => key.trim();
-  String get normalizedFileName => fileName.trim();
-
-  bool matchesIndexEntry(Map<String, dynamic> map) {
-    final indexKey = map['key']?.toString().trim();
-    final indexFileName = map['fileName']?.toString().trim();
-    return indexKey == normalizedKey ||
-        (indexFileName?.toLowerCase() == normalizedFileName.toLowerCase());
-  }
-
-  List<String> fallbackUrls() {
-    if (directUrls.isNotEmpty) {
-      return directUrls;
-    }
-    final file = normalizedFileName;
-    if (file.isEmpty) {
-      return const [];
-    }
-    return ['https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/$file'];
-  }
 }
 
 enum DailyCheckInStatus { success, alreadyCheckedIn, skipped }

@@ -1,11 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_state_controller.dart';
 import 'package:hazuki/services/source/runtime/source_script_editing_operations.dart';
-import 'package:hazuki/services/source/runtime/source_script_storage.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 
 void main() {
@@ -17,17 +15,11 @@ void main() {
     store = _MemorySourceScriptStore();
     host = SourceRuntimeHost(
       catalog: const [
-        SourceCatalogEntry(
-          key: 'jm',
-          name: 'JMComic',
-          fileName: 'jm.js',
-          directUrls: [],
-        ),
+        SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'jm.js'),
         SourceCatalogEntry(
           key: 'copy_manga',
           name: 'CopyManga',
           fileName: 'copy_manga.js',
-          directUrls: [],
         ),
       ],
       defaultSourceKey: 'jm',
@@ -53,17 +45,15 @@ void main() {
   });
 
   test(
-    'deleting an inactive script clears state and releases its handle',
+    'deleting an inactive script uninstalls it and keeps its edit state',
     () async {
       store.contents['copy_manga'] = 'cached source';
       store.edited['copy_manga'] = true;
-      final previousHandle = host.handleFor('copy_manga');
 
       await scripts.deleteLocalSourceFile('copy_manga');
 
       expect(store.contents, isNot(contains('copy_manga')));
-      expect(store.edited['copy_manga'], isFalse);
-      expect(host.handleFor('copy_manga'), isNot(same(previousHandle)));
+      expect(store.edited['copy_manga'], isTrue);
     },
   );
 
@@ -84,7 +74,7 @@ void main() {
   });
 }
 
-class _MemorySourceScriptStore implements SourceScriptStore {
+class _MemorySourceScriptStore implements SourcePluginManager {
   final contents = <String, String>{};
   final edited = <String, bool>{};
 
@@ -102,9 +92,6 @@ class _MemorySourceScriptStore implements SourceScriptStore {
       edited[sourceKey] ?? false;
 
   @override
-  Future<String?> readIfExists(String sourceKey) async => contents[sourceKey];
-
-  @override
   Future<void> setCustomEdited(String sourceKey, bool value) async {
     edited[sourceKey] = value;
   }
@@ -115,12 +102,5 @@ class _MemorySourceScriptStore implements SourceScriptStore {
   }
 
   @override
-  Future<File> ensureLocalSourceFile(String sourceKey) =>
-      throw UnsupportedError('not used');
-
-  @override
-  Future<File> sourceFileFor(
-    String sourceKey, {
-    bool ensureDirectory = false,
-  }) => throw UnsupportedError('not used');
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

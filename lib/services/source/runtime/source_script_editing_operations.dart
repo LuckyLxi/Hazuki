@@ -1,13 +1,9 @@
 import 'dart:io';
 
-import '../common/source_prefs_keys.dart';
-import '../models/source_identity.dart';
 import '../plugins/source_plugin_manager.dart';
-import 'source_runtime_facade.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_host.dart';
 import 'source_runtime_state_controller.dart';
-import 'source_script_storage.dart';
 
 /// Owns local source-script editing and edit-state lifecycle.
 ///
@@ -16,7 +12,7 @@ import 'source_script_storage.dart';
 class SourceScriptEditingOperations {
   SourceScriptEditingOperations({
     required SourceRuntimeHost runtimeHost,
-    required SourceScriptStore storage,
+    required SourcePluginManager storage,
     required SourceRuntimeStateController runtimeStateController,
     required Future<File> Function(SourceRuntimeHandle handle)
     ensureEditableFile,
@@ -26,7 +22,7 @@ class SourceScriptEditingOperations {
        _ensureEditableFile = ensureEditableFile;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceScriptStore _storage;
+  final SourcePluginManager _storage;
   final SourceRuntimeStateController _runtimeStateController;
   final Future<File> Function(SourceRuntimeHandle handle) _ensureEditableFile;
 
@@ -63,16 +59,7 @@ class SourceScriptEditingOperations {
     await handle.runOperation(() async {
       final facade = handle.facade;
       await _ensureEditableFile(handle);
-      if (_storage case final SourcePluginManager plugins) {
-        await plugins.saveEditedScript(handle.sourceKey, content);
-      } else {
-        await _storage.write(handle.sourceKey, content);
-        await setCustomEditedSourceFlag(
-          handle.sourceKey,
-          true,
-          targetFacade: facade,
-        );
-      }
+      await _storage.saveEditedScript(handle.sourceKey, content);
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'resolvedFrom': 'local_source_editor',
@@ -98,16 +85,9 @@ class SourceScriptEditingOperations {
       throw StateError('source_delete_active_not_allowed');
     }
 
-    if (_storage is SourcePluginManager) {
-      // Uninstalling also replaces the catalog and releases the runtime handle.
-      // The retained script backup must keep its original edit state.
-      await _storage.delete(normalizedSourceKey);
-      return;
-    }
-
+    // Uninstalling also replaces the catalog and releases the runtime handle.
+    // The retained script backup must keep its original edit state.
     await _storage.delete(normalizedSourceKey);
-    await setCustomEditedSourceFlag(normalizedSourceKey, false);
-    _runtimeHost.remove(normalizedSourceKey);
   }
 
   Future<bool> hasCustomEditedActiveSource() => _activeSourceKey.isEmpty
@@ -116,14 +96,11 @@ class SourceScriptEditingOperations {
 
   Future<bool> hasActiveSourceBackup() async {
     if (_activeSourceKey.isEmpty) return false;
-    return _storage is SourcePluginManager &&
-        await _storage.hasEditBackup(_activeSourceKey);
+    return _storage.hasEditBackup(_activeSourceKey);
   }
 
   Future<bool> restoreActiveSourceBackup() async {
-    if (_activeSourceKey.isEmpty || _storage is! SourcePluginManager) {
-      return false;
-    }
+    if (_activeSourceKey.isEmpty) return false;
     final handle = _runtimeHost.activeHandle;
     return handle.runOperation(() async {
       final restored = await _storage.restoreEditBackup(handle.sourceKey);
@@ -141,21 +118,6 @@ class SourceScriptEditingOperations {
   Future<bool> hasCustomEditedSource(String sourceKey) =>
       _storage.isCustomEdited(sourceKey);
 
-  Future<void> setCustomEditedSourceFlag(
-    String sourceKey,
-    bool value, {
-    HazukiSourceFacade? targetFacade,
-  }) async {
-    final normalizedSourceKey = _runtimeHost.normalize(sourceKey);
-    await _storage.setCustomEdited(normalizedSourceKey, value);
-    if (targetFacade == null) return;
-    final prefs = await targetFacade.ensurePrefs();
-    await prefs.setBool(
-      SourcePrefsKeys.customEditedSource(normalizedSourceKey),
-      value,
-    );
-    if (normalizedSourceKey == hazukiDefaultSourceKey) {
-      await prefs.setBool(SourcePrefsKeys.customEditedJmSource, value);
-    }
-  }
+  Future<void> setCustomEditedSourceFlag(String sourceKey, bool value) =>
+      _storage.setCustomEdited(_runtimeHost.normalize(sourceKey), value);
 }

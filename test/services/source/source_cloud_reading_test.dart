@@ -57,7 +57,6 @@ void main() {
           key: 'sample',
           name: 'Sample',
           fileName: 'sample.js',
-          directUrls: [],
         ),
       ],
       defaultSourceKey: 'sample',

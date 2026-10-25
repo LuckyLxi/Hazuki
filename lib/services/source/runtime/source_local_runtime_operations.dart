@@ -1,14 +1,14 @@
+import '../plugins/source_plugin_manager.dart';
 import 'source_js_bridge_cookie_capability.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_host.dart';
 import 'source_runtime_loader.dart';
-import 'source_script_storage.dart';
 
 /// Provides settings access without waiting for a source's network startup.
 class SourceLocalRuntimeOperations {
   const SourceLocalRuntimeOperations({
     required SourceRuntimeHost runtimeHost,
-    required SourceScriptStore scriptStore,
+    required SourcePluginManager scriptStore,
     required SourceRuntimeLoader runtimeLoader,
     required SourceJsBridgeCookieCapability jsBridge,
   }) : _runtimeHost = runtimeHost,
@@ -17,7 +17,7 @@ class SourceLocalRuntimeOperations {
        _jsBridge = jsBridge;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceScriptStore _scriptStore;
+  final SourcePluginManager _scriptStore;
   final SourceRuntimeLoader _runtimeLoader;
   final SourceJsBridgeCookieCapability _jsBridge;
 
@@ -43,7 +43,7 @@ class SourceLocalRuntimeOperations {
       try {
         await local.facade.ensurePrefs();
         _jsBridge.configureDioCookieBridge(local);
-        final file = await _scriptStore.ensureLocalSourceFile(handle.sourceKey);
+        final file = await _scriptStore.sourceFileFor(handle.sourceKey);
         await _runtimeLoader.loadLocalMetadata(local, file);
         return await operation(local);
       } finally {

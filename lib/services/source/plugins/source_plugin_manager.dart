@@ -12,7 +12,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../shared/preferences/hazuki_preference_keys.dart';
 import '../../../shared/preferences/software_update_source.dart';
 import '../models/source_contract_models.dart';
-import '../runtime/source_script_storage.dart';
 import 'source_plugin_models.dart';
 import 'source_presentation_metadata.dart';
 import 'source_plugin_script_inspector.dart';
@@ -23,7 +22,7 @@ typedef PluginPackageValidator =
 
 /// Owns installed packages. Atomic registry replacement commits complete
 /// generations; interrupted installs never overwrite committed user data.
-class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
+class SourcePluginManager extends ChangeNotifier {
   SourcePluginManager({
     Future<Directory> Function()? directory,
     Future<List<int>> Function(Uri url)? download,
@@ -859,46 +858,33 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     }
   }
 
-  @override
-  Future<File> sourceFileFor(
-    String sourceKey, {
-    bool ensureDirectory = false,
-  }) async {
+  Future<File> sourceFileFor(String sourceKey) async {
     await initialize();
     final plugin = _requirePlugin(sourceKey);
     return File(p.join(_root!.path, plugin.directory, plugin.manifest.entry));
   }
 
-  @override
-  Future<File> ensureLocalSourceFile(String sourceKey) =>
-      sourceFileFor(sourceKey);
-  @override
   Future<String?> readIfExists(String sourceKey) async =>
       await exists(sourceKey)
       ? (await sourceFileFor(sourceKey)).readAsString()
       : null;
-  @override
   Future<bool> exists(String sourceKey) async {
     await initialize();
     return _installed.containsKey(sourceKey) &&
         await (await sourceFileFor(sourceKey)).exists();
   }
 
-  @override
   Future<void> write(String sourceKey, String content) async {
     final file = await sourceFileFor(sourceKey);
     await file.writeAsString(content, flush: true);
   }
 
-  @override
   Future<void> delete(String sourceKey) => uninstall(sourceKey);
-  @override
   Future<bool> isCustomEdited(String sourceKey) async {
     await initialize();
     return _requirePlugin(sourceKey).customEdited;
   }
 
-  @override
   Future<void> setCustomEdited(String sourceKey, bool value) =>
       _serialize(() async {
         final old = _requirePlugin(sourceKey);

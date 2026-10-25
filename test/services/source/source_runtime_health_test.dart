@@ -8,11 +8,10 @@ import 'package:hazuki/services/source/account/source_relogin_coordinator.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/models/source_task.dart';
-import 'package:hazuki/services/source/runtime/source_catalog_resolver.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/runtime/source_js_bridge_cookie_capability.dart';
 import 'package:hazuki/services/source/runtime/source_operation_runner.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_diagnostics_operations.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_facade.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_handle.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_health.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
@@ -21,9 +20,7 @@ import 'package:hazuki/services/source/runtime/source_runtime_loader.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_recovery_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_state_controller.dart';
 import 'package:hazuki/services/source/runtime/source_script_editing_operations.dart';
-import 'package:hazuki/services/source/runtime/source_script_storage.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
-import 'package:hazuki/services/source/runtime/source_text_downloader.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -355,16 +352,9 @@ class _Fixture {
       activeHandle: () => host.activeHandle,
     );
     final store = _Store(files);
-    final downloader = _NoDownloads();
     final loader = _CountingLoader(
       SourceRuntimeLoader(
         scriptStore: store,
-        catalogResolver: SourceCatalogResolver(
-          runtimeHost: host,
-          downloader: downloader,
-          sourceIndexUrls: const [],
-        ),
-        downloader: downloader,
         jsBridge: bridge,
         runtimeStateController: state,
         bundledInitAssetPath: 'assets/init.js',
@@ -379,6 +369,7 @@ class _Fixture {
     );
     final recovery = SourceRuntimeRecoveryOperations(
       runtimeHost: host,
+      plugins: store,
       runtimeLoader: loader,
       scriptEditing: SourceScriptEditingOperations(
         runtimeHost: host,
@@ -455,66 +446,19 @@ class _CountingLoader implements SourceRuntimeLoadClient {
   }) => _inner.downloadOrLoad(handle, onProgress: onProgress);
 
   @override
-  Future<SourceRuntimeLoadResult> download(
-    SourceRuntimeHandle handle, {
-    void Function(int received, int total)? onProgress,
-  }) => _inner.download(handle, onProgress: onProgress);
-
-  @override
   Future<SourceMeta> loadMetadata(SourceRuntimeHandle handle, File sourceFile) {
     loads++;
     return _inner.loadMetadata(handle, sourceFile);
   }
 }
 
-class _NoDownloads implements SourceTextDownloadClient {
-  @override
-  Future<String?> firstAvailable(
-    List<String> urls, {
-    required HazukiSourceFacade facade,
-    String source = 'source_fetch',
-  }) async => throw StateError('unexpected download');
-
-  @override
-  Future<String?> sequential(
-    List<String> urls, {
-    required HazukiSourceFacade facade,
-    void Function(int received, int total)? onProgress,
-    String source = 'source_download',
-  }) async => throw StateError('unexpected download');
-}
-
-class _Store implements SourceScriptStore {
+class _Store implements SourcePluginManager {
   _Store(this.files);
   final Map<String, File> files;
 
   @override
-  Future<File> ensureLocalSourceFile(String sourceKey) async =>
-      files[sourceKey]!;
+  Future<File> sourceFileFor(String sourceKey) async => files[sourceKey]!;
 
   @override
-  Future<File> sourceFileFor(
-    String sourceKey, {
-    bool ensureDirectory = false,
-  }) async => files[sourceKey]!;
-
-  @override
-  Future<void> delete(String sourceKey) async {}
-
-  @override
-  Future<bool> exists(String sourceKey) => files[sourceKey]!.exists();
-
-  @override
-  Future<bool> isCustomEdited(String sourceKey) async => false;
-
-  @override
-  Future<String?> readIfExists(String sourceKey) async =>
-      files[sourceKey]!.readAsString();
-
-  @override
-  Future<void> setCustomEdited(String sourceKey, bool value) async {}
-
-  @override
-  Future<void> write(String sourceKey, String content) =>
-      files[sourceKey]!.writeAsString(content);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

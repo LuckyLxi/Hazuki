@@ -28,12 +28,7 @@ void main() {
     SharedPreferences.setMockInitialValues(const {});
     host = SourceRuntimeHost(
       catalog: const [
-        SourceCatalogEntry(
-          key: 'jm',
-          name: 'JMComic',
-          fileName: 'jm.js',
-          directUrls: [],
-        ),
+        SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'jm.js'),
       ],
       defaultSourceKey: 'jm',
       secureSessionStorage: MemorySourceSecureSessionStorage(),
@@ -199,12 +194,6 @@ class _FakeRuntimeLoader implements SourceRuntimeLoadClient {
       settingsDefaults: const {},
     );
   }
-
-  @override
-  Future<SourceRuntimeLoadResult> download(
-    SourceRuntimeHandle handle, {
-    void Function(int received, int total)? onProgress,
-  }) => throw UnsupportedError('not used');
 
   @override
   Future<SourceRuntimeLoadResult> ensureLocalSource(

@@ -6,14 +6,11 @@ import 'package:dio/dio.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
-import 'package:hazuki/services/source/runtime/source_catalog_resolver.dart';
 import 'package:hazuki/services/source/runtime/source_js_bridge_cookie_capability.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_loader.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_state_controller.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
-import 'package:hazuki/services/source/runtime/source_text_downloader.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _html = '''
@@ -237,8 +234,6 @@ Hazuki.registerSource({
       final oldDocuments = handle.htmlBridge;
       final loader = SourceRuntimeLoader(
         scriptStore: manager,
-        catalogResolver: _UnusedCatalogResolver(),
-        downloader: const SourceTextDownloader(),
         jsBridge: SourceJsBridgeCookieCapability(activeHandle: () => handle),
         runtimeStateController: SourceRuntimeStateController(),
         bundledInitAssetPath: 'assets/init.js',
@@ -290,5 +285,3 @@ class _HtmlFixtures implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
 }
-
-class _UnusedCatalogResolver extends Mock implements SourceCatalogResolver {}

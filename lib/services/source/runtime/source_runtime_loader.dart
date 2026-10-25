@@ -8,17 +8,15 @@ import 'source_script_engine.dart';
 import '../../../models/source_meta.dart';
 import '../common/source_json_coerce.dart';
 import '../models/source_contract_models.dart';
+import '../plugins/source_plugin_manager.dart';
 import '../plugins/source_plugin_models.dart';
 import '../plugins/source_plugin_script_inspector.dart';
-import 'source_catalog_resolver.dart';
 import 'source_js_bridge_cookie_capability.dart';
 import 'source_html_bridge.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_state_controller.dart';
 import 'source_runtime_metadata.dart';
 export 'source_runtime_metadata.dart' show parseSourceSettingsDefaults;
-import 'source_script_storage.dart';
-import 'source_text_downloader.dart';
 import '../interaction/source_ui_scope.dart';
 import '../interaction/source_ui_service.dart';
 
@@ -31,34 +29,24 @@ abstract interface class SourceRuntimeLoadClient {
     SourceRuntimeHandle handle, {
     void Function(int received, int total)? onProgress,
   });
-  Future<SourceRuntimeLoadResult> download(
-    SourceRuntimeHandle handle, {
-    void Function(int received, int total)? onProgress,
-  });
   Future<SourceMeta> loadMetadata(SourceRuntimeHandle handle, File sourceFile);
 }
 
 /// Prepares source scripts and builds their JavaScript runtime engines.
 class SourceRuntimeLoader implements SourceRuntimeLoadClient {
   SourceRuntimeLoader({
-    required SourceScriptStore scriptStore,
-    required SourceCatalogResolver catalogResolver,
-    required SourceTextDownloadClient downloader,
+    required SourcePluginManager scriptStore,
     required SourceJsBridgeCookieCapability jsBridge,
     required SourceRuntimeStateController runtimeStateController,
     required String bundledInitAssetPath,
     Future<String> Function(String path)? loadAssetText,
   }) : _scriptStore = scriptStore,
-       _catalogResolver = catalogResolver,
-       _downloader = downloader,
        _jsBridge = jsBridge,
        _runtimeStateController = runtimeStateController,
        _bundledInitAssetPath = bundledInitAssetPath,
        _loadAssetText = loadAssetText ?? rootBundle.loadString;
 
-  final SourceScriptStore _scriptStore;
-  final SourceCatalogResolver _catalogResolver;
-  final SourceTextDownloadClient _downloader;
+  final SourcePluginManager _scriptStore;
   final SourceJsBridgeCookieCapability _jsBridge;
   final SourceRuntimeStateController _runtimeStateController;
   final String _bundledInitAssetPath;
@@ -69,9 +57,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
     SourceRuntimeHandle handle, {
     bool requireFile = true,
   }) async {
-    final sourceFile = await _scriptStore.ensureLocalSourceFile(
-      handle.sourceKey,
-    );
+    final sourceFile = await _scriptStore.sourceFileFor(handle.sourceKey);
     if (requireFile && !await sourceFile.exists()) {
       throw Exception('source_local_jm_missing');
     }
@@ -89,27 +75,6 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
     final local = await ensureLocalSource(handle, requireFile: false);
     if (await local.sourceFile.exists()) return local;
     throw const SourcePluginException('plugin_not_installed');
-  }
-
-  @override
-  Future<SourceRuntimeLoadResult> download(
-    SourceRuntimeHandle handle, {
-    void Function(int received, int total)? onProgress,
-  }) async {
-    final local = await ensureLocalSource(handle, requireFile: false);
-    final sourceScript = await _downloader.sequential(
-      await _catalogResolver.resolve(handle),
-      onProgress: onProgress,
-      facade: handle.facade,
-    );
-    if (sourceScript != null && sourceScript.trim().isNotEmpty) {
-      await _scriptStore.write(handle.sourceKey, sourceScript);
-      return SourceRuntimeLoadResult(
-        sourceFile: local.sourceFile,
-        message: 'source_downloaded_manually',
-      );
-    }
-    throw Exception('source_download_failed_without_cache');
   }
 
   @override
@@ -309,12 +274,4 @@ class SourceRuntimeLoadResult {
 
   final File sourceFile;
   final String message;
-}
-
-String extractSourceClassName(String script) {
-  final match = RegExp(
-    r'class\s+([A-Za-z_][A-Za-z0-9_]*)\s+extends\s+ComicSource',
-  ).firstMatch(script);
-  if (match == null) throw Exception('source_class_not_found');
-  return match.group(1)!;
 }

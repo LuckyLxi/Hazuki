@@ -192,27 +192,6 @@ void main() {
       'copy_manga',
       'picacg',
     ]);
-    expect(
-      registry.allowedSources
-          .firstWhere((s) => s.key == 'jm')
-          .matchesIndexEntry({'key': 'jm', 'fileName': 'jm.js'}),
-      isTrue,
-    );
-    expect(
-      registry.allowedSources
-          .firstWhere((s) => s.key == 'copy_manga')
-          .matchesIndexEntry({
-            'key': 'copy_manga',
-            'fileName': 'copy_manga.js',
-          }),
-      isTrue,
-    );
-    expect(
-      registry.allowedSources
-          .firstWhere((s) => s.key == 'picacg')
-          .matchesIndexEntry({'key': 'picacg', 'fileName': 'picacg.js'}),
-      isTrue,
-    );
     expect(registry.isAllowedSourceKey('not-allowed'), isFalse);
   });
 

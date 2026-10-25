@@ -28,7 +28,6 @@ import '../image/image_cache_capability.dart';
 import '../image/source_image_operations.dart';
 import '../image/source_image_preparation_capability.dart';
 import '../models/source_contract_models.dart';
-import '../models/source_identity.dart';
 import '../plugins/source_plugin_manager.dart';
 import '../plugins/source_plugin_models.dart';
 import '../adapters/hazuki_source_plugin_adapter.dart';
@@ -46,7 +45,6 @@ import 'source_script_editing_operations.dart';
 import 'source_runtime_view.dart';
 import 'source_runtime_registry.dart';
 import 'source_runtime_state_controller.dart';
-import 'source_script_storage.dart';
 import 'source_secure_session_storage.dart';
 import '../../logging/app_log_store.dart';
 import 'source_settings_operations.dart';
@@ -63,7 +61,6 @@ export 'source_runtime_registry.dart';
 export 'source_session_store.dart';
 
 const _bundledInitAssetPath = 'assets/init.js';
-const _sourceIndexUrls = <String>[];
 
 /// Internal composition root for source runtime dependencies.
 ///
@@ -72,6 +69,7 @@ const _sourceIndexUrls = <String>[];
 class SourceRuntimeAssembly {
   SourceRuntimeAssembly({
     SourceSecureSessionStorage? secureSessionStorage,
+    // 仅供测试预置目录：跳过插件初始化，脚本存储仍是插件管理器。
     List<SourceCatalogEntry> initialCatalog = const [],
     SourcePluginManager? pluginManager,
   }) : _secureSessionStorage =
@@ -117,12 +115,11 @@ class SourceRuntimeAssembly {
     );
     _runtimeCapability = SourceRuntimeCapability(
       runtimeHost: _runtimeHost,
-      scriptStorage: initialCatalog.isEmpty ? plugins : _scriptStorage,
+      scriptStorage: plugins,
       jsBridgeCookieCapability: _jsBridgeCookieCapability,
       runtimeStateController: _runtimeStateController,
       reloginCoordinator: _reloginCoordinator,
       bundledInitAssetPath: _bundledInitAssetPath,
-      sourceIndexUrls: _sourceIndexUrls,
     );
     _runtimeHost.onRuntimeFailed = SourceRuntimeHealthMonitor(
       runtimeHost: _runtimeHost,
@@ -301,12 +298,6 @@ class SourceRuntimeAssembly {
     imagePreparation: _imagePreparationCapability,
     debug: _debugOperations,
   );
-  late final SourceScriptStorage _scriptStorage = SourceScriptStorage(
-    defaultSourceKey: hazukiDefaultSourceKey,
-    normalizeSourceKey: _normalizeAllowedSourceKey,
-    ensurePreferences: (sourceKey) =>
-        _handleFor(sourceKey).facade.ensurePrefs(),
-  );
   late final SourceJsBridgeCookieCapability _jsBridgeCookieCapability =
       SourceJsBridgeCookieCapability(activeHandle: () => _activeHandle);
   final SourceRuntimeStateController _runtimeStateController =
@@ -425,14 +416,10 @@ class SourceRuntimeAssembly {
     return handle.imageCache;
   }
 
-  String _normalizeAllowedSourceKey(String sourceKey) {
-    return _runtimeHost.normalize(sourceKey);
-  }
-
   String _resolveActiveSourceKey([String? requestedSourceKey]) {
     final requested = requestedSourceKey?.trim() ?? '';
     return requested.isNotEmpty
-        ? _normalizeAllowedSourceKey(requested)
+        ? _runtimeHost.normalize(requested)
         : (_runtimeView.activeSourceKey ?? '');
   }
 

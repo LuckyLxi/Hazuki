@@ -12,12 +12,7 @@ void main() {
   setUp(() async {
     host = SourceRuntimeHost(
       catalog: const [
-        SourceCatalogEntry(
-          key: 'jm',
-          name: 'JMComic',
-          fileName: 'jm.js',
-          directUrls: [],
-        ),
+        SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'jm.js'),
       ],
       defaultSourceKey: 'jm',
       secureSessionStorage: MemorySourceSecureSessionStorage(),
