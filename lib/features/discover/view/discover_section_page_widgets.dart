@@ -114,28 +114,26 @@ class _DiscoverSectionChipGroup extends StatelessWidget {
       0,
       options.indexWhere((option) => option.value == selectedValue),
     );
+    // 选项可能多达上百个，懒加载只构建视口附近的胶囊
     return SizedBox(
       key: ValueKey<String>('discover_section_sort_group_$groupIndex'),
       height: _height,
-      child: SingleChildScrollView(
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var index = 0; index < options.length; index++) ...[
-              if (index > 0) const SizedBox(width: 8),
-              _DiscoverSectionChip(
-                key: ValueKey<String>(
-                  'discover_section_sort_option_${groupIndex}_${options[index].value}',
-                ),
-                label: options[index].label,
-                selected: index == selectedIndex,
-                onTap: () => onSelected(options[index].value),
-              ),
-            ],
-          ],
-        ),
+        itemCount: options.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final option = options[index];
+          return _DiscoverSectionChip(
+            key: ValueKey<String>(
+              'discover_section_sort_option_${groupIndex}_${option.value}',
+            ),
+            label: option.label,
+            selected: index == selectedIndex,
+            onTap: () => onSelected(option.value),
+          );
+        },
       ),
     );
   }

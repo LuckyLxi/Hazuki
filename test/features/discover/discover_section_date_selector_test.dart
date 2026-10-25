@@ -155,7 +155,7 @@ void main() {
     expect(group, findsOneWidget);
     expect(tester.getSize(group).height, 34);
     expect(
-      find.descendant(of: group, matching: find.byType(SingleChildScrollView)),
+      find.descendant(of: group, matching: find.byType(ListView)),
       findsOneWidget,
     );
     expect(find.byType(BackdropFilter), findsNothing);
@@ -203,7 +203,9 @@ void main() {
           home: MediaQuery(
             data: MediaQueryData(textScaler: TextScaler.linear(scale)),
             child: Scaffold(
+              // 每个缩放比例用新的筛选行，从头开始检查懒加载的胶囊
               body: SizedBox(
+                key: ValueKey<double>(scale),
                 width: 320,
                 child: DiscoverSectionSortBar(
                   sortOptions: options,
@@ -216,13 +218,24 @@ void main() {
         ),
       );
 
+      // 胶囊懒加载，逐个滚到可见后再检查文字是否完整
+      final scrollable = find.descendant(
+        of: find.byKey(const ValueKey<String>('discover_section_sort_group_0')),
+        matching: find.byType(Scrollable),
+      );
       for (final option in options) {
+        await tester.scrollUntilVisible(
+          find.text(option.label),
+          80,
+          scrollable: scrollable,
+        );
         final paragraph = tester.renderObject<RenderParagraph>(
           find.text(option.label),
         );
         expect(paragraph.didExceedMaxLines, isFalse);
       }
       await tester.ensureVisible(find.text(options.last.label));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(options.last.label));
       expect(selected, options.last.value);
       expect(tester.takeException(), isNull);

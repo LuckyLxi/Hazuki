@@ -404,4 +404,79 @@ void main() {
     ).called(1);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'filters wait for the page transition and skip loading rebuilds',
+    (tester) async {
+      final result = Completer<CategoryComicsResult>();
+      when(
+        () => discoverSource.loadCategoryComicsByViewMore(
+          viewMoreUrl: any(named: 'viewMoreUrl'),
+          page: any(named: 'page'),
+          order: any(named: 'order'),
+          orders: any(named: 'orders'),
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      ).thenAnswer((_) => result.future);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: TagCategoryPage(
+            searchPageBuilder: (_) => const SizedBox.shrink(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            categorySource: categorySource,
+            discoverSource: discoverSource,
+            taskControl: FakeSourceTaskControl(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Adventure'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // 筛选项已在动画中途返回，但筛选栏要等过渡结束才插入
+      final group = find.byKey(
+        const ValueKey<String>('discover_section_sort_group_0'),
+      );
+      expect(find.byType(DiscoverSectionPage), findsOneWidget);
+      expect(group, findsNothing);
+
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(group, findsOneWidget);
+
+      var sortBarRebuilds = 0;
+      final previousCallback = debugOnRebuildDirtyWidget;
+      debugOnRebuildDirtyWidget = (element, builtOnce) {
+        previousCallback?.call(element, builtOnce);
+        if (element.widget is DiscoverSectionSortBar) {
+          sortBarRebuilds++;
+        }
+      };
+      addTearDown(() => debugOnRebuildDirtyWidget = previousCallback);
+
+      result.complete(
+        CategoryComicsResult(
+          comics: List.generate(
+            6,
+            (index) => ExploreComic(
+              id: '$index',
+              title: 'Comic $index',
+              subTitle: '',
+              cover: '',
+            ),
+          ),
+          maxPage: 1,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Comic 0'), findsOneWidget);
+      expect(sortBarRebuilds, 0);
+      expect(find.text('Popular').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

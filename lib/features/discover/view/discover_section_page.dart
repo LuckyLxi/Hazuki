@@ -38,6 +38,11 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   late final DiscoverSectionPageController _controller;
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<bool> _showBackToTop = ValueNotifier(false);
+  ModalRoute<Object?>? _route;
+  Animation<double>? _routeAnimation;
+  bool _routeSettled = false;
+  DiscoverSectionSortBar? _sortBar;
+  Widget? _sortBarHeader;
 
   @override
   void initState() {
@@ -53,7 +58,39 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_routeSettled) return;
+    final route = ModalRoute.of(context);
+    final animation = route?.animation;
+    if (route == null || animation == null) {
+      _routeSettled = true;
+      return;
+    }
+    _route = route;
+    if (!identical(animation, _routeAnimation)) {
+      _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
+      _routeAnimation = animation;
+      animation.addStatusListener(_onRouteAnimationStatusChanged);
+    }
+    // Hero 预构建时路由处于 offstage，动画代理会暂时指向已完成状态，需等真正入场后再判断
+    if (!route.offstage && animation.isCompleted) _settleRoute();
+  }
+
+  void _onRouteAnimationStatusChanged(AnimationStatus status) {
+    if (!status.isCompleted || _route?.offstage != false) return;
+    if (!mounted || _routeSettled) return;
+    setState(_settleRoute);
+  }
+
+  void _settleRoute() {
+    _routeSettled = true;
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
+  }
+
+  @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
     _scrollController.dispose();
     _showBackToTop.dispose();
     _controller.dispose();
@@ -140,15 +177,8 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
             final hasSortBar =
                 _controller.sortOptions.isNotEmpty ||
                 _controller.sortOptionGroups.any((group) => group.isNotEmpty);
-            final sortBar = DiscoverSectionSortBar(
-              sortOptions: _controller.sortOptions,
-              sortOptionGroups: _controller.sortOptionGroups,
-              useDateMorphSelector: usesWeeklyDateSelector,
-              selectedSortValue: _controller.selectedSortValue,
-              selectedSortValues: _controller.selectedSortValues,
-              onSelectSortOption: _onSelectSortOption,
-              onSelectSortOptionInGroup: _onSelectSortOptionInGroup,
-            );
+            // 过渡动画结束前不放筛选栏，避免大量胶囊的构建挤进动画帧
+            final showSortBar = hasSortBar && _routeSettled;
             final content = DiscoverSectionContent(
               controller: _controller,
               scrollController: _scrollController,
@@ -156,8 +186,10 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
               comicDetailPageBuilder: widget.comicDetailPageBuilder,
               comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
               // 筛选栏作为列表头部随内容一起滚动，向上滑动时被推出视口
-              scrollHeader: hasSortBar ? sortBar : null,
-              topPadding: hasSortBar ? 8 : 16,
+              scrollHeader: showSortBar
+                  ? _sortBarHeaderFor(usesWeeklyDateSelector)
+                  : null,
+              topPadding: showSortBar ? 8 : 16,
             );
 
             return Stack(
@@ -192,6 +224,41 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
           },
         ),
       ),
+    );
+  }
+
+  /// 筛选栏只在选项或选中项变化时重建；加载状态和漫画列表变化时复用同一实例，
+  /// Flutter 遇到相同的 widget 实例会直接跳过整栏重建
+  Widget _sortBarHeaderFor(bool usesWeeklyDateSelector) {
+    final cached = _sortBar;
+    final header = _sortBarHeader;
+    if (cached != null &&
+        header != null &&
+        identical(cached.sortOptions, _controller.sortOptions) &&
+        identical(cached.sortOptionGroups, _controller.sortOptionGroups) &&
+        identical(cached.selectedSortValues, _controller.selectedSortValues) &&
+        cached.selectedSortValue == _controller.selectedSortValue &&
+        cached.useDateMorphSelector == usesWeeklyDateSelector) {
+      return header;
+    }
+    final sortBar = DiscoverSectionSortBar(
+      sortOptions: _controller.sortOptions,
+      sortOptionGroups: _controller.sortOptionGroups,
+      useDateMorphSelector: usesWeeklyDateSelector,
+      selectedSortValue: _controller.selectedSortValue,
+      selectedSortValues: _controller.selectedSortValues,
+      onSelectSortOption: _onSelectSortOption,
+      onSelectSortOptionInGroup: _onSelectSortOptionInGroup,
+    );
+    _sortBar = sortBar;
+    // 首次出现时短淡入；之后目标值不变，重建不会重新播放
+    return _sortBarHeader = TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      builder: (context, opacity, child) =>
+          Opacity(opacity: opacity, child: child),
+      child: sortBar,
     );
   }
 
