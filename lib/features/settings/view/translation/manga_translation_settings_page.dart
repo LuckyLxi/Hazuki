@@ -99,27 +99,43 @@ class _MangaTranslationSettingsPageState
   Future<void> _pickTargetLanguage() async {
     final strings = l10n(context);
     final current = _settings.targetLanguage;
-    final selected = await showDialog<TranslationTargetLanguage>(
+    final selected = await showGeneralDialog<TranslationTargetLanguage>(
       context: context,
-      builder: (context) => SimpleDialog(
-        title: Text(strings.translationTargetLanguage),
-        children: [
-          for (final value in TranslationTargetLanguage.values)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, value),
-              child: Row(
-                children: [
-                  Expanded(child: Text(_languageLabel(strings, value))),
-                  if (value == current)
-                    Icon(
-                      Icons.check,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                ],
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black54,
+      transitionDuration: _duration,
+      pageBuilder: (context, animation, secondaryAnimation) => SafeArea(
+        child: SimpleDialog(
+          title: Text(strings.translationTargetLanguage),
+          children: [
+            for (final value in TranslationTargetLanguage.values)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, value),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(_languageLabel(strings, value))),
+                    if (value == current)
+                      Icon(
+                        Icons.check,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                  ],
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = animation.drive(CurveTween(curve: _curve));
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
+            child: child,
+          ),
+        );
+      },
     );
     if (selected != null && selected != current) {
       await _save(_settings.setTargetLanguage(selected));
@@ -166,7 +182,10 @@ class _MangaTranslationSettingsPageState
   Widget build(BuildContext context) {
     final strings = l10n(context);
     return Scaffold(
-      appBar: AppBar(title: Text(strings.translationTitle)),
+      appBar: AppBar(
+        title: Text(strings.translationTitle),
+        scrolledUnderElevation: 0,
+      ),
       body: !_ready
           ? const Center(child: CircularProgressIndicator())
           : ListenableBuilder(

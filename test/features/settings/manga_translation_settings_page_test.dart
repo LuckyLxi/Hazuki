@@ -167,6 +167,39 @@ void main() {
     expect(settings.targetLanguage, TranslationTargetLanguage.japanese);
   });
 
+  testWidgets('target language dialog animates opening and dismissal', (
+    tester,
+  ) async {
+    await pump(tester);
+    final originalLanguage = settings.targetLanguage;
+    final entry = find.text('Target language');
+    await tester.scrollUntilVisible(
+      entry,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(entry);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+
+    final dialog = find.byType(SimpleDialog);
+    double height() =>
+        tester.getBottomRight(dialog).dy - tester.getTopLeft(dialog).dy;
+    final openingHeight = height();
+    await tester.pumpAndSettle();
+    final fullHeight = height();
+    expect(openingHeight, lessThan(fullHeight));
+
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(dialog, findsOneWidget);
+    expect(height(), lessThan(fullHeight));
+    await tester.pumpAndSettle();
+    expect(dialog, findsNothing);
+    expect(settings.targetLanguage, originalLanguage);
+  });
+
   testWidgets('provider page switches preset fields', (tester) async {
     await settings.updateProvider(
       preset: TranslationProviderPreset.openai,

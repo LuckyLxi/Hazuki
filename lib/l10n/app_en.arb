@@ -1,6 +1,7 @@
 {
   "@@locale": "en",
   "translationTitle": "Manga translation",
+  "translationSettingsSubtitle": "Translation engines, target language, and reading options",
   "translationEnable": "Enable manga translation",
   "translationPrivacy": "Images are sent to your selected AI provider",
   "translationProvider": "Provider",

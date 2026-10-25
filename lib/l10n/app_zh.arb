@@ -1,6 +1,7 @@
 {
   "@@locale": "zh",
   "translationTitle": "漫画翻译",
+  "translationSettingsSubtitle": "翻译引擎、目标语言与阅读选项",
   "translationEnable": "启用漫画翻译",
   "translationPrivacy": "图片会发送给所选 AI 服务商",
   "translationProvider": "服务商",

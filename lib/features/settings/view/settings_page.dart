@@ -152,7 +152,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ListTile(
                   leading: const Icon(Icons.translate_rounded),
                   title: Text(strings.translationTitle),
-                  subtitle: Text(strings.translationPrivacy),
+                  subtitle: Text(strings.translationSettingsSubtitle),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => MangaTranslationSettingsPage(
