@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/view/translation/translation_usage_group.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/translation/translation_usage_store.dart';
+import 'package:intl/intl.dart';
 
 class _Usage extends TranslationUsageStore {
   bool cleared = false;
@@ -61,16 +62,82 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(
-          find.textContaining(
-            '3 pages · 4 requests · 12 input tokens · 5 output tokens',
-          ),
-          findsOneWidget,
-        );
+        final now = DateTime.now();
+        expect(find.text(DateFormat.yMMMEd('en').format(now)), findsOneWidget);
+        for (final (label, value) in [
+          ('Pages', '3'),
+          ('Requests', '4'),
+          ('Input tokens', '12'),
+          ('Output tokens', '5'),
+        ]) {
+          expect(
+            find.descendant(
+              of: find.ancestor(
+                of: find.text(label),
+                matching: find.byType(Row),
+              ),
+              matching: find.text(value),
+            ),
+            findsOneWidget,
+          );
+        }
         expect(tester.takeException(), isNull);
       },
     );
   }
+
+  testWidgets('tapping another cell switches the detail immediately', (
+    tester,
+  ) async {
+    final usage = _Usage();
+    addTearDown(usage.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('en'),
+        home: Scaffold(
+          body: ListView(children: [TranslationUsageGroup(store: usage)]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final bounds = tester.getRect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is CustomPaint &&
+            widget.painter.runtimeType.toString() == '_HeatmapPainter',
+      ),
+    );
+    final now = DateTime.now();
+    Offset cell(int daysAgo) {
+      final row = now.weekday - 1 - daysAgo;
+      return Offset(
+        bounds.right - 9 + (row < 0 ? -15 : 0),
+        bounds.top + (row % 7) * 15 + 6,
+      );
+    }
+
+    final today = find.text(DateFormat.yMMMEd('en').format(now));
+    final earlier = find.text(
+      DateFormat.yMMMEd(
+        'en',
+      ).format(DateTime(now.year, now.month, now.day - 1)),
+    );
+    await tester.tapAt(cell(0));
+    await tester.pumpAndSettle();
+    expect(today, findsOneWidget);
+
+    // 不等待收起动画，下一帧就应换成新格子的详情。
+    await tester.tapAt(cell(1));
+    await tester.pump();
+    expect(today, findsNothing);
+    expect(earlier, findsOneWidget);
+
+    await tester.tapAt(cell(1));
+    await tester.pumpAndSettle();
+    expect(earlier, findsNothing);
+  });
 
   testWidgets('clearing usage requires confirmation and updates the summary', (
     tester,
