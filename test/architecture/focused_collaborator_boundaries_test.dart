@@ -3,42 +3,39 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('favorite workflows depend on narrow state and injected callbacks', () {
-    for (final name in [
-      'favorite_folder_coordinator.dart',
-      'favorite_sort_flow.dart',
-    ]) {
-      final content = File(
-        'lib/features/favorite/support/$name',
-      ).readAsStringSync();
-      for (final forbidden in [
-        'favorite_page_controller.dart',
-        'FavoritePageController',
-        'favorite_page_state.dart',
-        'FavoritePageData',
-        '/view/',
-        'BuildContext',
-        'package:flutter/material.dart',
-        'favorite_list_loader.dart',
-      ]) {
-        expect(content, isNot(contains(forbidden)), reason: name);
+  test(
+    'favorite folder workflow depends on narrow state and injected callbacks',
+    () {
+      for (final name in ['favorite_folder_coordinator.dart']) {
+        final content = File(
+          'lib/features/favorite/support/$name',
+        ).readAsStringSync();
+        for (final forbidden in [
+          'favorite_page_controller.dart',
+          'FavoritePageController',
+          'favorite_page_state.dart',
+          'FavoritePageData',
+          '/view/',
+          'BuildContext',
+          'package:flutter/material.dart',
+          'favorite_list_loader.dart',
+        ]) {
+          expect(content, isNot(contains(forbidden)), reason: name);
+        }
       }
-    }
-    for (final name in [
-      'favorite_folder_state.dart',
-      'favorite_sort_state.dart',
-    ]) {
-      final content = File(
-        'lib/features/favorite/state/$name',
-      ).readAsStringSync();
-      expect(
-        content,
-        isNot(contains('favorite_page_state.dart')),
-        reason: name,
-      );
-      expect(content, isNot(contains('/support/')), reason: name);
-    }
-  });
+      for (final name in ['favorite_folder_state.dart']) {
+        final content = File(
+          'lib/features/favorite/state/$name',
+        ).readAsStringSync();
+        expect(
+          content,
+          isNot(contains('favorite_page_state.dart')),
+          reason: name,
+        );
+        expect(content, isNot(contains('/support/')), reason: name);
+      }
+    },
+  );
 
   test('reader controllers use narrow state contracts', () {
     for (final name in [

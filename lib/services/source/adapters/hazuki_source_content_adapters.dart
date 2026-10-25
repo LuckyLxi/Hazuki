@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../account/source_account_operations.dart';
-import '../comments/source_comments_operations.dart';
+import '../comments/comments_capability.dart';
 import '../content/source_content_operations.dart';
 import '../content/source_cloud_reading.dart';
 import '../debug/source_debug_operations.dart';
@@ -231,23 +231,26 @@ class HazukiSourceCategoryAdapter implements SourceCategoryGateway {
 
 class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
   const HazukiSourceCommentsAdapter({
-    required SourceCommentsOperations comments,
+    required SourceCommentsCapability comments,
+    required SourceAccountOperations account,
     required SourceDebugOperations debug,
   }) : _comments = comments,
+       _account = account,
        _debug = debug;
 
-  final SourceCommentsOperations _comments;
+  final SourceCommentsCapability _comments;
+  final SourceAccountOperations _account;
   final SourceDebugOperations _debug;
 
   @override
-  bool get isLogged => _comments.isLogged;
+  bool get isLogged => _account.isLogged;
   @override
-  bool get supportCommentSend => _comments.supportCommentSend;
+  bool get supportCommentSend => _comments.supportCommentSendForSource('');
   @override
-  bool get supportCommentLike => _comments.supportCommentLike;
+  bool get supportCommentLike => _comments.supportCommentLikeForSource('');
   @override
   bool isLoggedForSource(String sourceKey) =>
-      _comments.isLoggedForSource(sourceKey);
+      _account.isLoggedForSource(sourceKey);
   @override
   bool supportCommentSendForSource(String sourceKey) =>
       _comments.supportCommentSendForSource(sourceKey);

@@ -258,6 +258,7 @@ void main() {
           );
           return HazukiSourceCommentsAdapter(
             comments: source.testing.comments,
+            account: source.testing.account,
             debug: source.testing.debug,
           );
         })(),
@@ -300,6 +301,7 @@ void main() {
           );
           return HazukiSourceCommentsAdapter(
             comments: source.testing.comments,
+            account: source.testing.account,
             debug: source.testing.debug,
           );
         })(),

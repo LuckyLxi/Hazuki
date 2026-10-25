@@ -15,12 +15,10 @@ import '../support/favorite_list_loader.dart';
 import '../support/favorite_selection_store.dart';
 import '../support/favorite_change_coordinator.dart';
 import '../support/favorite_folder_coordinator.dart';
-import '../support/favorite_sort_flow.dart';
 
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'favorite_page_state.dart';
 import '../support/favorite_cloud_flow.dart';
-import '../support/favorite_local_flow.dart';
 
 class FavoritePageController extends ChangeNotifier {
   FavoritePageController({
@@ -40,32 +38,21 @@ class FavoritePageController extends ChangeNotifier {
        _selectionStore = FavoriteSelectionStore(localFavoritesPreferences),
        _localFavoritesRepository = localFavoritesRepository,
        _cloudFlow = FavoriteCloudFlow(sourceService, taskControl),
-       _localFlow = FavoriteLocalFlow(
-         repository: localFavoritesRepository,
-         preferences: localFavoritesPreferences,
-       ) {
+       _localFavoritesPreferences = localFavoritesPreferences {
     _lastActiveSourceKey = _activeSourceKey;
-    _listLoader = FavoriteListLoader(cloud: _cloudFlow, local: _localFlow);
+    _listLoader = FavoriteListLoader(
+      cloud: _cloudFlow,
+      local: _localFavoritesRepository,
+    );
     _folders = FavoriteFolderCoordinator(
       state: _state,
       cloudFlow: _cloudFlow,
-      localFlow: _localFlow,
+      localFavoritesRepository: _localFavoritesRepository,
       selectionStore: _selectionStore,
       readSourceKey: () => _activeSourceKey,
       isDisposed: () => _disposed,
       notify: _notify,
       selectFolder: selectFolder,
-    );
-    _sortFlow = FavoriteSortFlow(
-      state: _state,
-      cloudFlow: _cloudFlow,
-      localFlow: _localFlow,
-      sourcePolicy: _sourcePolicy,
-      readSourceKey: () => _activeSourceKey,
-      isDisposed: () => _disposed,
-      reloadLocalComicsAfterSort: _reloadLocalComicsAfterSort,
-      resetForReload: resetForReload,
-      loadInitial: loadInitial,
     );
     _changes = FavoriteChangeCoordinator(
       localChanges: _localFavoritesRepository,
@@ -87,7 +74,7 @@ class FavoritePageController extends ChangeNotifier {
   final FavoriteComicTagLoader _tagLoader;
   final FavoriteSourcePolicy _sourcePolicy;
   final FavoriteCloudFlow _cloudFlow;
-  final FavoriteLocalFlow _localFlow;
+  final LocalFavoritesPreferencesStore _localFavoritesPreferences;
   final LocalFavoritesRepository _localFavoritesRepository;
   final FavoritePageData _state = FavoritePageData();
 
@@ -95,7 +82,6 @@ class FavoritePageController extends ChangeNotifier {
   late final FavoriteListLoader _listLoader;
   late final FavoriteChangeCoordinator _changes;
   late final FavoriteFolderCoordinator _folders;
-  late final FavoriteSortFlow _sortFlow;
   final FavoriteSelectionStore _selectionStore;
 
   void _invalidateRequests() {
@@ -491,11 +477,43 @@ class FavoritePageController extends ChangeNotifier {
     String order, {
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
-  }) => _sortFlow.changeSortOrder(
-    order,
-    timeoutMessage: timeoutMessage,
-    onFolderLoadError: onFolderLoadError,
-  );
+  }) async {
+    final normalized = _state.mode == FavoritePageMode.local
+        ? normalizeLocalFavoriteSort(order)
+        : _sourcePolicy.normalizeSortOrder(
+            order,
+            allowedOrders: _cloudFlow.sortOrders,
+            sourceKey: _activeSourceKey,
+          );
+    if (normalized == _state.favoriteSortOrder) {
+      return null;
+    }
+
+    try {
+      if (_state.mode == FavoritePageMode.local) {
+        await _localFavoritesPreferences.saveSortOrder(normalized);
+        if (_disposed) {
+          return null;
+        }
+        _state.favoriteSortOrder = normalized;
+        return await _reloadLocalComicsAfterSort();
+      } else {
+        await _cloudFlow.setSortOrder(normalized);
+      }
+      if (_disposed) {
+        return null;
+      }
+      _state.favoriteSortOrder = normalized;
+      resetForReload();
+      await loadInitial(
+        timeoutMessage: timeoutMessage,
+        onFolderLoadError: onFolderLoadError,
+      );
+      return null;
+    } catch (e) {
+      return '$e';
+    }
+  }
 
   Future<String?> _reloadLocalComicsAfterSort() async {
     final requestVersion = _captureRequest(replace: true);
@@ -634,14 +652,14 @@ class FavoritePageController extends ChangeNotifier {
 
   Future<void> _loadInitialLocal({bool notifyIntermediate = true}) async {
     final requestVersion = _captureRequest(replace: true);
-    final sortOrder = await _localFlow.loadSortOrder();
+    final sortOrder = await _localFavoritesPreferences.loadSortOrder();
     if (!_isCurrent(requestVersion)) return;
     _state.favoriteSortOrder = normalizeLocalFavoriteSort(
       sortOrder,
       presentation: _presentationFor(_activeSourceKey),
     );
     if (sortOrder != _state.favoriteSortOrder) {
-      await _localFlow.saveSortOrder(_state.favoriteSortOrder);
+      await _localFavoritesPreferences.saveSortOrder(_state.favoriteSortOrder);
       if (!_isCurrent(requestVersion)) return;
     }
     await _reloadLocalFolders(notifyChanges: notifyIntermediate);

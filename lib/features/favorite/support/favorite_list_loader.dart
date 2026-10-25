@@ -2,7 +2,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/local_favorites/local_favorite_sort.dart';
 
 import 'favorite_cloud_flow.dart';
-import 'favorite_local_flow.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 
 /// Captures the scope at request creation, before any asynchronous work.
 class FavoriteListRequest {
@@ -22,7 +22,7 @@ class FavoriteListLoader {
 
   static const timeout = Duration(seconds: 90);
   final FavoriteCloudFlow cloud;
-  final FavoriteLocalFlow local;
+  final LocalFavoritesRepository local;
   int _generation = 0;
   bool _disposed = false;
 
@@ -58,9 +58,9 @@ class FavoriteListLoader {
     required String sortOrder,
     required String timeoutMessage,
   }) => request.mode == FavoritePageMode.local
-      ? local.loadPage(
+      ? local.loadFavoriteComics(
           page: page,
-          folderId: folderId,
+          folderId: folderId.trim(),
           sortOrder: normalizeLocalFavoriteSort(sortOrder),
           sourceKey: request.sourceKey,
         )

@@ -1,10 +1,8 @@
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 import 'package:hazuki/features/favorite/support/favorite_list_loader.dart';
-import 'package:hazuki/features/favorite/support/favorite_local_flow.dart';
 import 'package:hazuki/features/favorite/support/favorite_cloud_flow.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
-import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -16,8 +14,6 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 class _Reader extends Mock implements SourceReaderGateway {}
 
 class _Local extends Mock implements LocalFavoritesRepository {}
-
-class _Preferences extends Mock implements LocalFavoritesPreferencesStore {}
 
 class _Source extends Mock implements SourceFavoriteGateway {}
 
@@ -242,10 +238,7 @@ void main() {
       ).thenAnswer((_) async => const FavoriteComicsResult.success([]));
       final loader = FavoriteListLoader(
         cloud: FavoriteCloudFlow(_Source(), FakeSourceTaskControl()),
-        local: FavoriteLocalFlow(
-          repository: local,
-          preferences: _Preferences(),
-        ),
+        local: local,
       );
       await loader.load(
         request: loader.capture(
@@ -253,7 +246,7 @@ void main() {
           mode: FavoritePageMode.local,
         ),
         page: 1,
-        folderId: 'folder',
+        folderId: ' folder ',
         sortOrder: 'readNewest',
         timeoutMessage: '',
       );

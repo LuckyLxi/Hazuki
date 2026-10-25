@@ -2,7 +2,7 @@ import '../account/source_account_operations.dart';
 import '../adapters/hazuki_source_content_adapters.dart';
 import '../adapters/hazuki_source_image_adapters.dart';
 import '../adapters/hazuki_source_runtime_adapters.dart';
-import '../comments/source_comments_operations.dart';
+import '../comments/comments_capability.dart';
 import '../content/source_content_operations.dart';
 import '../debug/source_debug_operations.dart';
 import '../favorites/source_favorites_operations.dart';
@@ -37,7 +37,7 @@ class SourceGatewaySet {
     required SourceLocalizationOperations localization,
     required SourceSettingsOperations settings,
     required SourceAccountOperations account,
-    required SourceCommentsOperations comments,
+    required SourceCommentsCapability comments,
     required SourceContentOperations content,
     required SourceFavoritesOperations favorites,
     required SourceImageOperations image,
@@ -97,6 +97,7 @@ class SourceGatewaySet {
     category = HazukiSourceCategoryAdapter(content: content, debug: debug);
     commentsGateway = HazukiSourceCommentsAdapter(
       comments: comments,
+      account: account,
       debug: debug,
     );
     comicDetail = HazukiSourceComicDetailAdapter(

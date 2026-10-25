@@ -3,20 +3,16 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/favorite/state/favorite_folder_state.dart';
-import 'package:hazuki/features/favorite/state/favorite_sort_state.dart';
 import 'package:hazuki/features/favorite/support/favorite_cloud_flow.dart';
 import 'package:hazuki/features/favorite/support/favorite_folder_coordinator.dart';
-import 'package:hazuki/features/favorite/support/favorite_local_flow.dart';
 import 'package:hazuki/features/favorite/support/favorite_selection_store.dart';
-import 'package:hazuki/features/favorite/support/favorite_sort_flow.dart';
-import 'package:hazuki/features/favorite/support/favorite_source_policy.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _State extends Fake implements FavoriteFolderState, FavoriteSortState {
+class _State extends Fake implements FavoriteFolderState {
   _State(this.events);
 
   final List<String> events;
@@ -30,8 +26,6 @@ class _State extends Fake implements FavoriteFolderState, FavoriteSortState {
   String selectedLocalFolderId = 'local-1';
   @override
   bool loadingFolders = false;
-  @override
-  String favoriteSortOrder = 'mr';
   @override
   String get selectedFolderId => mode == FavoritePageMode.local
       ? selectedLocalFolderId
@@ -63,16 +57,12 @@ void main() {
   late _State state;
   late List<String> events;
   late FavoriteFolderCoordinator folders;
-  late FavoriteSortFlow sort;
   late List<FavoriteFolder> cloudFolders;
   late List<FavoriteFolder> localFolders;
   late String sourceKey;
   var disposed = false;
   Future<void>? selectionWait;
-  String? localReloadError;
   Object? selectionError;
-  Object? cloudReloadError;
-  void Function(String)? forwardedFolderError;
 
   setUp(() {
     events = [];
@@ -84,9 +74,6 @@ void main() {
     disposed = false;
     selectionWait = null;
     selectionError = null;
-    localReloadError = null;
-    cloudReloadError = null;
-    forwardedFolderError = null;
     cloudFolders = [
       defaultCloudFavoriteFolder,
       _folder('cloud-1', 'one', FavoriteFolderSource.cloud),
@@ -159,21 +146,11 @@ void main() {
         'save:${(call.positionalArguments[0] as FavoritePageMode).name}:${call.positionalArguments[1]}:${call.namedArguments[#sourceKey]}',
       );
     });
-    when(() => preferences.saveSortOrder(any())).thenAnswer((call) async {
-      events.add('local.sort:${call.positionalArguments.single}');
-    });
-    when(() => source.setFavoriteSortOrder(any())).thenAnswer((call) async {
-      events.add('cloud.sort:${call.positionalArguments.single}');
-    });
     final cloudFlow = FavoriteCloudFlow(source, FakeSourceTaskControl());
-    final localFlow = FavoriteLocalFlow(
-      repository: local,
-      preferences: preferences,
-    );
     folders = FavoriteFolderCoordinator(
       state: state,
       cloudFlow: cloudFlow,
-      localFlow: localFlow,
+      localFavoritesRepository: local,
       selectionStore: FavoriteSelectionStore(preferences),
       readSourceKey: () => sourceKey,
       isDisposed: () => disposed,
@@ -188,33 +165,6 @@ void main() {
         events.add('select:$id:$timeoutMessage');
         if (selectionError != null) throw selectionError!;
         if (selectionWait != null) await selectionWait;
-      },
-    );
-    sort = FavoriteSortFlow(
-      state: state,
-      cloudFlow: cloudFlow,
-      localFlow: localFlow,
-      sourcePolicy: FavoriteSourcePolicy(
-        presentationFor: (_) => {
-          'favoriteOrderAliases': {'old': 'mp'},
-          'favoriteDefaultOrder': 'mr',
-        },
-      ),
-      readSourceKey: () => sourceKey,
-      isDisposed: () => disposed,
-      reloadLocalComicsAfterSort: () async {
-        expect(state.favoriteSortOrder, 'readNewest');
-        events.add('reload.local');
-        return localReloadError;
-      },
-      resetForReload: () {
-        expect(state.favoriteSortOrder, 'mp');
-        events.add('reset.cloud');
-      },
-      loadInitial: ({required timeoutMessage, onFolderLoadError}) async {
-        events.add('reload.cloud:$timeoutMessage');
-        forwardedFolderError = onFolderLoadError;
-        if (cloudReloadError != null) throw cloudReloadError!;
       },
     );
   });
@@ -762,115 +712,5 @@ void main() {
         expect(events, ['notify:true:0']);
       });
     }
-  });
-
-  group('sort workflows', () {
-    for (final mode in FavoritePageMode.values) {
-      test('$mode sort aliases persist before reloading comics', () async {
-        state.mode = mode;
-        void onError(String error) {}
-        expect(
-          await sort.changeSortOrder(
-            mode == FavoritePageMode.local ? ' readNewest ' : ' old ',
-            timeoutMessage: 'timeout',
-            onFolderLoadError: onError,
-          ),
-          isNull,
-        );
-        expect(
-          state.favoriteSortOrder,
-          mode == FavoritePageMode.local ? 'readNewest' : 'mp',
-        );
-        expect(
-          events,
-          mode == FavoritePageMode.local
-              ? ['local.sort:readNewest', 'reload.local']
-              : ['cloud.sort:mp', 'reset.cloud', 'reload.cloud:timeout'],
-        );
-        if (mode == FavoritePageMode.cloud) {
-          expect(forwardedFolderError, same(onError));
-        }
-      });
-
-      test('$mode repeated sort does not persist or reload', () async {
-        state.mode = mode;
-        state.favoriteSortOrder = mode == FavoritePageMode.local
-            ? 'savedNewest'
-            : 'mr';
-        expect(
-          await sort.changeSortOrder(
-            ' ${state.favoriteSortOrder} ',
-            timeoutMessage: '',
-          ),
-          isNull,
-        );
-        expect(events, isEmpty);
-      });
-
-      test(
-        '$mode sort completion after disposal does not update state',
-        () async {
-          state.mode = mode;
-          final pending = Completer<void>();
-          if (mode == FavoritePageMode.local) {
-            when(
-              () => preferences.saveSortOrder('readNewest'),
-            ).thenAnswer((_) => pending.future);
-          } else {
-            when(
-              () => source.setFavoriteSortOrder('mp'),
-            ).thenAnswer((_) => pending.future);
-          }
-          final change = sort.changeSortOrder(
-            mode == FavoritePageMode.local ? 'readNewest' : 'mp',
-            timeoutMessage: 'timeout',
-          );
-          disposed = true;
-          pending.complete();
-          expect(await change, isNull);
-          expect(state.favoriteSortOrder, 'mr');
-          expect(events, isEmpty);
-        },
-      );
-    }
-
-    test('local list errors are returned through the callback', () async {
-      state.mode = FavoritePageMode.local;
-      localReloadError = 'list failed';
-      expect(
-        await sort.changeSortOrder('readNewest', timeoutMessage: ''),
-        'list failed',
-      );
-      expect(events, ['local.sort:readNewest', 'reload.local']);
-    });
-
-    test(
-      'cloud reload exceptions keep the persisted sort and return an error',
-      () async {
-        cloudReloadError = StateError('reload failed');
-        expect(
-          await sort.changeSortOrder('mp', timeoutMessage: ''),
-          contains('reload failed'),
-        );
-        expect(state.favoriteSortOrder, 'mp');
-        expect(events, ['cloud.sort:mp', 'reset.cloud', 'reload.cloud:']);
-      },
-    );
-
-    test(
-      'sort persistence failure leaves the selected order unchanged',
-      () async {
-        state.mode = FavoritePageMode.local;
-        when(
-          () => preferences.saveSortOrder('readNewest'),
-        ).thenThrow(StateError('save failed'));
-        expect(
-          await sort.changeSortOrder('readNewest', timeoutMessage: ''),
-          contains('save failed'),
-        );
-        expect(state.favoriteSortOrder, 'mr');
-        expect(events, isEmpty);
-      },
-    );
   });
 }

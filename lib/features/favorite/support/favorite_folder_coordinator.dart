@@ -6,7 +6,7 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 import '../state/favorite_folder_state.dart';
 import 'favorite_cloud_flow.dart';
-import 'favorite_local_flow.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'favorite_selection_store.dart';
 
 typedef _FolderContext = ({
@@ -22,7 +22,7 @@ class FavoriteFolderCoordinator {
   FavoriteFolderCoordinator({
     required FavoriteFolderState state,
     required FavoriteCloudFlow cloudFlow,
-    required FavoriteLocalFlow localFlow,
+    required LocalFavoritesRepository localFavoritesRepository,
     required FavoriteSelectionStore selectionStore,
     required String Function() readSourceKey,
     required bool Function() isDisposed,
@@ -35,7 +35,7 @@ class FavoriteFolderCoordinator {
     selectFolder,
   }) : _state = state,
        _cloudFlow = cloudFlow,
-       _localFlow = localFlow,
+       _localFavoritesRepository = localFavoritesRepository,
        _selectionStore = selectionStore,
        _readSourceKey = readSourceKey,
        _isDisposed = isDisposed,
@@ -44,7 +44,7 @@ class FavoriteFolderCoordinator {
 
   final FavoriteFolderState _state;
   final FavoriteCloudFlow _cloudFlow;
-  final FavoriteLocalFlow _localFlow;
+  final LocalFavoritesRepository _localFavoritesRepository;
   final FavoriteSelectionStore _selectionStore;
   final String Function() _readSourceKey;
   final bool Function() _isDisposed;
@@ -151,7 +151,10 @@ class FavoriteFolderCoordinator {
     final context = _captureContext();
     try {
       if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.addFolder(name, sourceKey: context.sourceKey);
+        await _localFavoritesRepository.addFavoriteFolder(
+          name,
+          sourceKey: context.sourceKey,
+        );
         if (!_isCurrentContext(context)) return null;
         await reloadLocalFolders();
       } else {
@@ -187,7 +190,7 @@ class FavoriteFolderCoordinator {
     final context = _captureContext();
     try {
       if (context.mode == FavoritePageMode.local) {
-        await _localFlow.renameFolder(
+        await _localFavoritesRepository.renameFavoriteFolder(
           folderId: normalizedFolderId,
           name: name,
           sourceKey: context.sourceKey,
@@ -223,7 +226,10 @@ class FavoriteFolderCoordinator {
     final context = _captureContext();
     try {
       if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.deleteFolder(currentId, sourceKey: context.sourceKey);
+        await _localFavoritesRepository.deleteFavoriteFolder(
+          currentId,
+          sourceKey: context.sourceKey,
+        );
         if (!_isCurrentContext(context)) return null;
         _state.selectedLocalFolderId = '';
         await saveSelectedFolderId(FavoritePageMode.local, '');
@@ -275,8 +281,8 @@ class FavoriteFolderCoordinator {
       _notify();
     }
 
-    final result = await _localFlow.loadFoldersForSource(
-      request.context.sourceKey,
+    final result = await _localFavoritesRepository.loadFavoriteFolders(
+      sourceKey: request.context.sourceKey,
     );
     if (!_isCurrentFolderRequest(request)) {
       return;

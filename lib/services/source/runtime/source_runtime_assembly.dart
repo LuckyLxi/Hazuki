@@ -14,7 +14,6 @@ import '../category/source_category_capability.dart';
 import '../comic/comic_details_capability.dart';
 import '../comic/source_comic_details_cache.dart';
 import '../comments/comments_capability.dart';
-import '../comments/source_comments_operations.dart';
 import '../common/source_json_coerce.dart';
 import '../content/source_content_operations.dart';
 import '../debug/debug_favorites_capability.dart';
@@ -245,11 +244,6 @@ class SourceRuntimeAssembly {
         dailyCheckIn: _dailyCheckInCapability,
       );
   late final SourceCommentsCapability _commentsCapability;
-  late final SourceCommentsOperations _commentsOperations =
-      SourceCommentsOperations(
-        comments: _commentsCapability,
-        account: _accountOperations,
-      );
   late final SourceDebugOperations _debugOperations = SourceDebugOperations(
     activeDebugLog: () => _activeHandle.debugLog,
     activeFacade: () => _facade,
@@ -291,7 +285,7 @@ class SourceRuntimeAssembly {
     localization: _localizationOperations,
     settings: _settingsOperations,
     account: _accountOperations,
-    comments: _commentsOperations,
+    comments: _commentsCapability,
     content: _contentOperations,
     favorites: _favoritesOperations,
     image: _imageOperations,
@@ -342,7 +336,7 @@ class SourceRuntimeAssembly {
     diagnostics: _runtimeCapability.diagnostics,
     scriptEditing: _runtimeCapability.scriptEditing,
     content: _contentOperations,
-    comments: _commentsOperations,
+    comments: _commentsCapability,
     favorites: _favoritesOperations,
     image: _imageOperations,
     settings: _settingsOperations,
@@ -511,7 +505,7 @@ class SourceRuntimeTestAccess {
   final SourceRuntimeDiagnosticsOperations diagnostics;
   final SourceScriptEditingOperations scriptEditing;
   final SourceContentOperations content;
-  final SourceCommentsOperations comments;
+  final SourceCommentsCapability comments;
   final SourceFavoritesOperations favorites;
   final SourceImageOperations image;
   final SourceSettingsOperations settings;

@@ -4,11 +4,10 @@ import 'package:hazuki/services/source/plugins/source_favorite_menu.dart';
 
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'favorite_folder_state.dart';
-import 'favorite_sort_state.dart';
 
 export 'favorite_folder_state.dart' show defaultCloudFavoriteFolder;
 
-class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
+class FavoritePageData implements FavoriteFolderState {
   bool isFirstLoad = true;
   @override
   FavoritePageMode mode = FavoritePageMode.cloud;
@@ -29,7 +28,6 @@ class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
   @override
   bool loadingFolders = false;
   int currentPage = 1;
-  @override
   String favoriteSortOrder = '';
 
   @override
