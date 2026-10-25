@@ -40,11 +40,11 @@ dart format --output=none --set-exit-if-changed lib test
 
 ## Architecture
 
-Hazuki is a Flutter manga reader targeting Android. It fetches and renders manga from third-party JavaScript source scripts (JMComic / CopyManga / Picacg via [venera-configs](https://github.com/venera-app/venera-configs)). No Provider/GetX/Riverpod — state is `ChangeNotifier` controllers consumed via `ListenableBuilder`/`AnimatedBuilder`.
+Hazuki is a Flutter manga reader targeting Android. It fetches and renders manga from installable JavaScript source plugins (Hazuki Source API v1; default index `LuckyLxi/Sources`). The bundled JMComic / CopyManga / Picacg plugins were adapted from [venera-configs](https://github.com/venera-app/venera-configs), and the plugin SDK still accepts venera-style `ComicSource` subclasses. No Provider/GetX/Riverpod — state is `ChangeNotifier` controllers consumed via `ListenableBuilder`/`AnimatedBuilder`.
 
 ### JS source runtime
 
-All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `quickjs_engine` (QuickJS, at `third_party/pub_overrides/quickjs_engine`). The JS source script is downloaded at first launch and stored locally. `assets/init.js` is the bridge library injected into the runtime before the source script (provides `sendMessage`, `Convert`, `Network`, etc.).
+All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `quickjs_engine` (QuickJS, at `third_party/pub_overrides/quickjs_engine`). Source scripts are installed locally by `SourcePluginManager`; there is no other script store. `assets/init.js` is the bridge library injected into the runtime before the source script (provides `sendMessage`, `Convert`, `Network`, etc.), followed by `assets/hazuki_plugin_sdk.js` (`HazukiSource`, `Hazuki.registerSource`).
 
 The source service is a decomposed subsystem under `lib/services/source/`, layered as:
 
