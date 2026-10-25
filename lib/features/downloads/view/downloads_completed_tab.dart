@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_models.dart';
 import 'package:hazuki/services/download_groups/download_group.dart';
+import 'package:hazuki/widgets/hazuki_morph_dialog.dart';
 import 'downloads_cover_widgets.dart';
 import 'downloads_completed_status_widgets.dart';
 import 'downloads_shell_widgets.dart';
@@ -366,16 +367,11 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
     setState(() {
       _categoryShellOpen = true;
     });
-    await showGeneralDialog<void>(
+    await showHazukiMorphDialog<void>(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.black.withValues(alpha: 0.34),
-      transitionDuration: const Duration(milliseconds: 420),
-      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+      builder: (dialogContext, animation) {
         return DownloadsCategoryShellDialog(
           animation: animation,
-          onDisposed: _restoreCategoryLauncher,
           groups: widget.groups,
           selectedGroupId: widget.selectedGroupId,
           groupComicCounts: widget.groupComicCounts,
@@ -386,10 +382,8 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
           onDeleteGroup: widget.onDeleteGroup,
         );
       },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        return child;
-      },
     );
+    _restoreCategoryLauncher();
   }
 
   void _restoreCategoryLauncher() {

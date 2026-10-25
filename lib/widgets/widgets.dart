@@ -8,6 +8,7 @@ export 'hazuki_frosted_menu.dart';
 export 'hazuki_frosted_menu_button.dart';
 export 'source_plugin_menu.dart';
 export 'hazuki_m3e_loading_indicator.dart';
+export 'hazuki_morph_dialog.dart';
 export 'hazuki_pull_to_refresh.dart';
 export 'hazuki_prompt.dart';
 export 'reader_settings_content.dart';

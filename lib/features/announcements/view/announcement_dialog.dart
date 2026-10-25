@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/announcements/announcement.dart';
+import 'package:hazuki/widgets/hazuki_morph_dialog.dart';
 
 import 'announcement_card_content.dart';
 import 'announcement_content.dart';
@@ -75,92 +74,17 @@ Future<void> _showMorphingAnnouncementDialog(
   BuildContext context,
   Announcement announcement, {
   VoidCallback? onMorphLanding,
-}) async {
+}) {
   final sourceRect = _resolveSourceRect(context);
-  final disposed = Completer<void>();
-  await showGeneralDialog<void>(
+  return showHazukiMorphDialog<void>(
     context: context,
-    barrierDismissible: true,
-    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor: Colors.black.withValues(alpha: 0.34),
-    transitionDuration: const Duration(milliseconds: 420),
-    pageBuilder: (dialogContext, animation, secondaryAnimation) {
-      return _AnnouncementMorphLifecycle(
-        animation: animation,
-        onLanding: onMorphLanding,
-        onDisposed: () {
-          if (!disposed.isCompleted) {
-            disposed.complete();
-          }
-        },
-        child: _AnnouncementMorphDialog(
-          animation: animation,
-          announcement: announcement,
-          sourceRect: sourceRect,
-        ),
-      );
-    },
-    transitionBuilder: (context, animation, secondaryAnimation, child) => child,
+    onLanding: onMorphLanding,
+    builder: (dialogContext, animation) => _AnnouncementMorphDialog(
+      animation: animation,
+      announcement: announcement,
+      sourceRect: sourceRect,
+    ),
   );
-  if (!disposed.isCompleted) {
-    await disposed.future;
-  }
-}
-
-class _AnnouncementMorphLifecycle extends StatefulWidget {
-  const _AnnouncementMorphLifecycle({
-    required this.animation,
-    this.onLanding,
-    required this.onDisposed,
-    required this.child,
-  });
-
-  final Animation<double> animation;
-  final VoidCallback? onLanding;
-  final VoidCallback onDisposed;
-  final Widget child;
-
-  @override
-  State<_AnnouncementMorphLifecycle> createState() =>
-      _AnnouncementMorphLifecycleState();
-}
-
-class _AnnouncementMorphLifecycleState
-    extends State<_AnnouncementMorphLifecycle> {
-  bool _landingReported = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.animation.addListener(_handleAnimation);
-  }
-
-  void _handleAnimation() {
-    if (!_landingReported &&
-        widget.animation.status == AnimationStatus.reverse &&
-        widget.animation.value <= 0.08) {
-      _reportLanding();
-    }
-  }
-
-  void _reportLanding() {
-    if (_landingReported) {
-      return;
-    }
-    _landingReported = true;
-    widget.onLanding?.call();
-  }
-
-  @override
-  void dispose() {
-    widget.animation.removeListener(_handleAnimation);
-    _reportLanding();
-    widget.onDisposed();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
 }
 
 Rect? _resolveSourceRect(BuildContext context) {
@@ -248,107 +172,28 @@ class _AnnouncementMorphDialogState extends State<_AnnouncementMorphDialog> {
               width: dialogWidth,
               height: announcementCardHeight,
             );
-        return AnimatedBuilder(
+        return HazukiMorphDialogShell(
           animation: animation,
-          builder: (context, child) {
-            final progress = animation.value;
-            final moveProgress = const Interval(
-              0,
-              0.78,
-              curve: Curves.easeOutCubic,
-            ).transform(progress);
-            final expandProgress = const Interval(
-              0.08,
-              1,
-              curve: Curves.easeOutCubic,
-            ).transform(progress);
-            final movingRect = Rect.lerp(
-              startRect,
-              Rect.fromCenter(
-                center: endRect.center,
-                width: startRect.width,
-                height: startRect.height,
-              ),
-              moveProgress,
-            )!;
-            final rect = Rect.fromCenter(
-              center: movingRect.center,
-              width:
-                  startRect.width +
-                  ((endRect.width - startRect.width) * expandProgress),
-              height:
-                  startRect.height +
-                  ((endRect.height - startRect.height) * expandProgress),
-            );
-            final contentOpacity = const Interval(
-              0.42,
-              0.78,
-              curve: Curves.easeOutCubic,
-            ).transform(progress);
-            final launcherOpacity =
-                1 - const Interval(0.12, 0.42).transform(progress);
-            final launcherColor =
-                announcement.level == AnnouncementLevel.important
-                ? colorScheme.errorContainer
-                : colorScheme.primaryContainer;
-            // 展开后跟随全局弹窗底色，未配置时回退 M3 默认值。
-            final shellColor = Color.lerp(
-              launcherColor,
-              DialogTheme.of(context).backgroundColor ??
-                  colorScheme.surfaceContainerHigh,
-              expandProgress,
-            )!;
-            return Stack(
-              key: const ValueKey<String>('announcement_morph_animation'),
-              children: [
-                Positioned.fromRect(
-                  rect: rect,
-                  child: Material(
-                    key: const ValueKey<String>('announcement_morph_dialog'),
-                    color: shellColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        announcementCardBorderRadius + (12 * expandProgress),
-                      ),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    elevation: 2 + (6 * expandProgress),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Opacity(
-                          opacity: launcherOpacity,
-                          child: _AnnouncementMorphLauncherContents(
-                            announcement: announcement,
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: ClipRect(
-                            child: OverflowBox(
-                              alignment: Alignment.center,
-                              minWidth: endRect.width,
-                              maxWidth: endRect.width,
-                              minHeight: endRect.height,
-                              maxHeight: endRect.height,
-                              child: Opacity(
-                                opacity: contentOpacity,
-                                child: _AnnouncementDialogPanel(
-                                  announcement: announcement,
-                                  contentScrollable:
-                                      dialogLayout.contentScrollable,
-                                  onContentSizeChanged: _updateContentHeight,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+          startRect: startRect,
+          endRect: endRect,
+          launcherColor: announcement.level == AnnouncementLevel.important
+              ? colorScheme.errorContainer
+              : colorScheme.primaryContainer,
+          launcherOverlay: _AnnouncementMorphLauncherContents(
+            announcement: announcement,
+          ),
+          beginRadius: announcementCardBorderRadius,
+          radiusGrowth: 12,
+          beginElevation: 2,
+          elevationGrowth: 6,
+          contentAlignment: Alignment.center,
+          animationKey: const ValueKey<String>('announcement_morph_animation'),
+          shellKey: const ValueKey<String>('announcement_morph_dialog'),
+          child: _AnnouncementDialogPanel(
+            announcement: announcement,
+            contentScrollable: dialogLayout.contentScrollable,
+            onContentSizeChanged: _updateContentHeight,
+          ),
         );
       },
     );

@@ -1,6 +1,6 @@
 part of '../downloads_completed_tab.dart';
 
-class DownloadsCategoryMorphLauncher extends StatefulWidget {
+class DownloadsCategoryMorphLauncher extends StatelessWidget {
   const DownloadsCategoryMorphLauncher({
     super.key,
     required this.visible,
@@ -10,8 +10,8 @@ class DownloadsCategoryMorphLauncher extends StatefulWidget {
     required this.comicCount,
   });
 
-  static const double height = 36;
-  static const double cornerRadius = 12;
+  static const double height = HazukiMorphCapsule.height;
+  static const double cornerRadius = HazukiMorphCapsule.cornerRadius;
 
   final bool visible;
   final int landingVersion;
@@ -20,129 +20,21 @@ class DownloadsCategoryMorphLauncher extends StatefulWidget {
   final int comicCount;
 
   @override
-  State<DownloadsCategoryMorphLauncher> createState() =>
-      _DownloadsCategoryMorphLauncherState();
-}
-
-class _DownloadsCategoryMorphLauncherState
-    extends State<DownloadsCategoryMorphLauncher>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _landingController;
-  late final Animation<double> _landingOffset;
-  late final Animation<double> _landingScale;
-
-  @override
-  void initState() {
-    super.initState();
-    _landingController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-      value: 1,
-    );
-    final landingCurve = CurvedAnimation(
-      parent: _landingController,
-      curve: Curves.easeOutCubic,
-    );
-    _landingOffset = Tween<double>(begin: -3, end: 0).animate(landingCurve);
-    _landingScale = Tween<double>(begin: 0.995, end: 1).animate(landingCurve);
-  }
-
-  @override
-  void didUpdateWidget(covariant DownloadsCategoryMorphLauncher oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.visible && widget.landingVersion != oldWidget.landingVersion) {
-      _landingController.forward(from: 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _landingController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final radius = BorderRadius.circular(
-      DownloadsCategoryMorphLauncher.cornerRadius,
-    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: AnimatedBuilder(
-            animation: _landingController,
-            builder: (context, child) {
-              return Transform.translate(
-                key: const ValueKey<String>(
-                  'downloads_category_launcher_landing',
-                ),
-                offset: Offset(0, _landingOffset.value),
-                child: Transform.scale(
-                  scale: _landingScale.value,
-                  child: child,
-                ),
-              );
-            },
-            child: Opacity(
-              key: const ValueKey<String>(
-                'downloads_category_launcher_opacity',
-              ),
-              opacity: widget.visible ? 1 : 0,
-              child: IgnorePointer(
-                ignoring: !widget.visible,
-                child: DecoratedBox(
-                  key: const ValueKey<String>('downloads_category_launcher'),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    borderRadius: radius,
-                    border: Border.all(
-                      color: colorScheme.primary.withValues(alpha: 0.24),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.shadow.withValues(alpha: 0.12),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: radius,
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: widget.onPressed,
-                      child: SizedBox(
-                        height: DownloadsCategoryMorphLauncher.height,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.folder_copy_outlined,
-                              size: 16,
-                              color: colorScheme.onPrimaryContainer,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${widget.label} (${widget.comicCount})',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+      child: HazukiMorphCapsule(
+        visible: visible,
+        landingVersion: landingVersion,
+        onPressed: onPressed,
+        icon: Icons.folder_copy_outlined,
+        label: '$label ($comicCount)',
+        decorationKey: const ValueKey<String>('downloads_category_launcher'),
+        opacityKey: const ValueKey<String>(
+          'downloads_category_launcher_opacity',
+        ),
+        landingKey: const ValueKey<String>(
+          'downloads_category_launcher_landing',
         ),
       ),
     );
@@ -153,7 +45,6 @@ class DownloadsCategoryShellDialog extends StatefulWidget {
   const DownloadsCategoryShellDialog({
     super.key,
     required this.animation,
-    required this.onDisposed,
     required this.groups,
     required this.selectedGroupId,
     required this.groupComicCounts,
@@ -171,7 +62,6 @@ class DownloadsCategoryShellDialog extends StatefulWidget {
   static const Duration _newGroupScrollDuration = Duration(milliseconds: 360);
 
   final Animation<double> animation;
-  final VoidCallback onDisposed;
   final List<DownloadGroup> groups;
   final String selectedGroupId;
   final Map<String, int> groupComicCounts;
@@ -207,148 +97,67 @@ class _DownloadsCategoryShellDialogState
   }
 
   @override
-  void dispose() {
-    widget.onDisposed();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
         final dialogWidth = (constraints.maxWidth - 32).clamp(0.0, 420.0);
         final horizontalPosition = (constraints.maxWidth - dialogWidth) / 2;
         final startTop = mediaQuery.padding.top + kToolbarHeight + 56;
-        final endCenterY = constraints.maxHeight / 2;
         final startRect = Rect.fromLTWH(
           horizontalPosition,
           startTop,
           dialogWidth,
           DownloadsCategoryMorphLauncher.height,
         );
-        final centeredBarRect = Rect.fromCenter(
-          center: Offset(constraints.maxWidth / 2, endCenterY),
+        final endRect = Rect.fromCenter(
+          center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
           width: dialogWidth,
-          height: DownloadsCategoryMorphLauncher.height,
+          height: DownloadsCategoryShellDialog._dialogHeight,
         );
-        return AnimatedBuilder(
+        return HazukiMorphDialogShell(
           animation: widget.animation,
-          builder: (context, child) {
-            final progress = widget.animation.value;
-            final moveProgress = const Interval(
-              0,
-              0.78,
-              curve: Curves.easeOutCubic,
-            ).transform(progress);
-            final expandProgress = const Interval(
-              0.08,
-              1,
-              curve: Curves.easeOutCubic,
-            ).transform(progress);
-            final movingRect = Rect.lerp(
-              startRect,
-              centeredBarRect,
-              moveProgress,
-            )!;
-            final rect = Rect.fromCenter(
-              center: movingRect.center,
-              width: dialogWidth,
-              height:
-                  DownloadsCategoryMorphLauncher.height +
-                  ((DownloadsCategoryShellDialog._dialogHeight -
-                          DownloadsCategoryMorphLauncher.height) *
-                      expandProgress),
-            );
-            final contentOpacity = const Interval(
-              0.42,
-              0.78,
-              curve: Curves.easeOutCubic,
-            ).transform(progress);
-            final launcherOpacity =
-                1 - const Interval(0.12, 0.42).transform(progress);
-            // 展开后跟随全局弹窗底色，未配置时回退 M3 默认值。
-            final shellColor = Color.lerp(
-              colorScheme.primaryContainer,
-              DialogTheme.of(context).backgroundColor ??
-                  colorScheme.surfaceContainerHigh,
-              expandProgress,
-            )!;
-            final borderColor = Color.lerp(
-              colorScheme.primary.withValues(alpha: 0.24),
-              Colors.transparent,
-              expandProgress,
-            )!;
-            return Stack(
-              key: const ValueKey<String>('downloads_category_morph_animation'),
-              children: [
-                Positioned.fromRect(
-                  rect: rect,
-                  child: Material(
-                    key: const ValueKey<String>('downloads_category_dialog'),
-                    color: shellColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        DownloadsCategoryMorphLauncher.cornerRadius +
-                            (16 * expandProgress),
-                      ),
-                      side: BorderSide(color: borderColor),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    elevation: 4 + (4 * expandProgress),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Opacity(
-                          opacity: launcherOpacity,
-                          child: _DownloadsCategoryLauncherContents(
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: ClipRect(
-                            child: OverflowBox(
-                              alignment: Alignment.topCenter,
-                              minHeight:
-                                  DownloadsCategoryShellDialog._dialogHeight,
-                              maxHeight:
-                                  DownloadsCategoryShellDialog._dialogHeight,
-                              child: Opacity(
-                                opacity: contentOpacity,
-                                child: _DownloadsCategoryShellContents(
-                                  groups: _groups,
-                                  selectedGroupId: _selectedGroupId,
-                                  groupComicCounts: widget.groupComicCounts,
-                                  onSelectGroup: (groupId) {
-                                    widget.onSelectGroup(groupId);
-                                    Navigator.of(context).pop();
-                                  },
-                                  onCreateGroup: _createGroup,
-                                  onRenameGroup: _renameGroup,
-                                  sorting: _sorting,
-                                  animateTiles: _animateGroupTiles,
-                                  deletingGroupIds: _deletingGroupIds,
-                                  focusedGroupId: _focusedGroupId,
-                                  focusVersion: _focusVersion,
-                                  highlightGroupId: _highlightGroupId,
-                                  highlightVersion: _highlightVersion,
-                                  onToggleSorting: _toggleSorting,
-                                  onReorder: _reorder,
-                                  onDeleteGroup: _deleteGroup,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+          startRect: startRect,
+          endRect: endRect,
+          launcherColor: colorScheme.primaryContainer,
+          launcherBorderColor: colorScheme.primary.withValues(alpha: 0.24),
+          launcherOverlay: HazukiMorphCapsuleContents(
+            icon: Icons.folder_copy_outlined,
+            label: l10n(context).comicDetailCategories,
+            color: colorScheme.onPrimaryContainer,
+            mainAxisSize: MainAxisSize.min,
+          ),
+          beginRadius: DownloadsCategoryMorphLauncher.cornerRadius,
+          radiusGrowth: 16,
+          beginElevation: 4,
+          elevationGrowth: 4,
+          contentAlignment: Alignment.topCenter,
+          animationKey: const ValueKey<String>(
+            'downloads_category_morph_animation',
+          ),
+          shellKey: const ValueKey<String>('downloads_category_dialog'),
+          child: _DownloadsCategoryShellContents(
+            groups: _groups,
+            selectedGroupId: _selectedGroupId,
+            groupComicCounts: widget.groupComicCounts,
+            onSelectGroup: (groupId) {
+              widget.onSelectGroup(groupId);
+              Navigator.of(context).pop();
+            },
+            onCreateGroup: _createGroup,
+            onRenameGroup: _renameGroup,
+            sorting: _sorting,
+            animateTiles: _animateGroupTiles,
+            deletingGroupIds: _deletingGroupIds,
+            focusedGroupId: _focusedGroupId,
+            focusVersion: _focusVersion,
+            highlightGroupId: _highlightGroupId,
+            highlightVersion: _highlightVersion,
+            onToggleSorting: _toggleSorting,
+            onReorder: _reorder,
+            onDeleteGroup: _deleteGroup,
+          ),
         );
       },
     );
@@ -476,30 +285,6 @@ class _DownloadsCategoryShellDialogState
         _selectedGroupId = DownloadGroup.defaultGroupId;
       }
     });
-  }
-}
-
-class _DownloadsCategoryLauncherContents extends StatelessWidget {
-  const _DownloadsCategoryLauncherContents({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.folder_copy_outlined, size: 16, color: color),
-        const SizedBox(width: 6),
-        Text(
-          l10n(context).comicDetailCategories,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
   }
 }
 
