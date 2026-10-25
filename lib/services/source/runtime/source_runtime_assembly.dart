@@ -19,7 +19,7 @@ import '../content/source_content_operations.dart';
 import '../debug/debug_favorites_capability.dart';
 import '../debug/debug_report_capability.dart';
 import '../debug/source_debug_operations.dart';
-import '../explore_capability.dart';
+import '../content/explore_capability.dart';
 import '../favorites/source_favorites_capability.dart';
 import '../favorites/source_favorites_operations.dart';
 import '../gateways/source_gateway_set.dart';

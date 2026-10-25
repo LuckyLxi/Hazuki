@@ -36,7 +36,7 @@ import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
-import 'package:hazuki/shared/window/window_title_bar_control.dart';
+import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/widgets/cached_image_widgets.dart';
 import 'package:hazuki/widgets/expanding_chapter_sheet.dart';

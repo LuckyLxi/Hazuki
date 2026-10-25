@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/discover/state/discover_section_page_controller.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/source/explore_capability.dart';
+import 'package:hazuki/services/source/content/explore_capability.dart';
 import 'package:hazuki/services/source/gateways/source_content_gateways.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 

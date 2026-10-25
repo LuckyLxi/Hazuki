@@ -563,7 +563,7 @@ void main() {
 
   test('migrated source capabilities use explicit runtime dependencies', () {
     const paths = [
-      'lib/services/source/explore_capability.dart',
+      'lib/services/source/content/explore_capability.dart',
       'lib/services/source/category/source_category_capability.dart',
       'lib/services/source/comic/source_comic_details_cache.dart',
       'lib/services/source/comic/source_comic_details_parser.dart',

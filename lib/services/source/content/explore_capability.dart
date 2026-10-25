@@ -1,12 +1,12 @@
-import 'runtime/source_runtime_handle.dart';
-import 'runtime/source_operation_context.dart';
-import 'runtime/source_operation_runner.dart';
-import 'models/source_task.dart';
+import '../runtime/source_runtime_handle.dart';
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../models/hazuki_models.dart';
-import 'common/source_json_coerce.dart';
-import 'runtime/source_runtime_host.dart';
+import '../../../models/hazuki_models.dart';
+import '../common/source_json_coerce.dart';
+import '../runtime/source_runtime_host.dart';
 
 typedef SourceTextTranslator = String Function(String text, {String sourceKey});
 

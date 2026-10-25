@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'package:hazuki/shared/window/window_title_bar_control.dart';
-import 'package:hazuki/shared/window/windows_app_bar_drag_area.dart';
+import 'package:hazuki/shared/windows/window_title_bar_control.dart';
+import 'package:hazuki/shared/windows/windows_app_bar_drag_area.dart';
 import 'package:hazuki/widgets/hazuki_frosted_app_bar.dart';
 
 class _TestWindowTitleBarControl extends ChangeNotifier

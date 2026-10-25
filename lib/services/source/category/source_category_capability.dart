@@ -10,7 +10,7 @@ import '../../../models/hazuki_models.dart';
 import '../common/source_prefs_keys.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
-import '../explore_capability.dart';
+import '../content/explore_capability.dart';
 
 typedef SourceComicParser =
     List<ExploreComic> Function(List comics, {String sourceKey});

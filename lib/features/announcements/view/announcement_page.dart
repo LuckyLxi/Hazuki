@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/announcements/announcement.dart';
 import 'package:hazuki/services/announcements/announcement_controller.dart';
-import 'package:hazuki/shared/window/windows_app_bar_drag_area.dart';
+import 'package:hazuki/shared/windows/windows_app_bar_drag_area.dart';
 
 import 'announcement_content.dart';
 

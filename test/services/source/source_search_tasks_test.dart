@@ -7,7 +7,7 @@ import 'package:hazuki/services/logging/app_log_store.dart';
 import 'package:hazuki/services/source/category/source_category_capability.dart';
 import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import 'package:hazuki/services/source/content/source_content_operations.dart';
-import 'package:hazuki/services/source/explore_capability.dart';
+import 'package:hazuki/services/source/content/explore_capability.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_handle.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';

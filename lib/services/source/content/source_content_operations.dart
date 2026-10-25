@@ -9,7 +9,7 @@ import '../../../models/hazuki_models.dart';
 import '../category/source_category_capability.dart';
 import '../comic/comic_details_capability.dart';
 import '../common/source_json_coerce.dart';
-import '../explore_capability.dart';
+import 'explore_capability.dart';
 import '../runtime/source_runtime_host.dart';
 import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_initialization_operations.dart';

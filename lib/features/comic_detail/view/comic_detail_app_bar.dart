@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/shared/window/windows_app_bar_drag_area.dart';
+import 'package:hazuki/shared/windows/windows_app_bar_drag_area.dart';
 
 import 'comic_detail_view_primitives.dart';
 

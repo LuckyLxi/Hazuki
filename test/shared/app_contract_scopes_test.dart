@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
-import 'package:hazuki/shared/window/window_title_bar_control.dart';
+import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 
 class _AppearanceSource extends ChangeNotifier
     implements AppearanceSettingsSource {

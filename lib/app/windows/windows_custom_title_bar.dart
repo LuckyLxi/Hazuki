@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'package:hazuki/shared/window/windows_app_bar_drag_area.dart';
+import 'package:hazuki/shared/windows/windows_app_bar_drag_area.dart';
 
 const double hazukiWindowsTitleBarHeight = kWindowCaptionHeight;
 
