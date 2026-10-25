@@ -105,10 +105,6 @@ class AdvancedSettingsContent extends StatelessWidget {
               title: Text(strings.advancedSoftwareUpdateSourceTitle),
               subtitle: Text(strings.advancedSoftwareUpdateSourceSubtitle),
               trailing: HazukiFrostedDropdown<SoftwareUpdateSource>(
-                pluginMenu: SourcePluginMenuBinding(
-                  menuId: 'settings.softwareUpdateSource',
-                  valueId: (value) => value.name,
-                ),
                 selected: softwareUpdateSource,
                 tooltip: strings.advancedSoftwareUpdateSourceTitle,
                 onSelected: onSoftwareUpdateSourceChanged,
