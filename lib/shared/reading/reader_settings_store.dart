@@ -21,7 +21,6 @@ class ReaderSettingsSnapshot {
     required this.filterStrength,
     required this.pageIndicator,
     required this.pinchToZoom,
-    required this.longPressToSave,
   });
 
   final ReaderMode readerMode;
@@ -37,7 +36,6 @@ class ReaderSettingsSnapshot {
   final double filterStrength;
   final bool pageIndicator;
   final bool pinchToZoom;
-  final bool longPressToSave;
 }
 
 class ReaderSettingsStore {
@@ -57,7 +55,6 @@ class ReaderSettingsStore {
   static const String filterStrengthKey = 'reader_filter_strength';
   static const String pageIndicatorKey = 'reader_page_indicator';
   static const String pinchToZoomKey = 'reader_pinch_to_zoom';
-  static const String longPressToSaveKey = 'reader_long_press_save';
   static const String restorePagePositionKey = 'reader_restore_page_position';
   static const String windowsShortcutsGuideSeenKey =
       'reader_windows_shortcuts_guide_seen';
@@ -75,7 +72,6 @@ class ReaderSettingsStore {
   static const double defaultFilterStrength = 0.3;
   static const bool defaultPageIndicator = false;
   static const bool defaultPinchToZoom = false;
-  static const bool defaultLongPressToSave = false;
   static const bool defaultRestorePagePosition = false;
 
   Future<ReaderSettingsSnapshot> load() async {
@@ -100,8 +96,6 @@ class ReaderSettingsStore {
       ),
       pageIndicator: prefs.getBool(pageIndicatorKey) ?? defaultPageIndicator,
       pinchToZoom: prefs.getBool(pinchToZoomKey) ?? defaultPinchToZoom,
-      longPressToSave:
-          prefs.getBool(longPressToSaveKey) ?? defaultLongPressToSave,
     );
   }
 
@@ -155,10 +149,6 @@ class ReaderSettingsStore {
 
   Future<void> savePinchToZoom(bool value) {
     return _saveBool(pinchToZoomKey, value);
-  }
-
-  Future<void> saveLongPressToSave(bool value) {
-    return _saveBool(longPressToSaveKey, value);
   }
 
   /// 仅在进入阅读器时读取一次，不放入快照，避免影响阅读器内设置抽屉。

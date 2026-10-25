@@ -143,7 +143,6 @@ void main() {
           filterStrength: 0.6,
           pageIndicator: true,
           pinchToZoom: true,
-          longPressToSave: true,
         ),
       );
 
@@ -160,7 +159,6 @@ void main() {
       expect(state.filterStrength, 0.6);
       expect(state.pageIndicator, isTrue);
       expect(state.pinchToZoom, isTrue);
-      expect(state.longPressToSave, isTrue);
       expect(state.readerSpreadSize, 2);
       expect(state.readerSpreadCount, 2);
       expect(state.itemKeys, hasLength(2));
@@ -613,7 +611,6 @@ void main() {
       await controller.updateFilterStrength(1.4);
       await controller.togglePageIndicator(true);
       await controller.togglePinchToZoom(true);
-      await controller.toggleLongPressToSave(true);
 
       final prefs = await SharedPreferences.getInstance();
       expect(
@@ -638,7 +635,6 @@ void main() {
       expect(prefs.getDouble(ReaderSettingsStore.filterStrengthKey), 1.0);
       expect(prefs.getBool(ReaderSettingsStore.pageIndicatorKey), isTrue);
       expect(prefs.getBool(ReaderSettingsStore.pinchToZoomKey), isTrue);
-      expect(prefs.getBool(ReaderSettingsStore.longPressToSaveKey), isTrue);
     });
   });
 
@@ -660,7 +656,6 @@ void main() {
               tapToTurnPage: false,
               volumeButtonTurnPage: false,
               pinchToZoom: false,
-              longPressToSave: false,
               immersiveMode: true,
               keepScreenOn: true,
               pageIndicator: false,
@@ -675,7 +670,6 @@ void main() {
               onTapToTurnPageChanged: (_) {},
               onVolumeButtonTurnPageChanged: (_) {},
               onPinchToZoomChanged: (_) {},
-              onLongPressToSaveChanged: (_) {},
               onImmersiveModeChanged: (_) {},
               onKeepScreenOnChanged: (_) {},
               onPageIndicatorChanged: (_) {},
@@ -689,6 +683,10 @@ void main() {
           ),
         ),
       );
+
+      expect(find.text('Long press to save images'), findsNothing);
+      expect(find.text('Image zoom'), findsOneWidget);
+      expect(find.text('Allow zooming in on images'), findsOneWidget);
 
       final modeSlider = find.byKey(
         const ValueKey<String>('reader-mode-slider'),

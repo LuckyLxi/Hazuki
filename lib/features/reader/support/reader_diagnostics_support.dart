@@ -41,7 +41,6 @@ class ReaderDiagnosticsSnapshot {
     required this.tapToTurnPage,
     required this.pageIndicator,
     required this.pinchToZoom,
-    required this.longPressToSave,
     required this.immersiveMode,
     required this.keepScreenOn,
     required this.customBrightness,
@@ -82,7 +81,6 @@ class ReaderDiagnosticsSnapshot {
   final bool tapToTurnPage;
   final bool pageIndicator;
   final bool pinchToZoom;
-  final bool longPressToSave;
   final bool immersiveMode;
   final bool keepScreenOn;
   final bool customBrightness;
@@ -194,7 +192,6 @@ Map<String, dynamic> buildReaderLogPayload({
     'tapToTurnPage': snapshot.tapToTurnPage,
     'pageIndicator': snapshot.pageIndicator,
     'pinchToZoom': snapshot.pinchToZoom,
-    'longPressToSave': snapshot.longPressToSave,
     'immersiveMode': snapshot.immersiveMode,
     'keepScreenOn': snapshot.keepScreenOn,
     'customBrightness': snapshot.customBrightness,

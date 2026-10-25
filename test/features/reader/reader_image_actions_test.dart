@@ -105,6 +105,7 @@ void main() {
       expect(find.text('分享'), findsNothing);
       expect(find.text('复制图片'), findsOneWidget);
       expect(find.text('保存图片'), findsOneWidget);
+      expect(find.text('重新翻译图片'), findsNothing);
       expect(find.byType(Divider), findsOneWidget);
 
       await tester.tap(
@@ -122,11 +123,16 @@ void main() {
     }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
   }
 
-  for (final action in ReaderImageAction.values) {
+  for (final action in [
+    ReaderImageAction.share,
+    ReaderImageAction.copy,
+    ReaderImageAction.save,
+  ]) {
     final label = switch (action) {
       ReaderImageAction.share => '分享',
       ReaderImageAction.copy => '复制图片',
       ReaderImageAction.save => '保存图片',
+      ReaderImageAction.retranslate => '重新翻译图片',
     };
     testWidgets(
       '$label uses processed image bytes and the resulting extension',
@@ -156,12 +162,41 @@ void main() {
           case ReaderImageAction.save:
             verify(() => media.saveImage(bytes, 'png', 'page.png')).called(1);
             expect(find.text('已保存'), findsOneWidget);
+          case ReaderImageAction.retranslate:
+            fail('Retranslation should not prepare image bytes');
         }
         verifyNoMoreInteractions(media);
         await finish(tester);
       },
     );
   }
+
+  testWidgets('retranslation runs only the selected image callback', (
+    tester,
+  ) async {
+    await pumpReader(tester);
+    String? selected;
+    final pending = controller.showSaveImageDialog(
+      url,
+      onRetranslate: () => selected = url,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('重新翻译图片'), findsOneWidget);
+    await tester.tap(find.text('重新翻译图片'));
+    await tester.pumpAndSettle();
+    await pending;
+    expect(selected, url);
+    verifyNever(
+      () => source.prepareChapterImageData(
+        url,
+        comicId: 'comic',
+        epId: 'chapter',
+        sourceKey: 'source',
+      ),
+    );
+    verifyZeroInteractions(media);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final brightness in Brightness.values) {
     testWidgets(

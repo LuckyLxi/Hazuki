@@ -74,6 +74,7 @@ void main() {
             ReaderSettingsStore.readingModeKey: mode,
             ReaderSettingsStore.doublePageModeKey: doublePage,
             ReaderSettingsStore.windowsShortcutsGuideSeenKey: true,
+            'reader_long_press_save': false,
           });
           await ensureTestServiceLocator();
           final previous = hazukiNoImageModeNotifier.value;
@@ -144,6 +145,12 @@ void main() {
 
           await decode();
           await decode();
+          await tester.longPress(find.byType(Image).first);
+          await tester.pumpAndSettle();
+          expect(find.text('Save image'), findsOneWidget);
+          expect(find.text('Retranslate image'), findsNothing);
+          await tester.tap(find.text('Cancel'));
+          await tester.pumpAndSettle();
           expect(reader.events, isNotEmpty);
           expect(reader.events.first['page'], 1);
           expect(reader.events.first['totalPages'], 6);

@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 
-enum ReaderImageAction { share, copy, save }
+enum ReaderImageAction { share, copy, save, retranslate }
 
 class ReaderImageActionsSheet extends StatelessWidget {
-  const ReaderImageActionsSheet({super.key});
+  const ReaderImageActionsSheet({super.key, this.canRetranslate = false});
+
+  final bool canRetranslate;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +23,8 @@ class ReaderImageActionsSheet extends StatelessWidget {
         (ReaderImageAction.share, strings.readerShareImage),
       (ReaderImageAction.copy, strings.readerCopyImage),
       (ReaderImageAction.save, strings.readerSaveImageTitle),
+      if (canRetranslate)
+        (ReaderImageAction.retranslate, strings.readerRetranslateImage),
     ];
 
     Widget action(String label, ReaderImageAction? result) => InkWell(

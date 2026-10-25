@@ -103,7 +103,6 @@ class ReaderDiagnosticsController {
       tapToTurnPage: _runtimeState.tapToTurnPage,
       pageIndicator: _runtimeState.pageIndicator,
       pinchToZoom: _runtimeState.pinchToZoom,
-      longPressToSave: _runtimeState.longPressToSave,
       immersiveMode: _runtimeState.immersiveMode,
       keepScreenOn: _runtimeState.keepScreenOn,
       customBrightness: _runtimeState.customBrightness,

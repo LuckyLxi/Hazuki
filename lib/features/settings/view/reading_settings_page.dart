@@ -70,7 +70,6 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
               tapToTurnPage: _controller.tapToTurnPage,
               volumeButtonTurnPage: _controller.volumeButtonTurnPage,
               pinchToZoom: _controller.pinchToZoom,
-              longPressToSave: _controller.longPressToSave,
               restorePagePosition: _controller.restorePagePosition,
               immersiveMode: _controller.immersiveMode,
               keepScreenOn: _controller.keepScreenOn,
@@ -90,7 +89,6 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
               onVolumeButtonTurnPageChanged:
                   _controller.toggleVolumeButtonTurnPage,
               onPinchToZoomChanged: _controller.togglePinchToZoom,
-              onLongPressToSaveChanged: _controller.toggleLongPressToSave,
               onRestorePagePositionChanged:
                   _controller.toggleRestorePagePosition,
               onImmersiveModeChanged: _controller.toggleImmersiveMode,

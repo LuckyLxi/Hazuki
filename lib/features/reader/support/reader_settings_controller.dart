@@ -253,18 +253,6 @@ class ReaderSettingsController {
     }
   }
 
-  Future<void> toggleLongPressToSave(bool value) async {
-    _updateState(() {
-      _runtimeState.updateSettings(longPressToSave: value);
-    });
-    await _settingsStore.saveLongPressToSave(value);
-    _logEvent(
-      'Reader long press to save toggled',
-      source: 'reader_settings',
-      content: _logPayload({'setting': 'long_press_to_save', 'value': value}),
-    );
-  }
-
   void handleBrightnessChangeEnd(double value) {
     final normalized = ReaderSettingsStore.normalizeBrightnessValue(value);
     _logEvent(

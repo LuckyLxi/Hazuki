@@ -76,7 +76,6 @@ class ReaderRuntimeState
     filterStrength: ReaderSettingsStore.defaultFilterStrength,
     pageIndicator: ReaderSettingsStore.defaultPageIndicator,
     pinchToZoom: ReaderSettingsStore.defaultPinchToZoom,
-    longPressToSave: ReaderSettingsStore.defaultLongPressToSave,
   );
   ReaderSettingsSnapshot get settings => _settings;
   @override
@@ -97,7 +96,6 @@ class ReaderRuntimeState
   bool get pageIndicator => _settings.pageIndicator;
   @override
   bool get pinchToZoom => _settings.pinchToZoom;
-  bool get longPressToSave => _settings.longPressToSave;
 
   final ValueNotifier<int> _pageIndexNotifier = ValueNotifier<int>(0);
   @override
@@ -129,7 +127,6 @@ class ReaderRuntimeState
     double? filterStrength,
     bool? pageIndicator,
     bool? pinchToZoom,
-    bool? longPressToSave,
   }) {
     applySettingsSnapshot(
       ReaderSettingsSnapshot(
@@ -147,7 +144,6 @@ class ReaderRuntimeState
         filterStrength: filterStrength ?? _settings.filterStrength,
         pageIndicator: pageIndicator ?? _settings.pageIndicator,
         pinchToZoom: pinchToZoom ?? _settings.pinchToZoom,
-        longPressToSave: longPressToSave ?? _settings.longPressToSave,
       ),
     );
   }

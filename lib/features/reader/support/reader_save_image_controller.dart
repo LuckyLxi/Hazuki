@@ -46,17 +46,23 @@ class ReaderSaveImageController {
   final ReaderImageActionsService _imageActions;
   bool _actionsOpen = false;
 
-  Future<void> showSaveImageDialog(String imageUrl) async {
+  Future<void> showSaveImageDialog(
+    String imageUrl, {
+    VoidCallback? onRetranslate,
+  }) async {
     if (_actionsOpen || !_isMounted()) return;
     _actionsOpen = true;
     try {
-      await _showImageActions(imageUrl);
+      await _showImageActions(imageUrl, onRetranslate: onRetranslate);
     } finally {
       _actionsOpen = false;
     }
   }
 
-  Future<void> _showImageActions(String imageUrl) async {
+  Future<void> _showImageActions(
+    String imageUrl, {
+    VoidCallback? onRetranslate,
+  }) async {
     unawaited(HapticFeedback.heavyImpact());
     final context = _context();
     final strings = l10n(context);
@@ -80,7 +86,10 @@ class ReaderSaveImageController {
         curve: Cubic(0.2, 0.9, 0.3, 1.15),
       ),
       builder: (dialogContext) {
-        return Theme(data: dialogTheme, child: const ReaderImageActionsSheet());
+        return Theme(
+          data: dialogTheme,
+          child: ReaderImageActionsSheet(canRetranslate: onRetranslate != null),
+        );
       },
     );
     if (action == null || !_isMounted()) {
@@ -96,11 +105,17 @@ class ReaderSaveImageController {
       source: 'reader_media',
       content: _logPayload({'imageUrl': imageUrl, 'action': action.name}),
     );
+    if (action == ReaderImageAction.retranslate) {
+      onRetranslate?.call();
+      return;
+    }
     try {
       final prepared = await _prepareImageForSave(imageUrl);
       if (!_isMounted()) return;
       String? savedPath;
       switch (action) {
+        case ReaderImageAction.retranslate:
+          return;
         case ReaderImageAction.share:
           await _imageActions.shareImage(prepared.bytes, prepared.extension);
         case ReaderImageAction.copy:
@@ -153,6 +168,7 @@ class ReaderSaveImageController {
           ReaderImageAction.share => strings.readerShareImageFailed('$error'),
           ReaderImageAction.copy => strings.readerCopyImageFailed('$error'),
           ReaderImageAction.save => strings.comicDetailSaveFailed('$error'),
+          ReaderImageAction.retranslate => strings.translationUnknown,
         }, isError: true),
       );
     }

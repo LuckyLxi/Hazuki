@@ -251,6 +251,119 @@ void main() {
   );
 
   test(
+    'retranslates only the selected image in a double-page spread',
+    () async {
+      size = 2;
+      await settings.setPrefetchAhead(0);
+      await tick();
+      service.pending[0].complete(empty);
+      service.pending[1].complete(empty);
+      await tick();
+      final otherPage = controller.pageState('0').value;
+
+      controller.retranslate('1');
+      await tick();
+      expect(service.calls.map((call) => call.$1), [0, 1, 1]);
+      expect(service.calls.last.$3, isTrue);
+      expect(controller.pageState('0').value, same(otherPage));
+      service.pending.last.complete(empty);
+      await tick();
+      expect(
+        controller.pageState('1').value.status,
+        PageTranslationStatus.done,
+      );
+    },
+  );
+
+  test(
+    'retranslation cancels the selected image request and bypasses cache',
+    () async {
+      await settings.setPrefetchAhead(0);
+      await tick();
+      controller.retranslate('0');
+      await tick();
+      expect(service.calls.first.$2.isCancelled, isTrue);
+      expect(service.calls.map((call) => call.$1), [0, 0]);
+      expect(service.calls.last.$3, isTrue);
+      service.pending.first.complete(empty);
+      await tick();
+      expect(
+        controller.pageState('0').value.status,
+        PageTranslationStatus.translating,
+      );
+      service.pending.last.complete(empty);
+      await tick();
+      expect(
+        controller.pageState('0').value.status,
+        PageTranslationStatus.done,
+      );
+    },
+  );
+
+  test(
+    'retranslates an image outside the automatic window with zero prefetch',
+    () async {
+      await settings.setPrefetchAhead(0);
+      await tick();
+      controller.retranslate('1');
+      await tick();
+      expect(service.calls.map((call) => call.$1), [0, 1]);
+      expect(service.calls.last.$3, isTrue);
+      service.pending.first.complete(empty);
+      await tick();
+      expect(service.calls.last.$2.isCancelled, isFalse);
+      expect(
+        controller.pageState('1').value.status,
+        PageTranslationStatus.translating,
+      );
+      service.pending.last.complete(empty);
+      await tick();
+      expect(
+        controller.pageState('1').value.status,
+        PageTranslationStatus.done,
+      );
+    },
+  );
+
+  test('retries a failed retranslation outside the automatic window', () async {
+    await settings.setPrefetchAhead(0);
+    await tick();
+    service.pending.single.complete(empty);
+    await tick();
+    final otherPage = controller.pageState('0').value;
+
+    controller.retranslate('1');
+    await tick();
+    service.pending.last.completeError(
+      const TranslationFailure(TranslationFailureKind.network),
+    );
+    await tick();
+    expect(
+      controller.pageState('1').value.status,
+      PageTranslationStatus.failed,
+    );
+
+    controller.retry('1');
+    await tick();
+    expect(service.calls.map((call) => call.$1), [0, 1, 1]);
+    expect(service.calls.last.$3, isTrue);
+    expect(controller.pageState('0').value, same(otherPage));
+    controller.updateWindow(0);
+    expect(service.calls.last.$2.isCancelled, isFalse);
+    service.pending.last.complete(empty);
+    await tick();
+    expect(controller.pageState('1').value.status, PageTranslationStatus.done);
+  });
+
+  test('retranslation does not run when manga translation is off', () async {
+    await settings.setReaderModeOn(false);
+    await tick();
+    controller.retranslate('0');
+    await tick();
+    expect(service.calls, isEmpty);
+  });
+
+  test(
     'new prompt and effort discard old results and cancel old requests',
     () async {
       await settings.setPrefetchAhead(0);

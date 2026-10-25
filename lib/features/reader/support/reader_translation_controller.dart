@@ -70,6 +70,7 @@ class ReaderTranslationController extends ChangeNotifier {
   final _queue = Queue<String>();
   final _active = <String, CancelToken>{};
   final _bypass = <String>{};
+  final _retranslateTargets = <String>{};
   Set<String> _window = {}, _visible = {};
   int _index = 0, _failures = 0;
   bool _disposed = false, _tripped = false;
@@ -140,7 +141,7 @@ class ReaderTranslationController extends ChangeNotifier {
       )
         if (value >= 0) images[value],
     ];
-    _window = {..._visible, ...ahead};
+    _window = {..._visible, ...ahead, ..._retranslateTargets};
     for (final entry in _active.entries) {
       if (!_window.contains(entry.key)) {
         entry.value.cancel();
@@ -151,7 +152,7 @@ class ReaderTranslationController extends ChangeNotifier {
       if (!_window.contains(url)) _state(url).value = PageTranslationView();
     }
     _queue.clear();
-    for (final url in [..._visible, ...ahead]) {
+    for (final url in [..._retranslateTargets, ..._visible, ...ahead]) {
       final status = _state(url).value.status;
       if (_active.containsKey(url) ||
           status == PageTranslationStatus.done ||
@@ -233,13 +234,20 @@ class ReaderTranslationController extends ChangeNotifier {
         if (!_disposed) _onFailure(failure);
       }
     } finally {
-      if (identical(_active[url], token)) _active.remove(url);
+      if (identical(_active[url], token)) {
+        _active.remove(url);
+        if (!token.isCancelled) _retranslateTargets.remove(url);
+      }
       if (!_disposed && modeOn && _window.isNotEmpty) updateWindow(_index);
     }
   }
 
   void retry(String url) {
-    if (_disposed || !modeOn || !_window.contains(url)) return;
+    if (_disposed || !modeOn) return;
+    if (!_window.contains(url)) {
+      retranslate(url);
+      return;
+    }
     _state(url).value = PageTranslationView();
     updateWindow(_index);
   }
@@ -251,6 +259,15 @@ class ReaderTranslationController extends ChangeNotifier {
       _bypass.add(url);
       _state(url).value = PageTranslationView();
     }
+    updateWindow(_index);
+  }
+
+  void retranslate(String url) {
+    if (_disposed || !modeOn || !_images().contains(url)) return;
+    _active[url]?.cancel();
+    _retranslateTargets.add(url);
+    _bypass.add(url);
+    _state(url).value = PageTranslationView();
     updateWindow(_index);
   }
 
@@ -276,6 +293,7 @@ class ReaderTranslationController extends ChangeNotifier {
     _window.clear();
     _visible.clear();
     _bypass.clear();
+    _retranslateTargets.clear();
     for (final token in _active.values) {
       token.cancel();
     }

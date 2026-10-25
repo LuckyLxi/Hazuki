@@ -1063,13 +1063,10 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         ],
       );
     }
-    if (_runtimeState.longPressToSave) {
-      result = GestureDetector(
-        onLongPress: () => _showSaveImageDialog(url),
-        child: result,
-      );
-    }
-    return result;
+    return GestureDetector(
+      onLongPress: () => _showSaveImageDialog(url),
+      child: result,
+    );
   }
 
   Widget _buildReaderSettingsDrawer(ThemeData readerTheme) {
@@ -1085,7 +1082,6 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       onVolumeButtonTurnPageChanged:
           _settingsController.toggleVolumeButtonTurnPage,
       onPinchToZoomChanged: _settingsController.togglePinchToZoom,
-      onLongPressToSaveChanged: _settingsController.toggleLongPressToSave,
       // 只影响下次进入阅读器，本次已完成的入口恢复不会重新执行。
       restorePagePosition: _restorePagePosition ?? false,
       onRestorePagePositionChanged: (value) {
@@ -1169,7 +1165,13 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   }
 
   Future<void> _showSaveImageDialog(String imageUrl) {
-    return _saveImageController.showSaveImageDialog(imageUrl);
+    final translation = _translationController;
+    return _saveImageController.showSaveImageDialog(
+      imageUrl,
+      onRetranslate: translation?.modeOn == true
+          ? () => translation!.retranslate(imageUrl)
+          : null,
+    );
   }
 
   Map<String, dynamic> _readerLogPayload([Map<String, dynamic>? extra]) {

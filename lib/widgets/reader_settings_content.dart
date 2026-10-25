@@ -19,7 +19,6 @@ class ReaderSettingsContent extends StatelessWidget {
     required this.tapToTurnPage,
     required this.volumeButtonTurnPage,
     required this.pinchToZoom,
-    required this.longPressToSave,
     required this.immersiveMode,
     required this.keepScreenOn,
     required this.pageIndicator,
@@ -34,7 +33,6 @@ class ReaderSettingsContent extends StatelessWidget {
     required this.onTapToTurnPageChanged,
     required this.onVolumeButtonTurnPageChanged,
     required this.onPinchToZoomChanged,
-    required this.onLongPressToSaveChanged,
     required this.onImmersiveModeChanged,
     required this.onKeepScreenOnChanged,
     required this.onPageIndicatorChanged,
@@ -59,7 +57,6 @@ class ReaderSettingsContent extends StatelessWidget {
   final bool tapToTurnPage;
   final bool volumeButtonTurnPage;
   final bool pinchToZoom;
-  final bool longPressToSave;
   final bool immersiveMode;
   final bool keepScreenOn;
   final bool pageIndicator;
@@ -74,7 +71,6 @@ class ReaderSettingsContent extends StatelessWidget {
   final ValueChanged<bool>? onTapToTurnPageChanged;
   final ValueChanged<bool> onVolumeButtonTurnPageChanged;
   final ValueChanged<bool> onPinchToZoomChanged;
-  final ValueChanged<bool> onLongPressToSaveChanged;
   final ValueChanged<bool> onImmersiveModeChanged;
   final ValueChanged<bool> onKeepScreenOnChanged;
   final ValueChanged<bool> onPageIndicatorChanged;
@@ -139,13 +135,6 @@ class ReaderSettingsContent extends StatelessWidget {
               subtitle: Text(l10n(context).readingPinchToZoomSubtitle),
               value: pinchToZoom,
               onChanged: onPinchToZoomChanged,
-            ),
-            SwitchListTile(
-              secondary: const Icon(Icons.save_alt_outlined),
-              title: Text(l10n(context).readingLongPressSaveTitle),
-              subtitle: Text(l10n(context).readingLongPressSaveSubtitle),
-              value: longPressToSave,
-              onChanged: onLongPressToSaveChanged,
             ),
             if (onRestorePagePositionChanged != null)
               SwitchListTile(
@@ -290,14 +279,6 @@ class ReaderSettingsContent extends StatelessWidget {
                 subtitle: Text(l10n(context).readingPinchToZoomSubtitle),
                 value: pinchToZoom,
                 onChanged: onPinchToZoomChanged,
-              ),
-              const Divider(height: 1),
-              SwitchListTile(
-                secondary: const Icon(Icons.save_alt_outlined),
-                title: Text(l10n(context).readingLongPressSaveTitle),
-                subtitle: Text(l10n(context).readingLongPressSaveSubtitle),
-                value: longPressToSave,
-                onChanged: onLongPressToSaveChanged,
               ),
               if (onRestorePagePositionChanged != null) ...[
                 const Divider(height: 1),

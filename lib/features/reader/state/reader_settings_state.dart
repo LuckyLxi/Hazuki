@@ -28,6 +28,5 @@ abstract interface class ReaderSettingsState {
     double? filterStrength,
     bool? pageIndicator,
     bool? pinchToZoom,
-    bool? longPressToSave,
   });
 }

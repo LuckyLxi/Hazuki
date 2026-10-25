@@ -13,7 +13,6 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     required this.tapToTurnPage,
     required this.volumeButtonTurnPage,
     required this.pinchToZoom,
-    required this.longPressToSave,
     required this.immersiveMode,
     required this.keepScreenOn,
     required this.pageIndicator,
@@ -28,7 +27,6 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     required this.onTapToTurnPageChanged,
     required this.onVolumeButtonTurnPageChanged,
     required this.onPinchToZoomChanged,
-    required this.onLongPressToSaveChanged,
     required this.onImmersiveModeChanged,
     required this.onKeepScreenOnChanged,
     required this.onPageIndicatorChanged,
@@ -51,7 +49,6 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   final bool tapToTurnPage;
   final bool volumeButtonTurnPage;
   final bool pinchToZoom;
-  final bool longPressToSave;
   final bool immersiveMode;
   final bool keepScreenOn;
   final bool pageIndicator;
@@ -66,7 +63,6 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   final ValueChanged<bool>? onTapToTurnPageChanged;
   final ValueChanged<bool> onVolumeButtonTurnPageChanged;
   final ValueChanged<bool> onPinchToZoomChanged;
-  final ValueChanged<bool> onLongPressToSaveChanged;
   final ValueChanged<bool> onImmersiveModeChanged;
   final ValueChanged<bool> onKeepScreenOnChanged;
   final ValueChanged<bool> onPageIndicatorChanged;
@@ -92,7 +88,6 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
       tapToTurnPage: tapToTurnPage,
       volumeButtonTurnPage: volumeButtonTurnPage,
       pinchToZoom: pinchToZoom,
-      longPressToSave: longPressToSave,
       immersiveMode: immersiveMode,
       keepScreenOn: keepScreenOn,
       pageIndicator: pageIndicator,
@@ -107,7 +102,6 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
       onTapToTurnPageChanged: onTapToTurnPageChanged,
       onVolumeButtonTurnPageChanged: onVolumeButtonTurnPageChanged,
       onPinchToZoomChanged: onPinchToZoomChanged,
-      onLongPressToSaveChanged: onLongPressToSaveChanged,
       onImmersiveModeChanged: onImmersiveModeChanged,
       onKeepScreenOnChanged: onKeepScreenOnChanged,
       onPageIndicatorChanged: onPageIndicatorChanged,

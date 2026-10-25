@@ -53,7 +53,6 @@ class _SettingsState extends Fake implements ReaderSettingsState {
     double? filterStrength,
     bool? pageIndicator,
     bool? pinchToZoom,
-    bool? longPressToSave,
   }) {
     events.add('state');
     if (readerMode != null) this.readerMode = readerMode;

@@ -36,7 +36,6 @@ class ReadingSettingsController extends ChangeNotifier {
   double filterStrength = ReaderSettingsStore.defaultFilterStrength;
   bool pageIndicator = ReaderSettingsStore.defaultPageIndicator;
   bool pinchToZoom = ReaderSettingsStore.defaultPinchToZoom;
-  bool longPressToSave = ReaderSettingsStore.defaultLongPressToSave;
   bool restorePagePosition = ReaderSettingsStore.defaultRestorePagePosition;
   late ReaderSourceImageQualitySnapshot sourceImageQuality;
 
@@ -69,7 +68,6 @@ class ReadingSettingsController extends ChangeNotifier {
     filterStrength = settings.filterStrength;
     pageIndicator = settings.pageIndicator;
     pinchToZoom = settings.pinchToZoom;
-    longPressToSave = settings.longPressToSave;
     restorePagePosition = restorePage;
     sourceImageQuality = sourceSettings;
     _notify();
@@ -156,12 +154,6 @@ class ReadingSettingsController extends ChangeNotifier {
     pinchToZoom = value;
     _notify();
     await _settingsStore.savePinchToZoom(value);
-  }
-
-  Future<void> toggleLongPressToSave(bool value) async {
-    longPressToSave = value;
-    _notify();
-    await _settingsStore.saveLongPressToSave(value);
   }
 
   Future<void> toggleRestorePagePosition(bool value) async {
