@@ -62,11 +62,32 @@ void main() {
         ..addFile(ArchiveFile.bytes('ort/lib/ort.dll', runtimeLibrary)),
     ),
   );
+  final companionLibrary = Uint8List.fromList(
+    List.generate(1024, (index) => index % 5),
+  );
+  final companionZip = Uint8List.fromList(
+    ZipEncoder().encodeBytes(
+      Archive()..addFile(ArchiveFile.bytes('bin/dep.dll', companionLibrary)),
+    ),
+  );
+  const runtimeVersion = '1.0.0';
+
+  OnnxRuntimeLibraryFile companionSpec({String? digest}) =>
+      OnnxRuntimeLibraryFile(
+        sources: ['http://${server.address.host}:${server.port}/dep.zip'],
+        archiveBytes: companionZip.length,
+        archiveEntry: 'bin/dep.dll',
+        fileName: 'dep.dll',
+        sha256: digest ?? sha256.convert(companionLibrary).toString(),
+        entryCompressedBytes: companionZip.length,
+      );
 
   OnnxRuntimeLibrarySpec runtimeSpec({
     List<String> paths = const ['/runtime.zip'],
     String? digest,
+    List<OnnxRuntimeLibraryFile> companions = const [],
   }) => OnnxRuntimeLibrarySpec(
+    version: runtimeVersion,
     sources: [
       for (final path in paths)
         'http://${server.address.host}:${server.port}$path',
@@ -76,6 +97,7 @@ void main() {
     fileName: 'ort.dll',
     sha256: digest ?? sha256.convert(runtimeLibrary).toString(),
     entryCompressedBytes: runtimeZip.length,
+    companions: companions,
   );
 
   TranslationDetectorModelStore store(
@@ -98,13 +120,13 @@ void main() {
     p.join(directory.path, 'manga_translation', 'models', id, 'v1.onnx'),
   );
 
-  File installedRuntime() => File(
+  File installedRuntime([String fileName = 'ort.dll']) => File(
     p.join(
       directory.path,
       'manga_translation',
       'runtime',
-      OnnxRuntimeLibrarySpec.version,
-      'ort.dll',
+      runtimeVersion,
+      fileName,
     ),
   );
 
@@ -353,7 +375,7 @@ void main() {
         final models = store(
           const [],
           runtime: runtimeSpec(paths: ['/offline.zip', '/runtime.zip']),
-          verifyRuntime: (library) async {
+          verifyRuntime: (_, library) async {
             verified.add(library.path);
             expect(await library.readAsBytes(), runtimeLibrary);
           },
@@ -383,7 +405,7 @@ void main() {
 
       final broken = store(
         const [],
-        verifyRuntime: (_) async => throw StateError('load'),
+        verifyRuntime: (_, _) async => throw StateError('load'),
       );
       await broken.downloadRuntime();
       expect(broken.runtimeState.failure, DetectorModelFailure.loadFailed);
@@ -397,6 +419,70 @@ void main() {
       final models = store(const [], runtime: runtimeSpec(paths: ['/a', '/b']));
       await models.downloadRuntime();
       expect(models.runtimeState.failure, DetectorModelFailure.network);
+      models.dispose();
+    });
+
+    test('installs companion libraries beside the runtime', () async {
+      routes['/runtime.zip'] = (response) => serve(response, runtimeZip);
+      routes['/dep.zip'] = (response) => serve(response, companionZip);
+      final siblings = <String>[];
+      final models = store(
+        const [],
+        runtime: runtimeSpec(companions: [companionSpec()]),
+        verifyRuntime: (spec, library) async {
+          expect(spec.version, runtimeVersion);
+          // 校验运行库时依赖库已在同一目录。
+          siblings.addAll(
+            library.parent.listSync().map((entry) => p.basename(entry.path)),
+          );
+        },
+      );
+      await models.downloadRuntime();
+      expect(models.runtimeState.status, DetectorModelStatus.installed);
+      expect(siblings, containsAll(['ort.dll', 'dep.dll']));
+      expect(await installedRuntime('dep.dll').readAsBytes(), companionLibrary);
+      expect(await installedRuntime().readAsBytes(), runtimeLibrary);
+      models.dispose();
+
+      // 缺少依赖库时视为未安装。
+      await installedRuntime('dep.dll').delete();
+      final restarted = store(
+        const [],
+        runtime: runtimeSpec(companions: [companionSpec()]),
+      );
+      await restarted.load();
+      expect(restarted.isRuntimeInstalled, isFalse);
+      restarted.dispose();
+    });
+
+    test('rejects a changed companion library', () async {
+      routes['/runtime.zip'] = (response) => serve(response, runtimeZip);
+      routes['/dep.zip'] = (response) => serve(response, companionZip);
+      final models = store(
+        const [],
+        runtime: runtimeSpec(companions: [companionSpec(digest: '0' * 64)]),
+      );
+      await models.downloadRuntime();
+      expect(
+        models.runtimeState.failure,
+        DetectorModelFailure.checksumMismatch,
+      );
+      expect(await installedRuntime().exists(), isFalse);
+      expect(await installedRuntime('dep.dll').exists(), isFalse);
+      models.dispose();
+    });
+
+    test('loading removes runtimes of other versions', () async {
+      await installRuntime();
+      final stale = File(
+        p.join(directory.path, 'manga_translation', 'runtime', '0.9.0', 'a'),
+      );
+      await stale.parent.create(recursive: true);
+      await stale.writeAsBytes([1]);
+      final models = store(const []);
+      await models.load();
+      expect(models.isRuntimeInstalled, isTrue);
+      expect(await stale.parent.exists(), isFalse);
       models.dispose();
     });
 

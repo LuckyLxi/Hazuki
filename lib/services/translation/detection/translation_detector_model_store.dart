@@ -52,7 +52,8 @@ typedef DetectorModelVerifier =
     );
 
 /// 发布前校验运行库可以加载且版本正确；抛出异常即视为加载失败。
-typedef OnnxRuntimeVerifier = Future<void> Function(File library);
+typedef OnnxRuntimeVerifier =
+    Future<void> Function(OnnxRuntimeLibrarySpec spec, File library);
 
 class _ModelDownloadFailure implements Exception {
   const _ModelDownloadFailure(this.kind);
@@ -155,8 +156,9 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     }
     final runtimeSpec = runtime;
     if (runtimeSpec != null && _runtimeTask == null) {
+      await _deleteStaleRuntimes(runtimeDirectory, runtimeSpec);
       _runtimeState = DetectorModelState(
-        status: await _runtimeFile(root, runtimeSpec).exists()
+        status: await _runtimeInstalled(root, runtimeSpec)
             ? DetectorModelStatus.installed
             : DetectorModelStatus.notInstalled,
       );
@@ -246,55 +248,67 @@ class TranslationDetectorModelStore extends ChangeNotifier {
     );
     notifyListeners();
     final partial = Directory(p.join(_runtimeDirectory(root).path, '.partial'));
-    final extracted = File(p.join(partial.path, spec.fileName));
     final scratch = File(p.join(partial.path, 'archive.download'));
+    // 依赖库先于主库下载与发布；主库存在即视为安装完成。
+    final files = [...spec.companions, spec];
     try {
       await partial.create(recursive: true);
-      Object? lastError;
-      for (final source in spec.sources) {
-        try {
-          await downloadZipEntry(
-            dio: _dio,
-            url: source,
-            archiveBytes: spec.archiveBytes,
-            entry: spec.archiveEntry,
-            output: extracted,
-            scratch: scratch,
-            cancelToken: token,
-            onProgress: _progressReporter(
-              spec.entryCompressedBytes,
-              (state) => _runtimeState = state,
-            ),
-          );
-          lastError = null;
-          break;
-        } on DioException catch (error) {
-          // 只有网络错误才换下一个下载源。
-          if (token.isCancelled) rethrow;
-          lastError = error;
+      final report = _progressReporter(
+        spec.downloadBytes,
+        (state) => _runtimeState = state,
+      );
+      var offset = 0;
+      for (final file in files) {
+        final extracted = File(p.join(partial.path, file.fileName));
+        final base = offset;
+        Object? lastError;
+        for (final source in file.sources) {
+          try {
+            await downloadZipEntry(
+              dio: _dio,
+              url: source,
+              archiveBytes: file.archiveBytes,
+              entry: file.archiveEntry,
+              output: extracted,
+              scratch: scratch,
+              cancelToken: token,
+              onProgress: (received, _) =>
+                  report(base + received, spec.downloadBytes),
+            );
+            lastError = null;
+            break;
+          } on DioException catch (error) {
+            // 只有网络错误才换下一个下载源。
+            if (token.isCancelled) rethrow;
+            lastError = error;
+          }
         }
+        if (lastError != null) throw lastError;
+        offset += file.entryCompressedBytes;
+        _checkCancelled(token);
+        if (await _digestInIsolate(extracted.path) != file.sha256) {
+          throw const _ModelDownloadFailure(
+            DetectorModelFailure.checksumMismatch,
+          );
+        }
+        _checkCancelled(token);
       }
-      if (lastError != null) throw lastError;
-      _checkCancelled(token);
-      if (await _digestInIsolate(extracted.path) != spec.sha256) {
-        throw const _ModelDownloadFailure(
-          DetectorModelFailure.checksumMismatch,
-        );
-      }
-      _checkCancelled(token);
       final verify = verifyRuntime;
       if (verify != null) {
         try {
-          await verify(extracted);
+          // 依赖库与主库同在临时目录，校验时的加载方式与正式使用一致。
+          await verify(spec, File(p.join(partial.path, spec.fileName)));
         } catch (_) {
           throw const _ModelDownloadFailure(DetectorModelFailure.loadFailed);
         }
       }
       _checkCancelled(token);
-      final target = _runtimeFile(root, spec);
-      await target.parent.create(recursive: true);
-      if (await target.exists()) await target.delete();
-      await extracted.rename(target.path);
+      for (final file in files) {
+        final target = _runtimeFile(root, spec, file);
+        await target.parent.create(recursive: true);
+        if (await target.exists()) await target.delete();
+        await File(p.join(partial.path, file.fileName)).rename(target.path);
+      }
       _runtimeState = const DetectorModelState(
         status: DetectorModelStatus.installed,
       );
@@ -485,14 +499,46 @@ class TranslationDetectorModelStore extends ChangeNotifier {
   static Directory _runtimeDirectory(Directory modelsRoot) =>
       Directory(p.join(p.dirname(modelsRoot.path), 'runtime'));
 
-  static File _runtimeFile(Directory modelsRoot, OnnxRuntimeLibrarySpec spec) =>
-      File(
-        p.join(
-          _runtimeDirectory(modelsRoot).path,
-          OnnxRuntimeLibrarySpec.version,
-          spec.fileName,
-        ),
-      );
+  static File _runtimeFile(
+    Directory modelsRoot,
+    OnnxRuntimeLibrarySpec spec, [
+    OnnxRuntimeLibraryFile? file,
+  ]) => File(
+    p.join(
+      _runtimeDirectory(modelsRoot).path,
+      spec.version,
+      (file ?? spec).fileName,
+    ),
+  );
+
+  static Future<bool> _runtimeInstalled(
+    Directory modelsRoot,
+    OnnxRuntimeLibrarySpec spec,
+  ) async {
+    for (final file in [spec, ...spec.companions]) {
+      if (!await _runtimeFile(modelsRoot, spec, file).exists()) return false;
+    }
+    return true;
+  }
+
+  /// 运行库换版本（如 Windows 改用 DirectML 版）后删除旧版本目录。
+  static Future<void> _deleteStaleRuntimes(
+    Directory runtimeDirectory,
+    OnnxRuntimeLibrarySpec spec,
+  ) async {
+    if (!await runtimeDirectory.exists()) return;
+    await for (final entry in runtimeDirectory.list()) {
+      final name = p.basename(entry.path);
+      if (entry is! Directory || name == spec.version || name == '.partial') {
+        continue;
+      }
+      try {
+        await entry.delete(recursive: true);
+      } on FileSystemException {
+        // 删除失败不影响当前版本，下次加载时再试。
+      }
+    }
+  }
 
   static void _checkCancelled(CancelToken token) {
     if (token.isCancelled) throw StateError('cancelled');

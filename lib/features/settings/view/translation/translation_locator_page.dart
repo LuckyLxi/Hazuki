@@ -208,10 +208,10 @@ class TranslationLocatorPage extends StatelessWidget {
           key: const ValueKey('translation-detector-runtime'),
           name: strings.translationRuntimeTitle,
           lines: [
-            'ONNX Runtime ${OnnxRuntimeLibrarySpec.version}',
+            'ONNX Runtime ${runtime.version}',
             strings.translationRuntimeDescription,
           ],
-          bytes: runtime.entryCompressedBytes,
+          bytes: runtime.downloadBytes,
           license: OnnxRuntimeLibrarySpec.license,
           state: models.runtimeState,
           note: models.runtimeDeletePending

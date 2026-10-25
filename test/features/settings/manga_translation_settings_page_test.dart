@@ -335,7 +335,7 @@ void main() {
     expect(
       find.descendant(
         of: runtimeRow,
-        matching: find.text('ONNX Runtime 1.23.2'),
+        matching: find.text('ONNX Runtime ${models.runtime!.version}'),
       ),
       findsOneWidget,
     );

@@ -1,9 +1,9 @@
 import 'dart:ffi';
 import 'dart:io';
 
-/// 本地检测使用的 ONNX Runtime 动态库；按需下载，不随安装包分发。
-class OnnxRuntimeLibrarySpec {
-  const OnnxRuntimeLibrarySpec({
+/// 发布包（zip / aar / nupkg）中按需提取的单个动态库。
+class OnnxRuntimeLibraryFile {
+  const OnnxRuntimeLibraryFile({
     required this.sources,
     required this.archiveBytes,
     required this.archiveEntry,
@@ -12,13 +12,10 @@ class OnnxRuntimeLibrarySpec {
     required this.entryCompressedBytes,
   });
 
-  static const version = '1.23.2';
-  static const license = 'MIT';
-
   /// 依次尝试的下载地址，内容完全相同；只有网络失败才换下一个。
   final List<String> sources;
 
-  /// 发布包（zip / aar）的总字节数，用于计算分段下载的区间。
+  /// 发布包的总字节数，用于计算分段下载的区间。
   final int archiveBytes;
 
   /// 发布包内动态库的路径。
@@ -32,6 +29,37 @@ class OnnxRuntimeLibrarySpec {
   final int entryCompressedBytes;
 }
 
+/// 本地检测使用的 ONNX Runtime 动态库；按需下载，不随安装包分发。
+class OnnxRuntimeLibrarySpec extends OnnxRuntimeLibraryFile {
+  const OnnxRuntimeLibrarySpec({
+    required this.version,
+    required super.sources,
+    required super.archiveBytes,
+    required super.archiveEntry,
+    required super.fileName,
+    required super.sha256,
+    required super.entryCompressedBytes,
+    this.companions = const [],
+  });
+
+  static const license = 'MIT';
+
+  final String version;
+
+  /// 与主库放在同一目录的依赖库，例如 DirectML 版运行库所需的 DirectML.dll。
+  final List<OnnxRuntimeLibraryFile> companions;
+
+  /// 主库与依赖库合计的实际下载流量。
+  int get downloadBytes => companions.fold(
+    entryCompressedBytes,
+    (total, file) => total + file.entryCompressedBytes,
+  );
+}
+
+/// DirectML 版运行库依赖的库文件名；运行库目录中存在该文件时启用 GPU 推理。
+const directMlLibraryName = 'DirectML.dll';
+
+const _androidVersion = '1.23.2';
 const _androidSources = [
   'https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.23.2/onnxruntime-android-1.23.2.aar',
   // 国内网络无法访问官方仓库时使用阿里云镜像。
@@ -41,6 +69,7 @@ const _androidArchiveBytes = 30241654;
 
 OnnxRuntimeLibrarySpec _android(String abi, String sha256, int compressed) =>
     OnnxRuntimeLibrarySpec(
+      version: _androidVersion,
       sources: _androidSources,
       archiveBytes: _androidArchiveBytes,
       archiveEntry: 'jni/$abi/libonnxruntime.so',
@@ -57,15 +86,31 @@ OnnxRuntimeLibrarySpec? onnxRuntimeLibraryFor(String os, Abi abi) => switch ((
   os,
   abi,
 )) {
+  // Windows 使用 DirectML 版（官方只发布到 1.23.0），GPU 不可用时同一个库仍可走 CPU。
   ('windows', Abi.windowsX64) => const OnnxRuntimeLibrarySpec(
+    version: '1.23.0',
     sources: [
-      'https://github.com/microsoft/onnxruntime/releases/download/v1.23.2/onnxruntime-win-x64-1.23.2.zip',
+      'https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime.directml/1.23.0/microsoft.ml.onnxruntime.directml.1.23.0.nupkg',
     ],
-    archiveBytes: 78127794,
-    archiveEntry: 'onnxruntime-win-x64-1.23.2/lib/onnxruntime.dll',
+    archiveBytes: 12746067,
+    archiveEntry: 'runtimes/win-x64/native/onnxruntime.dll',
     fileName: 'onnxruntime.dll',
-    sha256: 'dec964ab1ee36cc9b0ae247d13b376627992fc57dec0454354017ab8fd84f1ea',
-    entryCompressedBytes: 5250009,
+    sha256: 'f5131591edac6b0a8090d0e329040a49319d7a689cb5b465235fbf7030fa8027',
+    entryCompressedBytes: 6121610,
+    companions: [
+      // 系统自带的 DirectML 版本过旧，使用 ONNX Runtime 1.23 配套的可再发行版本。
+      OnnxRuntimeLibraryFile(
+        sources: [
+          'https://api.nuget.org/v3-flatcontainer/microsoft.ai.directml/1.15.4/microsoft.ai.directml.1.15.4.nupkg',
+        ],
+        archiveBytes: 202292617,
+        archiveEntry: 'bin/x64-win/DirectML.dll',
+        fileName: directMlLibraryName,
+        sha256:
+            '9c9e6d822561c6c41b90e6994b3e8857cf1d66dbfb1e0c4c799c7c89b4e92da1',
+        entryCompressedBytes: 9332741,
+      ),
+    ],
   ),
   ('android', Abi.androidArm64) => _android(
     'arm64-v8a',

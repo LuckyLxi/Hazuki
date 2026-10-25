@@ -589,6 +589,16 @@ class OrtSessionOptions {
     OrtStatus.checkOrtStatus(statusPtr);
   }
 
+  /// Disables the memory pattern optimization, which the DirectML execution
+  /// provider does not support.
+  void disableMemPattern() {
+    final statusPtr = OrtEnv.instance.ortApiPtr.ref.DisableMemPattern
+        .asFunction<
+            bg.OrtStatusPtr Function(
+                ffi.Pointer<bg.OrtSessionOptions>)>()(_ptr);
+    OrtStatus.checkOrtStatus(statusPtr);
+  }
+
   /// Adds a session configuration entry, e.g.
   /// `session.set_denormal_as_zero` = `1`.
   void addConfigEntry(String key, String value) {

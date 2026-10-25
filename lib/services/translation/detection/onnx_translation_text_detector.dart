@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:ffi' show DynamicLibrary;
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
@@ -10,6 +11,7 @@ import 'package:onnxruntime_v2/onnxruntime_v2.dart';
 
 import '../translation_failure.dart';
 import 'ctd_detector_pipeline.dart';
+import 'onnx_runtime_library.dart';
 import 'onnx_tensor_io.dart';
 import 'paddle_db_detector_pipeline.dart';
 import 'translation_detector_models.dart';
@@ -277,14 +279,51 @@ class _DetectorWorker {
   }
 }
 
-OrtSession _loadSession(String path) {
+/// 按完整路径预加载运行库同目录的 DirectML.dll，返回能否启用 DirectML。
+///
+/// DirectML 版运行库延迟加载 DirectML.dll，系统只在应用目录和 System32 中查找，
+/// 找不到时进程直接崩溃；预加载后延迟加载会复用已载入的同名模块。
+/// 预加载失败时不得追加 DirectML，否则会触发上述崩溃。
+bool _preloadDirectMl(String runtimePath) {
+  if (!Platform.isWindows) return false;
+  final library = File(
+    '${File(runtimePath).parent.path}${Platform.pathSeparator}'
+    '$directMlLibraryName',
+  );
+  if (!library.existsSync()) return false;
+  try {
+    DynamicLibrary.open(library.path);
+    return true;
+  } on ArgumentError {
+    return false;
+  }
+}
+
+OrtSession _loadSession(String path, {bool directMl = false}) {
   // 插件的 fromFile 按 UTF-8 传路径，Windows 需要 UTF-16；统一读字节加载。
   final bytes = File(path).readAsBytesSync();
+  if (directMl) {
+    try {
+      return _createSession(bytes, directMl: true);
+    } catch (_) {
+      // 没有支持 DirectX 12 的显卡或驱动异常时退回 CPU。
+    }
+  }
+  return _createSession(bytes, directMl: false);
+}
+
+OrtSession _createSession(Uint8List bytes, {required bool directMl}) {
   final options = OrtSessionOptions();
   try {
     // CTD 分割解码器的激活中有大量非规格化浮点数，x86 上会慢一个数量级以上；
     // 置零的误差远小于检测阈值，不影响结果。
     options.addConfigEntry('session.set_denormal_as_zero', '1');
+    if (directMl) {
+      // DirectML 不支持内存复用与并行执行，必须关闭；不支持的算子自动回落到 CPU。
+      options.disableMemPattern();
+      options.setSessionExecutionMode(OrtSessionExecutionMode.ortSequential);
+      options.appendDirectMLProvider();
+    }
     return OrtSession.fromBuffer(bytes, options);
   } finally {
     options.release();
@@ -294,6 +333,7 @@ OrtSession _loadSession(String path) {
 void _detectorWorkerMain((SendPort, String) arguments) {
   final (replies, runtimePath) = arguments;
   setOnnxRuntimeLibraryPath(runtimePath);
+  var directMl = _preloadDirectMl(runtimePath);
   final requests = ReceivePort();
   replies.send(requests.sendPort);
   OrtSession? session;
@@ -316,19 +356,17 @@ void _detectorWorkerMain((SendPort, String) arguments) {
       Isolate.exit();
     }
     final id = message['id'];
-    final OrtSession active;
+    final path = message['model']! as String;
     try {
       if (!envReady) {
         _initEnv();
         envReady = true;
       }
-      final path = message['model']! as String;
       if (sessionPath != path) {
         await releaseSession();
-        session = _loadSession(path);
+        session = _loadSession(path, directMl: directMl);
         sessionPath = path;
       }
-      active = session!;
     } catch (_) {
       replies.send({'id': id, 'error': 'unavailable'});
       return;
@@ -341,7 +379,8 @@ void _detectorWorkerMain((SendPort, String) arguments) {
         width: message['width']! as int,
         height: message['height']! as int,
       );
-      final boxes = message['kind'] == TranslationDetectorKind.ctd.name
+      List<Rect> detect(OrtSession active) =>
+          message['kind'] == TranslationDetectorKind.ctd.name
           ? _runCtd(active, image)
           : _runPaddleDb(
               active,
@@ -353,6 +392,18 @@ void _detectorWorkerMain((SendPort, String) arguments) {
                 maxCandidates: message['maxCandidates']! as int,
               ),
             );
+      List<Rect> boxes;
+      try {
+        boxes = detect(session!);
+      } catch (_) {
+        if (!directMl) rethrow;
+        // GPU 推理失败（如驱动重置）后，本工作 isolate 改用 CPU 并重试一次。
+        directMl = false;
+        await releaseSession();
+        session = _loadSession(path);
+        sessionPath = path;
+        boxes = detect(session!);
+      }
       replies.send({
         'id': id,
         'boxes': Float64List.fromList([
