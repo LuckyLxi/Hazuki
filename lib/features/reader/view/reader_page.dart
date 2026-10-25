@@ -592,10 +592,19 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     translationController: _translationController,
     onFrameDisplayed: (index) {
       _displayedImages.add(index);
-      _reportActualViewport();
+      // 同一帧内多张图片的回调合并为一次视口上报，避免重复扫描整章。
+      if (!_frameReportQueued) {
+        _frameReportQueued = true;
+        scheduleMicrotask(() {
+          _frameReportQueued = false;
+          if (mounted) _reportActualViewport();
+        });
+      }
       _updateTranslationWindow();
     },
   );
+
+  bool _frameReportQueued = false;
 
   final _displayedImages = <int>{};
   Map<String, dynamic>? _entryPosition;
