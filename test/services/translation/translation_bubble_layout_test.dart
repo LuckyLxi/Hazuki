@@ -7,6 +7,137 @@ import 'package:hazuki/services/translation/models/translation_models.dart';
 import 'package:image/image.dart' as img;
 
 void main() {
+  test('detector passages cannot snap to a nearby narrow strip', () {
+    final image = img.Image(width: 400, height: 400, numChannels: 4);
+    img.fill(image, color: img.ColorRgb8(70, 70, 70));
+    img.fillRect(
+      image,
+      x1: 240,
+      y1: 100,
+      x2: 350,
+      y2: 280,
+      color: img.ColorRgb8(255, 210, 255),
+    );
+    img.fillRect(
+      image,
+      x1: 20,
+      y1: 120,
+      x2: 380,
+      y2: 144,
+      color: img.ColorRgb8(255, 255, 255),
+    );
+    img.fillRect(
+      image,
+      x1: 270,
+      y1: 130,
+      x2: 320,
+      y2: 240,
+      color: img.ColorRgb8(0, 0, 0),
+    );
+    img.fillRect(
+      image,
+      x1: 90,
+      y1: 128,
+      x2: 130,
+      y2: 137,
+      color: img.ColorRgb8(0, 0, 0),
+    );
+    final rgba = image.getBytes(order: img.ChannelOrder.rgba);
+    TranslationRegion region(Rect box, TranslationRegionKind kind) =>
+        TranslationRegion(
+          id: 'passage',
+          box: box,
+          kind: kind,
+          sourceText: '先生の手をつないでる',
+          translatedText: '现在正牵着老师的手',
+          sourceVertical: true,
+          boxSource: TranslationBoxSource.detector,
+        );
+    // 多列文字框不够窄，不能依靠单列长宽比来避免误判。
+    const passage = Rect.fromLTRB(250 / 400, 110 / 400, 340 / 400, 250 / 400);
+    for (final kind in [
+      TranslationRegionKind.bubble,
+      TranslationRegionKind.caption,
+    ]) {
+      final result = const BubbleSnapper().snap(rgba, 400, 400, [
+        region(passage, kind),
+      ]).single;
+      expect(result.sourceVertical, isTrue);
+      expect(result.kind, isNot(TranslationRegionKind.caption));
+      expect(result.layoutBox!.height * 400, greaterThan(80));
+      expect(result.layoutBox!.center.dx, closeTo(passage.center.dx, .04));
+    }
+    final caption = const BubbleSnapper().snap(rgba, 400, 400, [
+      region(
+        const Rect.fromLTRB(88 / 400, 126 / 400, 132 / 400, 139 / 400),
+        TranslationRegionKind.bubble,
+      ),
+    ]).single;
+    expect(caption.kind, TranslationRegionKind.caption);
+    expect(caption.sourceVertical, isFalse);
+    expect(caption.layoutBox!.top * 400, greaterThanOrEqualTo(120));
+    expect(caption.layoutBox!.bottom * 400, lessThanOrEqualTo(145));
+  });
+
+  test(
+    'rejects a surrounding street component whose bounds enclose a balloon',
+    () {
+      final image = img.Image(width: 400, height: 400, numChannels: 4);
+      img.fill(image, color: img.ColorRgb8(30, 30, 30));
+      img.fillRect(
+        image,
+        x1: 20,
+        y1: 20,
+        x2: 380,
+        y2: 380,
+        color: img.ColorRgb8(150, 165, 195),
+      );
+      img.fillRect(
+        image,
+        x1: 250,
+        y1: 100,
+        x2: 350,
+        y2: 280,
+        color: img.ColorRgb8(255, 210, 255),
+      );
+      for (var y = 140; y < 250; y += 25) {
+        img.fillRect(
+          image,
+          x1: 270,
+          y1: y,
+          x2: 330,
+          y2: y + 9,
+          color: img.ColorRgb8(0, 0, 0),
+        );
+      }
+      final result = const BubbleSnapper().snap(
+        image.getBytes(order: img.ChannelOrder.rgba),
+        400,
+        400,
+        [
+          const TranslationRegion(
+            id: 'street',
+            box: Rect.fromLTRB(260 / 400, 138 / 400, 340 / 400, 252 / 400),
+            boxSource: TranslationBoxSource.detector,
+            kind: TranslationRegionKind.bubble,
+            sourceText: '老師感興趣的話',
+            translatedText: '先生が興味あるなら',
+            sourceVertical: true,
+          ),
+        ],
+      ).single;
+      expect(result.backgroundColor, const Color(0xffffd2ff));
+      expect(result.layoutBox!.left, greaterThan(250 / 400));
+      expect(result.layoutBox!.right, lessThan(351 / 400));
+      for (final patch in result.textPatches!) {
+        expect(patch.box.left, greaterThanOrEqualTo(250 / 400));
+        expect(patch.box.right, lessThanOrEqualTo(351 / 400));
+        expect(patch.box.top, greaterThanOrEqualTo(100 / 400));
+        expect(patch.box.bottom, lessThanOrEqualTo(281 / 400));
+      }
+    },
+  );
+
   for (final kind in [
     TranslationRegionKind.bubble,
     TranslationRegionKind.caption,

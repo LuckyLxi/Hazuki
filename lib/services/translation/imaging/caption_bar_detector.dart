@@ -6,7 +6,13 @@ import 'dart:ui';
 class CaptionBarDetector {
   const CaptionBarDetector();
 
-  Rect? find(Uint8List rgba, int width, int height, Rect source) {
+  Rect? find(
+    Uint8List rgba,
+    int width,
+    int height,
+    Rect source, {
+    bool requireSourceCoverage = false,
+  }) {
     final minimumHeight = math.max(8, (width * .012).round());
     final maximumHeight = math.max(minimumHeight, (width * .07).round());
     final padding = math.max(4, math.min(source.height / 2, width * .03));
@@ -91,6 +97,13 @@ class CaptionBarDetector {
         final bottom = bottoms[bottoms.length ~/ 2];
         final barHeight = bottom - top;
         if (barHeight < minimumHeight || last - start < barHeight * 5) return;
+        // 本地检测给出的是整段文字框，不能只取其中一条留白或附近的浅色条。
+        if (requireSourceCoverage &&
+            math.min(bottom.toDouble(), source.bottom) -
+                    math.max(top.toDouble(), source.top) <
+                source.height * .75) {
+          return;
+        }
         var left = -1, right = -1, runStart = -1, previous = -1;
         void closeRun() {
           if (runStart >= 0 &&

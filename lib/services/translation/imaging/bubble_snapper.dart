@@ -66,7 +66,14 @@ class BubbleSnapper {
             region.kind == TranslationRegionKind.sfx ||
             region.kind == TranslationRegionKind.other
         ? null
-        : const CaptionBarDetector().find(rgba, width, height, source);
+        : const CaptionBarDetector().find(
+            rgba,
+            width,
+            height,
+            source,
+            requireSourceCoverage:
+                region.boxSource == TranslationBoxSource.detector,
+          );
     final sampleMargin = math.max(
       2.0,
       math.min(24.0, source.shortestSide * 0.3),
@@ -111,7 +118,10 @@ class BubbleSnapper {
         : _BubbleInterior.caption(caption);
     final horizontalBar =
         caption != null ||
-        region.kind == TranslationRegionKind.caption && !narrowVertical ||
+        region.kind == TranslationRegionKind.caption &&
+            !narrowVertical &&
+            (region.boxSource != TranslationBoxSource.detector ||
+                source.height <= width * .07) ||
         region.kind == TranslationRegionKind.narration &&
             source.width > source.height * 4;
     if (caption == null &&
@@ -391,12 +401,16 @@ class _BubbleInterior {
     seeds.sort((a, b) => a.$1.compareTo(b.$1));
     final visited = Uint8List(w * h);
     final queue = Int32List(w * h);
+    // 框可能紧贴粗体笔画，允许底色在笔画边缘，不能要求框内有固定比例的底色。
+    final nearSource = source.inflate(
+      math.max(4.0, math.min(8.0, source.shortestSide * .1)),
+    );
     // 最近的同色像素可能是字形孔洞，逐个检查不同连通区域。
     for (final (_, seed) in seeds) {
       if (visited[seed] != 0) continue;
       queue[0] = seed;
       visited[seed] = 1;
-      var head = 0, tail = 1, outside = 0;
+      var head = 0, tail = 1, outside = 0, near = 0;
       final lefts = Int32List(h)..fillRange(0, h, w);
       final rights = Int32List(h)..fillRange(0, h, -1);
       var minX = w, maxX = -1, minY = h, maxY = -1;
@@ -424,6 +438,11 @@ class _BubbleInterior {
         maxY = math.max(maxY, y);
         lefts[y] = math.min(lefts[y], x);
         rights[y] = math.max(rights[y], x);
+        if (nearSource.contains(
+          Offset((x + ox).toDouble(), (y + oy).toDouble()),
+        )) {
+          near++;
+        }
         if (!source.contains(
           Offset((x + ox).toDouble(), (y + oy).toDouble()),
         )) {
@@ -454,11 +473,13 @@ class _BubbleInterior {
       );
       final intersection = bounds.intersect(source);
       // 黑字或白色描边也会连通，但它们不会形成包围原文的大块背景。
+      // 包围气泡的街道也可能有同样大的外接框，必须实际覆盖原文框内部。
       if (open ||
           naturalEdges < (horizontalBar ? 1 : 2) ||
           intersection.isEmpty ||
           intersection.width * intersection.height < sourceArea * 0.6 ||
           tail < sourceArea * 0.5 ||
+          near < math.max(4, sourceArea * .01) ||
           tail < (maxX - minX + 1) * (maxY - minY + 1) * 0.35 ||
           outside < math.max(4, sourceArea * 0.08) ||
           (horizontalBar && minX + ox == 0 && maxX + ox == width - 1) ||
