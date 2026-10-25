@@ -34,9 +34,13 @@ dart run build_runner build --delete-conflicting-outputs
 
 # Verify formatting (CI uses this exact form)
 dart format --output=none --set-exit-if-changed lib test
+
+# CI smoke builds
+flutter build apk --debug
+flutter build windows --debug
 ```
 
-`third_party/pub_overrides/quickjs_engine` and each package under `third_party/pub_overrides/` are **separate packages** — run their `flutter pub get` / `dart format` / `flutter analyze` / `flutter test` from that directory, not the repo root. Do not overwrite the local `dependency_overrides` in `pubspec.yaml` (they patch upstream bugs).
+`third_party/pub_overrides/quickjs_engine` and each package under `third_party/pub_overrides/` are **separate packages** — run their `flutter pub get` / `dart format` / `flutter analyze` / `flutter test` from that directory, not the repo root. The patched QuickJS tests need `LIBQUICKJSC_TEST_PATH` pointing at the library built by `tool/build_quickjs_test_library.dart` (see `.github/workflows/check.yml`). Do not overwrite the local `dependency_overrides` in `pubspec.yaml` (they patch upstream bugs); `third_party/pub_overrides/README.md` records why each exists and the pinned-version limits (`build_runner`, `dynamic_color`, `flutter_secure_storage`) — don't bump those without reading it.
 
 ## Architecture
 
@@ -57,6 +61,12 @@ The source service is a decomposed subsystem under `lib/services/source/`, layer
 Source scripts are managed as installable plugins by `SourcePluginManager` ([lib/services/source/plugins/](lib/services/source/plugins/)), which fetches an index from a GitHub repo or HTTPS JSON URL and commits installs atomically. Plugin authoring docs live outside this repo at `D:\Project\HazukiSources\docs`.
 
 **Task control / cancellation.** Every source operation runs under an explicit `SourceOperationContext` via `SourceOperationRunner` ([runtime/](lib/services/source/runtime/)), registered in `SourceTaskRegistry` and bound to the QuickJS engine's `task_control`. UI pages own requests through `SourceTaskOwner` ([lib/shared/source_task_owner.dart](lib/shared/source_task_owner.dart)); leaving a page cancels its reads, while already-admitted non-interactive writes may finish (`retainAdmittedWork`) without regaining UI scope. Cancellation must be recognized before fallback, auth retry, or generic error wrapping. Stopping tasks on source disable/uninstall/update belongs to the catalog paths — do not add blanket stops to generic `remove` / `recreateSourceRuntime`.
+
+### Manga translation
+
+`MangaTranslationService` ([lib/services/translation/](lib/services/translation/)) translates reader pages; the reader side is `ReaderTranslationController` + `reader_translation_overlay.dart`. Per page: settings → result cache (`TranslationResultCache`, bypassable) → `TranslationImageProcessor` slices the image → text location → LLM provider (`providers/`: Anthropic and OpenAI-compatible, built by `MangaTranslationProviderFactory`) → `TranslationResponseParser` → `BubbleSnapper` fits boxes to bubbles. Text location is either **AI** (the model returns boxes) or **detector** (`TranslationTextLocator.detector`): a local ONNX model (CTD or Paddle DB pipelines in `detection/`) runs in a worker isolate, and detected boxes are drawn onto the slice before it is sent to the model. Slices with no detected text skip the AI call.
+
+ONNX Runtime is **not bundled**: `onnx_runtime_library.dart` downloads the platform's runtime on demand (via the patched `onnxruntime_v2` override), picking DirectML on Windows and a QNN build for allow-listed Snapdragon SoCs, CPU otherwise. `translation_readiness.dart` defines when the reader may offer translation. Call `releaseDetector()` when leaving the reader or turning translation off.
 
 The app-level **`SourceRuntimeCoordinator`** ([lib/app/source_runtime/source_runtime_coordinator.dart](lib/app/source_runtime/source_runtime_coordinator.dart)) is a separate UI orchestrator: bootstrap overlay, connectivity recovery, and source-update checks. Do not confuse it with the generic handle-lifecycle coordinator above.
 
@@ -114,4 +124,4 @@ Tests mirror the `lib/` structure under `test/`. Two patterns: **smoke tests** (
 - **Code comments must be written in Simplified Chinese** — docstrings and inline comments explaining *why/how*, kept concise and professional.
 - **Strict scope**: touch only the lines/functions required for the task; do not refactor unrelated code or delete existing behavior without asking first.
 - **Commits**: Conventional Commits, imperative and scoped (e.g. `feat(settings): …`, `fix(storage): …`). No casual/playful language.
-- **Release notes / `update.json` `log` field / git tag descriptions**: list items start with `- ` (never numeric ordering), separated by `\n`. Release tags must be annotated (`git tag -a`).
+- **Release notes / `update.json` `log` field / git tag descriptions**: list items start with `- ` (never numeric ordering), separated by `\n`. Release tags must be annotated (`git tag -a`) and the message must contain Simplified Chinese — the `.githooks/pre-push` hook rejects lightweight tags and tag messages without Chinese, and the release workflow reads the tag message as the changelog.
