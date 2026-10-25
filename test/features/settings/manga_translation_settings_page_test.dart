@@ -12,6 +12,7 @@ import 'package:hazuki/services/translation/translation_glossary_store.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:hazuki/services/translation/translation_usage_store.dart';
 import 'package:hazuki/services/translation/detection/translation_detector_model_store.dart';
+import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 
 class _Usage extends TranslationUsageStore {
   @override
@@ -225,7 +226,9 @@ void main() {
       isTrue,
     );
 
-    await tester.tap(find.byType(DropdownButton<TranslationProviderPreset>));
+    await tester.tap(
+      find.byType(HazukiMenuSettingTile<TranslationProviderPreset>),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gemini').last);
     await tester.pumpAndSettle();
@@ -456,11 +459,18 @@ void main() {
     );
     await pump(tester);
     await openProvider(tester);
-    final effort = find.byType(DropdownButton<TranslationReasoningEffort>);
+    final effort = find.byType(
+      HazukiMenuSettingTile<TranslationReasoningEffort>,
+    );
+    final provider = find.byType(
+      HazukiMenuSettingTile<TranslationProviderPreset>,
+    );
     await tester.ensureVisible(effort);
     await tester.pumpAndSettle();
     expect(
-      tester.widget<DropdownButton<TranslationReasoningEffort>>(effort).value,
+      tester
+          .widget<HazukiMenuSettingTile<TranslationReasoningEffort>>(effort)
+          .selected,
       TranslationReasoningEffort.high,
     );
     await tester.tap(effort);
@@ -468,18 +478,18 @@ void main() {
     await tester.tap(find.text('Medium').last);
     await tester.pumpAndSettle();
     expect(settings.reasoningEffort, TranslationReasoningEffort.medium);
-    await tester.ensureVisible(
-      find.byType(DropdownButton<TranslationProviderPreset>),
-    );
+    await tester.ensureVisible(provider);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButton<TranslationProviderPreset>));
+    await tester.tap(provider);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gemini').last);
     await tester.pumpAndSettle();
     await tester.ensureVisible(effort);
     await tester.pumpAndSettle();
     expect(
-      tester.widget<DropdownButton<TranslationReasoningEffort>>(effort).value,
+      tester
+          .widget<HazukiMenuSettingTile<TranslationReasoningEffort>>(effort)
+          .selected,
       TranslationReasoningEffort.low,
     );
   });

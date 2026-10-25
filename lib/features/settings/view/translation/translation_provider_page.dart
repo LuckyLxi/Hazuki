@@ -9,6 +9,7 @@ import '../../../../services/translation/manga_translation_settings_store.dart';
 import '../../../../services/translation/translation_failure.dart';
 import '../../../../shared/translation/manga_translation_dependencies.dart';
 import '../../../../shared/translation/translation_failure_message.dart';
+import '../../../../widgets/widgets.dart';
 import '../settings_group.dart';
 
 /// 服务商、接口、模型与思考强度配置；进入前设置须已加载。
@@ -174,30 +175,19 @@ class _TranslationProviderPageState extends State<TranslationProviderPage> {
               children: [
                 SettingsGroup(
                   children: [
-                    ListTile(
-                      title: Text(strings.translationProvider),
-                      subtitle: DropdownButton<TranslationProviderPreset>(
-                        isExpanded: true,
-                        value: preset,
-                        onChanged: _busy
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  unawaited(
-                                    _save(_settings.setProviderPreset(value)),
-                                  );
-                                }
-                              },
-                        items: [
-                          for (final value in TranslationProviderPreset.values)
-                            DropdownMenuItem(
-                              value: value,
-                              child: Text(
-                                translationProviderLabel(strings, value),
-                              ),
-                            ),
-                        ],
-                      ),
+                    HazukiMenuSettingTile<TranslationProviderPreset>(
+                      title: strings.translationProvider,
+                      enabled: !_busy,
+                      selected: preset,
+                      onSelected: (value) =>
+                          unawaited(_save(_settings.setProviderPreset(value))),
+                      options: [
+                        for (final value in TranslationProviderPreset.values)
+                          HazukiFrostedMenuOption(
+                            value: value,
+                            label: translationProviderLabel(strings, value),
+                          ),
+                      ],
                     ),
                     field(
                       _baseUrl,
@@ -236,52 +226,37 @@ class _TranslationProviderPageState extends State<TranslationProviderPage> {
                         ),
                       ),
                     ),
-                    ListTile(
-                      title: Text(strings.translationReasoningEffort),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DropdownButton<TranslationReasoningEffort>(
-                            isExpanded: true,
-                            value: _settings.reasoningEffort,
-                            onChanged: _busy
-                                ? null
-                                : (value) {
-                                    if (value != null) {
-                                      unawaited(
-                                        _save(
-                                          _settings.updateProvider(
-                                            preset: preset,
-                                            reasoningEffort: value,
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                            items: [
-                              for (final value
-                                  in TranslationReasoningEffort.values)
-                                DropdownMenuItem(
-                                  value: value,
-                                  child: Text(switch (value) {
-                                    TranslationReasoningEffort
-                                        .providerDefault =>
-                                      strings.translationReasoningDefault,
-                                    TranslationReasoningEffort.off =>
-                                      strings.translationReasoningOff,
-                                    TranslationReasoningEffort.low =>
-                                      strings.translationReasoningLow,
-                                    TranslationReasoningEffort.medium =>
-                                      strings.translationReasoningMedium,
-                                    TranslationReasoningEffort.high =>
-                                      strings.translationReasoningHigh,
-                                  }),
-                                ),
-                            ],
+                    HazukiMenuSettingTile<TranslationReasoningEffort>(
+                      title: strings.translationReasoningEffort,
+                      subtitle: strings.translationReasoningHint,
+                      enabled: !_busy,
+                      selected: _settings.reasoningEffort,
+                      onSelected: (value) => unawaited(
+                        _save(
+                          _settings.updateProvider(
+                            preset: preset,
+                            reasoningEffort: value,
                           ),
-                          Text(strings.translationReasoningHint),
-                        ],
+                        ),
                       ),
+                      options: [
+                        for (final value in TranslationReasoningEffort.values)
+                          HazukiFrostedMenuOption(
+                            value: value,
+                            label: switch (value) {
+                              TranslationReasoningEffort.providerDefault =>
+                                strings.translationReasoningDefault,
+                              TranslationReasoningEffort.off =>
+                                strings.translationReasoningOff,
+                              TranslationReasoningEffort.low =>
+                                strings.translationReasoningLow,
+                              TranslationReasoningEffort.medium =>
+                                strings.translationReasoningMedium,
+                              TranslationReasoningEffort.high =>
+                                strings.translationReasoningHigh,
+                            },
+                          ),
+                      ],
                     ),
                     Padding(
                       padding: const EdgeInsets.all(16),
