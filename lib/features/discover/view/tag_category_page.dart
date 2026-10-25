@@ -288,7 +288,6 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
             ),
             comicDetailPageBuilder: widget.comicDetailPageBuilder,
             sourceService: widget.discoverSource,
-            scrollSortBarWithContent: true,
             taskControl: widget.taskControl,
           ),
         ),

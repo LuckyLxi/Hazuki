@@ -128,7 +128,7 @@ void main() {
     );
   });
 
-  testWidgets('regular sort bar uses a horizontally scrollable capsule', (
+  testWidgets('regular sort bar uses a horizontally scrollable chip row', (
     tester,
   ) async {
     var selectedValue = dates.first.value;
@@ -149,45 +149,43 @@ void main() {
     );
 
     expect(find.byType(ChoiceChip), findsNothing);
-    final capsule = find.byKey(
+    final group = find.byKey(
       const ValueKey<String>('discover_section_sort_group_0'),
     );
-    expect(capsule, findsOneWidget);
+    expect(group, findsOneWidget);
+    expect(tester.getSize(group).height, 34);
     expect(
-      find.descendant(
-        of: capsule,
-        matching: find.byType(SingleChildScrollView),
-      ),
+      find.descendant(of: group, matching: find.byType(SingleChildScrollView)),
       findsOneWidget,
     );
-    final material = tester.widget<Material>(capsule);
-    expect(material.borderRadius, BorderRadius.circular(999));
-    expect(
-      find.ancestor(of: capsule, matching: find.byType(BackdropFilter)),
-      findsOneWidget,
-    );
-    expect(material.color!.a, closeTo(0.72, 0.01));
-    final indicator = find.byKey(
-      const ValueKey<String>('discover_section_sort_indicator'),
-    );
-    final animatedIndicator = tester.widget<AnimatedPositioned>(indicator);
-    expect(animatedIndicator.duration, const Duration(milliseconds: 260));
+    expect(find.byType(BackdropFilter), findsNothing);
     expect(
       find.byKey(const ValueKey<String>('weekly_date_launcher')),
       findsNothing,
     );
 
-    final initialX = tester.getTopLeft(indicator).dx;
+    final colorScheme = Theme.of(tester.element(group)).colorScheme;
+    Color chipColor(String value) {
+      final container = tester.widget<AnimatedContainer>(
+        find.descendant(
+          of: find.byKey(
+            ValueKey<String>('discover_section_sort_option_0_$value'),
+          ),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+      return (container.decoration! as ShapeDecoration).color!;
+    }
+
+    expect(chipColor(dates.first.value), colorScheme.primaryContainer);
+    expect(chipColor(dates.last.value), colorScheme.surfaceContainerHigh);
+
     await tester.tap(find.text(dates.last.label));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    final movingX = tester.getTopLeft(indicator).dx;
     await tester.pumpAndSettle();
-    final settledX = tester.getTopLeft(indicator).dx;
 
     expect(selectedValue, dates.last.value);
-    expect(movingX, greaterThan(initialX));
-    expect(movingX, lessThan(settledX));
+    expect(chipColor(dates.first.value), colorScheme.surfaceContainerHigh);
+    expect(chipColor(dates.last.value), colorScheme.primaryContainer);
   });
 
   testWidgets('long sort labels stay complete at different text scales', (

@@ -140,7 +140,6 @@ void main() {
                                 comicDetailPageBuilder: (_, _) =>
                                     const SizedBox.shrink(),
                                 sourceService: discoverSource,
-                                scrollSortBarWithContent: true,
                               ),
                             ),
                           ),
@@ -380,7 +379,6 @@ void main() {
           ),
           comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
           sourceService: discoverSource,
-          scrollSortBarWithContent: true,
           taskControl: FakeSourceTaskControl(),
         ),
       ),

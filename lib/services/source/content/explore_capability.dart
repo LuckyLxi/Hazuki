@@ -2,7 +2,6 @@ import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
-import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../common/source_json_coerce.dart';
@@ -146,13 +145,11 @@ Promise.all(
             comics: comics,
             viewMoreUrl: viewMore?.isNotEmpty == true ? viewMore : null,
             initialPage: 0,
-            offersInitialComicsFilter:
-                (map['offersInitialComicsFilter'] == true),
           ),
         );
       }
     }
-    return markSectionsWithSharedCategoryViewMoreParameter(sections);
+    return sections;
   }
 
   List<ExploreSection> _parseSinglePageWithMultiPartExploreSections(
@@ -173,42 +170,6 @@ Promise.all(
       }
     }
     return sections;
-  }
-
-  @visibleForTesting
-  static List<ExploreSection> markSectionsWithSharedCategoryViewMoreParameter(
-    List<ExploreSection> sections,
-  ) {
-    final parameterCounts = <String, int>{};
-    for (final section in sections) {
-      final parameter = _categoryViewMoreParameter(section.viewMoreUrl);
-      if (parameter != null) {
-        parameterCounts.update(
-          parameter,
-          (count) => count + 1,
-          ifAbsent: () => 1,
-        );
-      }
-    }
-    if (parameterCounts.values.every((count) => count < 2)) return sections;
-
-    return sections
-        .map((section) {
-          final parameter = _categoryViewMoreParameter(section.viewMoreUrl);
-          return parameter != null && parameterCounts[parameter]! > 1
-              ? section.copyWith(offersInitialComicsFilter: true)
-              : section;
-        })
-        .toList(growable: false);
-  }
-
-  static String? _categoryViewMoreParameter(String? viewMoreUrl) {
-    final raw = viewMoreUrl?.trim() ?? '';
-    if (!raw.startsWith('category:')) return null;
-    final separator = raw.indexOf('@');
-    if (separator < 0 || separator == raw.length - 1) return null;
-    final parameter = raw.substring(separator + 1).trim();
-    return parameter.isEmpty ? null : parameter;
   }
 
   List<ExploreSection> _parseMultiPageComicListExploreSections(

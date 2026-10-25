@@ -23,14 +23,12 @@ class DiscoverSectionPage extends StatefulWidget {
     required this.comicDetailPageBuilder,
     required this.sourceService,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
-    this.scrollSortBarWithContent = false,
   });
 
   final ExploreSection section;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final SourceDiscoverGateway sourceService;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
-  final bool scrollSortBarWithContent;
 
   @override
   State<DiscoverSectionPage> createState() => _DiscoverSectionPageState();
@@ -48,22 +46,10 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
       sourceService: widget.sourceService,
       viewMoreUrl: widget.section.viewMoreUrl,
       initialComics: widget.section.comics,
-      initiallyOffersInitialComicsFilter:
-          widget.section.offersInitialComicsFilter,
       taskControl: widget.taskControl,
     );
     _scrollController.addListener(_onScroll);
     _scheduleInitialBootstrap();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _controller.setInitialComicsFilterLabel(
-      widget.section.viewMoreUrl != null && widget.section.comics.isNotEmpty
-          ? AppLocalizations.of(context)!.discoverSectionHomePreview
-          : null,
-    );
   }
 
   @override
@@ -154,11 +140,6 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
             final hasSortBar =
                 _controller.sortOptions.isNotEmpty ||
                 _controller.sortOptionGroups.any((group) => group.isNotEmpty);
-            final normalGroupCount = _controller.sortOptionGroups.isEmpty
-                ? (_controller.sortOptions.isEmpty ? 0 : 1)
-                : _controller.sortOptionGroups
-                      .where((group) => group.isNotEmpty)
-                      .length;
             final sortBar = DiscoverSectionSortBar(
               sortOptions: _controller.sortOptions,
               sortOptionGroups: _controller.sortOptionGroups,
@@ -174,36 +155,14 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
               section: widget.section,
               comicDetailPageBuilder: widget.comicDetailPageBuilder,
               comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-              scrollHeader: widget.scrollSortBarWithContent && hasSortBar
-                  ? sortBar
-                  : null,
-              topPadding: widget.scrollSortBarWithContent
-                  ? (hasSortBar ? 8 : 16)
-                  : usesWeeklyDateSelector || !hasSortBar
-                  ? 16
-                  : 26 + normalGroupCount * 48,
+              // 筛选栏作为列表头部随内容一起滚动，向上滑动时被推出视口
+              scrollHeader: hasSortBar ? sortBar : null,
+              topPadding: hasSortBar ? 8 : 16,
             );
 
             return Stack(
               children: [
-                if (widget.scrollSortBarWithContent)
-                  content
-                else if (usesWeeklyDateSelector)
-                  Column(
-                    children: [
-                      if (hasSortBar) sortBar,
-                      Expanded(child: content),
-                    ],
-                  )
-                else
-                  Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      content,
-                      if (hasSortBar)
-                        Positioned(left: 0, top: 0, right: 0, child: sortBar),
-                    ],
-                  ),
+                content,
                 if (_controller.errorMessage != null)
                   DiscoverSectionErrorOverlay(
                     errorMessage: _controller.errorMessage!,

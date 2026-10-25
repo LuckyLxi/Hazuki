@@ -1,7 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -13,6 +11,7 @@ import 'package:hazuki/widgets/widgets.dart';
 import '../state/discover_section_page_controller.dart';
 import 'discover_section_date_selector.dart';
 
+/// 专栏筛选栏：每组一行可横向滑动的紧凑胶囊，放在列表头部随内容滚动
 class DiscoverSectionSortBar extends StatelessWidget {
   const DiscoverSectionSortBar({
     super.key,
@@ -41,8 +40,9 @@ class DiscoverSectionSortBar extends StatelessWidget {
     final dateGroupIndex = useDateMorphSelector
         ? groups.indexWhere((group) => group.isNotEmpty)
         : -1;
+    // 胶囊行横向贴边滚动，左右留白放在行内而不是外层
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+      padding: const EdgeInsets.only(top: 10, bottom: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -52,7 +52,7 @@ class DiscoverSectionSortBar extends StatelessWidget {
                 padding: EdgeInsets.only(
                   bottom: groupIndex == groups.length - 1 ? 0 : 8,
                 ),
-                child: _DiscoverSectionCapsuleGroup(
+                child: _DiscoverSectionChipGroup(
                   groupIndex: groupIndex,
                   options: groups[groupIndex],
                   selectedValue: selectedSortValues.length > groupIndex
@@ -69,19 +69,22 @@ class DiscoverSectionSortBar extends StatelessWidget {
                 ),
               ),
           if (dateGroupIndex >= 0)
-            DiscoverSectionDateSelector(
-              options: groups[dateGroupIndex],
-              selectedValue: selectedSortValues.length > dateGroupIndex
-                  ? selectedSortValues[dateGroupIndex]
-                  : selectedSortValue,
-              onSelected: (value) {
-                final handler = onSelectSortOptionInGroup;
-                if (handler != null) {
-                  handler(dateGroupIndex, value);
-                  return;
-                }
-                onSelectSortOption(value);
-              },
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: DiscoverSectionDateSelector(
+                options: groups[dateGroupIndex],
+                selectedValue: selectedSortValues.length > dateGroupIndex
+                    ? selectedSortValues[dateGroupIndex]
+                    : selectedSortValue,
+                onSelected: (value) {
+                  final handler = onSelectSortOptionInGroup;
+                  if (handler != null) {
+                    handler(dateGroupIndex, value);
+                    return;
+                  }
+                  onSelectSortOption(value);
+                },
+              ),
             ),
         ],
       ),
@@ -89,13 +92,15 @@ class DiscoverSectionSortBar extends StatelessWidget {
   }
 }
 
-class _DiscoverSectionCapsuleGroup extends StatefulWidget {
-  const _DiscoverSectionCapsuleGroup({
+class _DiscoverSectionChipGroup extends StatelessWidget {
+  const _DiscoverSectionChipGroup({
     required this.groupIndex,
     required this.options,
     required this.selectedValue,
     required this.onSelected,
   });
+
+  static const double _height = 34;
 
   final int groupIndex;
   final List<CategoryRankingOption> options;
@@ -103,162 +108,41 @@ class _DiscoverSectionCapsuleGroup extends StatefulWidget {
   final ValueChanged<String> onSelected;
 
   @override
-  State<_DiscoverSectionCapsuleGroup> createState() =>
-      _DiscoverSectionCapsuleGroupState();
-}
-
-class _DiscoverSectionCapsuleGroupState
-    extends State<_DiscoverSectionCapsuleGroup> {
-  static const double _minimumItemWidth = 84;
-  static const double _height = 48;
-  static const double _inset = 4;
-
-  List<String>? _measuredLabels;
-  TextStyle? _measuredStyle;
-  TextScaler? _measuredTextScaler;
-  TextDirection? _measuredTextDirection;
-  Locale? _measuredLocale;
-  double _measuredMinimumItemWidth = _minimumItemWidth;
-
-  double _minimumWidthForLabels(BuildContext context, TextStyle style) {
-    final labels = [for (final option in widget.options) option.label];
-    final textScaler = MediaQuery.textScalerOf(context);
-    final textDirection = Directionality.of(context);
-    final locale = Localizations.maybeLocaleOf(context);
-    if (listEquals(labels, _measuredLabels) &&
-        style == _measuredStyle &&
-        textScaler == _measuredTextScaler &&
-        textDirection == _measuredTextDirection &&
-        locale == _measuredLocale) {
-      return _measuredMinimumItemWidth;
-    }
-
-    final labelPainter = TextPainter(
-      textDirection: textDirection,
-      textScaler: textScaler,
-      locale: locale,
-      maxLines: 1,
-    );
-    var minimumItemWidth = _minimumItemWidth;
-    for (final label in labels) {
-      for (final weight in const [FontWeight.w500, FontWeight.w700]) {
-        labelPainter.text = TextSpan(
-          text: label,
-          style: style.copyWith(fontWeight: weight),
-        );
-        labelPainter.layout();
-        minimumItemWidth = math.max(
-          minimumItemWidth,
-          labelPainter.width.ceilToDouble() + 24,
-        );
-      }
-    }
-    labelPainter.dispose();
-    _measuredLabels = labels;
-    _measuredStyle = style;
-    _measuredTextScaler = textScaler;
-    _measuredTextDirection = textDirection;
-    _measuredLocale = locale;
-    _measuredMinimumItemWidth = minimumItemWidth;
-    return minimumItemWidth;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final options = widget.options;
-    final groupIndex = widget.groupIndex;
-    final selectedValue = widget.selectedValue;
+    // 选中值不在选项中时沿用首项高亮，与插件默认排序保持一致
     final selectedIndex = math.max(
       0,
       options.indexWhere((option) => option.value == selectedValue),
     );
-    final minimumItemWidth = _minimumWidthForLabels(
-      context,
-      theme.textTheme.labelLarge ?? const TextStyle(),
-    );
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Material(
-          key: ValueKey<String>('discover_section_sort_group_$groupIndex'),
-          color: colorScheme.surfaceContainer.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(999),
-          clipBehavior: Clip.antiAlias,
-          child: SizedBox(
-            height: _height,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final viewportWidth = constraints.maxWidth - _inset * 2;
-                final itemWidth = math.max(
-                  minimumItemWidth,
-                  viewportWidth / options.length,
-                );
-                final contentWidth = math.max(
-                  viewportWidth,
-                  itemWidth * options.length,
-                );
-
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.all(_inset),
-                  child: SizedBox(
-                    width: contentWidth,
-                    height: _height - _inset * 2,
-                    child: Stack(
-                      children: [
-                        AnimatedPositioned(
-                          key: const ValueKey<String>(
-                            'discover_section_sort_indicator',
-                          ),
-                          left: selectedIndex * itemWidth,
-                          top: 0,
-                          bottom: 0,
-                          width: itemWidth,
-                          duration: const Duration(milliseconds: 260),
-                          curve: Curves.easeOutCubic,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            for (final option in options)
-                              SizedBox(
-                                width: itemWidth,
-                                height: double.infinity,
-                                child: _DiscoverSectionCapsuleOption(
-                                  key: ValueKey<String>(
-                                    'discover_section_sort_option_${groupIndex}_${option.value}',
-                                  ),
-                                  label: option.label,
-                                  selected: option.value == selectedValue,
-                                  onTap: () => widget.onSelected(option.value),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+    return SizedBox(
+      key: ValueKey<String>('discover_section_sort_group_$groupIndex'),
+      height: _height,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var index = 0; index < options.length; index++) ...[
+              if (index > 0) const SizedBox(width: 8),
+              _DiscoverSectionChip(
+                key: ValueKey<String>(
+                  'discover_section_sort_option_${groupIndex}_${options[index].value}',
+                ),
+                label: options[index].label,
+                selected: index == selectedIndex,
+                onTap: () => onSelected(options[index].value),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 }
 
-class _DiscoverSectionCapsuleOption extends StatelessWidget {
-  const _DiscoverSectionCapsuleOption({
+class _DiscoverSectionChip extends StatelessWidget {
+  const _DiscoverSectionChip({
     super.key,
     required this.label,
     required this.selected,
@@ -273,25 +157,41 @@ class _DiscoverSectionCapsuleOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    // 选中与未选中使用相同字重，避免切换时胶囊宽度跳动
     return Semantics(
       button: true,
       selected: selected,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              style: (theme.textTheme.labelLarge ?? const TextStyle()).copyWith(
-                color: selected
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSurfaceVariant,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        decoration: ShapeDecoration(
+          shape: const StadiumBorder(),
+          color: selected
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerHigh,
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Center(
+                widthFactor: 1,
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  style: (theme.textTheme.labelLarge ?? const TextStyle())
+                      .copyWith(
+                        color: selected
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                  child: Text(label, maxLines: 1),
+                ),
               ),
-              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
           ),
         ),
