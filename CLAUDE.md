@@ -66,13 +66,13 @@ The app-level **`SourceRuntimeCoordinator`** ([lib/app/source_runtime/source_run
 
 ### Manga translation
 
-`MangaTranslationService` ([lib/services/translation/](lib/services/translation/)) translates reader pages; the reader side is `ReaderTranslationController` + `reader_translation_overlay.dart`. Per page: settings → result cache (`TranslationResultCache`, bypassable) → `TranslationImageProcessor` slices the image → text location → LLM provider (`providers/`: Anthropic and OpenAI-compatible, built by `MangaTranslationProviderFactory`) → `TranslationResponseParser` → `BubbleSnapper` fits boxes to bubbles. Text location is either **AI** (the model returns boxes) or **detector** (`TranslationTextLocator.detector`): a local ONNX model (CTD or Paddle DB pipelines in `detection/`) runs in a worker isolate, and detected boxes are drawn onto the slice before it is sent to the model. Slices with no detected text skip the AI call.
+`MangaTranslationService` ([lib/services/translation/](lib/services/translation/)) translates reader pages; the reader side is `ReaderTranslationController` + `reader_translation_overlay.dart`. Per page: settings → result cache (`TranslationResultCache`, bypassable) → `TranslationImageProcessor` slices the image → text location → LLM provider (`providers/`: Anthropic and OpenAI-compatible, built by `MangaTranslationProviderFactory`) → `TranslationResponseParser` → `BubbleSnapper` fits boxes to bubbles. Text location is either **AI** (the model returns boxes) or **detector** (`TranslationTextLocator.detector`): a local ONNX model (CTD, Paddle DB, or RT-DETR pipelines in `detection/`, selected by `TranslationDetectorKind`) runs in a worker isolate, and detected boxes are drawn onto the slice before it is sent to the model. Slices with no detected text skip the AI call.
 
 ONNX Runtime is **not bundled**: `onnx_runtime_library.dart` downloads the platform's runtime on demand (via the patched `onnxruntime_v2` override), picking DirectML on Windows and a QNN build for allow-listed Snapdragon SoCs, CPU otherwise. `translation_readiness.dart` defines when the reader may offer translation. Call `releaseDetector()` when leaving the reader or turning translation off.
 
 ### Dependency injection
 
-Pure `get_it`. `lib/app/service_locator.dart` exposes `final GetIt sl` and `registerServices()`, which delegates to `registerSourceServices` + `registerApplicationServices` in [lib/app/di/](lib/app/di/). Resolve **everything** via `sl<T>()` (e.g. `sl<SourceReaderGateway>()`, `sl<MangaDownloadService>()`). There are no `.instance` static singletons. Registrars accept an optional `GetIt` so tests can build an isolated graph.
+Pure `get_it`. `lib/app/service_locator.dart` exposes `final GetIt sl` and `registerServices()`, which delegates to `registerSourceServices` + `registerApplicationServices` in [lib/app/di/](lib/app/di/). `sl<T>()` is used **only in `lib/main.dart` and `lib/app/`** (composition roots such as [home_feature_entrypoints.dart](lib/app/home/home_feature_entrypoints.dart), startup, and the app-level source runtime UI); `lib/features/`, `lib/shared/`, `lib/widgets/`, and `lib/services/` never call it. There are no `.instance` static singletons. Registrars accept an optional `GetIt` so tests can build an isolated graph.
 
 ### Startup
 
@@ -80,7 +80,7 @@ Pure `get_it`. `lib/app/service_locator.dart` exposes `final GetIt sl` and `regi
 
 ### State pattern
 
-Feature controllers are `ChangeNotifier`s that hold a private `_state` snapshot and call `notifyListeners()`. They accept **callbacks** injected at construction (e.g. reader update/log callbacks) to stay testable without widget dependencies. Views resolve gateways via `sl<T>()` and pass them into controllers, which take them as constructor parameters.
+Feature controllers are `ChangeNotifier`s that hold a private `_state` snapshot and call `notifyListeners()`. They accept **callbacks** injected at construction (e.g. reader update/log callbacks) to stay testable without widget dependencies. Views do not resolve dependencies themselves: `lib/main.dart` / `lib/app/` resolve gateways/services via `sl<T>()` and hand them to pages through feature dependency bundles (e.g. `HomeServices`, `ComicDetailDependencies`, `MangaTranslationDependencies`) or constructor parameters; views pass them on to controllers as constructor parameters.
 
 ### Feature modules
 
