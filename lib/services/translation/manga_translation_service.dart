@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:dio/dio.dart';
+import 'package:image/image.dart' as img;
 
 import 'detection/translation_detector_model_store.dart';
 import 'detection/translation_detector_models.dart';
@@ -62,6 +63,51 @@ class MangaTranslationService {
 
   /// 释放检测模型会话与工作 isolate；离开阅读器或关闭翻译模式时调用。
   Future<void> releaseDetector() => _detector.release();
+
+  /// 按当前服务商配置拉取可用模型列表。
+  Future<List<String>> listProviderModels({CancelToken? cancelToken}) =>
+      _providers
+          .create(_settings.providerPreset, _settings.configuration)
+          .listModels(cancelToken: cancelToken);
+
+  /// 先拉模型列表，再用固定测试图走一遍识别与解析，验证服务商配置可用；失败时原样抛出。
+  Future<void> testProviderConnection({CancelToken? cancelToken}) async {
+    final provider = _providers.create(
+      _settings.providerPreset,
+      _settings.configuration,
+    );
+    await provider.listModels(cancelToken: cancelToken);
+    final image = await Isolate.run(_buildConnectionTestImage);
+    final raw = await provider.translateImage(
+      image,
+      buildTranslationSystemPrompt(
+        targetLanguage: _settings.targetLanguage,
+        translateSfx: _settings.translateSfx,
+        customInstructions: _settings.customSystemPrompt,
+      ),
+      buildTranslationUserPrompt(),
+      cancelToken: cancelToken,
+    );
+    _parser.parse(raw.text, translateSfx: _settings.translateSfx);
+  }
+
+  static TranslationImagePayload _buildConnectionTestImage() {
+    final image = img.Image(width: 120, height: 48);
+    img.fill(image, color: img.ColorRgb8(255, 255, 255));
+    img.drawString(
+      image,
+      'Hello',
+      font: img.arial24,
+      x: 12,
+      y: 10,
+      color: img.ColorRgb8(0, 0, 0),
+    );
+    return TranslationImagePayload(
+      jpegBytes: img.encodeJpg(image, quality: 85),
+      width: image.width,
+      height: image.height,
+    );
+  }
 
   Future<PageTranslationResult> translatePage({
     required Uint8List imageBytes,

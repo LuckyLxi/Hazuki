@@ -31,8 +31,14 @@ class _Provider implements MangaTranslationProvider {
   TranslationProviderConfiguration? configuration;
   Future<ProviderRawResponse> Function(int call)? respond;
 
+  int listCalls = 0;
+  List<String> models = const [];
+
   @override
-  Future<List<String>> listModels({CancelToken? cancelToken}) async => [];
+  Future<List<String>> listModels({CancelToken? cancelToken}) async {
+    listCalls++;
+    return models;
+  }
 
   @override
   Future<ProviderRawResponse> translateImage(
@@ -788,6 +794,38 @@ void main() {
     test('releases the detector on request', () async {
       await service.releaseDetector();
       expect(detector.releases, 1);
+    });
+  });
+
+  group('provider check', () {
+    test('lists models with the current configuration', () async {
+      await settings.updateProvider(
+        preset: settings.providerPreset,
+        baseUrl: 'https://example.test',
+        apiKey: 'key',
+        model: 'm',
+      );
+      provider.models = const ['a', 'b'];
+      expect(await service.listProviderModels(), ['a', 'b']);
+      expect(provider.listCalls, 1);
+      expect(provider.calls, 0);
+      expect(provider.configuration?.baseUrl, 'https://example.test');
+    });
+
+    test('connection test lists models, sends one image and parses', () async {
+      await service.testProviderConnection();
+      expect(provider.listCalls, 1);
+      expect(provider.calls, 1);
+      expect(provider.systemPrompts.single, isNotEmpty);
+    });
+
+    test('connection test surfaces malformed responses', () async {
+      provider.respond = (_) async => const ProviderRawResponse(
+        text: 'not json',
+        usage: TranslationUsage(inputTokens: 1, outputTokens: 1),
+      );
+      await expectLater(service.testProviderConnection(), throwsA(anything));
+      expect(provider.calls, 1);
     });
   });
 }

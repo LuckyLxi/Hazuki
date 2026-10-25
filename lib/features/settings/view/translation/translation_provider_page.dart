@@ -1,16 +1,12 @@
 import 'dart:async';
-import 'dart:isolate';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../../l10n/l10n.dart';
-import '../../../../services/translation/manga_translation_provider.dart';
 import '../../../../services/translation/manga_translation_settings_store.dart';
 import '../../../../services/translation/translation_failure.dart';
-import '../../../../services/translation/translation_prompt.dart';
 import '../../../../shared/translation/manga_translation_dependencies.dart';
 import '../../../../shared/translation/translation_failure_message.dart';
 import '../settings_group.dart';
@@ -80,45 +76,14 @@ class _TranslationProviderPageState extends State<TranslationProviderPage> {
         apiKey: _apiKey.text,
         model: _model.text,
       );
-      final provider = widget.dependencies.providers.create(
-        _settings.providerPreset,
-        _settings.configuration,
-      );
-      final models = await provider.listModels(cancelToken: _token);
+      final service = widget.dependencies.service;
       if (testConnection) {
-        final image = await Isolate.run(() {
-          final image = img.Image(width: 120, height: 48);
-          img.fill(image, color: img.ColorRgb8(255, 255, 255));
-          img.drawString(
-            image,
-            'Hello',
-            font: img.arial24,
-            x: 12,
-            y: 10,
-            color: img.ColorRgb8(0, 0, 0),
-          );
-          return TranslationImagePayload(
-            jpegBytes: img.encodeJpg(image, quality: 85),
-            width: image.width,
-            height: image.height,
-          );
-        });
-        final raw = await provider.translateImage(
-          image,
-          buildTranslationSystemPrompt(
-            targetLanguage: _settings.targetLanguage,
-            translateSfx: _settings.translateSfx,
-            customInstructions: _settings.customSystemPrompt,
-          ),
-          buildTranslationUserPrompt(),
-          cancelToken: _token,
-        );
-        widget.dependencies.parser.parse(
-          raw.text,
-          translateSfx: _settings.translateSfx,
-        );
+        await service.testProviderConnection(cancelToken: _token);
         if (mounted) _message(l10n(context).translationConnectionOk);
-      } else if (mounted) {
+        return;
+      }
+      final models = await service.listProviderModels(cancelToken: _token);
+      if (mounted) {
         if (models.isEmpty) {
           _message(l10n(context).translationNoModels);
           return;

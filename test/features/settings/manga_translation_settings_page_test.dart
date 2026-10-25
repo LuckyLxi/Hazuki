@@ -8,9 +8,7 @@ import 'package:hazuki/services/translation/translation_result_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hazuki/shared/translation/manga_translation_dependencies.dart';
 import 'package:hazuki/services/translation/manga_translation_service.dart';
-import 'package:hazuki/services/translation/manga_translation_provider_factory.dart';
 import 'package:hazuki/services/translation/translation_glossary_store.dart';
-import 'package:hazuki/services/translation/translation_response_parser.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:hazuki/services/translation/translation_usage_store.dart';
 import 'package:hazuki/services/translation/detection/translation_detector_model_store.dart';
@@ -84,17 +82,14 @@ void main() {
       settings: settings,
       models: models,
       service: _Service(),
-      providers: MangaTranslationProviderFactory(),
       cache: _Cache(),
       glossary: TranslationGlossaryStore(),
-      parser: const TranslationResponseParser(),
       usage: _Usage(),
     );
   });
   tearDown(() async {
     models.dispose();
     settings.dispose();
-    dependencies.providers.dispose();
     dependencies.usage.dispose();
   });
 
