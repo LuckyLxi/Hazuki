@@ -10,9 +10,35 @@ import 'package:onnxruntime_v2/src/bindings/onnxruntime_bindings_generated.dart'
 
 /// 由 float32 数据创建输入张量；数据复制到原生内存，随张量 release 一并释放。
 OrtValueTensor createFloatTensor(Float32List data, List<int> shape) {
-  final api = OrtEnv.instance.ortApiPtr.ref;
   final dataPtr = calloc<ffi.Float>(data.length);
   dataPtr.asTypedList(data.length).setAll(0, data);
+  return _createTensor(
+    dataPtr.cast(),
+    data.length * 4,
+    shape,
+    bg.ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
+  );
+}
+
+/// 由 int64 数据创建输入张量，用于 RT-DETR 的原图尺寸输入。
+OrtValueTensor createInt64Tensor(Int64List data, List<int> shape) {
+  final dataPtr = calloc<ffi.Int64>(data.length);
+  dataPtr.asTypedList(data.length).setAll(0, data);
+  return _createTensor(
+    dataPtr.cast(),
+    data.length * 8,
+    shape,
+    bg.ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+  );
+}
+
+OrtValueTensor _createTensor(
+  ffi.Pointer<ffi.Void> dataPtr,
+  int bytes,
+  List<int> shape,
+  int type,
+) {
+  final api = OrtEnv.instance.ortApiPtr.ref;
   final shapePtr = calloc<ffi.Int64>(shape.length);
   shapePtr.asTypedList(shape.length).setAll(0, shape);
   final infoPtr = calloc<ffi.Pointer<bg.OrtMemoryInfo>>();
@@ -39,15 +65,15 @@ OrtValueTensor createFloatTensor(Float32List data, List<int> shape) {
         )
       >()(
         infoPtr.value,
-        dataPtr.cast(),
-        data.length * 4,
+        dataPtr,
+        bytes,
         shapePtr,
         shape.length,
-        bg.ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
+        type,
         valuePtr,
       ),
     );
-    return OrtValueTensor(valuePtr.value, dataPtr.cast());
+    return OrtValueTensor(valuePtr.value, dataPtr);
   } catch (_) {
     calloc.free(dataPtr);
     rethrow;
@@ -60,6 +86,24 @@ OrtValueTensor createFloatTensor(Float32List data, List<int> shape) {
 
 /// 读取 float32 输出张量，返回数据副本与形状。
 (Float32List, List<int>) readFloatTensor(OrtValue value) {
+  final (data, shape, length) = _readTensor(value);
+  return (
+    Float32List.fromList(data.cast<ffi.Float>().asTypedList(length)),
+    shape,
+  );
+}
+
+/// 读取 int64 输出张量，返回数据副本与形状。
+(Int64List, List<int>) readInt64Tensor(OrtValue value) {
+  final (data, shape, length) = _readTensor(value);
+  return (
+    Int64List.fromList(data.cast<ffi.Int64>().asTypedList(length)),
+    shape,
+  );
+}
+
+/// 返回张量数据指针（归张量所有）、形状与元素个数。
+(ffi.Pointer<ffi.Void>, List<int>, int) _readTensor(OrtValue value) {
   final api = OrtEnv.instance.ortApiPtr.ref;
   final infoPtr = calloc<ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>>();
   final countPtr = calloc<ffi.Size>();
@@ -113,10 +157,7 @@ OrtValueTensor createFloatTensor(Float32List data, List<int> shape) {
       >()(value.ptr, dataPtr),
     );
     final length = shape.fold(1, (total, dim) => total * dim);
-    final data = Float32List.fromList(
-      dataPtr.value.cast<ffi.Float>().asTypedList(length),
-    );
-    return (data, shape);
+    return (dataPtr.value, shape, length);
   } finally {
     calloc.free(infoPtr);
     calloc.free(countPtr);

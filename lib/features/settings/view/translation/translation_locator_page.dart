@@ -22,6 +22,11 @@ const _curve = Curves.easeOutCubic;
     strings.translationDetectorCtdDescription,
     strings.translationDetectorCtdCost,
   ),
+  'comic_text_bubble_detector' => (
+    'Comic Text & Bubble Detector',
+    strings.translationDetectorBubbleDescription,
+    strings.translationDetectorBubbleCost,
+  ),
   'pp_ocrv5_mobile_det' => (
     'PP-OCRv5 Mobile',
     strings.translationDetectorMobileDescription,

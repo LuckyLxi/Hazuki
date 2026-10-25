@@ -303,11 +303,9 @@ void main() {
     expect(required, findsNothing);
 
     final ai = find.byKey(const ValueKey('translation-text-locator-ai'));
-    await tester.scrollUntilVisible(
-      ai,
-      -250,
-      scrollable: find.byType(Scrollable).last,
-    );
+    // 回到列表顶部，避免选项停在顶栏下方而点不中。
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, 3000));
+    await tester.pumpAndSettle();
     await tester.tap(ai);
     await tester.pumpAndSettle();
     expect(settings.textLocator, TranslationTextLocator.ai);

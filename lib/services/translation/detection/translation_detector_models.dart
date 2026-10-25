@@ -1,4 +1,4 @@
-enum TranslationDetectorKind { ctd, paddleDb }
+enum TranslationDetectorKind { ctd, paddleDb, rtDetr }
 
 /// DB 文字检测后处理参数，取自 PaddleX 官方 `inference.yml`。
 class DbPostProcessParams {
@@ -89,6 +89,19 @@ const kTranslationDetectorModels = [
     license: 'Apache-2.0',
     detectionMaxSide: 960,
     archiveEntry: 'inference.onnx',
+  ),
+  TranslationDetectorModelSpec(
+    id: 'comic_text_bubble_detector',
+    version: 1,
+    kind: TranslationDetectorKind.rtDetr,
+    // 固定到具体提交，避免仓库更新后摘要不符。
+    url:
+        'https://huggingface.co/ogkalu/comic-text-and-bubble-detector/resolve/16e8a622f91fabc6b5b65c96d32d1183f8843546/detector.onnx',
+    downloadBytes: 168481531,
+    sha256: '065744e91c0594ad8663aa8b870ce3fb27222942eded5a3cc388ce23421bd195',
+    license: 'Apache-2.0',
+    // 模型内部统一拉伸到 640，切片保持与 CTD 相同的清晰度。
+    detectionMaxSide: 1024,
   ),
 ];
 

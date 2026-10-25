@@ -16,6 +16,7 @@ import 'ctd_detector_pipeline.dart';
 import 'onnx_runtime_library.dart';
 import 'onnx_tensor_io.dart';
 import 'paddle_db_detector_pipeline.dart';
+import 'rt_detr_detector_pipeline.dart';
 import 'translation_detector_models.dart';
 import 'translation_text_detector.dart';
 
@@ -459,8 +460,10 @@ OrtSession _createSession(
     }
     if (qnnBackend != null) {
       // NPU 只支持静态形状；CTD 本身是固定输入，覆盖不存在的维度名不受影响。
-      for (final MapEntry(:key, :value)
-          in PaddleDbDetectorPipeline.dynamicDimensions.entries) {
+      for (final MapEntry(:key, :value) in {
+        ...PaddleDbDetectorPipeline.dynamicDimensions,
+        ...RtDetrDetectorPipeline.dynamicDimensions,
+      }.entries) {
         options.addFreeDimensionOverrideByName(key, value);
       }
       if (qnnContextOutput != null) {
@@ -542,19 +545,21 @@ void _detectorWorkerMain((SendPort, String) arguments) {
         width: message['width']! as int,
         height: message['height']! as int,
       );
-      List<Rect> detect() => message['kind'] == TranslationDetectorKind.ctd.name
-          ? _runCtd(session!, image)
-          : _runPaddleDb(
-              session!,
-              image,
-              DbPostProcessParams(
-                thresh: message['thresh']! as double,
-                boxThresh: message['boxThresh']! as double,
-                unclipRatio: message['unclipRatio']! as double,
-                maxCandidates: message['maxCandidates']! as int,
-              ),
-              fixedShape: accelerated && accelerator == _Accelerator.qnn,
-            );
+      List<Rect> detect() => switch (message['kind']) {
+        'ctd' => _runCtd(session!, image),
+        'rtDetr' => _runRtDetr(session!, image),
+        _ => _runPaddleDb(
+          session!,
+          image,
+          DbPostProcessParams(
+            thresh: message['thresh']! as double,
+            boxThresh: message['boxThresh']! as double,
+            unclipRatio: message['unclipRatio']! as double,
+            maxCandidates: message['maxCandidates']! as int,
+          ),
+          fixedShape: accelerated && accelerator == _Accelerator.qnn,
+        ),
+      };
       List<Rect> boxes;
       try {
         boxes = detect();
@@ -664,6 +669,55 @@ List<Rect> _runPaddleDb(
     input.height,
     params,
   );
+}
+
+List<Rect> _runRtDetr(OrtSession session, DetectionImage image) {
+  final input = createFloatTensor(RtDetrDetectorPipeline.preprocess(image), [
+    1,
+    3,
+    RtDetrDetectorPipeline.inputSize,
+    RtDetrDetectorPipeline.inputSize,
+  ]);
+  // 传入切片尺寸，输出框即为切片像素坐标。
+  final sizes = createInt64Tensor(
+    Int64List.fromList([image.width, image.height]),
+    const [1, 2],
+  );
+  final runOptions = OrtRunOptions();
+  try {
+    final outputs = session.run(
+      runOptions,
+      {
+        RtDetrDetectorPipeline.inputName: input,
+        RtDetrDetectorPipeline.sizesName: sizes,
+      },
+      const [
+        RtDetrDetectorPipeline.labelsName,
+        RtDetrDetectorPipeline.boxesName,
+        RtDetrDetectorPipeline.scoresName,
+      ],
+    );
+    try {
+      final (labels, _) = readInt64Tensor(outputs[0]!);
+      final (boxes, _) = readFloatTensor(outputs[1]!);
+      final (scores, _) = readFloatTensor(outputs[2]!);
+      return RtDetrDetectorPipeline.postprocess(
+        labels,
+        boxes,
+        scores,
+        image.width,
+        image.height,
+      );
+    } finally {
+      for (final output in outputs) {
+        output?.release();
+      }
+    }
+  } finally {
+    input.release();
+    sizes.release();
+    runOptions.release();
+  }
 }
 
 List<(Float32List, List<int>)> _run(
