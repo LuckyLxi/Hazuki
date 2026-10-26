@@ -77,7 +77,8 @@ class SourceLoginStepContent extends StatelessWidget {
         backgroundColor: backgroundColor,
         title: title,
         content: content,
-        actions: actions,
+        // 无按钮时不保留空操作栏的留白。
+        actions: actions.isEmpty ? null : actions,
       );
     }
     return SizedBox(

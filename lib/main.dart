@@ -142,7 +142,14 @@ class _HazukiAppState extends State<HazukiApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _pluginDialogPresenter = SourcePluginDialogPresenter(_navigatorKey);
+    _pluginDialogPresenter = SourcePluginDialogPresenter(
+      _navigatorKey,
+      comicDetailPageBuilder: _buildRootComicDetailPage,
+      searchPageBuilder: (keyword) => _homeFeatureEntrypoints.buildSearchPage(
+        initialKeyword: keyword,
+        comicDetailPageBuilder: _buildRootComicDetailPage,
+      ),
+    );
     _themeController = HazukiThemeController(
       settingsStore: widget.settingsStore,
       initialSettings: widget.initialAppearance,

@@ -33,7 +33,7 @@ Map<String, Object> parseDialogFieldErrors(
   SourceDialogModel model,
 ) {
   final errors = dialogMap(raw);
-  final ids = model.content
+  final ids = model.allComponents
       .where((c) => c.interactive)
       .map((c) => c.id)
       .toSet();
@@ -47,6 +47,50 @@ Map<String, Object> parseDialogFieldErrors(
       if (entry.value != null) entry.key: entry.value as Object,
   };
 }
+
+/// 插件提供的纯字符串（漫画标题、标签值等站点数据），不参与插件翻译。
+String _plain(Object? value, {int max = 4096, bool allowEmpty = false}) {
+  if (value is String &&
+      (allowEmpty || value.trim().isNotEmpty) &&
+      value.length <= max) {
+    return value;
+  }
+  return invalidDialog();
+}
+
+List<Object?> _list(Object? value, {required int min, required int max}) {
+  if (value is List && value.length >= min && value.length <= max) {
+    return value;
+  }
+  return invalidDialog();
+}
+
+void _oneOf(Object? value, Set<String> allowed) {
+  if (value != null && !allowed.contains(value)) invalidDialog();
+}
+
+bool _isHttpUrl(String value) {
+  final uri = Uri.tryParse(value);
+  return uri != null &&
+      const {'http', 'https'}.contains(uri.scheme) &&
+      uri.host.isNotEmpty &&
+      uri.userInfo.isEmpty;
+}
+
+const _valueActions = {'search', 'copy', 'none'};
+const _textTones = {'normal', 'error', 'secondary'};
+
+/// row 只承载展示和轻量交互，避免嵌套布局与大尺寸组件挤在一行。
+const _rowChildTypes = {
+  'text',
+  'richText',
+  'image',
+  'button',
+  'rating',
+  'tags',
+  'progress',
+};
+final _iconName = RegExp(r'^[a-z0-9_]{1,40}$');
 
 Uint8List _image(Object? raw) {
   Uint8List bytes;
@@ -73,8 +117,8 @@ Uint8List _image(Object? raw) {
 }
 
 class SourceDialogComponent {
-  SourceDialogComponent._(this.data, this.image, this.hintImage);
-  factory SourceDialogComponent.parse(Object? raw) {
+  SourceDialogComponent._(this.data, this.image, this.hintImage, this.children);
+  factory SourceDialogComponent.parse(Object? raw, {bool nested = false}) {
     final data = dialogMap(raw);
     final type = data['type'];
     if (data['id'] is! String ||
@@ -89,22 +133,123 @@ class SourceDialogComponent {
           'clickImage',
           'progress',
           'divider',
-        }.contains(type)) {
+          'rating',
+          'row',
+          'button',
+          'comics',
+          'tags',
+          'info',
+          'richText',
+        }.contains(type) ||
+        nested && !_rowChildTypes.contains(type)) {
       invalidDialog();
     }
     for (final field in ['text', 'label', 'placeholder', 'description']) {
       _text(data[field]);
     }
-    for (final field in ['required', 'obscure', 'multiple', 'notifyChange']) {
+    for (final field in [
+      'required',
+      'obscure',
+      'multiple',
+      'notifyChange',
+      'allowHalf',
+      'readOnly',
+      'enabled',
+      'validate',
+    ]) {
       if (data[field] != null && data[field] is! bool) invalidDialog();
+    }
+    final flex = data['flex'];
+    if (flex != null && (flex is! int || flex < 0 || flex > 12)) {
+      invalidDialog();
     }
     if (type == 'text') {
       _text(data['text'], required: true);
-      if (data['tone'] != null &&
-          !const {'normal', 'error', 'secondary'}.contains(data['tone'])) {
+      _oneOf(data['tone'], _textTones);
+    }
+    if (type == 'image') {
+      final height = data['height'];
+      if (height != null &&
+          (height is! num || !height.isFinite || height < 16 || height > 400)) {
         invalidDialog();
       }
+      _oneOf(data['shape'], const {'rect', 'circle'});
     }
+    if (type == 'rating') {
+      final max = data['max'] ?? 5;
+      if (max is! int || max < 1 || max > 10) invalidDialog();
+      data['max'] = max;
+      if (data['readOnly'] == true) {
+        // 只读评分用于展示站点均分，允许任意小数。
+        final value = data['initialValue'] ?? 0;
+        if (value is! num || !value.isFinite || value < 0 || value > max) {
+          invalidDialog();
+        }
+      }
+    }
+    if (type == 'button') {
+      _text(data['text'], required: true);
+      final icon = data['icon'];
+      if (icon != null && (icon is! String || !_iconName.hasMatch(icon))) {
+        invalidDialog();
+      }
+      _oneOf(data['style'], const {
+        'filled',
+        'tonal',
+        'outlined',
+        'text',
+        'icon',
+      });
+      if (data['style'] == 'icon' && icon == null) invalidDialog();
+    }
+    if (type == 'comics') {
+      _text(data['title']);
+      _oneOf(data['layout'], const {'row', 'grid'});
+      for (final raw in _list(data['items'], min: 1, max: 100)) {
+        final item = dialogMap(raw);
+        _plain(item['id'], max: 256);
+        _plain(item['title']);
+        for (final key in ['subtitle', 'cover']) {
+          if (item[key] != null) _plain(item[key], allowEmpty: true);
+        }
+      }
+    }
+    if (type == 'tags') {
+      _oneOf(data['action'], _valueActions);
+      for (final value in _list(data['values'], min: 1, max: 100)) {
+        _plain(value, max: 1024);
+      }
+    }
+    if (type == 'info') {
+      for (final raw in _list(data['rows'], min: 1, max: 32)) {
+        final row = dialogMap(raw);
+        _text(row['label'], required: true);
+        _oneOf(row['action'], _valueActions);
+        for (final value in _list(row['values'], min: 0, max: 100)) {
+          _plain(value, max: 1024);
+        }
+      }
+    }
+    if (type == 'richText') {
+      for (final raw in _list(data['spans'], min: 1, max: 200)) {
+        final span = dialogMap(raw);
+        _text(span['text'], required: true);
+        for (final field in ['bold', 'italic']) {
+          if (span[field] != null && span[field] is! bool) invalidDialog();
+        }
+        _oneOf(span['tone'], const {'normal', 'error', 'secondary', 'primary'});
+        final link = span['link'];
+        if (link != null && (link is! String || !_isHttpUrl(link))) {
+          invalidDialog();
+        }
+      }
+    }
+    _oneOf(type == 'row' ? data['align'] : null, const {
+      'start',
+      'center',
+      'end',
+      'spaceBetween',
+    });
     if (const {'input', 'select', 'toggle'}.contains(type)) {
       _text(data['label'], required: true);
     }
@@ -153,6 +298,13 @@ class SourceDialogComponent {
       type == 'clickImage' && data['hintImage'] != null
           ? _image(data['hintImage'])
           : null,
+      type == 'row'
+          ? List.unmodifiable(
+              _list(data['children'], min: 1, max: 8).map(
+                (child) => SourceDialogComponent.parse(child, nested: true),
+              ),
+            )
+          : const [],
     );
     if (component.interactive) component.validateValue(component.initialValue);
     return component;
@@ -160,14 +312,28 @@ class SourceDialogComponent {
   final Map<String, dynamic> data;
   final Uint8List? image;
   final Uint8List? hintImage;
+
+  /// row 的子组件；其余类型为空。
+  final List<SourceDialogComponent> children;
   String get id => data['id'] as String;
   String get type => data['type'] as String;
   bool get interactive =>
-      const {'input', 'select', 'toggle', 'clickImage'}.contains(type);
+      const {'input', 'select', 'toggle', 'clickImage'}.contains(type) ||
+      type == 'rating' && data['readOnly'] != true;
+
+  /// 自身及 row 内子组件，按显示顺序展开。
+  Iterable<SourceDialogComponent> get flattened sync* {
+    yield this;
+    for (final child in children) {
+      yield* child.flattened;
+    }
+  }
+
   Object get initialValue =>
       data['initialValue'] ??
       switch (type) {
         'toggle' => false,
+        'rating' => 0,
         'clickImage' => <Object>[],
         'select' when data['multiple'] == true => <String>[],
         _ => '',
@@ -181,6 +347,17 @@ class SourceDialogComponent {
         }
       case 'toggle':
         if (value is! bool) invalidDialog();
+      case 'rating':
+        final max = data['max'] as int;
+        // 可交互评分只接受整星，开启 allowHalf 时额外接受半星。
+        final steps = data['allowHalf'] == true ? 2 : 1;
+        if (value is! num ||
+            !value.isFinite ||
+            value < 0 ||
+            value > max ||
+            value * steps != (value * steps).roundToDouble()) {
+          invalidDialog();
+        }
       case 'select':
         final options = (data['options'] as List)
             .map((o) => (o as Map)['value'])
@@ -214,22 +391,34 @@ class SourceDialogComponent {
 }
 
 class SourceDialogModel {
-  SourceDialogModel._(this.title, this.content, this.buttons);
+  SourceDialogModel._(
+    this.title,
+    this.content,
+    this.buttons,
+    this.presentation,
+    this.allComponents,
+  );
   factory SourceDialogModel.parse(Object? raw) {
     final data = dialogMap(raw);
     _text(data['title'], required: true);
     final content = data['content'];
     final buttons = data['buttons'];
+    // 内容区可放按钮后，纯展示窗口允许省略底部按钮。
     if (content is! List ||
         content.length > 64 ||
         buttons is! List ||
-        buttons.isEmpty ||
         buttons.length > 4) {
       invalidDialog();
     }
-    final components = content.map(SourceDialogComponent.parse).toList();
-    if (components.map((c) => c.id).toSet().length != components.length ||
-        components.fold<int>(
+    final presentation = data['presentation'] ?? 'dialog';
+    _oneOf(presentation, const {'dialog', 'sheet'});
+    final components = content
+        .map((raw) => SourceDialogComponent.parse(raw))
+        .toList();
+    final all = [for (final c in components) ...c.flattened];
+    if (all.length > 64 ||
+        all.map((c) => c.id).toSet().length != all.length ||
+        all.fold<int>(
               0,
               (sum, c) =>
                   sum + (c.image?.length ?? 0) + (c.hintImage?.length ?? 0),
@@ -258,13 +447,41 @@ class SourceDialogModel {
       }
     }
     if (primary > 1) invalidDialog();
+    // 内容按钮与底部按钮共用 action 事件，id 冲突会让插件无法区分来源。
+    if (all.any((c) => c.type == 'button' && ids.contains(c.id))) {
+      invalidDialog();
+    }
     final texts = [
       data['title'],
-      for (final c in components)
-        for (final key in ['text', 'label', 'description', 'placeholder'])
+      for (final c in all) ...[
+        for (final key in [
+          'text',
+          'label',
+          'description',
+          'placeholder',
+          'title',
+        ])
           c.data[key],
-      for (final c in components.where((c) => c.type == 'select'))
-        for (final o in c.data['options'] as List) (o as Map)['label'],
+        if (c.type == 'select')
+          for (final o in c.data['options'] as List) (o as Map)['label'],
+        if (c.type == 'comics')
+          for (final item in c.data['items'] as List) ...[
+            (item as Map)['title'],
+            item['subtitle'],
+            item['cover'],
+          ],
+        if (c.type == 'tags') ...c.data['values'] as List,
+        if (c.type == 'info')
+          for (final row in c.data['rows'] as List) ...[
+            (row as Map)['label'],
+            ...row['values'] as List,
+          ],
+        if (c.type == 'richText')
+          for (final span in c.data['spans'] as List) ...[
+            (span as Map)['text'],
+            span['link'],
+          ],
+      ],
       for (final b in actions) b['text'],
     ];
     if (utf8.encode(jsonEncode(texts)).length > 256 * 1024) invalidDialog();
@@ -274,18 +491,28 @@ class SourceDialogModel {
       List.unmodifiable(
         actions.map((b) => Map<String, dynamic>.unmodifiable(b)),
       ),
+      presentation as String,
+      List.unmodifiable(all),
     );
   }
   final Object title;
   final List<SourceDialogComponent> content;
   final List<Map<String, dynamic>> buttons;
+
+  /// `dialog` 为居中弹窗，`sheet` 为底部面板；打开后不可通过 update 切换。
+  final String presentation;
+
+  /// 包含 row 子组件在内的全部组件，用于取值、校验和按 id 查找。
+  final List<SourceDialogComponent> allComponents;
   Map<String, Object> get initialValues => {
-    for (final c in content.where((c) => c.interactive)) c.id: c.initialValue,
+    for (final c in allComponents.where((c) => c.interactive))
+      c.id: c.initialValue,
   };
   SourceDialogModel patch(Map<String, dynamic> patch) =>
       SourceDialogModel.parse({
         'title': patch['title'] ?? title,
         'content': patch['content'] ?? content.map((c) => c.data).toList(),
         'buttons': patch['buttons'] ?? buttons,
+        'presentation': presentation,
       });
 }

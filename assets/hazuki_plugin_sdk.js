@@ -122,13 +122,16 @@ const Hazuki = Object.freeze({
             const bytes = value => value instanceof Uint8Array
                 ? value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)
                 : value;
-            return {...options, content: options.content.map(component => {
+            // row 的子组件同样可能携带图片，需要递归处理。
+            const serialize = content => content.map(component => {
                 if (!component || typeof component !== 'object') return component;
                 return {...component,
                     ...(component.image != null ? {image: bytes(component.image)} : {}),
                     ...(component.hintImage != null ? {hintImage: bytes(component.hintImage)} : {}),
+                    ...(Array.isArray(component.children) ? {children: serialize(component.children)} : {}),
                 };
-            })};
+            });
+            return {...options, content: serialize(options.content)};
         }
         class PluginDialogCancelledError extends Error {
             constructor(reason = 'user') {
@@ -182,6 +185,8 @@ const Hazuki = Object.freeze({
         }
         return Object.freeze({
             PluginDialogCancelledError,
+            // 3：支持 rating/row/button/comics/tags/info/richText 与 sheet 展示。
+            dialogVersion: 3,
             isAvailable: async () => sendMessage({method: 'ui_available'}),
             openWebView: options => browserRequest({
                 completion: options?.callbacks?.length ? 'callback' : 'manual', ...options,

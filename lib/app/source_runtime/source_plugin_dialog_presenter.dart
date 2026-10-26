@@ -1,15 +1,24 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/source_account/source_account_dialog_support.dart';
 import 'package:hazuki/shared/source_interaction/source_animated_dialog.dart';
 import 'package:hazuki/shared/source_account/source_browser_authorization_dialog.dart';
 import 'package:hazuki/shared/source_account/source_authorization_browser.dart';
 import 'package:hazuki/shared/source_interaction/source_plugin_dialog.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 /// Observes exact route identities, excluding this presenter's own dialog route.
 class SourcePluginDialogPresenter extends NavigatorObserver {
-  SourcePluginDialogPresenter(this.navigatorKey, {this.browserFactory}) {
+  SourcePluginDialogPresenter(
+    this.navigatorKey, {
+    this.browserFactory,
+    this.comicDetailPageBuilder,
+    this.searchPageBuilder,
+  }) {
     final service = SourceUiService.instance;
     service.presenter = present;
     service.captureOwner = () =>
@@ -19,6 +28,11 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
   }
   final GlobalKey<NavigatorState> navigatorKey;
   final SourceAuthorizationBrowser Function()? browserFactory;
+
+  /// 弹窗内漫画卡片与搜索型标签的跳转目标；为空时对应组件不可点击。
+  final Widget Function(ExploreComic comic, String heroTag)?
+  comicDetailPageBuilder;
+  final Widget Function(String keyword)? searchPageBuilder;
   final List<Route<dynamic>> _routes = [];
   final Set<Route<dynamic>> _dialogRoutes = {};
   final Map<Route<dynamic>, SourceDialogSession> _sessions = {};
@@ -50,16 +64,36 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
     _pushingDialog = true;
     _pushingSession = dialog;
     try {
+      final sheet = dialog.model.presentation == 'sheet';
+      Widget content(BuildContext context) {
+        route = ModalRoute.of(context);
+        return SourcePluginDialog(
+          dialog: dialog,
+          sheet: sheet,
+          onOpenComic: comicDetailPageBuilder == null
+              ? null
+              : (comic) => _openComic(dialog, comic),
+          onSearch: searchPageBuilder == null
+              ? null
+              : (keyword) => _search(dialog, keyword),
+        );
+      }
+
       final shown = dialog.browserRequest != null
           ? _presentBrowser(context, dialog)
+          : sheet
+          ? showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              useSafeArea: true,
+              showDragHandle: true,
+              backgroundColor: homeDialogBackgroundColor(context),
+              constraints: const BoxConstraints(maxWidth: 640),
+              builder: content,
+            )
           : showSourceAnimatedDialog<void>(
               context,
-              child: Builder(
-                builder: (context) {
-                  route = ModalRoute.of(context);
-                  return SourcePluginDialog(dialog: dialog);
-                },
-              ),
+              child: Builder(builder: content),
             );
       route ??= _routes.lastOrNull;
       changed();
@@ -91,6 +125,34 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
       browserFactory: browserFactory,
     );
     dialog.completeBrowser(result);
+  }
+
+  /// 关闭窗口（reason 为 navigated，不取消插件操作）后打开目标页面。
+  void _openComic(SourceDialogSession dialog, ExploreComic comic) {
+    final context = navigatorKey.currentState?.overlay?.context;
+    final builder = comicDetailPageBuilder;
+    if (context == null || builder == null || dialog.isClosed) return;
+    dialog.close('navigated');
+    unawaited(
+      openComicDetail(
+        context,
+        comic: comic,
+        heroTag: comicCoverHeroTag(comic, salt: 'plugin-dialog-${dialog.id}'),
+        pageBuilder: builder,
+      ),
+    );
+  }
+
+  void _search(SourceDialogSession dialog, String keyword) {
+    final navigator = navigatorKey.currentState;
+    final builder = searchPageBuilder;
+    if (navigator == null || builder == null || dialog.isClosed) return;
+    dialog.close('navigated');
+    unawaited(
+      navigator.push<void>(
+        MaterialPageRoute<void>(builder: (_) => builder(keyword)),
+      ),
+    );
   }
 
   void _sync() {

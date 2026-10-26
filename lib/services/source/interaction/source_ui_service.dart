@@ -663,12 +663,12 @@ class SourceDialogSession extends ChangeNotifier {
 
   void setValue(String id, Object value) {
     if (isClosed || busy) return;
-    final c = model.content.firstWhere((c) => c.id == id);
+    final c = model.allComponents.firstWhere((c) => c.id == id);
     c.validateValue(value);
     values[id] = value;
     fieldErrors.remove(id);
     if (c.data['notifyChange'] == true &&
-        const {'select', 'toggle'}.contains(c.type)) {
+        const {'select', 'toggle', 'rating'}.contains(c.type)) {
       _emit('change', id);
     }
     notifyListeners();
@@ -676,15 +676,23 @@ class SourceDialogSession extends ChangeNotifier {
 
   void action(String id) {
     if (isClosed || busy) return;
-    final button = model.buttons.firstWhere((b) => b['id'] == id);
+    // 底部按钮与内容区 button 组件共用同一套 action 事件。
+    final button =
+        model.buttons.where((b) => b['id'] == id).firstOrNull ??
+        model.allComponents
+            .firstWhere((c) => c.type == 'button' && c.id == id)
+            .data;
     if (button['enabled'] == false) return;
     fieldErrors.clear();
     if (button['validate'] == true) {
-      for (final c in model.content.where((c) => c.interactive)) {
+      for (final c in model.allComponents.where((c) => c.interactive)) {
         final value = values[c.id];
-        final empty = value is String
-            ? value.trim().isEmpty
-            : value is List && value.isEmpty;
+        final empty = switch (value) {
+          String() => value.trim().isEmpty,
+          List() => value.isEmpty,
+          num() => value == 0,
+          _ => false,
+        };
         if (c.data['required'] == true && empty ||
             c.type == 'clickImage' &&
                 (value as List).length !=
@@ -734,8 +742,8 @@ class SourceDialogSession extends ChangeNotifier {
         ? dialogMap(patch['values'])
         : <String, dynamic>{};
     final nextValues = next.initialValues;
-    final old = {for (final c in model.content) c.id: c};
-    for (final c in next.content.where((c) => c.interactive)) {
+    final old = {for (final c in model.allComponents) c.id: c};
+    for (final c in next.allComponents.where((c) => c.interactive)) {
       if (old[c.id]?.type == c.type) {
         final previous = values[c.id]!;
         if (c.type != 'clickImage' || listEquals(old[c.id]?.image, c.image)) {

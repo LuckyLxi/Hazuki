@@ -497,6 +497,257 @@ void main() {
     },
   );
 
+  Map<String, Object?> richOptions() => {
+    'title': 'Rate',
+    'presentation': 'sheet',
+    'content': [
+      {
+        'id': 'average',
+        'type': 'rating',
+        'readOnly': true,
+        'initialValue': 4.32,
+      },
+      {
+        'id': 'header',
+        'type': 'row',
+        'align': 'spaceBetween',
+        'children': [
+          {'id': 'name', 'type': 'text', 'text': 'Author', 'flex': 2},
+          {
+            'id': 'follow',
+            'type': 'button',
+            'text': 'Follow',
+            'icon': 'add',
+            'style': 'outlined',
+          },
+        ],
+      },
+      {
+        'id': 'score',
+        'type': 'rating',
+        'label': 'Your rating',
+        'allowHalf': true,
+        'required': true,
+      },
+      {
+        'id': 'submit',
+        'type': 'button',
+        'text': 'Submit',
+        'style': 'filled',
+        'validate': true,
+      },
+      {
+        'id': 'related',
+        'type': 'comics',
+        'title': 'More',
+        'layout': 'grid',
+        'items': [
+          {'id': '1', 'title': 'One', 'cover': 'https://example.com/1.jpg'},
+          {'id': '2', 'title': 'Two', 'subtitle': 'Vol. 2'},
+        ],
+      },
+      {
+        'id': 'tags',
+        'type': 'tags',
+        'label': 'Tags',
+        'values': ['romance', 'school'],
+      },
+      {
+        'id': 'info',
+        'type': 'info',
+        'rows': [
+          {
+            'label': {'zh_CN': '作者', 'en_US': 'Author'},
+            'values': ['A', 'B'],
+            'action': 'search',
+          },
+          {'label': 'Empty', 'values': <String>[]},
+        ],
+      },
+      {
+        'id': 'notes',
+        'type': 'richText',
+        'spans': [
+          {'text': 'Bold\n', 'bold': true},
+          {'text': 'link', 'link': 'https://example.com/g/1'},
+          {'text': ' secondary', 'tone': 'secondary', 'italic': true},
+        ],
+      },
+    ],
+    'buttons': <Object>[],
+  };
+
+  test('parses composite components and flattens row children', () {
+    final model = SourceDialogModel.parse(richOptions());
+    expect(model.presentation, 'sheet');
+    expect(model.buttons, isEmpty);
+    expect(model.content, hasLength(8));
+    expect(model.allComponents.map((c) => c.id), contains('follow'));
+    expect(model.initialValues, {'score': 0});
+    expect(model.patch({'title': 'Again'}).presentation, 'sheet');
+    for (final content in [
+      // row 不允许嵌套 row 或大尺寸交互组件。
+      [
+        {
+          'id': 'r',
+          'type': 'row',
+          'children': [
+            {
+              'id': 'inner',
+              'type': 'row',
+              'children': [
+                {'id': 't', 'type': 'text', 'text': 'x'},
+              ],
+            },
+          ],
+        },
+      ],
+      [
+        {
+          'id': 'r',
+          'type': 'row',
+          'children': [
+            {'id': 'i', 'type': 'input', 'label': 'x'},
+          ],
+        },
+      ],
+      [
+        {'id': 'r', 'type': 'row', 'children': <Object>[]},
+      ],
+      // 子组件 id 同样参与全局唯一性校验。
+      [
+        {'id': 'dup', 'type': 'text', 'text': 'x'},
+        {
+          'id': 'r',
+          'type': 'row',
+          'children': [
+            {'id': 'dup', 'type': 'text', 'text': 'y'},
+          ],
+        },
+      ],
+      [
+        {'id': 'x', 'type': 'rating', 'max': 11},
+      ],
+      [
+        {'id': 'x', 'type': 'rating', 'initialValue': 3.5},
+      ],
+      [
+        {'id': 'x', 'type': 'rating', 'readOnly': true, 'initialValue': 6},
+      ],
+      [
+        {'id': 'x', 'type': 'button', 'text': 'x', 'style': 'icon'},
+      ],
+      [
+        {'id': 'x', 'type': 'button', 'text': 'x', 'icon': 'Bad Name'},
+      ],
+      [
+        {'id': 'x', 'type': 'comics', 'items': <Object>[]},
+      ],
+      [
+        {
+          'id': 'x',
+          'type': 'comics',
+          'items': [
+            {'id': '', 'title': 'x'},
+          ],
+        },
+      ],
+      [
+        {
+          'id': 'x',
+          'type': 'tags',
+          'values': ['a'],
+          'action': 'open',
+        },
+      ],
+      [
+        {
+          'id': 'x',
+          'type': 'richText',
+          'spans': [
+            {'text': 'x', 'link': 'javascript:alert(1)'},
+          ],
+        },
+      ],
+      [
+        {
+          'id': 'x',
+          'type': 'image',
+          'image': [1],
+          'height': 1000,
+        },
+      ],
+    ]) {
+      expect(
+        () => SourceDialogModel.parse({...richOptions(), 'content': content}),
+        throwsFormatException,
+        reason: '$content',
+      );
+    }
+    expect(
+      () => SourceDialogModel.parse({
+        ...richOptions(),
+        'presentation': 'fullscreen',
+      }),
+      throwsFormatException,
+    );
+    // 内容按钮与底部按钮共用 action 事件，id 不能冲突。
+    expect(
+      () => SourceDialogModel.parse({
+        ...richOptions(),
+        'buttons': [
+          {'id': 'submit', 'text': 'Submit'},
+        ],
+      }),
+      throwsFormatException,
+    );
+  });
+
+  test(
+    'content buttons emit actions and rating values follow their step',
+    () async {
+      final service = SourceUiService();
+      late SourceDialogSession dialog;
+      service.presenter = (value) async {
+        dialog = value;
+        value.markShown();
+        await value.whenClosed;
+      };
+      await service.run(() async {
+        final scope = SourceUiScope.current!..runtimeIds.add('engine');
+        await service.handle(
+          {'method': 'ui_open', 'options': richOptions()},
+          execution(scope),
+          'engine',
+          'Plugin',
+        );
+        dialog.action('submit');
+        expect(dialog.fieldErrors.keys, ['score']);
+        expect(() => dialog.setValue('score', 4.25), throwsFormatException);
+        expect(() => dialog.setValue('score', 6), throwsFormatException);
+        dialog.setValue('score', 4.5);
+        final event = dialog.nextEvent();
+        dialog.action('submit');
+        expect(await event, {
+          'type': 'action',
+          'id': 'submit',
+          'values': {'score': 4.5},
+        });
+        dialog.update({});
+        final follow = dialog.nextEvent();
+        dialog.action('follow');
+        expect((await follow)['id'], 'follow');
+        // 宿主跳转关闭窗口时不取消插件的原操作。
+        dialog.close('navigated');
+        expect(await dialog.nextEvent(), {
+          'type': 'closed',
+          'reason': 'navigated',
+        });
+        expect(scope.reason, isNull);
+      });
+    },
+  );
+
   test(
     'background execution retains interaction and runtime teardown cancels work',
     () async {
