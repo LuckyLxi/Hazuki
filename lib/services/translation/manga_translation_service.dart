@@ -366,7 +366,12 @@ class MangaTranslationService {
       _checkCancelled(cancelToken);
       await _cache.write(key, result);
       _checkCancelled(cancelToken);
-      await _glossary.merge(sourceKey, comicId, terms);
+      await _glossary.merge(
+        sourceKey,
+        comicId,
+        terms,
+        pageText: result.regions.map((region) => region.sourceText).join('\n'),
+      );
       _checkCancelled(cancelToken);
       await _usageStore.record(pages: 1);
       return result;

@@ -158,6 +158,28 @@ void main() {
     expect(await store.load('source', 'another-comic'), isEmpty);
   });
 
+  test('glossary refreshes terms found in page source text', () async {
+    var now = DateTime(2026, 1, 1);
+    final store = TranslationGlossaryStore(
+      supportDirectory: () async => directory,
+      now: () => now,
+    );
+    await store.merge('source', 'comic', const [
+      TranslationTerm(source: 'アリス', target: '爱丽丝'),
+      TranslationTerm(source: 'ボブ', target: '鲍勃'),
+    ]);
+    now = DateTime(2026, 1, 2);
+    await store.merge('source', 'comic', const [], pageText: 'アリスさん、待って');
+    final entries = {
+      for (final entry in await store.load('source', 'comic'))
+        entry.source: entry,
+    };
+    expect(entries['アリス']!.lastSeenAt, DateTime(2026, 1, 2));
+    expect(entries['アリス']!.addedAt, DateTime(2026, 1, 1));
+    expect(entries['アリス']!.target, '爱丽丝');
+    expect(entries['ボブ']!.lastSeenAt, DateTime(2026, 1, 1));
+  });
+
   test(
     'concurrent glossary merges preserve entries and first writer',
     () async {

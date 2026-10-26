@@ -93,13 +93,26 @@ class TranslationGlossaryStore {
   Future<void> merge(
     String sourceKey,
     String comicId,
-    List<TranslationTerm> terms,
-  ) => _queue.run(_lockKey(sourceKey, comicId), () async {
+    List<TranslationTerm> terms, {
+    String pageText = '',
+  }) => _queue.run(_lockKey(sourceKey, comicId), () async {
     final file = await _file(sourceKey, comicId);
     final entries = {
       for (final entry in await _read(file)) entry.source: entry,
     };
     final now = _now();
+    // 提示词要求模型不再上报已有术语，改由本页原文命中来刷新 lastSeenAt，避免常用词被容量上限淘汰。
+    if (pageText.isNotEmpty) {
+      for (final entry in entries.values.toList()) {
+        if (!pageText.contains(entry.source)) continue;
+        entries[entry.source] = TranslationGlossaryEntry(
+          source: entry.source,
+          target: entry.target,
+          addedAt: entry.addedAt,
+          lastSeenAt: now,
+        );
+      }
+    }
     for (final term in terms) {
       final source = term.source.trim();
       if (source.isEmpty || term.target.trim().isEmpty) continue;

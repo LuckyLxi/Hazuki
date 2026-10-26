@@ -308,6 +308,14 @@ void main() {
         contains('Always preserve the JSON schema, normalized box coordinates'),
       );
       expect(prompt, contains('required glossary translations'));
+      expect(prompt, isNot(contains(kDefaultTranslationStyle)));
+      expect(
+        buildTranslationSystemPrompt(
+          targetLanguage: TranslationTargetLanguage.english,
+          translateSfx: false,
+        ),
+        contains(kDefaultTranslationStyle),
+      );
       expect(
         buildTranslationSystemPrompt(
           targetLanguage: TranslationTargetLanguage.english,
@@ -551,6 +559,7 @@ void main() {
       expect(system, contains('false detections'));
       expect(system, contains('Keep honorifics.'));
       expect(system, contains('box ids and grouping rules'));
+      expect(system, isNot(contains(kDefaultTranslationStyle)));
       expect(system, isNot(contains('normalized box coordinates')));
     });
   });
