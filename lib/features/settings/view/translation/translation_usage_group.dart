@@ -90,7 +90,16 @@ class _TranslationUsageGroupState extends State<TranslationUsageGroup>
   }
 
   @override
-  Widget build(BuildContext context) => SettingsGroup(
+  Widget build(BuildContext context) => PopScope(
+    // 详情卡打开时，返回键先收起详情而不是退出页面。
+    canPop: !_detailOpen,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _hideDetail();
+    },
+    child: _buildGroup(context),
+  );
+
+  Widget _buildGroup(BuildContext context) => SettingsGroup(
     children: [
       ListTile(
         title: Text(l10n(context).translationUsage),
