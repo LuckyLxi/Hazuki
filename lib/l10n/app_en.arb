@@ -130,6 +130,8 @@
   "translationSfxHint": "Onomatopoeia, signs and handwriting",
   "translationVerticalText": "Vertical text",
   "translationVerticalTextHint": "Show Chinese and Japanese translations vertically when the source text is vertical",
+  "translationAutoEnable": "Auto-enable translation in reader",
+  "translationAutoEnableHint": "When off, turn on translation manually in the reader each time you open a comic",
   "translationUsageDetails": "Heatmap and daily details",
   "translationAddTerm": "Add term",
   "translationEditTerm": "Edit term",

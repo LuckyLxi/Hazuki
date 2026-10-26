@@ -283,6 +283,13 @@ class _MangaTranslationSettingsPageState
                             ),
                             onTap: _pickTargetLanguage,
                           ),
+                          SwitchListTile(
+                            title: Text(strings.translationAutoEnable),
+                            subtitle: Text(strings.translationAutoEnableHint),
+                            value: _settings.autoEnableReaderMode,
+                            onChanged: (value) =>
+                                _save(_settings.setAutoEnableReaderMode(value)),
+                          ),
                           _PrefetchSelector(
                             value: _settings.prefetchAhead,
                             onChanged: (value) =>

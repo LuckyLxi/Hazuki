@@ -79,6 +79,7 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
 
   bool _enabled = false;
   bool _readerModeOn = false;
+  bool _autoEnableReaderMode = false;
   TranslationProviderPreset _providerPreset = TranslationProviderPreset.openai;
   TranslationTargetLanguage _targetLanguage =
       TranslationTargetLanguage.simplifiedChinese;
@@ -96,6 +97,9 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
 
   bool get enabled => _enabled;
   bool get readerModeOn => _readerModeOn;
+
+  /// 进入阅读器时是否沿用上次的翻译开关；关闭时每次进入都从未翻译开始。
+  bool get autoEnableReaderMode => _autoEnableReaderMode;
   TranslationProviderPreset get providerPreset => _providerPreset;
   TranslationTargetLanguage get targetLanguage => _targetLanguage;
   int get prefetchAhead => _prefetchAhead;
@@ -144,6 +148,8 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
     _configurations.addAll(configurations);
     _enabled = prefs.getBool('${_prefix}enabled') ?? false;
     _readerModeOn = prefs.getBool('${_prefix}reader_mode_on') ?? false;
+    _autoEnableReaderMode =
+        prefs.getBool('${_prefix}auto_enable_reader_mode') ?? false;
     _providerPreset = TranslationProviderPreset.values.firstWhere(
       (value) => value.name == prefs.getString('${_prefix}provider_preset'),
       orElse: () => TranslationProviderPreset.openai,
@@ -278,6 +284,13 @@ class MangaTranslationSettingsStore extends ChangeNotifier {
     await load();
     await _prefs.setString('${_prefix}bubble_style', value.name);
     _bubbleStyle = value;
+    notifyListeners();
+  }
+
+  Future<void> setAutoEnableReaderMode(bool value) async {
+    await load();
+    await _prefs.setBool('${_prefix}auto_enable_reader_mode', value);
+    _autoEnableReaderMode = value;
     notifyListeners();
   }
 

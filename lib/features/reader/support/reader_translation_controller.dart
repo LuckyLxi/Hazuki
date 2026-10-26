@@ -69,6 +69,9 @@ class ReaderTranslationController extends ChangeNotifier {
   final _states = <String, ValueNotifier<PageTranslationView>>{};
   final _queue = Queue<String>();
   final _active = <String, CancelToken>{};
+
+  /// 已把图片交给翻译服务的页面；这些请求可能已计费，翻出窗口时不再取消。
+  final _sent = <String>{};
   final _bypass = <String>{};
   final _retranslateTargets = <String>{};
   Set<String> _window = {}, _visible = {};
@@ -90,6 +93,10 @@ class ReaderTranslationController extends ChangeNotifier {
   /// 加载翻译设置与已安装模型，并按最新状态同步翻译窗口。
   Future<void> load() async {
     await settings.load();
+    // 未开启“自动开启翻译”时，每次进入阅读器都从关闭状态开始，避免不需要翻译的漫画被自动翻译。
+    if (!settings.autoEnableReaderMode && settings.readerModeOn) {
+      await settings.setReaderModeOn(false);
+    }
     await models.load();
     _settingsChanged();
   }
@@ -143,7 +150,8 @@ class ReaderTranslationController extends ChangeNotifier {
     ];
     _window = {..._visible, ...ahead, ..._retranslateTargets};
     for (final entry in _active.entries) {
-      if (!_window.contains(entry.key)) {
+      // 已发出的请求让其完成并写入结果缓存，翻回来时直接复用，避免重复计费。
+      if (!_window.contains(entry.key) && !_sent.contains(entry.key)) {
         entry.value.cancel();
         _state(entry.key).value = PageTranslationView();
       }
@@ -198,6 +206,7 @@ class ReaderTranslationController extends ChangeNotifier {
       if (bytes == null) {
         throw const TranslationFailure(TranslationFailureKind.badResponse);
       }
+      if (identical(_active[url], token)) _sent.add(url);
       final result = await _service.translatePage(
         imageBytes: bytes,
         sourceKey: sourceKey,
@@ -236,6 +245,7 @@ class ReaderTranslationController extends ChangeNotifier {
     } finally {
       if (identical(_active[url], token)) {
         _active.remove(url);
+        _sent.remove(url);
         if (!token.isCancelled) _retranslateTargets.remove(url);
       }
       if (!_disposed && modeOn && _window.isNotEmpty) updateWindow(_index);
@@ -256,6 +266,7 @@ class ReaderTranslationController extends ChangeNotifier {
     if (_disposed || !modeOn) return;
     for (final url in _visible) {
       _active[url]?.cancel();
+      _sent.remove(url);
       _bypass.add(url);
       _state(url).value = PageTranslationView();
     }
@@ -265,6 +276,7 @@ class ReaderTranslationController extends ChangeNotifier {
   void retranslate(String url) {
     if (_disposed || !modeOn || !_images().contains(url)) return;
     _active[url]?.cancel();
+    _sent.remove(url);
     _retranslateTargets.add(url);
     _bypass.add(url);
     _state(url).value = PageTranslationView();
@@ -294,6 +306,7 @@ class ReaderTranslationController extends ChangeNotifier {
     _visible.clear();
     _bypass.clear();
     _retranslateTargets.clear();
+    _sent.clear();
     for (final token in _active.values) {
       token.cancel();
     }

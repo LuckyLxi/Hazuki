@@ -144,26 +144,32 @@ void main() {
     },
   );
 
-  test(
-    'visible pages take priority and leaving cancels active and queued work',
-    () async {
-      controller.updateWindow(0);
-      await tick();
-      controller.updateWindow(5);
-      await tick();
-      expect(service.calls[0].$2.isCancelled, isTrue);
-      expect(service.calls[1].$2.isCancelled, isTrue);
-      expect(service.calls.skip(2).map((call) => call.$1), [5, 6]);
-      expect(
-        controller.pageState('2').value.status,
-        PageTranslationStatus.idle,
-      );
-      expect(
-        controller.pageState('3').value.status,
-        PageTranslationStatus.idle,
-      );
-    },
-  );
+  test('leaving keeps sent requests running and drops queued work', () async {
+    controller.updateWindow(0);
+    await tick();
+    controller.updateWindow(5);
+    await tick();
+    expect(service.calls[0].$2.isCancelled, isFalse);
+    expect(service.calls[1].$2.isCancelled, isFalse);
+    expect(service.calls, hasLength(2));
+    expect(controller.pageState('2').value.status, PageTranslationStatus.idle);
+    expect(controller.pageState('3').value.status, PageTranslationStatus.idle);
+    service.pending[0].complete(empty);
+    await tick();
+    expect(controller.pageState('0').value.status, PageTranslationStatus.done);
+    expect(service.calls.skip(2).map((call) => call.$1), [5]);
+  });
+
+  test('reader mode starts off on load unless auto enable is on', () async {
+    await controller.load();
+    expect(settings.readerModeOn, isFalse);
+    expect(controller.modeOn, isFalse);
+
+    await settings.setAutoEnableReaderMode(true);
+    await settings.setReaderModeOn(true);
+    await controller.load();
+    expect(settings.readerModeOn, isTrue);
+  });
 
   test(
     'zero prefetch translates only visible pages and disabling cancels everything',

@@ -130,6 +130,8 @@
   "translationSfxHint": "如拟声词、招牌、手写字",
   "translationVerticalText": "竖排显示",
   "translationVerticalTextHint": "原文为竖排时，中文和日文译文按竖排显示",
+  "translationAutoEnable": "进入阅读器时自动开启翻译",
+  "translationAutoEnableHint": "关闭时，每次打开漫画都需要在阅读器中手动开启翻译",
   "translationUsageDetails": "热力图与每日明细",
   "translationAddTerm": "添加术语",
   "translationEditTerm": "编辑术语",
