@@ -10,6 +10,7 @@ import '../settings_group.dart';
 import 'appearance_settings_locale_dialog.dart';
 import 'appearance_favorite_layout_picker.dart';
 import 'appearance_layout_option.dart';
+import 'appearance_settings_widgets.dart';
 
 class AppearanceSettingsContent extends StatefulWidget {
   const AppearanceSettingsContent({
@@ -33,10 +34,8 @@ class AppearanceSettingsContent extends StatefulWidget {
 }
 
 class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
-  static const _themeSliderDuration = Duration(milliseconds: 220);
-
   final GlobalKey _themeIconKey = GlobalKey();
-  final GlobalKey _themeSliderKey = GlobalKey();
+  final GlobalKey _themeModeSelectorKey = GlobalKey();
   ThemeMode? _pendingThemeMode;
   int _themeSelectionGeneration = 0;
 
@@ -208,14 +207,14 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     return origin;
   }
 
-  Rect? _themeSliderRect() {
-    final sliderContext = _themeSliderKey.currentContext;
-    final renderObject = sliderContext?.findRenderObject();
+  Rect? _themeModeSelectorRect() {
+    final selectorContext = _themeModeSelectorKey.currentContext;
+    final renderObject = selectorContext?.findRenderObject();
     if (renderObject is! RenderBox) {
       _logThemeUiEvent(
-        'Theme slider bounds unavailable',
+        'Theme mode selector bounds unavailable',
         level: 'warning',
-        content: {'reason': 'slider_render_box_not_found'},
+        content: {'reason': 'selector_render_box_not_found'},
       );
       return null;
     }
@@ -252,7 +251,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
       await widget.onApply(
         widget.settings.copyWith(themeMode: mode),
         revealOrigin: _themeToggleOrigin(),
-        revealSyncRegion: waitsForThemeReveal ? _themeSliderRect() : null,
+        revealSyncRegion: waitsForThemeReveal ? _themeModeSelectorRect() : null,
       );
     } finally {
       if (mounted && generation == _themeSelectionGeneration) {
@@ -263,130 +262,118 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     }
   }
 
-  Alignment get _themeSliderAlignment {
-    return switch (_selectedThemeMode) {
-      ThemeMode.light => Alignment.centerLeft,
-      ThemeMode.dark => Alignment.center,
-      ThemeMode.system => Alignment.centerRight,
-    };
+  Future<void> _applyPreset(int index) async {
+    final settings = widget.settings;
+    if (!settings.dynamicColor && settings.presetIndex == index) {
+      return;
+    }
+    // 选择固定配色即退出壁纸取色。
+    await widget.onApply(
+      settings.copyWith(presetIndex: index, dynamicColor: false),
+    );
   }
 
-  IconData _themeModeIcon(ThemeMode mode) {
-    return switch (mode) {
-      ThemeMode.light => Icons.light_mode_rounded,
-      ThemeMode.dark => Icons.dark_mode_rounded,
-      ThemeMode.system => Icons.settings_suggest_outlined,
-    };
+  Future<void> _applyWallpaperColor() async {
+    if (widget.settings.dynamicColor) {
+      return;
+    }
+    await widget.onApply(widget.settings.copyWith(dynamicColor: true));
   }
 
-  Widget _buildThemeSliderOption({
-    required ThemeMode mode,
-    required String label,
+  Widget _buildThemeModeSelector({
+    required AppLocalizations strings,
     required ColorScheme colorScheme,
   }) {
-    final selected = _selectedThemeMode == mode;
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => unawaited(_applyThemeMode(mode)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                _themeModeIcon(mode),
-                size: 18,
-                color: selected
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSurfaceVariant,
+    // 缩略图按当前主色分别生成浅色/深色配色，确保与实际效果一致。
+    final lightScheme = ColorScheme.fromSeed(
+      seedColor: colorScheme.primary,
+      brightness: Brightness.light,
+    );
+    final darkScheme = ColorScheme.fromSeed(
+      seedColor: colorScheme.primary,
+      brightness: Brightness.dark,
+    );
+    final options = [
+      (ThemeMode.light, strings.displayThemeLight),
+      (ThemeMode.dark, strings.displayThemeDark),
+      (ThemeMode.system, strings.displayThemeSystem),
+    ];
+    return Padding(
+      key: _themeModeSelectorKey,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Row(
+        spacing: 10,
+        children: [
+          for (final (mode, label) in options)
+            Expanded(
+              child: AppearanceThemeModeCard(
+                key: ValueKey('theme-mode-option-${mode.name}'),
+                mode: mode,
+                label: label,
+                selected: _selectedThemeMode == mode,
+                lightScheme: lightScheme,
+                darkScheme: darkScheme,
+                pureBlack: widget.settings.oledPureBlack,
+                onTap: () => unawaited(_applyThemeMode(mode)),
               ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    color: selected
-                        ? colorScheme.onPrimaryContainer
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildThemeModeSlider({
-    required AppLocalizations strings,
-    required ColorScheme colorScheme,
-  }) {
-    return Container(
-      key: _themeSliderKey,
-      height: 52,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
-        ),
-      ),
-      child: Stack(
-        children: [
-          AnimatedAlign(
-            alignment: _themeSliderAlignment,
-            duration: _themeSliderDuration,
-            curve: Curves.easeOutCubic,
-            child: FractionallySizedBox(
-              widthFactor: 1 / 3,
-              heightFactor: 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.shadow.withValues(alpha: 0.10),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+  Widget _buildColorPalette(AppLocalizations strings) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final itemWidth = constraints.maxWidth / 5;
+          return Wrap(
+            runSpacing: 4,
+            children: [
+              SizedBox(
+                width: itemWidth,
+                child: AppearanceColorSwatch(
+                  key: const ValueKey('theme-color-wallpaper'),
+                  label: strings.displayWallpaperColorLabel,
+                  icon: Icons.wallpaper_rounded,
+                  selected: widget.settings.dynamicColor,
+                  onTap: () => unawaited(_applyWallpaperColor()),
                 ),
               ),
-            ),
-          ),
-          Positioned.fill(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildThemeSliderOption(
-                  mode: ThemeMode.light,
-                  label: strings.displayThemeLight,
-                  colorScheme: colorScheme,
+              for (var index = 0; index < kHazukiColorPresets.length; index++)
+                SizedBox(
+                  width: itemWidth,
+                  child: AppearanceColorSwatch(
+                    key: ValueKey('theme-color-preset-$index'),
+                    label: kHazukiColorPresets[index].labelBuilder(strings),
+                    color: kHazukiColorPresets[index].seedColor,
+                    selected:
+                        !widget.settings.dynamicColor &&
+                        widget.settings.presetIndex == index,
+                    onTap: () => unawaited(_applyPreset(index)),
+                  ),
                 ),
-                _buildThemeSliderOption(
-                  mode: ThemeMode.dark,
-                  label: strings.displayThemeDark,
-                  colorScheme: colorScheme,
-                ),
-                _buildThemeSliderOption(
-                  mode: ThemeMode.system,
-                  label: strings.displayThemeSystem,
-                  colorScheme: colorScheme,
-                ),
-              ],
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildSwitch({
+    required IconData icon,
+    required bool value,
+    required String title,
+    required String subtitle,
+    required AppearanceSettingsData Function(bool value) update,
+  }) {
+    return SwitchListTile(
+      secondary: Icon(icon),
+      value: value,
+      title: Text(title),
+      subtitle: Text(subtitle),
+      onChanged: (next) => unawaited(widget.onApply(update(next))),
     );
   }
 
@@ -395,137 +382,142 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     final strings = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isWindows = theme.platform == TargetPlatform.windows;
+    final settings = widget.settings;
+    const divider = Divider(height: 1, indent: 56);
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
+        AppearanceSectionHeader(
+          title: strings.displayThemeModeTitle,
+          // 日月图标是主题切换扩散动画的起点。
+          trailing: SizedBox(
+            key: _themeIconKey,
+            width: 20,
+            height: 20,
+            child: SunMoonIcon(
+              isDark: theme.brightness == Brightness.dark,
+              size: 20,
+              duration: const Duration(milliseconds: 600),
+              sunColor: colorScheme.primary,
+              moonColor: colorScheme.primary,
+            ),
+          ),
+        ),
+        _buildThemeModeSelector(strings: strings, colorScheme: colorScheme),
         SettingsGroup(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    strings.displayThemeTitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  SizedBox(
-                    key: _themeIconKey,
-                    width: 20,
-                    height: 20,
-                    child: SunMoonIcon(
-                      isDark: theme.brightness == Brightness.dark,
-                      size: 20,
-                      duration: const Duration(milliseconds: 600),
-                      sunColor: colorScheme.primary,
-                      moonColor: colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _buildThemeModeSlider(
-                strings: strings,
-                colorScheme: colorScheme,
-              ),
-            ),
-            const Divider(height: 1, indent: 16, endIndent: 16),
-            SwitchListTile(
-              value: widget.settings.useSystemFont,
-              title: Text(strings.displaySystemFontTitle),
-              subtitle: Text(strings.displaySystemFontSubtitle),
-              onChanged: (value) {
-                unawaited(
-                  widget.onApply(
-                    widget.settings.copyWith(useSystemFont: value),
-                  ),
-                );
-              },
-            ),
-            const Divider(height: 1, indent: 16, endIndent: 16),
-            SwitchListTile(
-              value: widget.settings.oledPureBlack,
-              title: Text(strings.displayPureBlackTitle),
-              subtitle: Text(strings.displayPureBlackSubtitle),
-              onChanged: (value) {
-                unawaited(
-                  widget.onApply(
-                    widget.settings.copyWith(oledPureBlack: value),
-                  ),
-                );
-              },
-            ),
-            const Divider(height: 1, indent: 16, endIndent: 16),
-            SwitchListTile(
-              value: widget.settings.liquidGlassEnabled,
-              title: Text(strings.displayLiquidGlassTitle),
-              subtitle: Text(strings.displayLiquidGlassSubtitle),
-              onChanged: (value) {
-                unawaited(
-                  widget.onApply(
-                    widget.settings.copyWith(liquidGlassEnabled: value),
-                  ),
-                );
-              },
-            ),
-            const Divider(height: 1, indent: 16, endIndent: 16),
-            SwitchListTile(
-              value: widget.settings.homeTabCutTransition,
-              title: Text(strings.displayHomeTabCutTransitionTitle),
-              subtitle: Text(strings.displayHomeTabCutTransitionSubtitle),
-              onChanged: (value) {
-                unawaited(
-                  widget.onApply(
-                    widget.settings.copyWith(homeTabCutTransition: value),
-                  ),
-                );
-              },
+            _buildSwitch(
+              icon: Icons.dark_mode_outlined,
+              value: settings.oledPureBlack,
+              title: strings.displayPureBlackTitle,
+              subtitle: strings.displayPureBlackSubtitle,
+              update: (value) => settings.copyWith(oledPureBlack: value),
             ),
           ],
         ),
+        AppearanceSectionHeader(title: strings.displayThemeColorTitle),
+        SettingsGroup(
+          children: [
+            _buildColorPalette(strings),
+            divider,
+            _buildSwitch(
+              icon: Icons.format_paint_outlined,
+              value: settings.comicDetailDynamicColor,
+              title: strings.displayComicDynamicColorTitle,
+              subtitle: strings.displayComicDynamicColorSubtitle,
+              update: (value) =>
+                  settings.copyWith(comicDetailDynamicColor: value),
+            ),
+          ],
+        ),
+        AppearanceSectionHeader(title: strings.displayInterfaceEffectsTitle),
+        SettingsGroup(
+          children: [
+            _buildSwitch(
+              icon: Icons.water_drop_outlined,
+              value: settings.liquidGlassEnabled,
+              title: strings.displayLiquidGlassTitle,
+              subtitle: strings.displayLiquidGlassSubtitle,
+              update: (value) => settings.copyWith(liquidGlassEnabled: value),
+            ),
+            divider,
+            _buildSwitch(
+              icon: Icons.splitscreen_outlined,
+              value: settings.homeTabCutTransition,
+              title: strings.displayHomeTabCutTransitionTitle,
+              subtitle: strings.displayHomeTabCutTransitionSubtitle,
+              update: (value) => settings.copyWith(homeTabCutTransition: value),
+            ),
+            divider,
+            _buildSwitch(
+              icon: Icons.font_download_outlined,
+              value: settings.useSystemFont,
+              title: strings.displaySystemFontTitle,
+              subtitle: strings.displaySystemFontSubtitle,
+              update: (value) => settings.copyWith(useSystemFont: value),
+            ),
+          ],
+        ),
+        AppearanceSectionHeader(title: strings.displayLayoutSectionTitle),
         SettingsGroup(
           children: [
             ListTile(
               leading: const Icon(Icons.view_quilt_outlined),
               title: Text(strings.displayDiscoverLayoutTitle),
               subtitle: Text(
-                theme.platform == TargetPlatform.windows
+                isWindows
                     ? strings.displayDiscoverLayoutAdaptiveWall
                     : _discoverSectionLayoutLabel(
                         strings,
-                        widget.settings.discoverSectionLayout,
+                        settings.discoverSectionLayout,
                       ),
               ),
-              trailing: theme.platform == TargetPlatform.windows
+              trailing: isWindows
                   ? null
-                  : const Icon(Icons.chevron_right_rounded),
-              onTap: theme.platform == TargetPlatform.windows
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 4,
+                      children: [
+                        AppearanceLayoutGlyph.discover(
+                          settings.discoverSectionLayout,
+                        ),
+                        const Icon(Icons.chevron_right_rounded),
+                      ],
+                    ),
+              onTap: isWindows
                   ? null
                   : () {
                       unawaited(_handleDiscoverSectionLayoutTap(context));
                     },
             ),
-            const Divider(height: 1, indent: 56),
+            divider,
             ListTile(
               key: const ValueKey('favorite-layout-setting'),
               leading: const Icon(Icons.collections_bookmark_outlined),
               title: Text(strings.displayFavoriteLayoutTitle),
               subtitle: Text(
-                favoriteLayoutLabel(strings, widget.settings.favoriteLayout),
+                favoriteLayoutLabel(strings, settings.favoriteLayout),
               ),
-              trailing: const Icon(Icons.chevron_right_rounded),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 4,
+                children: [
+                  AppearanceLayoutGlyph.favorite(settings.favoriteLayout),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
               onTap: () => unawaited(_handleFavoriteLayoutTap()),
             ),
-            const Divider(height: 1, indent: 56),
+          ],
+        ),
+        AppearanceSectionHeader(
+          title: strings.displayLanguageSystemSectionTitle,
+        ),
+        SettingsGroup(
+          children: [
             ListTile(
               leading: const Icon(Icons.language_rounded),
               title: Text(strings.displayLanguageTitle),
@@ -535,7 +527,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
                 unawaited(_handleLocaleTap(context));
               },
             ),
-            const Divider(height: 1, indent: 56),
+            divider,
             ListTile(
               leading: const Icon(Icons.speed_rounded),
               title: Text(strings.displayRefreshRateTitle),
@@ -545,7 +537,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
                 await Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => DisplayModeSettingsPage(
-                      currentDisplayModeRaw: widget.settings.displayModeRaw,
+                      currentDisplayModeRaw: settings.displayModeRaw,
                       onDisplayModeChanged: (displayModeRaw) {
                         return widget.onApply(
                           widget.settings.copyWith(
@@ -557,140 +549,6 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
                   ),
                 );
               },
-            ),
-          ],
-        ),
-        SettingsGroup(
-          children: [
-            SwitchListTile(
-              secondary: const Icon(Icons.color_lens_outlined),
-              value: widget.settings.dynamicColor,
-              title: Text(strings.displayDynamicColorTitle),
-              subtitle: Text(strings.displayDynamicColorSubtitle),
-              onChanged: (value) {
-                unawaited(
-                  widget.onApply(widget.settings.copyWith(dynamicColor: value)),
-                );
-              },
-            ),
-            const Divider(height: 1, indent: 56),
-            SwitchListTile(
-              secondary: const Icon(Icons.format_paint_outlined),
-              value: widget.settings.comicDetailDynamicColor,
-              title: Text(strings.displayComicDynamicColorTitle),
-              subtitle: Text(strings.displayComicDynamicColorSubtitle),
-              onChanged: (value) {
-                unawaited(
-                  widget.onApply(
-                    widget.settings.copyWith(comicDetailDynamicColor: value),
-                  ),
-                );
-              },
-            ),
-            const Divider(height: 1, indent: 56),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                strings.displayColorSchemeTitle,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.primary,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  const spacing = 10.0;
-                  final presetWidth = (constraints.maxWidth - spacing * 2) / 3;
-                  return Wrap(
-                    spacing: spacing,
-                    runSpacing: spacing,
-                    children: List<Widget>.generate(
-                      kHazukiColorPresets.length,
-                      (index) {
-                        final preset = kHazukiColorPresets[index];
-                        final selected = widget.settings.presetIndex == index;
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOutCubic,
-                          width: presetWidth,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () {
-                              unawaited(
-                                widget.onApply(
-                                  widget.settings.copyWith(presetIndex: index),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? colorScheme.primaryContainer
-                                    : colorScheme.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: selected
-                                      ? colorScheme.primary
-                                      : colorScheme.outlineVariant.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                  width: selected ? 1.5 : 1,
-                                ),
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 28,
-                                    height: 28,
-                                    decoration: BoxDecoration(
-                                      color: preset.seedColor,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        if (selected)
-                                          BoxShadow(
-                                            color: preset.seedColor.withValues(
-                                              alpha: 0.4,
-                                            ),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    preset.labelBuilder(strings),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: selected
-                                          ? FontWeight.w600
-                                          : FontWeight.w500,
-                                      color: selected
-                                          ? colorScheme.onPrimaryContainer
-                                          : colorScheme.onSurface,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
             ),
           ],
         ),
