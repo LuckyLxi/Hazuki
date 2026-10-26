@@ -10,6 +10,7 @@ import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_secure_session_storage.dart';
 import 'source_plugin_models.dart';
 import 'source_plugin_buttons.dart';
+import 'source_detail_tabs.dart';
 import 'source_search_capabilities.dart';
 import '../account/source_login_interaction.dart';
 
@@ -143,6 +144,13 @@ Future<SourcePluginManifest> registeredSourcePluginManifest(
             true) {
       throw SourcePluginException('plugin_button_callback_missing', button.id);
     }
+  }
+  if (SourceDetailTab.forPresentation(manifest.presentation).isNotEmpty &&
+      await evaluate(
+            'typeof globalThis.__hazuki_source.comic?.loadDetailTab === "function"',
+          ) !=
+          true) {
+    throw const SourcePluginException('plugin_detail_tab_callback_missing');
   }
   return manifest;
 }

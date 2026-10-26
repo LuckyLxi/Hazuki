@@ -1,5 +1,6 @@
 import '../plugins/source_search_capabilities.dart';
 import '../plugins/source_sort_options.dart';
+import '../plugins/source_detail_tabs.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -430,6 +431,18 @@ class HazukiSourceComicDetailAdapter
   }) => _content.loadChapterImages(
     comicId: comicId,
     epId: epId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
+  @override
+  Future<List<SourceDetailTabBlock>> loadDetailTab({
+    required String comicId,
+    required String tabId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => _content.loadDetailTab(
+    comicId: comicId,
+    tabId: tabId,
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
   );

@@ -80,7 +80,12 @@ class ComicDetailActionsController extends ChangeNotifier {
   bool _disposed = false;
   int _readerOpenRequest = 0;
 
-  Future<void> showCoverPreview(BuildContext context, String imageUrl) async {
+  /// [heroTag] 为空时使用封面的 hero，插件标签页图片传入各自的 hero。
+  Future<void> showCoverPreview(
+    BuildContext context,
+    String imageUrl, {
+    String? heroTag,
+  }) async {
     final normalized = imageUrl.trim();
     if (normalized.isEmpty) return;
     FocusManager.instance.primaryFocus?.unfocus();
@@ -113,7 +118,7 @@ class ComicDetailActionsController extends ChangeNotifier {
           return _coverPreviewPageBuilder(
             imageUrl: normalized,
             sourceKey: _comic.sourceKey,
-            heroTag: _heroTag,
+            heroTag: heroTag ?? _heroTag,
             onLongPress: () {
               unawaited(HapticFeedback.selectionClick());
               unawaited(_showCoverActions(context, normalized));

@@ -585,6 +585,7 @@
   "comicDetailLoading": "加载中...",
   "comicDetailSummary": "简介",
   "comicDetailNoRelatedComics": "暂无相关漫画",
+  "comicDetailPluginTabEmpty": "暂无内容",
   "comicDetailCollapse": "收起",
   "comicDetailExpand": "展开",
   "comicDetailUpdatedAt": "漫画更新时间：{time}",

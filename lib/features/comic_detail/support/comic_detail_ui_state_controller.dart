@@ -11,7 +11,9 @@ class ComicDetailUiStateController extends ChangeNotifier {
     required ScrollController scrollController,
     required bool includeRelatedTab,
     required bool includeCommentsTab,
-  }) : _comicId = comicId,
+    int pluginTabCount = 0,
+  }) : _pluginTabCount = pluginTabCount,
+       _comicId = comicId,
        _shouldAnimateInitialRevealOverride = shouldAnimateInitialRevealOverride,
        _initialTabIndex = initialTabIndex,
        _vsync = vsync,
@@ -26,6 +28,7 @@ class ComicDetailUiStateController extends ChangeNotifier {
   final ScrollController _scrollController;
   final bool _includeRelatedTab;
   final bool _includeCommentsTab;
+  final int _pluginTabCount;
 
   bool _disposed = false;
 
@@ -46,6 +49,13 @@ class ComicDetailUiStateController extends ChangeNotifier {
   int? get commentsTabIndex => _includeCommentsTab ? 1 : null;
   int? get relatedTabIndex =>
       _includeRelatedTab ? (_includeCommentsTab ? 2 : 1) : null;
+
+  /// 插件标签页固定排在宿主内置标签页之后。
+  int pluginTabIndex(int position) =>
+      1 +
+      (_includeCommentsTab ? 1 : 0) +
+      (_includeRelatedTab ? 1 : 0) +
+      position;
   bool get shouldAnimateInitialDetailReveal =>
       _shouldAnimateInitialDetailReveal;
   String get appBarComicTitle => _appBarComicTitle;
@@ -58,8 +68,7 @@ class ComicDetailUiStateController extends ChangeNotifier {
         !wasComicDetailIdAnimated(_comicId.trim());
     _appBarSolidProgressNotifier = ValueNotifier<double>(0);
     _collapsedTitleNotifier = ValueNotifier<bool>(false);
-    final tabCount =
-        1 + (_includeCommentsTab ? 1 : 0) + (_includeRelatedTab ? 1 : 0);
+    final tabCount = pluginTabIndex(_pluginTabCount);
     _tabController = TabController(
       length: tabCount,
       initialIndex: _initialTabIndex.clamp(0, tabCount - 1),

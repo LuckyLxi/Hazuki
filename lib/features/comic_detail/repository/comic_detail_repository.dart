@@ -61,6 +61,15 @@ class ComicDetailFeatureFacade {
     forceRefresh: forceRefresh,
   );
 
+  Future<List<SourceDetailTabBlock>> loadDetailTab({
+    required String comicId,
+    required String tabId,
+  }) => _source.loadDetailTab(
+    comicId: comicId,
+    tabId: tabId,
+    sourceKey: _sourceKey,
+  );
+
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     SourceTaskOrigin? taskOrigin,
   }) {

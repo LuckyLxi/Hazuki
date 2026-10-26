@@ -8,11 +8,14 @@ import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
 import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/comments/comments_sort_scope.dart';
+import 'package:hazuki/shared/source_presentation.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_header.dart';
 import 'comic_detail_info_tab.dart';
 import 'comic_detail_panels.dart';
+import 'comic_detail_plugin_tab.dart';
 import 'comic_detail_related_tab.dart';
 import 'comic_detail_view_primitives.dart';
 
@@ -98,6 +101,12 @@ class _ComicDetailBodyState extends State<ComicDetailBody> {
                   shouldAnimateInitialDetailReveal && details != null;
               final supportsRelatedTab = scope.supportsRelatedTab;
               final supportsCommentsTab = uiState.commentsTabIndex != null;
+              final pluginTabs = scope.pluginTabs;
+              final pluginTranslation =
+                  SourcePresentationScope.pluginsOf(
+                    context,
+                  )?.pluginFor(comic.sourceKey.trim())?.manifest.translation ??
+                  const {};
 
               uiState.updateAppBarMetadata(
                 title: displayTitle,
@@ -209,6 +218,18 @@ class _ComicDetailBodyState extends State<ComicDetailBody> {
                                   height: 44,
                                   text: l10n(context).comicDetailTabRelated,
                                 ),
+                              for (final tab in pluginTabs.tabs)
+                                Tab(
+                                  height: 44,
+                                  text: localizeSourcePluginText(
+                                    tab.title,
+                                    Localizations.localeOf(
+                                      context,
+                                    ).toLanguageTag(),
+                                    translation: pluginTranslation,
+                                    fallback: tab.id,
+                                  ),
+                                ),
                             ],
                           ),
                           surface,
@@ -311,6 +332,28 @@ class _ComicDetailBodyState extends State<ComicDetailBody> {
                                     ),
                                   );
                                 },
+                              ),
+                            );
+                          },
+                        ),
+                      for (final (position, tab) in pluginTabs.tabs.indexed)
+                        ComicDetailTabTickerScope(
+                          tabController: uiState.tabController,
+                          tabIndex: uiState.pluginTabIndex(position),
+                          builder: (context, shouldRender) {
+                            return RepaintBoundary(
+                              child: ComicDetailPluginTab(
+                                controller: pluginTabs,
+                                tabId: tab.id,
+                                sourceKey: comic.sourceKey,
+                                isActiveInTabView: shouldRender,
+                                onOpenImage: (url, heroTag) => unawaited(
+                                  scope.actions.showCoverPreview(
+                                    context,
+                                    url,
+                                    heroTag: heroTag,
+                                  ),
+                                ),
                               ),
                             );
                           },

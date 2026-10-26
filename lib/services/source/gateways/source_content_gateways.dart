@@ -1,5 +1,6 @@
 import '../plugins/source_search_capabilities.dart';
 import '../plugins/source_sort_options.dart';
+import '../plugins/source_detail_tabs.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -154,6 +155,12 @@ abstract interface class SourceComicDetailGateway {
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<List<SourceDetailTabBlock>> loadDetailTab({
+    required String comicId,
+    required String tabId,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
   });

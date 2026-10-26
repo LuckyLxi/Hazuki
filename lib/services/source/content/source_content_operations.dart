@@ -8,6 +8,8 @@ import 'source_reading_progress_uploads.dart';
 import '../../../models/hazuki_models.dart';
 import '../category/source_category_capability.dart';
 import '../comic/comic_details_capability.dart';
+import '../comic/comic_detail_tab_capability.dart';
+import '../plugins/source_detail_tabs.dart';
 import '../common/source_json_coerce.dart';
 import 'explore_capability.dart';
 import '../runtime/source_runtime_host.dart';
@@ -32,12 +34,16 @@ class SourceContentOperations
     required SourceExploreCapability explore,
     required SourceCategoryCapability category,
     required SourceComicDetailsCapability comicDetails,
+    SourceComicDetailTabCapability? detailTabs,
     this.loadCloudReadRuntime,
   }) : _runtimeHost = runtimeHost,
        _initialization = initialization,
        _explore = explore,
        _category = category,
-       _comicDetails = comicDetails {
+       _comicDetails = comicDetails,
+       _detailTabs =
+           detailTabs ??
+           SourceComicDetailTabCapability(runtimeHost: runtimeHost) {
     _cloud;
     _uploads;
   }
@@ -47,6 +53,7 @@ class SourceContentOperations
   final SourceExploreCapability _explore;
   final SourceCategoryCapability _category;
   final SourceComicDetailsCapability _comicDetails;
+  final SourceComicDetailTabCapability _detailTabs;
   late final _uploads = SourceReadingProgressUploads(_runtimeHost);
   List<SourceTaskSnapshot> get activeSearchTasks => _runtimeHost
       .tasks
@@ -200,6 +207,17 @@ class SourceContentOperations
     comicId,
     sourceKey: sourceKey,
     forceRefresh: forceRefresh,
+    taskOrigin: taskOrigin,
+  );
+  Future<List<SourceDetailTabBlock>> loadDetailTab({
+    required String comicId,
+    required String tabId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => _detailTabs.loadDetailTab(
+    comicId: comicId,
+    tabId: tabId,
+    sourceKey: sourceKey,
     taskOrigin: taskOrigin,
   );
   Future<List<String>> loadChapterImages({

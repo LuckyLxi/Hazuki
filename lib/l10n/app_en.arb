@@ -585,6 +585,7 @@
   "comicDetailLoading": "Loading...",
   "comicDetailSummary": "Summary",
   "comicDetailNoRelatedComics": "No related comics yet",
+  "comicDetailPluginTabEmpty": "No content yet",
   "comicDetailCollapse": "Collapse",
   "comicDetailExpand": "Expand",
   "comicDetailUpdatedAt": "Updated at: {time}",

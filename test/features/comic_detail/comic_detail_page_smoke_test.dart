@@ -35,6 +35,7 @@ import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/widgets/source_image_gateway_scope.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
@@ -568,6 +569,113 @@ void main() {
       );
     }
   }
+  testWidgets('plugin detail tabs follow built-in tabs and prefetch content', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final facade = _PluginTabsDetailFacade();
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        builder: (context, child) => withTestSourcePresentation(
+          SourceImageGatewayScope(
+            gateway: sl<SourceImageGateway>(),
+            child: child!,
+          ),
+          activeSourceKey: 'copy_manga',
+          catalog: [
+            const SourceCatalogEntry(
+              key: 'copy_manga',
+              name: 'Custom',
+              fileName: 'main.js',
+              presentation: {
+                'buttons': [
+                  {'id': 'relatedComics', 'location': 'comicDetailTabs'},
+                ],
+                'detailTabs': [
+                  {
+                    'id': 'notes',
+                    'title': {'zh_CN': '说明', 'en_US': 'Notes'},
+                  },
+                  {'id': 'empty', 'title': 'Empty'},
+                  {'id': 'broken', 'title': 'Broken'},
+                ],
+              },
+            ),
+          ],
+        ),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: _buildDesktopTestDetail(
+          comic: const ExploreComic(
+            id: 'plugin-tabs',
+            sourceKey: 'copy_manga',
+            title: 'Comic',
+            subTitle: '',
+            cover: '',
+          ),
+          facade: facade,
+          shouldAnimateInitialRevealOverride: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // 打开详情时即预取所有插件标签页，而不是等切换过去。
+    expect(facade.requests, [
+      'plugin-tabs/notes',
+      'plugin-tabs/empty',
+      'plugin-tabs/broken',
+    ]);
+    final tabs = tester.widget<TabBar>(find.byType(TabBar));
+    expect(tabs.tabs.length, 5);
+
+    await tester.tap(find.text('Related'));
+    await tester.pumpAndSettle();
+    expect(tabs.controller!.index, 1);
+
+    await tester.tap(find.text('Notes'));
+    // 图片在测试环境中不会加载完成，只推进切换动画。
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(tabs.controller!.index, 2);
+    expect(find.text('Intro'), findsOneWidget);
+    expect(find.text('Plugin notes'), findsOneWidget);
+    expect(find.text('Gallery'), findsOneWidget);
+    final grid = tester.widget<SliverGrid>(find.byType(SliverGrid));
+    expect(
+      (grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount)
+          .crossAxisCount,
+      3,
+    );
+    final tileSizes = tester
+        .widgetList<Hero>(find.byType(Hero))
+        .where((hero) => '${hero.tag}'.startsWith('comic-detail-plugin-tab-'))
+        .map((hero) => tester.getSize(find.byWidget(hero)))
+        .toList();
+    expect(tileSizes, hasLength(3));
+    expect(
+      tileSizes.first.height / tileSizes.first.width,
+      closeTo(4 / 3, 0.01),
+    );
+
+    await tester.tap(find.text('Empty'));
+    await tester.pumpAndSettle();
+    expect(find.text('No content yet'), findsOneWidget);
+
+    await tester.tap(find.text('Broken'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ComicDetailLoadErrorView), findsOneWidget);
+    facade.failBroken = false;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Recovered'), findsOneWidget);
+    expect(facade.requests.last, 'plugin-tabs/broken');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
     testWidgets(
       'authors stay in plugin info rows before and after loading in $platform',
@@ -1961,6 +2069,31 @@ class _DesktopDetailFacade extends ComicDetailFeatureFacade {
     isFavorite: false,
     subId: '',
   );
+}
+
+class _PluginTabsDetailFacade extends _DesktopDetailFacade {
+  final requests = <String>[];
+  var failBroken = true;
+
+  @override
+  Future<List<SourceDetailTabBlock>> loadDetailTab({
+    required String comicId,
+    required String tabId,
+  }) async {
+    requests.add('$comicId/$tabId');
+    return switch (tabId) {
+      'notes' => const [
+        SourceDetailTextBlock(title: 'Intro', text: 'Plugin notes'),
+        SourceDetailImagesBlock(
+          title: 'Gallery',
+          urls: ['https://a/1.jpg', 'https://a/2.jpg', 'https://a/3.jpg'],
+        ),
+      ],
+      'broken' when failBroken => throw Exception('broken'),
+      'broken' => const [SourceDetailTextBlock(text: 'Recovered')],
+      _ => const [],
+    };
+  }
 }
 
 class _DownloadSelectionDetailFacade extends _DesktopDetailFacade {

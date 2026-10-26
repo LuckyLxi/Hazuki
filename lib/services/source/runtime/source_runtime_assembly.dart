@@ -12,6 +12,7 @@ import '../account/source_daily_check_in_capability.dart';
 import '../account/source_relogin_coordinator.dart';
 import '../category/source_category_capability.dart';
 import '../comic/comic_details_capability.dart';
+import '../comic/comic_detail_tab_capability.dart';
 import '../comic/source_comic_details_cache.dart';
 import '../comments/comments_capability.dart';
 import '../common/source_json_coerce.dart';
@@ -267,6 +268,10 @@ class SourceRuntimeAssembly {
         explore: _exploreCapability,
         category: _categoryCapability,
         comicDetails: _comicDetailsCapability,
+        detailTabs: SourceComicDetailTabCapability(
+          runtimeHost: _runtimeHost,
+          reloginCoordinator: _reloginCoordinator,
+        ),
       );
   late final SourceFavoritesOperations _favoritesOperations =
       SourceFavoritesOperations(

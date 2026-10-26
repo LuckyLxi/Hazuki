@@ -13,6 +13,7 @@ import '../support/comic_detail_actions_controller.dart';
 import '../support/comic_detail_controller_support.dart';
 import '../support/comic_detail_dependencies.dart';
 import '../support/comic_detail_favorite_controller.dart';
+import '../support/comic_detail_plugin_tabs_controller.dart';
 import '../support/comic_detail_scope.dart';
 import '../support/comic_detail_session_controller.dart';
 import '../support/comic_detail_theme_controller.dart';
@@ -82,6 +83,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   late final ComicDetailFavoriteController _favoriteController;
   late final bool _supportsRelatedTab;
   late final bool _supportsCommentsTab;
+  late final ComicDetailPluginTabsController _pluginTabsController;
 
   @override
   void initState() {
@@ -106,9 +108,15 @@ class _ComicDetailPageState extends State<ComicDetailPage>
           listen: false,
         ) !=
         null;
+    _pluginTabsController = ComicDetailPluginTabsController(
+      repository: _repository,
+      comicId: widget.comic.id,
+      tabs: sourceDetailTabs(comicSourceKey, context: context, listen: false),
+    );
     _initializeControllers();
     _uiStateController.initialize(initialAppBarTitle: widget.comic.title);
     _sessionController.initialize();
+    _pluginTabsController.initialize();
     _themeController.addListener(_rebuildPage);
     _sessionController.addListener(_rebuildPage);
     _uiStateController.addListener(_rebuildPage);
@@ -136,6 +144,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     _themeController.dispose();
     _actionsController.dispose();
     _favoriteController.dispose();
+    _pluginTabsController.dispose();
     super.dispose();
   }
 
@@ -253,6 +262,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       scrollController: _scrollController,
       includeRelatedTab: _supportsRelatedTab,
       includeCommentsTab: _supportsCommentsTab,
+      pluginTabCount: _pluginTabsController.tabs.length,
     );
   }
 
@@ -278,6 +288,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       actions: _actionsController,
       favorite: _favoriteController,
       supportsRelatedTab: _supportsRelatedTab,
+      pluginTabs: _pluginTabsController,
       child: AnimatedTheme(
         data: theme,
         duration: const Duration(milliseconds: 360),

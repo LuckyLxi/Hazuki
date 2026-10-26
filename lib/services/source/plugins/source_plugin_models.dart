@@ -1,6 +1,7 @@
 import 'source_search_capabilities.dart';
 import 'dart:convert';
 import 'source_plugin_buttons.dart';
+import 'source_detail_tabs.dart';
 import 'source_favorite_menu.dart';
 import 'source_menu.dart';
 import 'source_plugin_exception.dart';
@@ -168,6 +169,7 @@ class SourcePluginManifest {
     }
     SourcePluginAction.parseList(presentation['actions']);
     SourcePluginButton.parseList(presentation['buttons']);
+    SourceDetailTab.parseList(presentation['detailTabs']);
     SourceFavoriteMenuEntry.parseList(presentation['favoriteMenu']);
     SourceMenuEntry.parseMenus(presentation['menus']);
     if (json['settings'] case final Map settings) {
