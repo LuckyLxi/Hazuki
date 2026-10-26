@@ -2,12 +2,18 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:pointycastle/api.dart' show KeyParameter;
+import 'package:enough_convert/gbk.dart';
+import 'package:pointycastle/api.dart'
+    show BlockCipher, CipherParameters, KeyParameter, ParametersWithIV;
 import 'package:pointycastle/block/aes.dart';
+import 'package:pointycastle/block/modes/cbc.dart';
+import 'package:pointycastle/block/modes/cfb.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
+import 'package:pointycastle/block/modes/ofb.dart';
 
 import '../common/source_json_coerce.dart';
 import 'source_html_bridge.dart';
+import 'source_rsa_key.dart';
 
 /// Pure host capabilities owned by one script worker.
 class SourceLocalScriptBridge {
@@ -55,22 +61,85 @@ class SourceLocalScriptBridge {
             ? digest.toString()
             : Uint8List.fromList(digest.bytes);
       case 'aes-ecb':
-        final bytes = jsToBytes(value);
-        final cipher = ECBBlockCipher(AESEngine())
-          ..init(encode, KeyParameter(jsToBytes(request['key'])));
-        final result = Uint8List(bytes.length);
-        for (var offset = 0; offset < bytes.length;) {
-          offset += cipher.processBlock(bytes, offset, result, offset);
-        }
-        return result;
-      case 'gbk':
+        return _processAes(ECBBlockCipher(AESEngine()), encode, request);
       case 'aes-cbc':
+        return _processAes(
+          CBCBlockCipher(AESEngine()),
+          encode,
+          request,
+          withIv: true,
+        );
       case 'aes-cfb':
+        return _processAes(
+          CFBBlockCipher(AESEngine(), _aesSegmentSize(request)),
+          encode,
+          request,
+          withIv: true,
+        );
       case 'aes-ofb':
+        return _processAes(
+          OFBBlockCipher(AESEngine(), _aesSegmentSize(request)),
+          encode,
+          request,
+          withIv: true,
+        );
+      case 'gbk':
+        return encode
+            ? Uint8List.fromList(
+                const GbkCodec().encode((value ?? '').toString()),
+              )
+            : const GbkCodec().decode(jsToBytes(value));
       case 'rsa':
-        throw UnsupportedError('Unsupported conversion: ${request['type']}');
+        return decryptRsaForPlugin(
+          value,
+          request['key'],
+          padding: request['padding']?.toString(),
+        );
       default:
-        return value;
+        // 未知类型必须显式失败，避免插件把原样返回的输入误当作转换结果。
+        throw UnsupportedError(
+          'plugin_unsupported_convert_type: ${request['type']}',
+        );
     }
+  }
+
+  /// 不做自动填充：输入须按分组对齐，填充由插件自行处理（与既有 ECB 行为一致）。
+  Uint8List _processAes(
+    BlockCipher cipher,
+    bool encode,
+    Map<String, dynamic> request, {
+    bool withIv = false,
+  }) {
+    final key = jsToBytes(request['key']);
+    if (!const {16, 24, 32}.contains(key.length)) {
+      throw const FormatException('plugin_invalid_cipher_key');
+    }
+    CipherParameters parameters = KeyParameter(key);
+    if (withIv) {
+      final iv = jsToBytes(request['iv']);
+      if (iv.length != 16) {
+        throw const FormatException('plugin_invalid_cipher_iv');
+      }
+      parameters = ParametersWithIV(parameters, iv);
+    }
+    cipher.init(encode, parameters);
+    final bytes = jsToBytes(request['value']);
+    if (bytes.length % cipher.blockSize != 0) {
+      throw const FormatException('plugin_invalid_cipher_input');
+    }
+    final result = Uint8List(bytes.length);
+    for (var offset = 0; offset < bytes.length;) {
+      offset += cipher.processBlock(bytes, offset, result, offset);
+    }
+    return result;
+  }
+
+  /// CFB/OFB 的分段字节数，省略时为完整的 16 字节分组。
+  int _aesSegmentSize(Map<String, dynamic> request) {
+    final size = request['blockSize'] ?? 16;
+    if (size is! num || size != size.toInt() || size < 1 || size > 16) {
+      throw const FormatException('plugin_invalid_cipher_block_size');
+    }
+    return size.toInt();
   }
 }

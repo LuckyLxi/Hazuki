@@ -170,6 +170,7 @@ class SourceHttpGateway {
     final headers = Map<String, dynamic>.from(request['headers'] as Map? ?? {});
     final bytes = request['bytes'] == true;
     final data = request['data'];
+    final extra = _parsePluginHttpExtra(request['extra']);
     final cancelToken = hostContext == null ? null : CancelToken();
     var finished = false;
     var cancelled = false;
@@ -194,6 +195,10 @@ class SourceHttpGateway {
         options: Options(
           responseType: bytes ? ResponseType.bytes : ResponseType.plain,
           headers: headers,
+          sendTimeout: extra.timeout,
+          receiveTimeout: extra.timeout,
+          followRedirects: extra.followRedirects,
+          maxRedirects: extra.maxRedirects,
           extra: {
             'skipNetworkDebugLog': true,
             _hostContextKey: ?hostContext,
@@ -253,10 +258,47 @@ class SourceHttpGateway {
 
     return {
       'status': response?.statusCode,
+      // 跟随重定向后的最终地址；未跟随时即本次请求地址。
+      'url': response?.realUri.toString(),
       'headers': _stringHeaders(response?.headers),
       'body': response?.data,
       'error': error,
     };
+  }
+
+  /// 插件 `Hazuki.http` 的 extra 只接受白名单选项，未知键或越界值直接拒绝。
+  static ({Duration? timeout, bool? followRedirects, int? maxRedirects})
+  _parsePluginHttpExtra(dynamic raw) {
+    if (raw == null) {
+      return (timeout: null, followRedirects: null, maxRedirects: null);
+    }
+    const invalid = FormatException('plugin_invalid_http_extra');
+    if (raw is! Map) throw invalid;
+    int? integerIn(dynamic value, int min, int max) {
+      if (value == null) return null;
+      if (value is! num || value != value.toInt()) throw invalid;
+      final result = value.toInt();
+      if (result < min || result > max) throw invalid;
+      return result;
+    }
+
+    for (final key in raw.keys) {
+      if (!const {
+        'timeoutMs',
+        'followRedirects',
+        'maxRedirects',
+      }.contains(key)) {
+        throw invalid;
+      }
+    }
+    final followRedirects = raw['followRedirects'];
+    if (followRedirects != null && followRedirects is! bool) throw invalid;
+    final timeoutMs = integerIn(raw['timeoutMs'], 1000, 120000);
+    return (
+      timeout: timeoutMs == null ? null : Duration(milliseconds: timeoutMs),
+      followRedirects: followRedirects as bool?,
+      maxRedirects: integerIn(raw['maxRedirects'], 0, 20),
+    );
   }
 
   void configureCookieBridge() {

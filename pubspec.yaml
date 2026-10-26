@@ -72,6 +72,7 @@ dependencies:
   archive: ^4.5.2
   onnxruntime_v2: 1.23.2+2
   ffi: ^2.2.0
+  enough_convert: ^1.7.1
 
 dev_dependencies:
   flutter_test:

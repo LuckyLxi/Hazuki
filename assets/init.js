@@ -297,15 +297,17 @@ let Convert = {
     /**
      * @param {ArrayBuffer} value
      * @param {ArrayBuffer} key
+     * @param {ArrayBuffer} iv
      * @param {number} blockSize
      * @returns {ArrayBuffer}
      */
-    encryptAesOfb: (value, key, blockSize) => {
+    encryptAesOfb: (value, key, iv, blockSize) => {
         return sendMessage({
             method: "convert",
             type: "aes-ofb",
             value: value,
             key: key,
+            iv: iv,
             blockSize: blockSize,
             isEncode: true
         });
@@ -314,15 +316,17 @@ let Convert = {
     /**
      * @param {ArrayBuffer} value
      * @param {ArrayBuffer} key
+     * @param {ArrayBuffer} iv
      * @param {number} blockSize
      * @returns {ArrayBuffer}
      */
-    decryptAesOfb: (value, key, blockSize) => {
+    decryptAesOfb: (value, key, iv, blockSize) => {
         return sendMessage({
             method: "convert",
             type: "aes-ofb",
             value: value,
             key: key,
+            iv: iv,
             blockSize: blockSize,
             isEncode: false
         });
@@ -330,15 +334,17 @@ let Convert = {
 
     /**
      * @param {ArrayBuffer} value
-     * @param {ArrayBuffer} key
+     * @param {string|ArrayBuffer} key - PEM (PKCS#1 / PKCS#8) or DER private key
+     * @param {string} [padding] - pkcs1 (default) or oaep
      * @returns {ArrayBuffer}
      */
-    decryptRsa: (value, key) => {
+    decryptRsa: (value, key, padding) => {
         return sendMessage({
             method: "convert",
             type: "rsa",
             value: value,
             key: key,
+            padding: padding,
             isEncode: false
         });
     },
