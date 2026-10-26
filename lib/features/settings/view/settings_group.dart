@@ -66,13 +66,16 @@ class SettingsLeadingIcon extends StatelessWidget {
   }
 }
 
+/// 与图标对齐的缩进分隔线。
+Widget settingsDivider(BuildContext context) => Divider(
+  height: 1,
+  indent: 72,
+  color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+);
+
 /// 条目之间插入与图标对齐的缩进分隔线。
 List<Widget> withSettingsDividers(BuildContext context, List<Widget> tiles) {
-  final divider = Divider(
-    height: 1,
-    indent: 72,
-    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
-  );
+  final divider = settingsDivider(context);
   return [
     for (var i = 0; i < tiles.length; i++) ...[if (i > 0) divider, tiles[i]],
   ];

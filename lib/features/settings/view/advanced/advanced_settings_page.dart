@@ -233,6 +233,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
               : SourcePluginActionList(
                   gateway: widget.sourcePlugins!,
                   location: SourcePluginActionLocation.advanced,
+                  title: strings.otherSectionPlugins,
                 ),
           loading: _loading,
           noImageMode: _noImageMode,
@@ -257,7 +258,9 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
                   onInvoke: () =>
                       _runSourceDeviceAction(sourceKey, deviceAction),
                   builder: (context, activate) => ListTile(
-                    leading: const Icon(Icons.phonelink_erase_outlined),
+                    leading: const SettingsLeadingIcon(
+                      Icons.phonelink_erase_outlined,
+                    ),
                     title: Text(
                       buttonText(deviceAction.title ?? deviceAction.id),
                     ),

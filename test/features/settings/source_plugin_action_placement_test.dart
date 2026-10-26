@@ -698,6 +698,8 @@ void main() {
               location != SourcePluginActionLocation.lines) {
             expect(plugins.metadataLoads, isEmpty);
           }
+          await tester.ensureVisible(find.text('Action ${location.name}'));
+          await tester.pumpAndSettle();
           await tester.tap(find.text('Action ${location.name}'));
           await tester.pumpAndSettle();
           if (declared) {
