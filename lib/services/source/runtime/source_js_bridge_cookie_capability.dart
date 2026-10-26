@@ -283,20 +283,11 @@ class SourceJsBridgeCookieCapability {
         final ms = map['time'] is num ? (map['time'] as num).toInt() : 0;
         result = Future<void>.delayed(Duration(milliseconds: ms));
         break;
-      case 'random':
-        result = _local.random(map);
-        break;
-      case 'uuid':
-        result = _local.uuid();
-        break;
       case 'convert':
         result = _local.convert(map);
         break;
       case 'getLocale':
         result = sourcePluginLocaleTag(handle.session.prefs);
-        break;
-      case 'getPlatform':
-        result = _local.handle(map);
         break;
       case 'log':
         // Foreground login may hold a complete authorization callback. Never

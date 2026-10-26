@@ -47,6 +47,10 @@ Future<SourceScriptEngine> _installRuntime(SourceRuntimeHandle handle) async {
     (dynamic message) => bridge.handleJsMessageForHandle(handle, message),
   );
   await engine.evaluate(await File('assets/init.js').readAsString());
+  // SDK 加载后会删除内部入口，测试需在此之前保留解析函数以便传入任意语言。
+  await engine.evaluate(
+    'globalThis.__testLocalizeText = __hazukiRuntime.localizeText;',
+  );
   await engine.evaluate(
     await File('assets/hazuki_plugin_sdk.js').readAsString(),
   );
@@ -90,7 +94,7 @@ void main() {
       );
       expect(
         await engine.evaluate(
-          '__hazukiLocalizeText(${jsonEncode(text)}, ${jsonEncode(_translation)}, ${jsonEncode(locale)})',
+          '__testLocalizeText(${jsonEncode(text)}, ${jsonEncode(_translation)}, ${jsonEncode(locale)})',
         ),
         expected,
       );
@@ -125,7 +129,6 @@ void main() {
       ]) {
         await prefs.setString(hazukiLocalePreferenceKey, language);
         expect(await engine.evaluate('Hazuki.locale'), tag);
-        expect(await engine.evaluate('APP.locale'), tag);
         expect(await engine.evaluate("Hazuki.translate('Greeting')"), greeting);
         expect(await engine.evaluate("legacy.translate('Greeting')"), greeting);
         expect(

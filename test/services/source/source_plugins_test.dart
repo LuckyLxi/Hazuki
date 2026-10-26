@@ -166,7 +166,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
         package(
           script: '''Hazuki.registerSource({
       search:{load:async()=>({comics:[]})},
-      comic:{loadInfo:async id=>new ComicDetails({title:'Grouped',chapterGroups:[
+      comic:{loadInfo:async id=>({title:'Grouped',chapterGroups:[
         {id:'a',title:'Serial',chapters:[{id:'10',title:'First'},{id:'2',title:'Second'}]},
         {id:'b',title:'Other',chapters:[{id:'1',title:'Other'}]}]}),
       loadEp:async()=>({images:['image']}),
@@ -470,6 +470,25 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
     },
   );
 
+  test('plugin scripts see only Hazuki APIs and generic JS helpers', () async {
+    final manifest = await SourcePluginScriptInspector().inspect('''
+const hidden = {
+  Network: typeof Network, Convert: typeof Convert, HtmlDocument: typeof HtmlDocument,
+  ComicSource: typeof ComicSource, UI: typeof UI, APP: typeof APP, Image: typeof Image,
+  Comic: typeof Comic, ComicDetails: typeof ComicDetails, fetch: typeof fetch,
+  compute: typeof compute, setClipboard: typeof setClipboard, getClipboard: typeof getClipboard,
+  createUuid: typeof createUuid, runtime: typeof __hazukiRuntime,
+};
+const leaked = Object.keys(hidden).filter(name => hidden[name] !== 'undefined');
+if (leaked.length) throw new Error('leaked: ' + leaked.join(','));
+if ([typeof setTimeout, typeof setInterval, typeof console, typeof HazukiSource]
+    .some(type => type === 'undefined')) throw new Error('missing helper');
+Hazuki.registerSource({id:'hazuki_only',search:{load:async()=>({comics:[]})},
+comic:{loadInfo:async()=>({title:'',chapters:{}}),loadEp:async()=>({images:[]})}});
+''');
+    expect(manifest.id, 'hazuki_only');
+  });
+
   test(
     'registers a class source without headers or a registration call',
     () async {
@@ -478,7 +497,7 @@ class PlainSource extends HazukiSource {
   key = ['plain', 'source'].join('_');
   search = {load: async () => ({comics: [], maxPage: 1})};
   comic = {
-    loadInfo: async id => new ComicDetails({title: 'Comic', chapters: {}, tags: {}, viewsCount: 12, headerStats: [{text: {zh: '每周更新', en: 'Weekly'}}], infoFields: [{label: {zh: '状态', en: 'Status'}, values: 'Ongoing'}]}),
+    loadInfo: async id => ({title: 'Comic', chapters: {}, tags: {}, viewsCount: 12, headerStats: [{text: {zh: '每周更新', en: 'Weekly'}}], infoFields: [{label: {zh: '状态', en: 'Status'}, values: 'Ongoing'}]}),
     loadEp: async () => ({images: []})
   };
 }

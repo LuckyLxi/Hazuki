@@ -94,7 +94,7 @@ void main() {
       final engine = handle.runtime.engine!;
       final result = await engine.evaluate('''
 (() => {
-  const doc = new HtmlDocument(fixtureHtml);
+  const doc = Hazuki.html.parse(fixtureHtml);
   try {
     const catalog = doc.getElementById('catalog');
     const first = doc.getElementById('comic:1');

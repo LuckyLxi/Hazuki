@@ -161,12 +161,6 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
               : candidateMeta,
         ),
       );
-      await engine.setGlobal(
-        'appVersion',
-        '1.0.0',
-        execution: control?.execution,
-      );
-
       await execute(initScript, name: 'init.js');
       await execute(sdk, name: 'hazuki_plugin_sdk.js');
       await evaluateSourcePlugin(engine, sourceScript, control: control);

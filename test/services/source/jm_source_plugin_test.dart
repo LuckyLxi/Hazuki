@@ -208,10 +208,6 @@ void main() {
     await engine.evaluate(
       await File('assets/hazuki_plugin_sdk.js').readAsString(),
     );
-    // Prove the plugin uses only documented SDK APIs, without legacy globals.
-    await engine.evaluate(
-      'Network=undefined;Convert=undefined;Comic=undefined;ComicDetails=undefined;Comment=undefined;HazukiSource=undefined;',
-    );
     await engine.evaluate(
       await File('test/fixtures/source_plugins/jm/main.js').readAsString(),
     );

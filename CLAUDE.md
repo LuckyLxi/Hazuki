@@ -44,11 +44,11 @@ flutter build windows --debug
 
 ## Architecture
 
-Hazuki is a Flutter manga reader targeting Android. It fetches and renders manga from installable JavaScript source plugins (Hazuki Source API v1; default index `LuckyLxi/Sources`). The bundled JMComic / CopyManga / Picacg plugins were adapted from [venera-configs](https://github.com/venera-app/venera-configs), and the plugin SDK still accepts venera-style `ComicSource` subclasses. No Provider/GetX/Riverpod — state is `ChangeNotifier` controllers consumed via `ListenableBuilder`/`AnimatedBuilder`.
+Hazuki is a Flutter manga reader targeting Android. It fetches and renders manga from installable JavaScript source plugins (Hazuki Source API v1; default index `LuckyLxi/Sources`). The bundled JMComic / CopyManga / Picacg plugins were adapted from [venera-configs](https://github.com/venera-app/venera-configs) but now use only the Hazuki SDK; the host deliberately does **not** provide venera API compatibility (no `ComicSource`, `Network`, `UI`, `Image`, `fetch`, etc.), and only `Hazuki.registerSource` or `extends HazukiSource` registrations are accepted. No Provider/GetX/Riverpod — state is `ChangeNotifier` controllers consumed via `ListenableBuilder`/`AnimatedBuilder`.
 
 ### JS source runtime
 
-All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `quickjs_engine` (QuickJS, at `third_party/pub_overrides/quickjs_engine`). Source scripts are installed locally by `SourcePluginManager`; there is no other script store. `assets/init.js` is the bridge library injected into the runtime before the source script (provides `sendMessage`, `Convert`, `Network`, etc.), followed by `assets/hazuki_plugin_sdk.js` (`HazukiSource`, `Hazuki.registerSource`).
+All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `quickjs_engine` (QuickJS, at `third_party/pub_overrides/quickjs_engine`). Source scripts are installed locally by `SourcePluginManager`; there is no other script store. `assets/init.js` is the internal bridge library injected before the source script: it wraps `Network`, `Convert`, `HtmlDocument` and locale helpers in an IIFE and hands them over through a temporary `__hazukiRuntime` global, which `assets/hazuki_plugin_sdk.js` captures and deletes. Plugins therefore see only `Hazuki`, `HazukiSource`, and the generic `setTimeout` / `setInterval` / `console`; new plugin-facing capabilities go on `Hazuki.*`, not new globals.
 
 The source service is a decomposed subsystem under `lib/services/source/`, layered as:
 

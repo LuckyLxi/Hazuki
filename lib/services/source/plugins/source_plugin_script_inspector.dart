@@ -50,20 +50,11 @@ class SourcePluginScriptInspector {
         }
         if (method == 'isLogged') return false;
         if (method == 'ui_available') return false;
-        if (const {
-          'html',
-          'convert',
-          'random',
-          'uuid',
-          'getLocale',
-          'getPlatform',
-          'log',
-        }.contains(method)) {
+        if (const {'html', 'convert', 'getLocale', 'log'}.contains(method)) {
           return bridge.handleJsMessageForHandle(handle, message);
         }
         throw const SourcePluginException('plugin_host_call_during_inspection');
       });
-      await engine.setGlobal('appVersion', '1.0.0');
       await engine.execute(init, name: 'init.js');
       await engine.execute(sdk, name: 'hazuki_plugin_sdk.js');
       await evaluateSourcePlugin(engine, script);
@@ -89,7 +80,7 @@ Future<void> evaluateSourcePlugin(
   }
   if (await evaluate('!!globalThis.__hazuki_source') == true) return;
   final sourceClass = RegExp(
-    r'class\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+extends\s+(?:HazukiSource|ComicSource)\b',
+    r'class\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+extends\s+HazukiSource\b',
   ).firstMatch(script)?.group(1);
   if (sourceClass == null) {
     throw const SourcePluginException('plugin_registration_missing');

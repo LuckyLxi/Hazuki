@@ -1,12 +1,50 @@
 // Hazuki Source API v1. Identity comes from the registered source.
-class HazukiSource extends ComicSource {}
+const {Hazuki, HazukiSource} = (() => {
+// 取走 init.js 的内部实现后删除临时入口，插件只能经由 Hazuki.* 使用这些能力。
+const {Network, Convert, HtmlDocument, getLocale, localizeText} = globalThis.__hazukiRuntime;
+delete globalThis.__hazukiRuntime;
 
-const Hazuki = (() => {
+class HazukiSource {
+    name = '';
+
+    key = '';
+
+    version = '';
+
+    translation = {};
+
+    loadData(dataKey) {
+        return sendMessage({method: 'load_data', key: this.key, data_key: dataKey});
+    }
+
+    loadSetting(key) {
+        return sendMessage({method: 'load_setting', key: this.key, setting_key: key});
+    }
+
+    saveData(dataKey, data) {
+        return sendMessage({method: 'save_data', key: this.key, data_key: dataKey, data});
+    }
+
+    deleteData(dataKey) {
+        return sendMessage({method: 'delete_data', key: this.key, data_key: dataKey});
+    }
+
+    get isLogged() {
+        return sendMessage({method: 'isLogged', key: this.key});
+    }
+
+    translate(key) {
+        return localizeText(key, this.translation);
+    }
+
+    init() { }
+}
+
 let sourceKey;
-return Object.freeze({
+const Hazuki = Object.freeze({
     apiVersion: 1,
-    get locale() { return APP.locale; },
-    translate: text => __hazukiLocalizeText(text, globalThis.__hazuki_source?.translation),
+    get locale() { return getLocale(); },
+    translate: text => localizeText(text, globalThis.__hazuki_source?.translation),
     registerSource(source) {
         if (globalThis.__hazuki_source) throw new Error('plugin_duplicate_registration');
         if (!source || typeof source.search?.load !== 'function' ||
@@ -181,6 +219,7 @@ return Object.freeze({
         });
     })(),
 });
+return {Hazuki, HazukiSource};
 })();
 
 // Only an isolated foreground login runtime installs this host capability.
