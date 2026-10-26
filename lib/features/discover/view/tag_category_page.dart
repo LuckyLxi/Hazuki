@@ -80,9 +80,9 @@ class _TagCategoryGroupCard extends StatelessWidget {
   }
 }
 
-/// 分组出现动画：淡入并从下方轻微上移。
+/// 分组出现动画：仅淡入。
 ///
-/// 只驱动透明度和位移，内部卡片作为固定 child 不会随动画重建；
+/// 只驱动透明度，内部卡片作为固定 child 不会随动画重建；
 /// 卡片自带 RepaintBoundary，淡入时只合成已缓存的图层。
 class _TagCategoryGroupReveal extends StatefulWidget {
   const _TagCategoryGroupReveal({
@@ -100,8 +100,6 @@ class _TagCategoryGroupReveal extends StatefulWidget {
 
 class _TagCategoryGroupRevealState extends State<_TagCategoryGroupReveal>
     with SingleTickerProviderStateMixin {
-  static const double _riseDistance = 16;
-
   late final AnimationController _controller;
   late final Animation<double> _progress;
 
@@ -129,17 +127,7 @@ class _TagCategoryGroupRevealState extends State<_TagCategoryGroupReveal>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _progress,
-      child: AnimatedBuilder(
-        animation: _progress,
-        builder: (context, child) => Transform.translate(
-          offset: Offset(0, (1 - _progress.value) * _riseDistance),
-          child: child,
-        ),
-        child: widget.child,
-      ),
-    );
+    return FadeTransition(opacity: _progress, child: widget.child);
   }
 }
 
