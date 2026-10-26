@@ -366,6 +366,44 @@ let Convert = {
 
         return String.fromCharCode(...charCodes);
     },
+
+    /** Decode hex string to bytes
+     * @param hex {string}
+     * @return {ArrayBuffer}
+     */
+    hexDecode: (hex) => {
+        if (typeof hex !== 'string' || hex.length % 2 !== 0 || /[^0-9a-fA-F]/.test(hex)) {
+            throw new Error('plugin_invalid_hex');
+        }
+        const bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < bytes.length; i++) {
+            bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+        }
+        return bytes.buffer;
+    },
+
+    /** Cryptographically secure random bytes from the host
+     * @param length {number} - integer 1..1024
+     * @return {ArrayBuffer}
+     */
+    randomBytes: (length) => {
+        return sendMessage({
+            method: "convert",
+            type: "random",
+            length: length,
+        });
+    },
+
+    /** RFC 4122 version 4 UUID built from secure random bytes
+     * @return {string}
+     */
+    randomUUID: () => {
+        const bytes = new Uint8Array(Convert.randomBytes(16));
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const hex = Convert.hexEncode(bytes.buffer);
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    },
 }
 
 class _Timer {

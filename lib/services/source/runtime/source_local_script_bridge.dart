@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -19,6 +20,7 @@ import 'source_rsa_key.dart';
 class SourceLocalScriptBridge {
   final SourceHtmlBridge html = SourceHtmlBridge();
   static const methods = {'html', 'convert'};
+  static final _secureRandom = Random.secure();
 
   dynamic handle(Map<String, dynamic> request) => switch (request['method']) {
     'html' => html.handleOperation(request),
@@ -95,6 +97,17 @@ class SourceLocalScriptBridge {
           request['key'],
           padding: request['padding']?.toString(),
         );
+      case 'random':
+        final length = request['length'];
+        if (length is! num ||
+            length != length.toInt() ||
+            length < 1 ||
+            length > 1024) {
+          throw const FormatException('plugin_invalid_random_length');
+        }
+        return Uint8List.fromList([
+          for (var i = 0; i < length.toInt(); i++) _secureRandom.nextInt(256),
+        ]);
       default:
         // 未知类型必须显式失败，避免插件把原样返回的输入误当作转换结果。
         throw UnsupportedError(

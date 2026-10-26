@@ -226,6 +226,19 @@ void main() {
     );
   });
 
+  test('random returns secure bytes of the requested length', () {
+    final first = bridge.convert({'type': 'random', 'length': 32});
+    final second = bridge.convert({'type': 'random', 'length': 32});
+    expect(first, isA<Uint8List>().having((b) => b.length, 'length', 32));
+    expect(first, isNot(second));
+    for (final length in [0, 1025, 1.5, '16', null]) {
+      expect(
+        () => bridge.convert({'type': 'random', 'length': length}),
+        _throwsCode('plugin_invalid_random_length'),
+      );
+    }
+  });
+
   test('unknown conversion types fail instead of echoing input', () {
     expect(
       () => bridge.convert({'type': 'rot13', 'value': 'abc'}),
