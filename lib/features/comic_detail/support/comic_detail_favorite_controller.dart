@@ -35,17 +35,22 @@ class ComicDetailFavoriteController extends ChangeNotifier {
   final SourceTaskOwner _readTasks;
 
   bool _busy = false;
-  bool _likeBusy = false;
+  String? _busyHeaderActionId;
   bool? _favoriteOverride;
   bool? _cloudFavoriteOverride;
-  bool? _likedOverride;
+  List<ComicHeaderStat>? _headerStatsOverride;
+  List<ComicHeaderBadge>? _headerBadgesOverride;
 
   bool get isBusy => _busy;
-  bool get isLikeBusy => _likeBusy;
-  bool get supportComicLike => _repository.supportComicLike;
+
+  /// 正在执行的插件顶部动作；执行期间其他插件动作暂不可点。
+  String? get busyHeaderActionId => _busyHeaderActionId;
   bool? get favoriteOverride => _favoriteOverride;
   bool? get cloudFavoriteOverride => _cloudFavoriteOverride;
-  bool? get likedOverride => _likedOverride;
+
+  /// 插件动作返回的新顶部内容，优先于详情数据显示。
+  List<ComicHeaderStat>? get headerStatsOverride => _headerStatsOverride;
+  List<ComicHeaderBadge>? get headerBadgesOverride => _headerBadgesOverride;
 
   void applyInitialOverrides({
     required bool favoriteOverride,
@@ -57,59 +62,56 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> toggleLike(
+  /// 执行插件声明的顶部动作，返回插件是否要求重新加载详情。
+  Future<bool> runHeaderAction(
     BuildContext context,
     ComicDetailsData details,
+    ComicHeaderStat stat,
   ) async {
-    if (_likeBusy) return;
-    if (!supportComicLike) {
-      unawaited(
-        showHazukiPrompt(
-          context,
-          l10n(context).comicDetailLikeActionFailed('not_supported'),
-          isError: true,
-        ),
-      );
-      return;
-    }
-
-    final nextLiked = !(_likedOverride ?? details.isLiked);
-    _likeBusy = true;
+    if (_busyHeaderActionId != null) return false;
+    _busyHeaderActionId = stat.actionId;
     notifyListeners();
 
     try {
-      await _sourceUi.run(
-        () => _repository.toggleComicLike(
+      // 插件可能在回调中弹窗，需要页面级交互作用域。
+      final result = await _sourceUi.run(
+        () => _repository.runComicHeaderAction(
           comicId: details.id,
-          isLike: nextLiked,
+          actionId: stat.actionId,
           sourceKey: details.sourceKey,
         ),
       );
-      if (_disposed) return;
-      _likedOverride = nextLiked;
-      unawaited(
-        showHazukiPrompt(
-          context,
-          nextLiked
-              ? l10n(context).comicDetailLiked
-              : l10n(context).comicDetailUnliked,
-        ),
-      );
+      if (_disposed) return false;
+      _headerStatsOverride = result.headerStats ?? _headerStatsOverride;
+      _headerBadgesOverride = result.headerBadges ?? _headerBadgesOverride;
+      return result.reload;
     } catch (e) {
-      if (_disposed || isSourceUiCancellation(e)) return;
+      if (_disposed || isSourceUiCancellation(e)) return false;
       unawaited(
         showHazukiPrompt(
           context,
-          l10n(context).comicDetailLikeActionFailed('$e'),
+          l10n(context).comicDetailHeaderActionFailed('$e'),
           isError: true,
         ),
       );
+      return false;
     } finally {
       if (!_disposed) {
-        _likeBusy = false;
+        _busyHeaderActionId = null;
         notifyListeners();
       }
     }
+  }
+
+  /// 详情重新加载成功后，以新数据为准。
+  void clearHeaderOverrides() {
+    if (_disposed ||
+        _headerStatsOverride == null && _headerBadgesOverride == null) {
+      return;
+    }
+    _headerStatsOverride = null;
+    _headerBadgesOverride = null;
+    notifyListeners();
   }
 
   Future<void> showFoldersDialog(

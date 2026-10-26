@@ -78,6 +78,17 @@ class ComicDetailSessionController extends ChangeNotifier {
     _startDetailRetry();
   }
 
+  /// 插件动作要求刷新时静默重载：新数据到达前继续显示旧详情，
+  /// 失败时保留旧详情而不进入错误页；返回的 Future 仍会抛出失败。
+  Future<void> reloadDetails() async {
+    if (_disposed) return;
+    final previous = _future;
+    final fresh = _createComicDetailsFuture(forceRefresh: true);
+    _future = fresh.catchError((Object _) => previous);
+    notifyListeners();
+    await fresh;
+  }
+
   void _startDetailRetry() {
     _detailsTimeoutTimer?.cancel();
     _detailsTimeoutTimer = null;

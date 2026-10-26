@@ -129,7 +129,6 @@ abstract interface class SourceComicDetailGateway {
   bool supportFavoriteFolderAddForSource(String sourceKey);
   bool supportFavoriteFolderDeleteForSource(String sourceKey);
   bool supportFavoriteToggleForSource(String sourceKey);
-  bool supportComicLikeForSource(String sourceKey);
   bool favoriteSingleFolderForSingleComicForSource(String sourceKey);
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
@@ -196,9 +195,9 @@ abstract interface class SourceComicDetailGateway {
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
   });
-  Future<void> toggleComicLike({
+  Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
-    required bool isLike,
+    required String actionId,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
   });

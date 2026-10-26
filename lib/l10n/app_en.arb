@@ -659,12 +659,8 @@
       "count": {}
     }
   },
-  "comicDetailLike": "Like",
-  "comicDetailUnlike": "Unlike",
-  "comicDetailLiked": "Liked",
-  "comicDetailUnliked": "Like removed",
-  "comicDetailLikeActionFailed": "Like action failed: {error}",
-  "@comicDetailLikeActionFailed": {
+  "comicDetailHeaderActionFailed": "Action failed: {error}",
+  "@comicDetailHeaderActionFailed": {
     "placeholders": {
       "error": {}
     }

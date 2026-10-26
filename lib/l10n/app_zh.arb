@@ -659,12 +659,8 @@
       "count": {}
     }
   },
-  "comicDetailLike": "点赞",
-  "comicDetailUnlike": "取消点赞",
-  "comicDetailLiked": "已点赞",
-  "comicDetailUnliked": "已取消点赞",
-  "comicDetailLikeActionFailed": "点赞操作失败：{error}",
-  "@comicDetailLikeActionFailed": {
+  "comicDetailHeaderActionFailed": "操作失败：{error}",
+  "@comicDetailHeaderActionFailed": {
     "placeholders": {
       "error": {}
     }

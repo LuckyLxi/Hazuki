@@ -251,21 +251,21 @@ void main() {
       kernel.engine = old;
       await old.evaluate('''globalThis.__hazuki_source={
       key:'test',name:'Test',version:'1',settings:{line:{default:'a'}},
-      translation:{hello:'old'},comic:{likeComic(){}}};null;''');
+      translation:{hello:'old'},comic:{onReadingProgress(){}}};null;''');
       expect(kernel.sourceMeta!.translation['hello'], 'old');
       expect(
         old.cachedValue(
-          'typeof this.__hazuki_source.comic?.likeComic === "function"',
+          'typeof globalThis.__hazuki_source.comic?.onReadingProgress === "function"',
         ),
         true,
       );
       await old.evaluate('''(async()=>{await Promise.resolve();
       __hazuki_source.translation.hello='updated';
-      __hazuki_source.comic.likeComic=null;})()''');
+      __hazuki_source.comic.onReadingProgress=null;})()''');
       expect(kernel.sourceMeta!.translation['hello'], 'updated');
       expect(
         old.cachedValue(
-          'typeof this.__hazuki_source.comic?.likeComic === "function"',
+          'typeof globalThis.__hazuki_source.comic?.onReadingProgress === "function"',
         ),
         false,
       );

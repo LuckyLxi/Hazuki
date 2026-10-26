@@ -831,5 +831,4 @@ const _snapshotExpressions = <String>[
   "typeof globalThis.__hazuki_source.comic?.loadReadingHistory === \"function\"",
   "typeof globalThis.__hazuki_source.comic?.loadReadingProgress === \"function\"",
   "typeof globalThis.__hazuki_source.comic?.onReadingProgress === \"function\"",
-  "typeof this.__hazuki_source.comic?.likeComic === \"function\"",
 ];

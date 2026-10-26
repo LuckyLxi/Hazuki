@@ -375,9 +375,6 @@ class HazukiSourceComicDetailAdapter
   bool supportFavoriteToggleForSource(String sourceKey) =>
       _favorites.supportFavoriteToggleForSource(sourceKey);
   @override
-  bool supportComicLikeForSource(String sourceKey) =>
-      _content.supportComicLikeForSource(sourceKey);
-  @override
   bool favoriteSingleFolderForSingleComicForSource(String sourceKey) =>
       _favorites.favoriteSingleFolderForSingleComicForSource(sourceKey);
   @override
@@ -511,14 +508,14 @@ class HazukiSourceComicDetailAdapter
     taskOrigin: taskOrigin,
   );
   @override
-  Future<void> toggleComicLike({
+  Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
-    required bool isLike,
+    required String actionId,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.toggleComicLike(
+  }) => _content.runComicHeaderAction(
     comicId: comicId,
-    isLike: isLike,
+    actionId: actionId,
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
   );

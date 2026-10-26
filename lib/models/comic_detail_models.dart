@@ -3,7 +3,10 @@ import 'source_scoped_comic_id.dart';
 
 enum ComicInfoAction { none, search, copy }
 
-enum ComicHeaderStatAction { none, like }
+/// `plugin` 回调插件的 `comic.onHeaderAction`；点赞等有状态按钮也由插件自行处理。
+enum ComicHeaderStatAction { none, plugin, link, search, copy }
+
+enum ComicHeaderBadgeTone { normal, primary, warning, error }
 
 class ComicChapterGroup {
   const ComicChapterGroup({
@@ -20,11 +23,51 @@ class ComicChapterGroup {
 class ComicHeaderStat {
   const ComicHeaderStat({
     required this.text,
+    this.icon,
     this.action = ComicHeaderStatAction.none,
+    this.actionId = '',
+    this.url = '',
+    this.value,
   });
 
   final Object text;
+
+  /// 内置图标名；宿主不认识的名称不显示图标。
+  final String? icon;
   final ComicHeaderStatAction action;
+
+  /// `plugin` 动作传给 `onHeaderAction` 的标识。
+  final String actionId;
+
+  /// `link` 动作打开的 http(s) 地址。
+  final String url;
+
+  /// `search` / `copy` 的目标文字；为空时使用显示文字。
+  final String? value;
+}
+
+/// 标题下方的短标签，例如「连载中」「付费」。
+class ComicHeaderBadge {
+  const ComicHeaderBadge({
+    required this.text,
+    this.tone = ComicHeaderBadgeTone.normal,
+  });
+
+  final Object text;
+  final ComicHeaderBadgeTone tone;
+}
+
+/// `onHeaderAction` 的返回：替换顶部内容，或要求重新加载详情。
+class ComicHeaderActionResult {
+  const ComicHeaderActionResult({
+    this.headerStats,
+    this.headerBadges,
+    this.reload = false,
+  });
+
+  final List<ComicHeaderStat>? headerStats;
+  final List<ComicHeaderBadge>? headerBadges;
+  final bool reload;
 }
 
 /// One plugin-defined detail row. Labels may be localized language maps.
@@ -56,11 +99,11 @@ class ComicDetailsData {
     required this.subId,
     this.uploader = '',
     this.pageCount = '',
-    this.isLiked = false,
     this.sourceKey = '',
     this.infoFields = const [],
     this.viewsCount = '',
     this.headerStats = const [],
+    this.headerBadges = const [],
     this.chapterGroups = const [],
   });
 
@@ -83,11 +126,11 @@ class ComicDetailsData {
   final String subId;
   final String uploader;
   final String pageCount;
-  final bool isLiked;
   final String sourceKey;
   final List<ComicInfoField> infoFields;
   final String viewsCount;
   final List<ComicHeaderStat> headerStats;
+  final List<ComicHeaderBadge> headerBadges;
 
   SourceScopedComicId get scopedId =>
       SourceScopedComicId(sourceKey: sourceKey, comicId: id);
@@ -108,11 +151,11 @@ class ComicDetailsData {
     String? subId,
     String? uploader,
     String? pageCount,
-    bool? isLiked,
     String? sourceKey,
     List<ComicInfoField>? infoFields,
     String? viewsCount,
     List<ComicHeaderStat>? headerStats,
+    List<ComicHeaderBadge>? headerBadges,
   }) {
     return ComicDetailsData(
       id: id ?? this.id,
@@ -130,11 +173,11 @@ class ComicDetailsData {
       subId: subId ?? this.subId,
       uploader: uploader ?? this.uploader,
       pageCount: pageCount ?? this.pageCount,
-      isLiked: isLiked ?? this.isLiked,
       sourceKey: sourceKey ?? this.sourceKey,
       infoFields: infoFields ?? this.infoFields,
       viewsCount: viewsCount ?? this.viewsCount,
       headerStats: headerStats ?? this.headerStats,
+      headerBadges: headerBadges ?? this.headerBadges,
     );
   }
 }

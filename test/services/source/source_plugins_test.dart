@@ -728,7 +728,7 @@ Hazuki.registerSource({
         expect(manifest.version, switch (id) {
           'example' => '1.0.0',
           'jm' => '1.0.4',
-          'picacg' => '1.0.3',
+          'picacg' => '1.1.0',
           _ => '1.0.2',
         });
         expect(manifest.presentation['searchDefaultOrder'], isNotEmpty);

@@ -34,7 +34,6 @@ class SourceComicDetailsParser {
       tags: _filterDisplayTags(tags),
       recommend: recommendations,
       isFavorite: jsAsBool(map['isFavorite']),
-      isLiked: jsAsBool(map['isLiked']),
       uploader: map['uploader']?.toString() ?? '',
       pageCount: (map['pageCount'] ?? map['maxPage'] ?? '').toString(),
       subId: map['subId']?.toString() ?? '',
@@ -45,7 +44,51 @@ class SourceComicDetailsParser {
         map['headerStats'],
         sourceKey: sourceKey,
       ),
+      headerBadges: _extractHeaderBadges(
+        map['headerBadges'],
+        sourceKey: sourceKey,
+      ),
     );
+  }
+
+  /// 解析 `comic.onHeaderAction` 的返回；未返回对象表示无需更新。
+  ComicHeaderActionResult parseHeaderActionResult(
+    Object? value, {
+    required String sourceKey,
+  }) {
+    if (value == null) return const ComicHeaderActionResult();
+    if (value is! Map) {
+      throw const FormatException('plugin_invalid_header_action_result');
+    }
+    final reload = value['reload'];
+    if (reload != null && reload is! bool) {
+      throw const FormatException('plugin_invalid_header_action_result');
+    }
+    return ComicHeaderActionResult(
+      headerStats: value.containsKey('headerStats')
+          ? _extractHeaderStats(value['headerStats'], sourceKey: sourceKey)
+          : null,
+      headerBadges: value.containsKey('headerBadges')
+          ? _extractHeaderBadges(value['headerBadges'], sourceKey: sourceKey)
+          : null,
+      reload: reload == true,
+    );
+  }
+
+  /// 返回 null 表示文案为空，该项应跳过。
+  Object? _headerText(Object? text, {required String sourceKey}) {
+    if (text is String) {
+      final trimmed = text.trim();
+      return trimmed.isEmpty
+          ? null
+          : _translateSourceText(trimmed, sourceKey: sourceKey);
+    }
+    if (text is Map &&
+        text.entries.every((e) => e.key is String && e.value is String)) {
+      if (text.values.every((v) => (v as String).trim().isEmpty)) return null;
+      return Map<String, String>.unmodifiable(Map<String, String>.from(text));
+    }
+    throw const FormatException('plugin_invalid_header_text');
   }
 
   List<ComicHeaderStat> _extractHeaderStats(
@@ -61,33 +104,86 @@ class SourceComicDetailsParser {
       if (item is! Map) {
         throw const FormatException('plugin_invalid_header_stat');
       }
-      final text = item['text'];
-      final Object parsedText;
-      if (text is String) {
-        parsedText = _translateSourceText(text.trim(), sourceKey: sourceKey);
-      } else if (text is Map &&
-          text.entries.every((e) => e.key is String && e.value is String)) {
-        parsedText = Map<String, String>.unmodifiable(
-          Map<String, String>.from(text),
-        );
-      } else {
-        throw const FormatException('plugin_invalid_header_stat_text');
+      final parsedText = _headerText(item['text'], sourceKey: sourceKey);
+      final icon = item['icon'];
+      if (icon != null &&
+          (icon is! String || !RegExp(r'^[a-z0-9_]{1,40}$').hasMatch(icon))) {
+        throw const FormatException('plugin_invalid_header_stat_icon');
       }
       final action = item['action'] ?? 'none';
-      final parsedAction = ComicHeaderStatAction.values
-          .where((candidate) => candidate.name == action)
-          .firstOrNull;
+      // 旧版插件的 like 由宿主特判，现已交给插件声明；按普通文字兼容显示。
+      final parsedAction = action == 'like'
+          ? ComicHeaderStatAction.none
+          : ComicHeaderStatAction.values
+                .where((candidate) => candidate.name == action)
+                .firstOrNull;
       if (parsedAction == null) {
         throw const FormatException('plugin_invalid_header_stat_action');
       }
-      if (text is String && text.trim().isEmpty ||
-          text is Map &&
-              text.values.every((v) => (v as String).trim().isEmpty)) {
-        continue;
+      final id = item['id'];
+      if (parsedAction == ComicHeaderStatAction.plugin &&
+          (id is! String || id.isEmpty || id.length > 64)) {
+        throw const FormatException('plugin_invalid_header_stat_id');
       }
-      stats.add(ComicHeaderStat(text: parsedText, action: parsedAction));
+      final url = item['url'];
+      if (parsedAction == ComicHeaderStatAction.link &&
+          (url is! String || !_isHttpUrl(url))) {
+        throw const FormatException('plugin_invalid_header_stat_url');
+      }
+      final target = item['value'];
+      if (target != null && target is! String) {
+        throw const FormatException('plugin_invalid_header_stat_value');
+      }
+      if (parsedText == null) continue;
+      stats.add(
+        ComicHeaderStat(
+          text: parsedText,
+          icon: icon as String?,
+          action: parsedAction,
+          actionId: parsedAction == ComicHeaderStatAction.plugin
+              ? id as String
+              : '',
+          url: parsedAction == ComicHeaderStatAction.link ? url as String : '',
+          value: target as String?,
+        ),
+      );
     }
     return List.unmodifiable(stats);
+  }
+
+  /// 标题下最多显示 3 个短标签，多余的忽略。
+  List<ComicHeaderBadge> _extractHeaderBadges(
+    Object? value, {
+    required String sourceKey,
+  }) {
+    if (value == null) return const [];
+    if (value is! List) {
+      throw const FormatException('plugin_invalid_header_badges');
+    }
+    final badges = <ComicHeaderBadge>[];
+    for (final item in value) {
+      if (item is! Map) {
+        throw const FormatException('plugin_invalid_header_badge');
+      }
+      final parsedText = _headerText(item['text'], sourceKey: sourceKey);
+      final tone = item['tone'] ?? 'normal';
+      final parsedTone = ComicHeaderBadgeTone.values
+          .where((candidate) => candidate.name == tone)
+          .firstOrNull;
+      if (parsedTone == null) {
+        throw const FormatException('plugin_invalid_header_badge_tone');
+      }
+      if (parsedText == null || badges.length >= 3) continue;
+      badges.add(ComicHeaderBadge(text: parsedText, tone: parsedTone));
+    }
+    return List.unmodifiable(badges);
+  }
+
+  bool _isHttpUrl(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null &&
+        const {'http', 'https'}.contains(uri.scheme) &&
+        uri.host.isNotEmpty;
   }
 
   List<ComicInfoField> _extractInfoFields(

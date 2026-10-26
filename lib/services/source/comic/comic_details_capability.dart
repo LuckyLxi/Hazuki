@@ -414,54 +414,21 @@ class SourceComicDetailsCapability {
     });
   }
 
-  bool get supportComicLike {
-    final engine = facade.js.engine;
-    if (engine == null) return false;
-    try {
-      return jsAsBool(
-        engine.cachedValue(
-          'typeof this.__hazuki_source.comic?.likeComic === "function"',
-        ),
-      );
-    } catch (_) {
-      return false;
-    }
-  }
-
-  bool supportComicLikeForSource(String sourceKey) {
-    if (!_runtimeHost.runtimeRegistry.isAllowedSourceKey(
-      sourceKey.isEmpty ? _runtimeHost.activeSourceKey : sourceKey,
-    )) {
-      return false;
-    }
-    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final targetFacade = _runtimeHost.handleFor(resolvedSourceKey).facade;
-    final engine = targetFacade.js.engine;
-    if (engine == null) return false;
-    try {
-      return targetFacade.js.asBool(
-        engine.cachedValue(
-          'typeof this.__hazuki_source.comic?.likeComic === "function"',
-        ),
-      );
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<void> toggleComicLike({
+  /// 详情页顶部 `plugin` 动作：调用插件的 `comic.onHeaderAction`。
+  /// 插件可在回调中自行弹窗或发请求；返回的新顶部内容同步写回详情缓存。
+  Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
-    required bool isLike,
+    required String actionId,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) async => runSourceOperation(
+  }) => runSourceOperation(
     _runtimeHost,
     _runtimeHost.handleFor(_resolveActiveSourceKey(sourceKey)),
-    'comic.like',
-    (operationContext) => _toggleComicLikeTask(
+    'comic.headerAction',
+    (operationContext) => _runComicHeaderActionTask(
       operationContext,
       comicId: comicId,
-      isLike: isLike,
+      actionId: actionId,
       sourceKey: sourceKey,
     ),
     origin: taskOrigin,
@@ -469,10 +436,10 @@ class SourceComicDetailsCapability {
     sensitiveValues: [comicId],
   );
 
-  Future<void> _toggleComicLikeTask(
+  Future<ComicHeaderActionResult> _runComicHeaderActionTask(
     SourceOperationContext operationContext, {
     required String comicId,
-    required bool isLike,
+    required String actionId,
     String sourceKey = '',
   }) async {
     final normalizedComicId = comicId.trim();
@@ -485,7 +452,7 @@ class SourceComicDetailsCapability {
       await facade.ensureInitialized();
 
       final originalEngine = facade.js.engine;
-      Future<void> runToggle() async {
+      Future<ComicHeaderActionResult> runAction() async {
         final engine = facade.js.engine;
         if (engine == null) {
           throw Exception('source_not_initialized');
@@ -493,57 +460,53 @@ class SourceComicDetailsCapability {
         if (!jsAsBool(
           await operationContext.evaluate(
             engine,
-            'typeof this.__hazuki_source.comic?.likeComic === "function"',
+            'typeof this.__hazuki_source.comic?.onHeaderAction === "function"',
           ),
         )) {
-          throw Exception('comic_like_not_supported');
+          throw Exception('comic_header_action_not_supported');
         }
 
         final dynamic result = await operationContext.evaluate(
           engine,
-          'this.__hazuki_source.comic.likeComic(${jsonEncode(normalizedComicId)}, $isLike)',
-          name: 'source_comic_like.js',
+          'this.__hazuki_source.comic.onHeaderAction('
+          '${jsonEncode(normalizedComicId)}, ${jsonEncode(actionId)})',
+          name: 'source_comic_header_action.js',
         );
-        await operationContext.resolve(facade.js.resolve(result));
+        return _parser.parseHeaderActionResult(
+          await operationContext.resolve(facade.js.resolve(result)),
+          sourceKey: resolvedSourceKey,
+        );
       }
 
-      await _reloginCoordinator.runWithReloginRetry(
-        runToggle,
+      final result = await _reloginCoordinator.runWithReloginRetry(
+        runAction,
         context: SourceFacadeReloginContext(facade),
         checkActive: operationContext.checkActive,
       );
 
-      if (!operationContext.canCache() ||
-          !identical(facade.js.engine, originalEngine) ||
-          !identical(
-            _runtimeHost.handleFor(resolvedSourceKey).facade,
-            facade,
-          )) {
-        return;
-      }
-
-      final scopedKey = SourceScopedComicId(
-        sourceKey: resolvedSourceKey,
-        comicId: normalizedComicId,
-      ).storageKey;
-      final cached = _cache.get(scopedKey, sourceKey: resolvedSourceKey);
-      if (cached != null) {
-        _updateComicDetailsLikeStateInMemoryCache(
-          cached.scopedId,
-          isLike: isLike,
+      if ((result.headerStats != null || result.headerBadges != null) &&
+          operationContext.canCache() &&
+          identical(facade.js.engine, originalEngine) &&
+          identical(_runtimeHost.handleFor(resolvedSourceKey).facade, facade)) {
+        final scopedId = SourceScopedComicId(
+          sourceKey: resolvedSourceKey,
+          comicId: normalizedComicId,
+        );
+        // 别名 ID 先解析到缓存里的规范 ID，保证所有别名条目一起更新。
+        final cached = _cache.get(
+          scopedId.storageKey,
+          sourceKey: resolvedSourceKey,
+        );
+        _updateComicDetailsStateInMemoryCache(
+          cached?.scopedId ?? scopedId,
+          update: (details) => details.copyWith(
+            headerStats: result.headerStats,
+            headerBadges: result.headerBadges,
+          ),
         );
       }
+      return result;
     });
-  }
-
-  void _updateComicDetailsLikeStateInMemoryCache(
-    SourceScopedComicId scopedId, {
-    required bool isLike,
-  }) {
-    _updateComicDetailsStateInMemoryCache(
-      scopedId,
-      update: (details) => details.copyWith(isLiked: isLike),
-    );
   }
 
   void updateFavoriteStateInMemoryCache(

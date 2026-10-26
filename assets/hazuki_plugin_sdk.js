@@ -43,6 +43,9 @@ class HazukiSource {
 let sourceKey;
 const Hazuki = Object.freeze({
     apiVersion: 1,
+    // 2：详情页顶部支持 headerBadges、统计项图标与 plugin/link/search/copy 动作，
+    // 点赞改由插件通过 comic.onHeaderAction 处理。旧宿主没有该字段。
+    comicHeaderVersion: 2,
     get locale() { return getLocale(); },
     translate: text => localizeText(text, globalThis.__hazuki_source?.translation),
     registerSource(source) {

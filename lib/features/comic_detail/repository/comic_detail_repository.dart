@@ -49,8 +49,6 @@ class ComicDetailFeatureFacade {
 
   // ── Source capabilities ──────────────────────────────────────────────────
 
-  bool get supportComicLike => _source.supportComicLikeForSource(_sourceKey);
-
   Future<ComicDetailsData> loadComicDetails(
     String id, {
     String sourceKey = '',
@@ -117,13 +115,13 @@ class ComicDetailFeatureFacade {
 
   // ── Local favorites ──────────────────────────────────────────────────────
 
-  Future<void> toggleComicLike({
+  Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
-    required bool isLike,
+    required String actionId,
     String sourceKey = '',
-  }) => _source.toggleComicLike(
+  }) => _source.runComicHeaderAction(
     comicId: comicId,
-    isLike: isLike,
+    actionId: actionId,
     sourceKey: sourceKey.trim().isEmpty ? _sourceKey : sourceKey,
   );
 

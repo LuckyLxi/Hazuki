@@ -231,16 +231,14 @@ class SourceContentOperations
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
   );
-  bool supportComicLikeForSource(String sourceKey) =>
-      _comicDetails.supportComicLikeForSource(sourceKey);
-  Future<void> toggleComicLike({
+  Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
-    required bool isLike,
+    required String actionId,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _comicDetails.toggleComicLike(
+  }) => _comicDetails.runComicHeaderAction(
     comicId: comicId,
-    isLike: isLike,
+    actionId: actionId,
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
   );

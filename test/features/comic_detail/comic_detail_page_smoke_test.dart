@@ -352,15 +352,18 @@ void main() {
         await tester.pumpAndSettle();
       },
     );
-    for (final canLike in [false, true]) {
+    for (final reload in [false, true]) {
       testWidgets(
-        'custom header stats keep order, localization and like behavior ($platform, like=$canLike)',
+        'custom header stats keep order, localization and plugin actions ($platform, reload=$reload)',
         (tester) async {
           tester.view.physicalSize = const Size(1200, 1800);
           tester.view.devicePixelRatio = 1;
           addTearDown(tester.view.resetPhysicalSize);
           addTearDown(tester.view.resetDevicePixelRatio);
-          final facade = _CompletingLikeDetailFacade()..canLike = canLike;
+          final facade = _CompletingHeaderActionDetailFacade();
+          if (reload) {
+            facade.result = const ComicHeaderActionResult(reload: true);
+          }
           final locale = ValueNotifier(const Locale('en'));
           addTearDown(locale.dispose);
           final page = _buildDesktopTestDetail(
@@ -392,59 +395,53 @@ void main() {
               ComicHeaderStat(text: ''),
               ComicHeaderStat(
                 text: {'zh': '自定义点赞', 'en': 'Custom likes'},
-                action: ComicHeaderStatAction.like,
+                icon: 'like',
+                action: ComicHeaderStatAction.plugin,
+                actionId: 'like',
               ),
               ComicHeaderStat(text: {'zh': '每周更新', 'en': 'Weekly'}),
             ],
           );
           await tester.pumpAndSettle();
           final row = find.byType(ComicDetailHeaderFavoriteRow);
-          final desktop = platform == TargetPlatform.windows;
-          if (desktop) {
-            expect(
-              find.descendant(
-                of: row,
-                matching: find.text('Rating 9.8 / Custom likes / Weekly'),
-              ),
-              findsOneWidget,
-            );
-          } else if (canLike) {
-            expect(
-              tester.getTopLeft(find.text('Rating 9.8')).dx,
-              lessThan(tester.getTopLeft(find.text('Custom likes')).dx),
-            );
-            expect(
-              tester.getTopLeft(find.text('Custom likes')).dx,
-              lessThan(tester.getTopLeft(find.text('Weekly')).dx),
-            );
-            await tester.tap(find.text('Custom likes'));
-            await tester.pumpAndSettle();
-            expect(facade.likeCalls, [
-              ('desktop-loading-reveal', true, 'copy_manga'),
-            ]);
-            expect(find.byIcon(Icons.thumb_up_alt_rounded), findsOneWidget);
+          expect(
+            tester.getTopLeft(find.text('Rating 9.8')).dx,
+            lessThan(tester.getTopLeft(find.text('Custom likes')).dx),
+          );
+          expect(
+            tester.getTopLeft(find.text('Custom likes')).dx,
+            lessThan(tester.getTopLeft(find.text('Weekly')).dx),
+          );
+          expect(find.byIcon(Icons.thumb_up_alt_outlined), findsOneWidget);
+          expect(facade.refreshCalls, [false]);
+          await tester.tap(find.text('Custom likes'));
+          await tester.pumpAndSettle();
+          expect(facade.actionCalls, [
+            ('desktop-loading-reveal', 'like', 'copy_manga'),
+          ]);
+          if (reload) {
+            // 插件要求重载：静默强制刷新，旧内容保持显示。
+            expect(facade.refreshCalls, [false, true]);
+            expect(find.text('Custom likes'), findsOneWidget);
           } else {
-            expect(
-              find.descendant(
-                of: row,
-                matching: find.text('Rating 9.8 · Custom likes · Weekly'),
-              ),
-              findsOneWidget,
-            );
-            expect(find.byIcon(Icons.thumb_up_alt_outlined), findsNothing);
-            expect(facade.likeCalls, isEmpty);
+            // 插件返回的新统计项替换整行。
+            expect(find.text('43 likes'), findsOneWidget);
+            expect(find.text('Rating 9.8'), findsNothing);
+            expect(find.byIcon(Icons.thumb_up_alt_rounded), findsOneWidget);
           }
           expect(find.text('42 likes'), findsNothing);
           locale.value = const Locale('zh', 'CN');
           await tester.pumpAndSettle();
-          expect(
-            find.descendant(of: row, matching: find.textContaining('评分9.8')),
-            findsOneWidget,
-          );
-          expect(
-            find.descendant(of: row, matching: find.textContaining('每周更新')),
-            findsOneWidget,
-          );
+          if (reload) {
+            expect(
+              find.descendant(of: row, matching: find.textContaining('评分9.8')),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(of: row, matching: find.textContaining('每周更新')),
+              findsOneWidget,
+            );
+          }
           expect(tester.takeException(), isNull);
           await tester.pump(const Duration(seconds: 4));
           await tester.pumpWidget(const SizedBox());
@@ -458,7 +455,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        final facade = _CompletingLikeDetailFacade()..canLike = true;
+        final facade = _CompletingHeaderActionDetailFacade();
         await tester.pumpWidget(
           MaterialApp(
             theme: ThemeData(platform: platform),
@@ -480,10 +477,8 @@ void main() {
         facade.complete(headerStats: []);
         await tester.pumpAndSettle();
         expect(find.text('42 likes'), findsNothing);
-        expect(
-          find.byIcon(Icons.thumb_up_alt_outlined),
-          platform == TargetPlatform.windows ? findsOneWidget : findsNothing,
-        );
+        // 宿主不再自动放置点赞按钮，桌面端同样只由插件声明。
+        expect(find.byIcon(Icons.thumb_up_alt_outlined), findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
       },
@@ -735,50 +730,41 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
-    testWidgets(
-      'like button follows the initialized plugin capability in $platform',
-      (tester) async {
-        tester.view.physicalSize = const Size(1200, 2200);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final facade = _CompletingLikeDetailFacade();
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: ThemeData(platform: platform),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: _buildDesktopTestDetail(
-              comic: const ExploreComic(
-                id: 'like-capability',
-                sourceKey: 'copy_manga',
-                title: 'Comic',
-                subTitle: '',
-                cover: '',
-              ),
-              facade: facade,
-              shouldAnimateInitialRevealOverride: false,
+    testWidgets('plugin header badges show under the title in $platform', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 2200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final facade = _BadgeDetailFacade();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: platform),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: _buildDesktopTestDetail(
+            comic: const ExploreComic(
+              id: 'badges',
+              sourceKey: 'copy_manga',
+              title: 'Comic',
+              subTitle: '',
+              cover: '',
             ),
+            facade: facade,
+            shouldAnimateInitialRevealOverride: false,
           ),
-        );
-        await tester.pump();
-        expect(find.byIcon(Icons.thumb_up_alt_outlined), findsNothing);
-        facade.canLike = true;
-        facade.complete();
-        await tester.pumpAndSettle();
-        final like = find.byIcon(Icons.thumb_up_alt_outlined);
-        expect(like, findsOneWidget);
-        await tester.tap(like);
-        await tester.pumpAndSettle();
-        expect(facade.likeCalls, [
-          ('desktop-loading-reveal', true, 'copy_manga'),
-        ]);
-        expect(find.byIcon(Icons.thumb_up_alt_rounded), findsOneWidget);
-        expect(tester.takeException(), isNull);
-        await tester.pump(const Duration(seconds: 4));
-        await tester.pumpAndSettle();
-      },
-    );
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Ongoing'), findsOneWidget);
+      expect(find.text('Paid'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Ongoing')).dy,
+        greaterThan(tester.getTopLeft(find.text('Stable title')).dy),
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
   for (final openReader in [true, false]) {
     testWidgets('mobile detail uses horizontal routing for '
@@ -1051,22 +1037,18 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final (canLike, likesCount, textScale, width) in [
-    (false, '42', 1.0, 390.0),
-    (true, '42', 1.0, 390.0),
-    (false, '', 1.0, 390.0),
-    (false, '12345678901234567890', 2.0, 320.0),
-    (true, '12345678901234567890', 2.0, 320.0),
+  for (final (likesCount, textScale, width) in [
+    ('42', 1.0, 390.0),
+    ('', 1.0, 390.0),
+    ('12345678901234567890', 2.0, 320.0),
   ]) {
     testWidgets('Android keeps controls stable from loading to resolved stats '
-        '(like: $canLike, count: $likesCount, scale: $textScale)', (
-      tester,
-    ) async {
+        '(count: $likesCount, scale: $textScale)', (tester) async {
       tester.view.physicalSize = Size(width, 1600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final facade = _CompletingLikeDetailFacade();
+      final facade = _CompletingHeaderActionDetailFacade();
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(platform: TargetPlatform.android),
@@ -1098,8 +1080,6 @@ void main() {
       final tabs = find.byType(TabBar);
       final loadingActionTop = tester.getTopLeft(actions).dy;
       final loadingTabTop = tester.getTopLeft(tabs).dy;
-      // Plugin capabilities can become available with the detail response.
-      facade.canLike = canLike;
       facade.complete(likesCount: likesCount);
       await tester.pump();
       await tester.pump();
@@ -1113,10 +1093,7 @@ void main() {
         expect(tester.getTopLeft(tabs).dy, closeTo(loadingTabTop, 0.5));
         expect(tester.takeException(), isNull);
       }
-      expect(
-        find.byIcon(Icons.thumb_up_alt_outlined),
-        canLike ? findsOneWidget : findsNothing,
-      );
+      expect(find.byIcon(Icons.thumb_up_alt_outlined), findsOneWidget);
     });
   }
 
@@ -2161,7 +2138,9 @@ class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
             [
               ComicHeaderStat(
                 text: likesCount.isEmpty ? 'Like' : '$likesCount likes',
-                action: ComicHeaderStatAction.like,
+                icon: 'like',
+                action: ComicHeaderStatAction.plugin,
+                actionId: 'like',
               ),
             ],
         chapters: {'1': 'Chapter 1'},
@@ -2266,18 +2245,61 @@ class _NavigationTitleBarControl extends ChangeNotifier
   Future<void> updateUseSystemTitleBar(bool value) async {}
 }
 
-class _CompletingLikeDetailFacade extends _CompletingDesktopDetailFacade {
-  bool canLike = false;
-  final likeCalls = <(String, bool, String)>[];
+class _BadgeDetailFacade extends _DesktopDetailFacade {
   @override
-  bool get supportComicLike => canLike;
+  Future<ComicDetailsData> loadComicDetails(
+    String id, {
+    String sourceKey = '',
+    bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  }) async => (await super.loadComicDetails(id)).copyWith(
+    title: 'Stable title',
+    headerBadges: const [
+      ComicHeaderBadge(text: 'Ongoing', tone: ComicHeaderBadgeTone.primary),
+      ComicHeaderBadge(text: 'Paid', tone: ComicHeaderBadgeTone.warning),
+    ],
+  );
+}
+
+class _CompletingHeaderActionDetailFacade
+    extends _CompletingDesktopDetailFacade {
+  final actionCalls = <(String, String, String)>[];
+  final refreshCalls = <bool>[];
+  ComicHeaderActionResult result = const ComicHeaderActionResult(
+    headerStats: [
+      ComicHeaderStat(
+        text: '43 likes',
+        icon: 'liked',
+        action: ComicHeaderStatAction.plugin,
+        actionId: 'like',
+      ),
+    ],
+  );
+
   @override
-  Future<void> toggleComicLike({
+  Future<ComicDetailsData> loadComicDetails(
+    String id, {
+    String sourceKey = '',
+    bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  }) {
+    refreshCalls.add(forceRefresh);
+    return super.loadComicDetails(
+      id,
+      sourceKey: sourceKey,
+      forceRefresh: forceRefresh,
+      taskOrigin: taskOrigin,
+    );
+  }
+
+  @override
+  Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
-    required bool isLike,
+    required String actionId,
     String sourceKey = '',
   }) async {
-    likeCalls.add((comicId, isLike, sourceKey));
+    actionCalls.add((comicId, actionId, sourceKey));
+    return result;
   }
 }
 

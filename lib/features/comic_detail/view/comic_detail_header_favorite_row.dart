@@ -2,8 +2,10 @@ import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
+import 'package:hazuki/shared/source_interaction/source_plugin_icons.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
@@ -31,19 +33,36 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     final scope = ComicDetailScope.of(context);
     final favorite = scope.favorite;
     final theme = Theme.of(context);
-    final showLikeButton = favorite.supportComicLike;
     final detailsReady = details != null;
-    String statText(ComicHeaderStat stat) => localizeSourcePluginText(
-      stat.text,
-      Localizations.localeOf(context).toLanguageTag(),
-    ).trim();
-    final stats = (details?.headerStats ?? const <ComicHeaderStat>[])
-        .where((stat) => statText(stat).isNotEmpty)
-        .toList(growable: false);
-    final statsText = stats.map(statText).join(' / ');
     final favoriteActive =
         favorite.favoriteOverride ?? details?.isFavorite ?? false;
-    final likedActive = favorite.likedOverride ?? details?.isLiked ?? false;
+    final stats = ComicDetailHeaderStatsRow(details: details);
+    Widget reserveButtonHeight(Widget content) => SizedBox(
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          // Reserve a button-sized row even before plugin stats resolve.
+          // Measuring it also honors text scale, theme padding and the
+          // minimum touch target size.
+          Visibility(
+            visible: false,
+            maintainSize: true,
+            maintainState: true,
+            maintainAnimation: true,
+            child: TextButton.icon(
+              onPressed: null,
+              style: comicDetailHeaderStatButtonStyle(theme),
+              icon: const SizedBox.square(dimension: 16),
+              label: const Text(' ', maxLines: 1),
+            ),
+          ),
+          Positioned.fill(
+            child: Align(alignment: Alignment.centerLeft, child: content),
+          ),
+        ],
+      ),
+    );
 
     if (isDesktop) {
       ButtonStyle buttonStyle(bool active) => OutlinedButton.styleFrom(
@@ -62,155 +81,56 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
         key: favoriteRowKey,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            height: 20,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: !detailsReady
-                  ? ComicDetailSkeletonBlock(
+          // 与下方操作按钮同宽，统计行不超出按钮区域；
+          // 加载前后都按按钮高度占位，避免下方控件跳动。
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: reserveButtonHeight(
+              detailsReady
+                  ? stats
+                  : ComicDetailSkeletonBlock(
                       color: skeletonColor,
                       width: 160,
                       height: 16,
-                    )
-                  : statsText.isNotEmpty
-                  ? Text(
-                      statsText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    )
-                  : const SizedBox.shrink(),
+                    ),
             ),
           ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              if (showLikeButton)
-                OutlinedButton.icon(
-                  style: buttonStyle(likedActive),
-                  onPressed: detailsReady && !favorite.isLikeBusy
-                      ? () => unawaited(favorite.toggleLike(context, details!))
-                      : null,
-                  icon: Icon(
-                    likedActive
-                        ? Icons.thumb_up_alt_rounded
-                        : Icons.thumb_up_alt_outlined,
-                    size: 18,
-                  ),
-                  label: Text(
-                    likedActive
-                        ? l10n(context).comicDetailUnlike
-                        : l10n(context).comicDetailLike,
-                  ),
-                ),
-              OutlinedButton.icon(
-                style: buttonStyle(favoriteActive),
-                onPressed: detailsReady && !favorite.isBusy
-                    ? () => unawaited(
-                        favorite.showFoldersDialog(
-                          context,
-                          details!,
-                          (vm) => Theme(
-                            data: scope.theme.buildDetailTheme(theme),
-                            child: FavoriteFoldersMorphDialog(viewModel: vm),
-                          ),
-                        ),
-                      )
-                    : null,
-                icon: Icon(
-                  favoriteActive ? Icons.favorite : Icons.favorite_border,
-                  size: 18,
-                ),
-                label: Text(
-                  favoriteActive
-                      ? l10n(context).comicDetailUnfavorite
-                      : l10n(context).comicDetailFavorite,
-                ),
-              ),
-            ],
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            style: buttonStyle(favoriteActive),
+            onPressed: detailsReady && !favorite.isBusy
+                ? () => unawaited(
+                    favorite.showFoldersDialog(
+                      context,
+                      details!,
+                      (vm) => Theme(
+                        data: scope.theme.buildDetailTheme(theme),
+                        child: FavoriteFoldersMorphDialog(viewModel: vm),
+                      ),
+                    ),
+                  )
+                : null,
+            icon: Icon(
+              favoriteActive ? Icons.favorite : Icons.favorite_border,
+              size: 18,
+            ),
+            label: Text(
+              favoriteActive
+                  ? l10n(context).comicDetailUnfavorite
+                  : l10n(context).comicDetailFavorite,
+            ),
           ),
         ],
       );
     }
 
-    final statsStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
     final reserveStatsHeight = theme.platform == TargetPlatform.android;
-    final likeButtonStyle = TextButton.styleFrom(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      foregroundColor: likedActive
-          ? theme.colorScheme.primary
-          : theme.colorScheme.onSurfaceVariant,
-      textStyle: statsStyle,
-    );
-    final statWidgets = <Widget>[];
-    final plainText = <String>[];
-    void flushPlainText() {
-      if (plainText.isEmpty) return;
-      statWidgets.add(
-        Text(
-          plainText.join(' · '),
-          style: statsStyle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      );
-      plainText.clear();
-    }
-
-    for (final stat in stats) {
-      if (stat.action == ComicHeaderStatAction.like && showLikeButton) {
-        flushPlainText();
-        statWidgets.add(
-          TextButton.icon(
-            onPressed: detailsReady && !favorite.isLikeBusy
-                ? () => unawaited(favorite.toggleLike(context, details!))
-                : null,
-            style: likeButtonStyle,
-            icon: Icon(
-              likedActive
-                  ? Icons.thumb_up_alt_rounded
-                  : Icons.thumb_up_alt_outlined,
-              size: 16,
-            ),
-            label: Text(
-              statText(stat),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        );
-      } else {
-        plainText.add(statText(stat));
-      }
-    }
-    flushPlainText();
-    final resolvedStats = reserveStatsHeight
-        ? Row(
-            children: [
-              for (var index = 0; index < statWidgets.length; index++) ...[
-                if (index > 0) const SizedBox(width: 14),
-                Flexible(child: statWidgets[index]),
-              ],
-            ],
-          )
-        : Wrap(
-            spacing: 14,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: statWidgets,
-          );
     final statsContent = detailsReady
         ? ComicDetailEntranceReveal(
             key: const ValueKey('comic-detail-stats'),
             beginOffset: Offset.zero,
             enabled: shouldAnimateInitialDetailReveal,
-            child: resolvedStats,
+            child: stats,
           )
         : ComicDetailSkeletonBlock(
             color: skeletonColor,
@@ -225,37 +145,120 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
         duration: Duration.zero,
         curve: Curves.easeOutCubic,
         child: reserveStatsHeight
-            ? SizedBox(
-                width: double.infinity,
-                child: Stack(
-                  alignment: Alignment.centerLeft,
-                  children: [
-                    // Reserve a button-sized row even before the plugin's like
-                    // capability resolves. Measuring it also honors text scale,
-                    // theme padding and the minimum touch target size.
-                    Visibility(
-                      visible: false,
-                      maintainSize: true,
-                      maintainState: true,
-                      maintainAnimation: true,
-                      child: TextButton.icon(
-                        onPressed: null,
-                        style: likeButtonStyle,
-                        icon: const SizedBox.square(dimension: 16),
-                        label: const Text(' ', maxLines: 1),
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: statsContent,
-                      ),
-                    ),
-                  ],
-                ),
-              )
+            ? reserveButtonHeight(statsContent)
             : statsContent,
       ),
     );
+  }
+}
+
+ButtonStyle comicDetailHeaderStatButtonStyle(ThemeData theme) =>
+    TextButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      foregroundColor: theme.colorScheme.onSurfaceVariant,
+      textStyle: theme.textTheme.bodySmall,
+    );
+
+/// 封面下方的插件统计行：单行显示，宽度不超过操作按钮区域，
+/// 放不下时各项按比例截断。可点击项为无背景按钮。
+class ComicDetailHeaderStatsRow extends StatelessWidget {
+  const ComicDetailHeaderStatsRow({super.key, required this.details});
+
+  final ComicDetailsData? details;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = ComicDetailScope.of(context);
+    final favorite = scope.favorite;
+    final theme = Theme.of(context);
+    final details = this.details;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    String statText(ComicHeaderStat stat) =>
+        localizeSourcePluginText(stat.text, locale).trim();
+    final stats =
+        (favorite.headerStatsOverride ??
+                details?.headerStats ??
+                const <ComicHeaderStat>[])
+            .where((stat) => statText(stat).isNotEmpty)
+            .toList(growable: false);
+    final statsStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    VoidCallback? onPressed(ComicHeaderStat stat, String text) {
+      if (details == null) return null;
+      final target = (stat.value ?? text).trim();
+      return switch (stat.action) {
+        ComicHeaderStatAction.none => null,
+        ComicHeaderStatAction.plugin =>
+          favorite.busyHeaderActionId != null
+              ? null
+              : () => unawaited(_runPluginAction(context, details, stat)),
+        ComicHeaderStatAction.link => () => unawaited(
+          launchUrl(Uri.parse(stat.url), mode: LaunchMode.externalApplication),
+        ),
+        ComicHeaderStatAction.search => () => unawaited(
+          scope.actions.openTagValue(context, target),
+        ),
+        ComicHeaderStatAction.copy => () => unawaited(
+          scope.actions.copyMetaValue(context, target),
+        ),
+      };
+    }
+
+    final children = <Widget>[];
+    for (final stat in stats) {
+      final text = statText(stat);
+      final icon = sourcePluginIcon(stat.icon);
+      final label = Text(text, maxLines: 1, overflow: TextOverflow.ellipsis);
+      final Widget item;
+      if (stat.action == ComicHeaderStatAction.none) {
+        item = Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: statsStyle?.color),
+                const SizedBox(width: 4),
+              ],
+              Flexible(
+                child: DefaultTextStyle.merge(style: statsStyle, child: label),
+              ),
+            ],
+          ),
+        );
+      } else {
+        final style = comicDetailHeaderStatButtonStyle(theme);
+        final callback = onPressed(stat, text);
+        item = icon == null
+            ? TextButton(onPressed: callback, style: style, child: label)
+            : TextButton.icon(
+                onPressed: callback,
+                style: style,
+                icon: Icon(icon, size: 16),
+                label: label,
+              );
+      }
+      if (children.isNotEmpty) children.add(const SizedBox(width: 10));
+      children.add(Flexible(child: item));
+    }
+    return Row(mainAxisSize: MainAxisSize.min, children: children);
+  }
+
+  Future<void> _runPluginAction(
+    BuildContext context,
+    ComicDetailsData details,
+    ComicHeaderStat stat,
+  ) async {
+    final scope = ComicDetailScope.of(context);
+    final reload = await scope.favorite.runHeaderAction(context, details, stat);
+    if (!reload) return;
+    try {
+      await scope.session.reloadDetails();
+      scope.favorite.clearHeaderOverrides();
+    } catch (_) {
+      // 重载失败时保留当前显示，由插件下次操作再刷新。
+    }
   }
 }
