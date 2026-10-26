@@ -91,7 +91,11 @@ class AppearanceThemeModeCard extends StatelessWidget {
           child: InkWell(
             borderRadius: borderRadius,
             onTap: onTap,
-            child: Padding(
+            // 边框宽度会计入 AnimatedContainer 的布局内边距并随动画渐变，
+            // 内边距需以相同时长与曲线同步渐变，保持两者之和恒定，避免卡片高度跳动。
+            child: AnimatedPadding(
+              duration: _duration,
+              curve: Curves.easeOutCubic,
               padding: EdgeInsets.all(selected ? 7 : 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,

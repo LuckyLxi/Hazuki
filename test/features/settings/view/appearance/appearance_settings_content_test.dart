@@ -67,6 +67,57 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('keeps layout stable while theme mode selection animates', (
+    tester,
+  ) async {
+    var settings = _initialSettings;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => AppearanceSettingsContent(
+              settings: settings,
+              locale: const Locale('en'),
+              onApply: (next, {revealOrigin, revealSyncRegion}) async {
+                setState(() => settings = next);
+              },
+              onApplyLocale: (_) async {},
+              debugGateway: _MockSourceDebugGateway(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final darkCard = find.byKey(const ValueKey('theme-mode-option-dark'));
+    final darkLabel = find.descendant(
+      of: darkCard,
+      matching: find.byType(Text),
+    );
+    final belowSelector = find.byType(SwitchListTile).first;
+    final initialCardHeight = tester.getSize(darkCard).height;
+    final initialLabelTop = tester.getTopLeft(darkLabel).dy;
+    final initialBelowTop = tester.getTopLeft(belowSelector).dy;
+
+    await tester.tap(darkCard);
+    // 逐帧检查选中态过渡期间卡片高度与下方内容位置都不发生位移。
+    for (var frame = 0; frame < 20; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.getSize(darkCard).height, closeTo(initialCardHeight, 0.01));
+      expect(tester.getTopLeft(darkLabel).dy, closeTo(initialLabelTop, 0.01));
+      expect(
+        tester.getTopLeft(belowSelector).dy,
+        closeTo(initialBelowTop, 0.01),
+      );
+    }
+    expect(settings.themeMode, ThemeMode.dark);
+  });
+
   testWidgets('switches between wallpaper color and fixed presets', (
     tester,
   ) async {
