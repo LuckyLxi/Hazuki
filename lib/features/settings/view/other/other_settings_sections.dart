@@ -52,66 +52,86 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    return SettingsGroup(
+    Widget section(String title, List<Widget> tiles) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ChineseConversionSetting(
-          onChanged: onChineseConversionChanged,
-          enabled: chineseConversionEnabled,
-        ),
+        SettingsSectionHeader(title),
+        SettingsGroup(children: withSettingsDividers(context, tiles)),
+      ],
+    );
+
+    // 按用途拆成多个分区；签到依赖当前源，不支持时整个账号分区隐藏
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        section(strings.otherSectionDisplay, [
+          ChineseConversionSetting(
+            onChanged: onChineseConversionChanged,
+            enabled: chineseConversionEnabled,
+          ),
+          if (showWindowsTitleBarToggle)
+            SwitchListTile(
+              secondary: const SettingsLeadingIcon(Icons.web_asset_outlined),
+              title: Text(strings.otherUseSystemTitleBarTitle),
+              subtitle: Text(strings.otherUseSystemTitleBarSubtitle),
+              value: useSystemTitleBar,
+              onChanged: onUseSystemTitleBarChanged,
+            ),
+        ]),
+        section(strings.otherSectionSearchDiscover, [
+          SwitchListTile(
+            key: const ValueKey('other-aggregate-search-switch'),
+            secondary: const SettingsLeadingIcon(Icons.travel_explore_outlined),
+            title: Text(strings.searchAggregateSearch),
+            subtitle: Text(strings.searchAggregateSearchDescription),
+            value: aggregateSearchEnabled,
+            onChanged: onAggregateSearchChanged,
+          ),
+          if (showComicIdSearchSetting)
+            SwitchListTile(
+              secondary: const SettingsLeadingIcon(Icons.tag_outlined),
+              title: Text(strings.advancedComicIdSearchTitle),
+              subtitle: Text(strings.advancedComicIdSearchSubtitle),
+              value: comicIdSearchEnhanceEnabled,
+              onChanged: onComicIdSearchEnhanceChanged,
+            ),
+          if (showDailyRecommendationSetting)
+            SwitchListTile(
+              secondary: const SettingsLeadingIcon(Icons.auto_awesome_outlined),
+              title: Text(strings.otherDiscoverDailyRecommendationTitle),
+              subtitle: Text(strings.otherDiscoverDailyRecommendationSubtitle),
+              value: discoverDailyRecommendationEnabled,
+              onChanged: onDiscoverDailyRecommendationChanged,
+            ),
+        ]),
         if (showAutoCheckInSetting)
-          SwitchListTile(
-            secondary: const Icon(Icons.event_available_outlined),
-            title: Text(strings.otherAutoCheckInTitle),
-            subtitle: Text(strings.otherAutoCheckInSubtitle),
-            value: autoCheckInEnabled,
-            onChanged: onAutoCheckInChanged,
+          section(strings.otherSectionAccount, [
+            SwitchListTile(
+              secondary: const SettingsLeadingIcon(
+                Icons.event_available_outlined,
+              ),
+              title: Text(strings.otherAutoCheckInTitle),
+              subtitle: Text(strings.otherAutoCheckInSubtitle),
+              value: autoCheckInEnabled,
+              onChanged: onAutoCheckInChanged,
+            ),
+          ]),
+        section(strings.otherSectionDownloadContent, [
+          ListTile(
+            leading: const SettingsLeadingIcon(Icons.folder_outlined),
+            title: Text(strings.otherMangaDownloadPathTitle),
+            subtitle: Text(mangaDownloadsRootPath),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: onEditMangaDownloadPath,
           ),
-        SwitchListTile(
-          key: const ValueKey('other-aggregate-search-switch'),
-          secondary: const Icon(Icons.travel_explore_outlined),
-          title: Text(strings.searchAggregateSearch),
-          subtitle: Text(strings.searchAggregateSearchDescription),
-          value: aggregateSearchEnabled,
-          onChanged: onAggregateSearchChanged,
-        ),
-        if (showComicIdSearchSetting)
-          SwitchListTile(
-            secondary: const Icon(Icons.tag_outlined),
-            title: Text(strings.advancedComicIdSearchTitle),
-            subtitle: Text(strings.advancedComicIdSearchSubtitle),
-            value: comicIdSearchEnhanceEnabled,
-            onChanged: onComicIdSearchEnhanceChanged,
+          ListTile(
+            leading: const SettingsLeadingIcon(Icons.filter_alt_outlined),
+            title: Text(strings.otherCommentFilterTitle),
+            subtitle: Text(strings.otherCommentFilterSubtitle),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: onCommentFilter,
           ),
-        if (showDailyRecommendationSetting)
-          SwitchListTile(
-            secondary: const Icon(Icons.auto_awesome_outlined),
-            title: Text(strings.otherDiscoverDailyRecommendationTitle),
-            subtitle: Text(strings.otherDiscoverDailyRecommendationSubtitle),
-            value: discoverDailyRecommendationEnabled,
-            onChanged: onDiscoverDailyRecommendationChanged,
-          ),
-        if (showWindowsTitleBarToggle)
-          SwitchListTile(
-            secondary: const Icon(Icons.web_asset_outlined),
-            title: Text(strings.otherUseSystemTitleBarTitle),
-            subtitle: Text(strings.otherUseSystemTitleBarSubtitle),
-            value: useSystemTitleBar,
-            onChanged: onUseSystemTitleBarChanged,
-          ),
-        ListTile(
-          leading: const Icon(Icons.folder_outlined),
-          title: Text(strings.otherMangaDownloadPathTitle),
-          subtitle: Text(mangaDownloadsRootPath),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: onEditMangaDownloadPath,
-        ),
-        ListTile(
-          leading: const Icon(Icons.filter_alt_outlined),
-          title: Text(strings.otherCommentFilterTitle),
-          subtitle: Text(strings.otherCommentFilterSubtitle),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: onCommentFilter,
-        ),
+        ]),
       ],
     );
   }

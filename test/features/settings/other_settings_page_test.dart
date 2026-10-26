@@ -185,6 +185,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('settings are grouped and empty sections stay hidden', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    expect(find.text('Display'), findsOneWidget);
+    expect(find.text('Search & discover'), findsOneWidget);
+    expect(find.text('Downloads & content'), findsOneWidget);
+    // 当前源不支持签到、也没有插件操作时，对应分区标题不显示
+    expect(find.text('Account'), findsNothing);
+    expect(find.text('Plugins'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('comic ID setting follows source support without clearing it', (
     tester,
   ) async {

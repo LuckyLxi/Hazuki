@@ -16,11 +16,15 @@ class SourcePluginActionList extends StatelessWidget {
     required this.gateway,
     required this.location,
     this.pluginId,
+    this.title,
   });
 
   final SourcePluginGateway gateway;
   final SourcePluginActionLocation location;
   final String? pluginId;
+
+  /// 分区标题，仅在存在插件操作时随卡片一起显示
+  final String? title;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -47,9 +51,16 @@ class SourcePluginActionList extends StatelessWidget {
           );
         }
       }
-      return tiles.isEmpty
-          ? const SizedBox.shrink()
-          : SettingsGroup(children: tiles);
+      if (tiles.isEmpty) return const SizedBox.shrink();
+      final title = this.title;
+      if (title == null) return SettingsGroup(children: tiles);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SettingsSectionHeader(title),
+          SettingsGroup(children: withSettingsDividers(context, tiles)),
+        ],
+      );
     },
   );
 }

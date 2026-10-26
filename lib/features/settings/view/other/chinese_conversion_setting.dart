@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
+import 'package:hazuki/widgets/widgets.dart';
+
+import '../settings_group.dart';
 import 'chinese_conversion_menu.dart';
 
 class ChineseConversionSetting extends StatefulWidget {
@@ -54,23 +57,17 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
         key: const ValueKey('other-chinese-conversion-menu'),
         enabled: widget.enabled,
         onTap: widget.enabled ? _showMenu : null,
-        leading: const Icon(Icons.translate_rounded),
+        leading: const SettingsLeadingIcon(Icons.translate_rounded),
         title: Text(strings.otherChineseConversionTitle),
         subtitle: Text(strings.otherChineseConversionSubtitle),
+        // 当前值胶囊与菜单设置项一致，同时作为菜单弹出锚点
         trailing: InkWell(
           key: _anchorKey,
-          borderRadius: BorderRadius.circular(20),
+          customBorder: const StadiumBorder(),
           onTap: widget.enabled ? _showMenu : null,
-          child: Padding(
+          child: HazukiMenuValuePill(
             key: const ValueKey('chinese-conversion-button'),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(label(hazukiChineseConversion.mode)),
-                const Icon(Icons.arrow_drop_down_rounded),
-              ],
-            ),
+            label: label(hazukiChineseConversion.mode),
           ),
         ),
       ),

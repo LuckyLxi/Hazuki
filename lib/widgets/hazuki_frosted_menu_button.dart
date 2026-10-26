@@ -140,15 +140,16 @@ class HazukiMenuSettingTile<T> extends StatelessWidget {
         leading: leading,
         title: Text(title),
         subtitle: subtitle == null ? null : Text(subtitle!),
-        trailing: label == null ? null : _MenuValuePill(label: label),
+        trailing: label == null ? null : HazukiMenuValuePill(label: label),
         onTap: activate,
       ),
     );
   }
 }
 
-class _MenuValuePill extends StatelessWidget {
-  const _MenuValuePill({required this.label});
+/// 菜单设置项右侧的当前值胶囊，也供自定义菜单入口复用。
+class HazukiMenuValuePill extends StatelessWidget {
+  const HazukiMenuValuePill({super.key, required this.label});
 
   final String label;
 

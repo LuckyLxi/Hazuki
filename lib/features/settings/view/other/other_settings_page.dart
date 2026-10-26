@@ -167,7 +167,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
         child: _snapshot.loading
             ? const Center(child: CircularProgressIndicator())
             : ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.only(top: 4, bottom: 24),
                 children: [
                   OtherSettingsGeneralSection(
                     onChineseConversionChanged: (mode) =>
@@ -208,6 +208,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                     SourcePluginActionList(
                       gateway: plugins,
                       location: SourcePluginActionLocation.other,
+                      title: strings.otherSectionPlugins,
                     ),
                 ],
               ),
