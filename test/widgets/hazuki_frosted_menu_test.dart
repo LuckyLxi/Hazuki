@@ -93,14 +93,9 @@ void main() {
         // 右缘与父菜单对齐，只向左下方展开。
         expect(submenu.right, closeTo(originalParent.right, 0.01));
         // 父菜单底色淡出，子菜单的模糊才能采样到页面颜色。
-        final fill =
-            tester
-                    .widget<DecoratedBox>(
-                      find.byKey(const ValueKey('hazuki-frosted-menu-fill')),
-                    )
-                    .decoration
-                as BoxDecoration;
-        expect(fill.gradient!.colors.first.a, lessThan(0.2));
+        // 一级菜单由按钮形变而来，底色挂在私有的形变外框组件上。
+        final fill = (tester.widget(_surface) as dynamic).fill as Gradient;
+        expect(fill.colors.first.a, lessThan(0.2));
         // 子菜单标题行落在被点击的那一行上。
         final headers = find.text('Group');
         expect(headers, findsNWidgets(2));
@@ -274,6 +269,67 @@ void main() {
     expect(menu.right, anchor.right);
     expect(menu.width, lessThan(120));
     expect(find.text('a').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('icon button morphs into the menu and reappears after closing', (
+    tester,
+  ) async {
+    await _openMenu(tester);
+    double iconOpacity() => tester
+        .widget<Opacity>(
+          find.ancestor(
+            of: find.byType(IconButton),
+            matching: find.byType(Opacity),
+          ),
+        )
+        .opacity;
+
+    // 展开后入口按钮完全让位给菜单。
+    expect(iconOpacity(), 0);
+    await tester.tap(find.text('b'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    // 收起前段按钮仍隐藏，等外框缩回按钮附近才重新出现。
+    expect(iconOpacity(), lessThan(1));
+    await tester.pumpAndSettle();
+    expect(_surface, findsNothing);
+    expect(iconOpacity(), 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('menu grows out of a copy of its button', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: HazukiFrostedMenuButton<int>(
+              selected: 0,
+              options: const [
+                HazukiFrostedMenuOption(value: 0, label: 'a'),
+                HazukiFrostedMenuOption(value: 1, label: 'b'),
+              ],
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    final button = find.byType(IconButton);
+    final anchor = tester.getRect(button);
+    await tester.tap(button);
+    await tester.pump();
+    final ghost = find.byKey(
+      const ValueKey('hazuki-frosted-menu-anchor-ghost'),
+    );
+    // 第一帧外框里的副本与入口逐像素重合，真实入口已隐藏。
+    expect(tester.getRect(ghost), anchor);
+    await tester.pump(const Duration(milliseconds: 120));
+    // 菜单内容跟随外框缩放，而不是固定在最终位置上被裁出来。
+    final growing = tester.getRect(find.text('a'));
+    await tester.pumpAndSettle();
+    expect(ghost, findsNothing);
+    expect(growing, isNot(tester.getRect(find.text('a'))));
     expect(tester.takeException(), isNull);
   });
 

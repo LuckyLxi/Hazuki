@@ -24,6 +24,7 @@ class ChineseConversionSetting extends StatefulWidget {
 class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
   final _anchorKey = GlobalKey();
   bool _menuOpen = false;
+  Animation<double>? _menuTransition;
 
   Future<void> _showMenu() async {
     if (!widget.enabled || _menuOpen) return;
@@ -33,6 +34,9 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
         context: context,
         anchorKey: _anchorKey,
         selected: hazukiChineseConversion.mode,
+        onTransitionChanged: (transition) {
+          if (mounted) setState(() => _menuTransition = transition);
+        },
       );
       if (mounted && widget.enabled && mode != null) widget.onChanged(mode);
     } finally {
@@ -61,13 +65,16 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
         title: Text(strings.otherChineseConversionTitle),
         subtitle: Text(strings.otherChineseConversionSubtitle),
         // 当前值胶囊与菜单设置项一致，同时作为菜单弹出锚点
-        trailing: InkWell(
-          key: _anchorKey,
-          customBorder: const StadiumBorder(),
-          onTap: widget.enabled ? _showMenu : null,
-          child: HazukiMenuValuePill(
-            key: const ValueKey('chinese-conversion-button'),
-            label: label(hazukiChineseConversion.mode),
+        trailing: HazukiMenuMorphAnchor(
+          anchorKey: _anchorKey,
+          transition: _menuTransition,
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: widget.enabled ? _showMenu : null,
+            child: HazukiMenuValuePill(
+              key: const ValueKey('chinese-conversion-button'),
+              label: label(hazukiChineseConversion.mode),
+            ),
           ),
         ),
       ),

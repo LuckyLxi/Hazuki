@@ -63,10 +63,14 @@ void main() {
       );
       await tester.tap(find.byIcon(Icons.sort_rounded));
       await tester.pumpAndSettle();
+      // 排序按钮形变成毛玻璃菜单，模糊由形变外框在绘制层完成。
       final surface = find.byKey(const ValueKey('hazuki-frosted-menu-surface'));
+      expect(surface, findsOneWidget);
       expect(
-        find.descendant(of: surface, matching: find.byType(BackdropFilter)),
-        findsOneWidget,
+        tester
+            .getRect(surface)
+            .contains(tester.getCenter(find.byIcon(Icons.sort_rounded))),
+        isTrue,
       );
       await tester.tap(
         find.byKey(ValueKey(('hazuki-frosted-menu', orders.last))),

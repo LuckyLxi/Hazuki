@@ -42,6 +42,8 @@ class HazukiFrostedMenuButton<T> extends StatelessWidget {
     enabled: enabled,
     onOpened: onOpened,
     waitForDismissal: waitForDismissal,
+    // 图标按钮、文字按钮与下拉框都由入口本身形变成菜单。
+    morphFromAnchor: true,
     builder: (context, activate) {
       if (child == null) {
         return IconButton(tooltip: tooltip, onPressed: activate, icon: icon);
@@ -102,7 +104,8 @@ class HazukiFrostedDropdown<T> extends StatelessWidget {
   }
 }
 
-/// 单选类设置行：左侧图标、标题与说明，右侧胶囊显示当前取值，点整行弹出毛玻璃菜单。
+/// 单选类设置行：左侧图标、标题与说明，右侧胶囊显示当前取值，点整行后菜单
+/// 由当前值胶囊形变展开。
 class HazukiMenuSettingTile<T> extends StatelessWidget {
   const HazukiMenuSettingTile({
     super.key,
@@ -135,12 +138,17 @@ class HazukiMenuSettingTile<T> extends StatelessWidget {
       onSelected: onSelected,
       label: title,
       enabled: enabled,
+      // 没有当前值胶囊时无处可长出，退回锚定整行的普通弹出。
+      morphFromAnchor: label != null,
+      innerAnchor: label != null,
       builder: (context, activate) => ListTile(
         enabled: enabled,
         leading: leading,
         title: Text(title),
         subtitle: subtitle == null ? null : Text(subtitle!),
-        trailing: label == null ? null : HazukiMenuValuePill(label: label),
+        trailing: label == null
+            ? null
+            : SourcePluginMenuAnchor(child: HazukiMenuValuePill(label: label)),
         onTap: activate,
       ),
     );

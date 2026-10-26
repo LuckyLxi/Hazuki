@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -28,6 +29,43 @@ class HazukiFrostedMenuOption<T> {
       : selected != null && children.any((e) => e.containsValue(selected));
 }
 
+/// 形变菜单的入口锚点：挂上菜单定位用的 [anchorKey]，并把 [child] 的外观
+/// 交给菜单形变外框复用。菜单打开期间由外框里的副本代替入口显示，入口本身隐藏，
+/// 菜单完全收起后再显示。
+///
+/// 无论菜单是否打开都保持同一结构，菜单路由持有锚点的 RenderBox，换树会让锚点失效。
+class HazukiMenuMorphAnchor extends StatelessWidget {
+  const HazukiMenuMorphAnchor({
+    super.key,
+    required this.anchorKey,
+    required this.transition,
+    required this.child,
+  });
+
+  final GlobalKey anchorKey;
+
+  /// 当前菜单路由的动画；没有菜单时为 null。
+  final Animation<double>? transition;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final transition = this.transition ?? kAlwaysDismissedAnimation;
+    return KeyedSubtree(
+      key: anchorKey,
+      child: AnimatedBuilder(
+        animation: transition,
+        child: child,
+        // 收起动画结束的同一帧恢复入口，与外框里副本的消失无缝衔接。
+        builder: (context, child) => Opacity(
+          opacity: transition.status == AnimationStatus.dismissed ? 1 : 0,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 Future<T?> showHazukiFrostedMenuCore<T>({
   required BuildContext context,
   required GlobalKey anchorKey,
@@ -37,10 +75,19 @@ Future<T?> showHazukiFrostedMenuCore<T>({
   String keyPrefix = 'hazuki-frosted-menu',
   Listenable? dismissOn,
   bool waitForDismissal = false,
+  bool morphFromAnchor = false,
+  ValueChanged<Animation<double>?>? onTransitionChanged,
 }) async {
   if (options.isEmpty || anchorKey.currentContext == null) return null;
   final anchor = anchorKey.currentContext!.findRenderObject() as RenderBox?;
   if (anchor == null || !anchor.attached) return null;
+  // 入口用 HazukiMenuMorphAnchor 包裹时，把它的外观复制进形变外框，
+  // 让菜单看起来是由入口本身长出来的。
+  final anchorGhost = morphFromAnchor
+      ? anchorKey.currentContext!
+            .findAncestorWidgetOfExactType<HazukiMenuMorphAnchor>()
+            ?.child
+      : null;
   final navigator = Navigator.of(context, rootNavigator: true);
   final strings = MaterialLocalizations.of(context);
   final route = _HazukiFrostedMenuRoute<T>(
@@ -51,6 +98,8 @@ Future<T?> showHazukiFrostedMenuCore<T>({
     keyPrefix: keyPrefix,
     closeLabel: strings.modalBarrierDismissLabel,
     themes: InheritedTheme.capture(from: context, to: navigator.context),
+    morphFromAnchor: morphFromAnchor,
+    anchorGhost: anchorGhost,
   );
   void dismiss() {
     WidgetsBinding.instance.addPostFrameCallback((_) => route.dismiss());
@@ -58,7 +107,13 @@ Future<T?> showHazukiFrostedMenuCore<T>({
 
   dismissOn?.addListener(dismiss);
   try {
-    final result = await navigator.push<T>(route);
+    final pushed = navigator.push<T>(route);
+    if (onTransitionChanged != null) {
+      onTransitionChanged(route.animation);
+      // 无论正常收起还是被直接移除，路由销毁时都会完成，借此让入口恢复显示。
+      unawaited(route.completed.whenComplete(() => onTransitionChanged(null)));
+    }
+    final result = await pushed;
     if (waitForDismissal) await route.completed;
     return result;
   } finally {
@@ -76,6 +131,8 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
     required String closeLabel,
     required this.themes,
     this.header,
+    this.morphFromAnchor = false,
+    this.anchorGhost,
   }) : barrierLabel = closeLabel;
 
   final RenderBox anchor;
@@ -85,7 +142,14 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
   final String keyPrefix;
   final CapturedThemes themes;
   final String? header;
+
+  /// 一级菜单是否由入口按钮原位形变展开，收起时缩回按钮。
+  final bool morphFromAnchor;
+
+  /// 入口外观的副本，形变初期显示在外框内，随后淡出让位给菜单内容。
+  final Widget? anchorGhost;
   CurvedAnimation? _progress;
+  CurvedAnimation? _morphGeometry;
   CurvedAnimation? _depthProgress;
   bool _openingSubmenu = false;
   _HazukiFrostedMenuRoute<T>? _submenu;
@@ -130,6 +194,7 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
   @override
   void dispose() {
     _progress?.dispose();
+    _morphGeometry?.dispose();
     _depthProgress?.dispose();
     super.dispose();
   }
@@ -144,7 +209,13 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
   bool get barrierDismissible => true;
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 280);
+  Duration get transitionDuration =>
+      Duration(milliseconds: _buttonMorph ? 360 : 280);
+
+  bool get _buttonMorph => morphFromAnchor && header == null;
+
+  /// 按钮形变的外框尺寸曲线：展开时略微越过终点再回弹，收起时平滑缩回。
+  static const _morphOpenCurve = Cubic(0.2, 1.25, 0.35, 1);
 
   @override
   Duration get reverseTransitionDuration => const Duration(milliseconds: 200);
@@ -159,6 +230,11 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
       parent: animation,
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
+    );
+    final geometryAnimation = _morphGeometry ??= CurvedAnimation(
+      parent: animation,
+      curve: _morphOpenCurve,
+      reverseCurve: Curves.easeInOutCubic,
     );
     final depthAnimation = _depthProgress ??= CurvedAnimation(
       parent: secondaryAnimation,
@@ -188,6 +264,7 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
           final below =
               bounds.bottom - anchorRect.bottom >= anchorRect.top - bounds.top;
           final isSubmenu = header != null;
+          final morphs = isSubmenu || morphFromAnchor;
           final surface = IntrinsicWidth(
             child: _FrostedMenuSurface<T>(
               animation: progressAnimation,
@@ -196,7 +273,15 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
               options: options,
               label: label,
               header: header,
-              morphAnchor: isSubmenu ? anchor : null,
+              morphAnchor: morphs ? anchor : null,
+              geometry: geometryAnimation,
+              // 副本按入口当前尺寸布局，起点处与入口逐像素重合。
+              anchorGhost: anchorGhost == null
+                  ? null
+                  : SizedBox.fromSize(
+                      size: anchorRect.size,
+                      child: anchorGhost,
+                    ),
               keyPrefix: keyPrefix,
               onSelected: _select,
               onBack: () {
@@ -218,8 +303,8 @@ class _HazukiFrostedMenuRoute<T> extends PopupRoute<T> {
               builder: (context, child) {
                 final progress = progressAnimation.value;
                 final ignoring = animation.status == AnimationStatus.reverse;
-                // 子菜单的展开/收起由自身外框形变完成，不再叠加整体缩放位移。
-                if (isSubmenu) {
+                // 形变菜单的展开/收起由自身外框完成，不再叠加整体缩放位移。
+                if (morphs) {
                   return IgnorePointer(ignoring: ignoring, child: child);
                 }
                 return IgnorePointer(
@@ -318,8 +403,10 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
     required this.keyPrefix,
     required this.onSelected,
     required this.onBack,
+    required this.geometry,
     this.header,
     this.morphAnchor,
+    this.anchorGhost,
   });
 
   final T? selected;
@@ -332,8 +419,13 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
   final void Function(HazukiFrostedMenuOption<T>, GlobalKey) onSelected;
   final VoidCallback onBack;
 
-  /// 非空时为子菜单：外框从这一行原位形变展开，收起时再缩回该行。
+  /// 非空时外框从锚点原位形变展开、收起时再缩回：子菜单锚定被点的那一行，
+  /// 一级菜单锚定入口按钮。
   final RenderBox? morphAnchor;
+
+  /// 按钮形变的外框尺寸进度，带轻微回弹，可能略大于 1。
+  final Animation<double> geometry;
+  final Widget? anchorGhost;
 
   @override
   Widget build(BuildContext context) {
@@ -357,13 +449,50 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
       child: _buildContent(context, scheme),
     );
     if (morphAnchor case final anchor?) {
-      return _FrostedMenuMorph(
-        key: ValueKey('$keyPrefix-surface'),
+      final fromButton = header == null;
+      if (!fromButton) {
+        return _FrostedMenuMorph(
+          key: ValueKey('$keyPrefix-surface'),
+          animation: animation,
+          anchor: anchor,
+          fill: fill,
+          borderColor: borderColor,
+          child: content,
+        );
+      }
+      // 入口外观先占满外框，菜单内容随外框一起放大并逐渐显现。
+      final items = AnimatedBuilder(
         animation: animation,
-        anchor: anchor,
-        fill: fill,
-        borderColor: borderColor,
         child: content,
+        builder: (context, child) => Opacity(
+          key: ValueKey('$keyPrefix-items-fade'),
+          opacity: _buttonContentInterval.transform(animation.value),
+          child: child,
+        ),
+      );
+      final ghost = anchorGhost;
+      // 与非形变面板一致：被子菜单覆盖时淡化底色，让子菜单的模糊采样到页面。
+      return AnimatedBuilder(
+        animation: Listenable.merge([dimAnimation, animation]),
+        builder: (context, _) => _FrostedButtonMorph(
+          key: ValueKey('$keyPrefix-surface'),
+          progress: animation,
+          geometry: geometry,
+          anchor: anchor,
+          fill: fill.scale(1 - 0.85 * dimAnimation.value),
+          borderColor: borderColor,
+          children: [
+            items,
+            // 副本完全淡出后移出树，避免与菜单内容重复参与查找和语义。
+            if (ghost != null &&
+                animation.value < _RenderFrostedButtonMorph.ghostFadeEnd)
+              Material(
+                key: ValueKey('$keyPrefix-anchor-ghost'),
+                type: MaterialType.transparency,
+                child: IgnorePointer(child: ExcludeSemantics(child: ghost)),
+              ),
+          ],
+        ),
       );
     }
     return _AnimatedMenuGlass(
@@ -386,6 +515,8 @@ class _FrostedMenuSurface<T> extends StatelessWidget {
       ),
     );
   }
+
+  static const _buttonContentInterval = Interval(0.2, 0.75);
 
   Widget _buildContent(BuildContext context, ColorScheme scheme) {
     return Material(
@@ -765,6 +896,345 @@ class _RenderFrostedMenuMorph extends RenderProxyBox {
   void applyPaintTransform(RenderBox child, Matrix4 transform) {
     final shift = _geometry().shift;
     transform.translateByDouble(shift.dx, shift.dy, 0, 1);
+  }
+}
+
+/// 一级菜单由入口按钮形变而成：外框从按钮矩形带回弹地长成完整面板。
+///
+/// 子节点依次为菜单内容与可选的入口外观副本。形变初期副本占满外框、与真实
+/// 入口完全重合，随后淡出；菜单内容锚定外框右上角，按外框宽度同比缩放，
+/// 跟随外框一起长大而不是被外框裁出来。收起时按相反顺序缩回入口。
+class _FrostedButtonMorph extends MultiChildRenderObjectWidget {
+  const _FrostedButtonMorph({
+    super.key,
+    required this.progress,
+    required this.geometry,
+    required this.anchor,
+    required this.fill,
+    required this.borderColor,
+    required super.children,
+  });
+
+  final Animation<double> progress;
+  final Animation<double> geometry;
+  final RenderBox anchor;
+  final Gradient fill;
+  final Color borderColor;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderFrostedButtonMorph(
+        progress: progress,
+        geometry: geometry,
+        anchor: anchor,
+        fill: fill,
+        borderColor: borderColor,
+      );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderFrostedButtonMorph renderObject,
+  ) {
+    renderObject
+      ..progress = progress
+      ..geometry = geometry
+      ..anchor = anchor
+      ..fill = fill
+      ..borderColor = borderColor;
+  }
+}
+
+class _MorphParentData extends ContainerBoxParentData<RenderBox> {}
+
+class _RenderFrostedButtonMorph extends RenderBox
+    with
+        ContainerRenderObjectMixin<RenderBox, _MorphParentData>,
+        RenderBoxContainerDefaultsMixin<RenderBox, _MorphParentData> {
+  _RenderFrostedButtonMorph({
+    required Animation<double> progress,
+    required Animation<double> geometry,
+    required RenderBox anchor,
+    required Gradient fill,
+    required Color borderColor,
+  }) : _progress = progress,
+       _geometryAnimation = geometry,
+       _anchor = anchor,
+       _fill = fill,
+       _borderColor = borderColor;
+
+  /// 玻璃底色在形变初期就铺满，入口副本盖在其上，看起来是入口本身在变大。
+  static const _fillInterval = Interval(0, 0.2);
+  static const ghostFadeEnd = 0.3;
+  static const _ghostFadeInterval = Interval(0, ghostFadeEnd);
+  static const _borderInterval = Interval(0.4, 1);
+
+  final _clipLayer = LayerHandle<ClipRRectLayer>();
+  final _blurLayer = LayerHandle<BackdropFilterLayer>();
+  final _fillLayer = LayerHandle<OpacityLayer>();
+  final _contentLayer = LayerHandle<TransformLayer>();
+  final _ghostLayer = LayerHandle<OpacityLayer>();
+
+  Animation<double> _progress;
+  set progress(Animation<double> value) {
+    if (identical(value, _progress)) return;
+    if (attached) {
+      _progress.removeListener(markNeedsPaint);
+      value.addListener(markNeedsPaint);
+    }
+    _progress = value;
+    markNeedsPaint();
+  }
+
+  Animation<double> _geometryAnimation;
+  set geometry(Animation<double> value) {
+    if (identical(value, _geometryAnimation)) return;
+    if (attached) {
+      _geometryAnimation.removeListener(markNeedsPaint);
+      value.addListener(markNeedsPaint);
+    }
+    _geometryAnimation = value;
+    markNeedsPaint();
+  }
+
+  RenderBox _anchor;
+  set anchor(RenderBox value) {
+    if (identical(value, _anchor)) return;
+    _anchor = value;
+    markNeedsPaint();
+  }
+
+  Gradient _fill;
+  set fill(Gradient value) {
+    if (value == _fill) return;
+    _fill = value;
+    markNeedsPaint();
+  }
+
+  Color _borderColor;
+  set borderColor(Color value) {
+    if (value == _borderColor) return;
+    _borderColor = value;
+    markNeedsPaint();
+  }
+
+  RenderBox? get _content => firstChild;
+  RenderBox? get _ghost => firstChild == null ? null : childAfter(firstChild!);
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _MorphParentData) {
+      child.parentData = _MorphParentData();
+    }
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _progress.addListener(markNeedsPaint);
+    _geometryAnimation.addListener(markNeedsPaint);
+  }
+
+  @override
+  void detach() {
+    _progress.removeListener(markNeedsPaint);
+    _geometryAnimation.removeListener(markNeedsPaint);
+    super.detach();
+  }
+
+  @override
+  void dispose() {
+    _clipLayer.layer = null;
+    _blurLayer.layer = null;
+    _fillLayer.layer = null;
+    _contentLayer.layer = null;
+    _ghostLayer.layer = null;
+    super.dispose();
+  }
+
+  @override
+  bool get alwaysNeedsCompositing => true;
+
+  @override
+  double computeMinIntrinsicWidth(double height) =>
+      _content?.getMinIntrinsicWidth(height) ?? 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) =>
+      _content?.getMaxIntrinsicWidth(height) ?? 0;
+
+  @override
+  double computeMinIntrinsicHeight(double width) =>
+      _content?.getMinIntrinsicHeight(width) ?? 0;
+
+  @override
+  double computeMaxIntrinsicHeight(double width) =>
+      _content?.getMaxIntrinsicHeight(width) ?? 0;
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) =>
+      _content?.getDryLayout(constraints) ?? constraints.smallest;
+
+  @override
+  void performLayout() {
+    final content = _content;
+    if (content == null) {
+      size = constraints.smallest;
+      return;
+    }
+    content.layout(constraints, parentUsesSize: true);
+    size = content.size;
+    _ghost?.layout(const BoxConstraints(), parentUsesSize: true);
+  }
+
+  Rect get _anchorRect => _anchor.attached
+      ? MatrixUtils.transformRect(
+          _anchor.getTransformTo(this),
+          Offset.zero & _anchor.size,
+        )
+      : Offset.zero & size;
+
+  RRect _frame() {
+    final from = _anchorRect;
+    final t = _geometryAnimation.value;
+    return RRect.fromRectAndRadius(
+      Rect.lerp(from, Offset.zero & size, t)!,
+      // 起点用半短边作圆角，贴合按钮或胶囊的轮廓。
+      Radius.circular(ui.lerpDouble(from.shortestSide / 2, 28, t.clamp(0, 1))!),
+    );
+  }
+
+  /// 菜单内容锚定外框右上角、按外框宽度同比缩放。
+  Matrix4 _contentTransform(RRect frame) {
+    final scale = size.width == 0 ? 1.0 : frame.width / size.width;
+    return Matrix4.translationValues(frame.right, frame.top, 0)
+      ..scaleByDouble(scale, scale, 1, 1)
+      ..translateByDouble(-size.width, 0, 0, 1);
+  }
+
+  /// 入口副本贴着外框右上角，起点处与真实入口完全重合。
+  Offset _ghostOffset(RRect frame, RenderBox ghost) =>
+      Offset(frame.right - ghost.size.width, frame.top);
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final content = _content;
+    if (content == null) return;
+    final p = _progress.value;
+    final fill = _fillInterval.transform(p);
+    final ghost = _ghost;
+    final ghostAlpha = ghost == null
+        ? 0.0
+        : 1 - _ghostFadeInterval.transform(p);
+    if (fill == 0 && ghostAlpha == 0) {
+      _clipLayer.layer = null;
+      _blurLayer.layer = null;
+      _fillLayer.layer = null;
+      _contentLayer.layer = null;
+      _ghostLayer.layer = null;
+      return;
+    }
+    final frame = _frame();
+    if (fill > 0) {
+      final shadow = BoxShadow(
+        color: Colors.black.withValues(alpha: 0.16 * fill),
+        blurRadius: 28,
+        offset: const Offset(0, 10),
+      );
+      context.canvas.drawRRect(
+        frame.shift(offset + shadow.offset),
+        shadow.toPaint(),
+      );
+    }
+    _clipLayer.layer = context.pushClipRRect(
+      needsCompositing,
+      offset,
+      Offset.zero & size,
+      frame,
+      (context, offset) {
+        if (fill > 0) {
+          // 模糊层保持在透明度层之外，确保每一帧都能采样到页面内容。
+          final blur = _blurLayer.layer ??= BackdropFilterLayer();
+          blur.filter = ui.ImageFilter.blur(
+            sigmaX: 24 * fill,
+            sigmaY: 24 * fill,
+          );
+          context.pushLayer(blur, (context, offset) {
+            _fillLayer.layer = context.pushOpacity(
+              offset,
+              (fill * 255).round(),
+              (context, offset) {
+                final rect = frame.shift(offset);
+                context.canvas.drawRRect(
+                  rect,
+                  Paint()..shader = _fill.createShader(rect.outerRect),
+                );
+              },
+              oldLayer: _fillLayer.layer,
+            );
+          }, offset);
+        } else {
+          _blurLayer.layer = null;
+          _fillLayer.layer = null;
+        }
+        _contentLayer.layer = context.pushTransform(
+          needsCompositing,
+          offset,
+          _contentTransform(frame),
+          (context, offset) => context.paintChild(content, offset),
+          oldLayer: _contentLayer.layer,
+        );
+        if (ghost != null && ghostAlpha > 0) {
+          _ghostLayer.layer = context.pushOpacity(
+            offset,
+            (ghostAlpha * 255).round(),
+            (context, offset) =>
+                context.paintChild(ghost, offset + _ghostOffset(frame, ghost)),
+            oldLayer: _ghostLayer.layer,
+          );
+        } else {
+          _ghostLayer.layer = null;
+        }
+      },
+      oldLayer: _clipLayer.layer,
+    );
+    final edge = _borderInterval.transform(p);
+    if (edge > 0) {
+      context.canvas.drawRRect(
+        frame.shift(offset).deflate(0.5),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..color = _borderColor.withValues(alpha: _borderColor.a * edge),
+      );
+    }
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    final content = _content;
+    if (content == null) return false;
+    final frame = _frame();
+    if (!frame.contains(position)) return false;
+    return result.addWithPaintTransform(
+      transform: _contentTransform(frame),
+      position: position,
+      hitTest: (result, transformed) =>
+          content.hitTest(result, position: transformed),
+    );
+  }
+
+  @override
+  bool hitTestSelf(Offset position) => _frame().contains(position);
+
+  @override
+  void applyPaintTransform(RenderBox child, Matrix4 transform) {
+    final frame = _frame();
+    if (identical(child, _content)) {
+      transform.multiply(_contentTransform(frame));
+    } else {
+      final ghostOffset = _ghostOffset(frame, child);
+      transform.translateByDouble(ghostOffset.dx, ghostOffset.dy, 0, 1);
+    }
   }
 }
 

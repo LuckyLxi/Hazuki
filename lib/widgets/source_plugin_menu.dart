@@ -177,6 +177,8 @@ Future<T?> showSourcePluginMenu<T>({
   Listenable? dismissOn,
   ValueChanged<bool>? onActionBusyChanged,
   bool waitForDismissal = false,
+  bool morphFromAnchor = false,
+  ValueChanged<Animation<double>?>? onTransitionChanged,
 }) async {
   final menu = binding.resolve(context, listen: false);
   if (menu.entries.isEmpty) {
@@ -189,6 +191,8 @@ Future<T?> showSourcePluginMenu<T>({
       keyPrefix: keyPrefix,
       dismissOn: dismissOn,
       waitForDismissal: waitForDismissal,
+      morphFromAnchor: morphFromAnchor,
+      onTransitionChanged: onTransitionChanged,
     );
   }
   final layout = _SourceMenuLayout<T>(
@@ -216,6 +220,8 @@ Future<T?> showSourcePluginMenu<T>({
       keyPrefix: keyPrefix,
       dismissOn: dismissOn,
       waitForDismissal: true,
+      morphFromAnchor: morphFromAnchor,
+      onTransitionChanged: onTransitionChanged,
     );
     if (cancelled || !context.mounted || entry == null) return null;
     final current = binding.resolve(context, listen: false);

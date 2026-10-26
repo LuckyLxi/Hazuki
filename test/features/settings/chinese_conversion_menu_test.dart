@@ -50,9 +50,8 @@ void main() {
     await tester.pumpAndSettle();
 
     Future<void> expectBlurredFrame() async {
-      final rect = tester.getRect(
-        find.byKey(const ValueKey('chinese-conversion-menu-surface')),
-      );
+      // 菜单从入口按钮形变展开，动画途中外框始终覆盖按钮所在区域。
+      final rect = tester.getRect(find.byKey(anchorKey));
       final contrast = await tester.runAsync(() async {
         final boundary =
             captureKey.currentContext!.findRenderObject()
@@ -166,13 +165,16 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 80));
         expect(surface, findsOneWidget);
+        // 收起时菜单文字先淡出，外框随后缩回按钮。
         expect(
           tester
               .widget<Opacity>(
-                find.byKey(const ValueKey('chinese-conversion-menu-opacity')),
+                find.byKey(
+                  const ValueKey('chinese-conversion-menu-items-fade'),
+                ),
               )
               .opacity,
-          inExclusiveRange(0, 1),
+          lessThan(1),
         );
         await tester.pumpAndSettle();
         expect(surface, findsNothing);
@@ -216,7 +218,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     final opacity = find.byKey(
-      const ValueKey('chinese-conversion-menu-opacity'),
+      const ValueKey('chinese-conversion-menu-items-fade'),
     );
     final before = tester.widget<Opacity>(opacity).opacity;
     await tester.tapAt(const Offset(10, 500));

@@ -22,6 +22,8 @@ class SourcePluginInteraction<T> extends StatefulWidget {
     this.enabled = true,
     this.onOpened,
     this.waitForDismissal = false,
+    this.morphFromAnchor = false,
+    this.innerAnchor = false,
     this.fallback,
   });
 
@@ -34,6 +36,13 @@ class SourcePluginInteraction<T> extends StatefulWidget {
   final bool enabled;
   final VoidCallback? onOpened;
   final bool waitForDismissal;
+
+  /// 菜单由入口控件原位形变展开；展开期间入口自身淡出，收起后再显示。
+  final bool morphFromAnchor;
+
+  /// 为 true 时菜单锚定在 builder 内由 [SourcePluginMenuAnchor] 标出的子控件上，
+  /// 而不是整个控件；builder 必须渲染出该锚点。
+  final bool innerAnchor;
 
   /// Invoked directly when a button has no menu declaration.
   final FutureOr<void> Function()? fallback;
@@ -52,6 +61,11 @@ class _SourcePluginInteractionController<T>
   Object? _scope;
   bool _running = false;
   bool _actionBusy = false;
+  Animation<double>? _menuTransition;
+
+  void _menuTransitionChanged(Animation<double>? animation) {
+    if (mounted) setState(() => _menuTransition = animation);
+  }
 
   Object? _identity(ResolvedSourcePluginMenu? menu) => menu == null
       ? null
@@ -129,6 +143,10 @@ class _SourcePluginInteractionController<T>
                 label: widget.label,
                 dismissOn: _dismiss,
                 waitForDismissal: widget.waitForDismissal,
+                morphFromAnchor: widget.morphFromAnchor,
+                onTransitionChanged: widget.morphFromAnchor
+                    ? _menuTransitionChanged
+                    : null,
               )
             : await showSourcePluginMenu<T>(
                 context: context,
@@ -139,6 +157,10 @@ class _SourcePluginInteractionController<T>
                 binding: binding,
                 dismissOn: _dismiss,
                 waitForDismissal: widget.waitForDismissal,
+                morphFromAnchor: widget.morphFromAnchor,
+                onTransitionChanged: widget.morphFromAnchor
+                    ? _menuTransitionChanged
+                    : null,
                 onActionBusyChanged: (busy) {
                   if (mounted) setState(() => _actionBusy = busy);
                 },
@@ -167,9 +189,56 @@ class _SourcePluginInteractionController<T>
         (widget.fallback != null ||
             widget.options.isNotEmpty ||
             menu?.entries.isNotEmpty == true);
-    return KeyedSubtree(
-      key: _anchorKey,
-      child: widget.builder(context, enabled ? _activate : null),
+    final control = widget.builder(context, enabled ? _activate : null);
+    if (widget.innerAnchor) {
+      return _MenuAnchorScope(
+        anchorKey: _anchorKey,
+        transition: widget.morphFromAnchor ? _menuTransition : null,
+        child: control,
+      );
+    }
+    if (!widget.morphFromAnchor) {
+      return KeyedSubtree(key: _anchorKey, child: control);
+    }
+    return HazukiMenuMorphAnchor(
+      anchorKey: _anchorKey,
+      transition: _menuTransition,
+      child: control,
+    );
+  }
+}
+
+class _MenuAnchorScope extends InheritedWidget {
+  const _MenuAnchorScope({
+    required this.anchorKey,
+    required this.transition,
+    required super.child,
+  });
+
+  final GlobalKey anchorKey;
+  final Animation<double>? transition;
+
+  @override
+  bool updateShouldNotify(_MenuAnchorScope oldWidget) =>
+      anchorKey != oldWidget.anchorKey || transition != oldWidget.transition;
+}
+
+/// 标出 [SourcePluginInteraction.innerAnchor] 模式下菜单的弹出锚点，
+/// 例如设置行右侧的当前值胶囊；菜单从这里形变展开。
+class SourcePluginMenuAnchor extends StatelessWidget {
+  const SourcePluginMenuAnchor({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<_MenuAnchorScope>();
+    if (scope == null) return child;
+    return HazukiMenuMorphAnchor(
+      anchorKey: scope.anchorKey,
+      transition: scope.transition,
+      child: child,
     );
   }
 }

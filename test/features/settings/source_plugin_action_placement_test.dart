@@ -442,13 +442,11 @@ void main() {
       ]) {
         await tester.tap(dropdown);
         await tester.pumpAndSettle();
+        // 下拉框形变成毛玻璃菜单，模糊由形变外框在绘制层完成。
         final surface = find.byKey(
           const ValueKey('hazuki-frosted-menu-surface'),
         );
-        expect(
-          find.descendant(of: surface, matching: find.byType(BackdropFilter)),
-          findsOneWidget,
-        );
+        expect(surface, findsOneWidget);
         await tester.tap(
           find.descendant(of: surface, matching: find.text(label)),
         );

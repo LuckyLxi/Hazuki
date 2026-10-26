@@ -70,31 +70,26 @@ void main() {
         const ValueKey('chinese-conversion-menu-surface'),
       );
       final opacity = find.byKey(
-        const ValueKey('chinese-conversion-menu-opacity'),
+        const ValueKey('chinese-conversion-menu-items-fade'),
       );
-      final scale = find.byKey(const ValueKey('chinese-conversion-menu-scale'));
+      // 当前值胶囊形变成菜单：展开途中胶囊淡出。
+      double pillOpacity() => tester
+          .widget<Opacity>(
+            find.ancestor(of: button, matching: find.byType(Opacity)).first,
+          )
+          .opacity;
       final route = ModalRoute.of(tester.element(surface))!;
       expect(route.animation!.value, greaterThan(0));
       expect(route.animation!.value, lessThan(1));
       expect(tester.widget<Opacity>(opacity).opacity, inExclusiveRange(0, 1));
-      expect(
-        tester.widget<Transform>(scale).transform.storage[0],
-        inExclusiveRange(0.86, 1),
-      );
+      expect(pillOpacity(), lessThan(1));
       await tester.pumpAndSettle();
       expect(route.animation!.value, 1);
+      expect(pillOpacity(), 0);
       final menuRect = tester.getRect(surface);
       expect(menuRect.right, closeTo(buttonRect.right, 0.1));
       expect(menuRect.top, closeTo(buttonRect.top, 0.1));
       expect(menuRect.overlaps(buttonRect), isTrue);
-      expect(
-        tester.widget<ClipRRect>(surface).borderRadius,
-        BorderRadius.circular(28),
-      );
-      expect(
-        find.descendant(of: surface, matching: find.byType(BackdropFilter)),
-        findsOneWidget,
-      );
       expect(find.text('Traditional Chinese'), findsOneWidget);
       expect(find.text('Simplified Chinese'), findsOneWidget);
 
@@ -104,13 +99,11 @@ void main() {
       expect(route.animation!.status, AnimationStatus.reverse);
       expect(route.animation!.value, greaterThan(0));
       expect(route.animation!.value, lessThan(1));
-      expect(tester.widget<Opacity>(opacity).opacity, inExclusiveRange(0, 1));
-      expect(
-        tester.widget<Transform>(scale).transform.storage[0],
-        inExclusiveRange(0.86, 1),
-      );
+      // 收起时菜单文字先淡出，外框随后缩回胶囊。
+      expect(tester.widget<Opacity>(opacity).opacity, lessThan(1));
       await tester.pumpAndSettle();
       expect(surface, findsNothing);
+      expect(pillOpacity(), 1);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(hazukiChineseConversionPreferenceKey), isNull);
     },
