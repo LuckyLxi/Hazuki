@@ -479,4 +479,118 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('groups reveal one by one without rebuilding shown tags', (
+    tester,
+  ) async {
+    when(
+      () => categorySource.loadCategoryTagGroups(
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
+    ).thenAnswer(
+      (_) async => [
+        for (var group = 0; group < 4; group++)
+          CategoryTagGroup(
+            name: 'Group $group',
+            tags: [for (var tag = 0; tag < 3; tag++) 'Tag $group-$tag'],
+            itemType: 'search',
+          ),
+      ],
+    );
+    var tagBuilds = 0;
+    final previousCallback = debugOnRebuildDirtyWidget;
+    debugOnRebuildDirtyWidget = (element, builtOnce) {
+      previousCallback?.call(element, builtOnce);
+      // 每个标签只应构建一次；已显示的标签被重建会让次数超过标签总数
+      if (element.widget is ActionChip) tagBuilds++;
+    };
+    addTearDown(() => debugOnRebuildDirtyWidget = previousCallback);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: TagCategoryPage(
+          searchPageBuilder: (_) => const SizedBox.shrink(),
+          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+          categorySource: categorySource,
+          discoverSource: discoverSource,
+          taskControl: FakeSourceTaskControl(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Group 0'), findsOneWidget);
+    expect(find.text('Group 3'), findsNothing);
+
+    await tester.pumpAndSettle();
+    for (var group = 0; group < 4; group++) {
+      expect(find.text('Group $group'), findsOneWidget);
+    }
+    expect(tagBuilds, 12);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'groups fade in while revealing but not when scrolled into view',
+    (tester) async {
+      when(
+        () => categorySource.loadCategoryTagGroups(
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      ).thenAnswer(
+        (_) async => [
+          for (var group = 0; group < 30; group++)
+            CategoryTagGroup(
+              name: 'Group $group',
+              tags: [for (var tag = 0; tag < 6; tag++) 'Tag $group-$tag'],
+              itemType: 'search',
+            ),
+        ],
+      );
+      double groupOpacity(String name) => tester
+          .widget<FadeTransition>(
+            find
+                .ancestor(
+                  of: find.text(name),
+                  matching: find.byType(FadeTransition),
+                )
+                .first,
+          )
+          .opacity
+          .value;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: TagCategoryPage(
+            searchPageBuilder: (_) => const SizedBox.shrink(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            categorySource: categorySource,
+            discoverSource: discoverSource,
+            taskControl: FakeSourceTaskControl(),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(groupOpacity('Group 0'), lessThan(1));
+
+      await tester.pumpAndSettle();
+      expect(groupOpacity('Group 0'), 1);
+      expect(find.text('Group 29'), findsNothing);
+
+      // 展开结束后滚动带出的分组直接显示，不再播放出现动画
+      await tester.dragUntilVisible(
+        find.text('Group 29'),
+        find.byType(ListView),
+        const Offset(0, -400),
+      );
+      await tester.pump();
+      expect(groupOpacity('Group 29'), 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

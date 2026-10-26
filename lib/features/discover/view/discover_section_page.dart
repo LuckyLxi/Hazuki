@@ -11,6 +11,7 @@ import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import '../state/discover_section_page_controller.dart';
 import 'discover_section_page_widgets.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/navigation/route_transition_settled.dart';
 
 /// 涓撴爮婕敾鍒楄〃锟?/// 锟?[section.viewMoreUrl] 涓嶄负绌猴紝鍒欒繘鍏ラ〉鍚庡姞杞借椤甸潰鑷繁鐨勭涓€椤垫暟鎹紱
 /// 鑻ヤ负绌猴紝鍒欑洿鎺ュ睍锟?[section.comics]
@@ -34,13 +35,11 @@ class DiscoverSectionPage extends StatefulWidget {
   State<DiscoverSectionPage> createState() => _DiscoverSectionPageState();
 }
 
-class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
+class _DiscoverSectionPageState extends State<DiscoverSectionPage>
+    with RouteTransitionSettledMixin {
   late final DiscoverSectionPageController _controller;
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<bool> _showBackToTop = ValueNotifier(false);
-  ModalRoute<Object?>? _route;
-  Animation<double>? _routeAnimation;
-  bool _routeSettled = false;
   DiscoverSectionSortBar? _sortBar;
   Widget? _sortBarHeader;
 
@@ -58,39 +57,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_routeSettled) return;
-    final route = ModalRoute.of(context);
-    final animation = route?.animation;
-    if (route == null || animation == null) {
-      _routeSettled = true;
-      return;
-    }
-    _route = route;
-    if (!identical(animation, _routeAnimation)) {
-      _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
-      _routeAnimation = animation;
-      animation.addStatusListener(_onRouteAnimationStatusChanged);
-    }
-    // Hero 预构建时路由处于 offstage，动画代理会暂时指向已完成状态，需等真正入场后再判断
-    if (!route.offstage && animation.isCompleted) _settleRoute();
-  }
-
-  void _onRouteAnimationStatusChanged(AnimationStatus status) {
-    if (!status.isCompleted || _route?.offstage != false) return;
-    if (!mounted || _routeSettled) return;
-    setState(_settleRoute);
-  }
-
-  void _settleRoute() {
-    _routeSettled = true;
-    _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
-  }
-
-  @override
   void dispose() {
-    _routeAnimation?.removeStatusListener(_onRouteAnimationStatusChanged);
     _scrollController.dispose();
     _showBackToTop.dispose();
     _controller.dispose();
@@ -178,7 +145,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                 _controller.sortOptions.isNotEmpty ||
                 _controller.sortOptionGroups.any((group) => group.isNotEmpty);
             // 过渡动画结束前不放筛选栏，避免大量胶囊的构建挤进动画帧
-            final showSortBar = hasSortBar && _routeSettled;
+            final showSortBar = hasSortBar && routeTransitionSettled;
             final content = DiscoverSectionContent(
               controller: _controller,
               scrollController: _scrollController,
