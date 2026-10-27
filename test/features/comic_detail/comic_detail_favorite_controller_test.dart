@@ -7,6 +7,7 @@ import 'package:hazuki/features/comic_detail/repository/comic_detail_repository.
 import 'package:hazuki/features/comic_detail/support/comic_detail_favorite_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
@@ -32,6 +33,82 @@ const _details = ComicDetailsData(
 );
 
 void main() {
+  for (final scenario in [
+    (
+      name: 'user cancellation',
+      error: const SourceTaskCancelled('rating', SourceTaskStopReason.user),
+      silent: true,
+    ),
+    (
+      name: 'source change cancellation',
+      error: const SourceTaskCancelled(
+        'rating',
+        SourceTaskStopReason.sourceChanged,
+      ),
+      silent: true,
+    ),
+    (
+      name: 'timeout',
+      error: const SourceTaskTimedOut(
+        'rating',
+        SourceTaskStopReason.executionTimeout,
+      ),
+      silent: false,
+    ),
+    (name: 'website failure', error: StateError('vote failed'), silent: false),
+  ]) {
+    testWidgets('header action handles ${scenario.name}', (tester) async {
+      final repository = _MockRepository();
+      when(
+        () => repository.runComicHeaderAction(
+          comicId: _details.id,
+          actionId: 'rating',
+          sourceKey: '',
+        ),
+      ).thenThrow(scenario.error);
+      final controller = ComicDetailFavoriteController(
+        repository: repository,
+        taskControl: FakeSourceTaskControl(),
+      );
+      addTearDown(controller.dispose);
+      late BuildContext pageContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              pageContext = context;
+              return const Scaffold();
+            },
+          ),
+        ),
+      );
+
+      final reload = await controller.runHeaderAction(
+        pageContext,
+        _details,
+        const ComicHeaderStat(
+          text: '评分',
+          action: ComicHeaderStatAction.plugin,
+          actionId: 'rating',
+        ),
+      );
+      await tester.pump();
+      expect(reload, isFalse);
+      expect(controller.busyHeaderActionId, isNull);
+      expect(
+        find.textContaining('${scenario.error}'),
+        scenario.silent ? findsNothing : findsOneWidget,
+      );
+      // Drain the error prompt's hold and dismissal timers.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final saveFails in [false, true]) {
     testWidgets('confirmed save starts before dismissal and survives disposal '
         '(saveFails=$saveFails)', (tester) async {

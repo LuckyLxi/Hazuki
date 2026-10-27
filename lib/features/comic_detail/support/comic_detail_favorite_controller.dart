@@ -86,7 +86,11 @@ class ComicDetailFavoriteController extends ChangeNotifier {
       _headerBadgesOverride = result.headerBadges ?? _headerBadgesOverride;
       return result.reload;
     } catch (e) {
-      if (_disposed || isSourceUiCancellation(e)) return false;
+      if (_disposed ||
+          isSourceUiCancellation(e) ||
+          isSourceTaskCancellation(e)) {
+        return false;
+      }
       unawaited(
         showHazukiPrompt(
           context,
