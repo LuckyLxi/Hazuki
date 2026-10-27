@@ -15,6 +15,13 @@ void main() {
     expect(formatCommentTime('yesterday'), 'yesterday');
   });
 
+  test('layout text keeps line breaks while preview text collapses them', () {
+    const content = 'a<br>b<p>c</p><img src="x" alt="[smile]">d';
+
+    expect(commentLayoutText(content), 'a\nbc\n[smile]d');
+    expect(commentPreviewText(content), 'a bc [smile]d');
+  });
+
   test('parses legacy reply attribution with arbitrary whitespace', () {
     expect(parseCommentUserAttribution('Alice  👉  Bob'), (
       author: 'Alice',

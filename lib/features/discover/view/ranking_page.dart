@@ -754,7 +754,7 @@ class _RankingPageState extends State<RankingPage> {
                               if (_rankingOptionsIntroPlayed) {
                                 return chip;
                               }
-                              // 涓烘瘡涓垎绫绘寜閽坊鍔犱粠宸﹀悜鍙虫粦鍏ュ苟娓愭樉鐨勪氦閿欏姩锟?
+                              // 为每个分类按钮添加从左向右滑入并渐显的交错动画
                               return TweenAnimationBuilder<double>(
                                 tween: Tween<double>(begin: 0.0, end: 1.0),
                                 duration: Duration(

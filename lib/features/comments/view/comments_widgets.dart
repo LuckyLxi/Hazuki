@@ -20,7 +20,7 @@ class CommentsSelectableContent extends StatelessWidget {
     return _ExpandableCommentContent(
       key: ValueKey<String>(expansionKey),
       spans: buildCommentContentSpans(context, content, style),
-      plainText: convertChineseText(context, commentPreviewText(content)),
+      plainText: convertChineseText(context, commentLayoutText(content)),
       style: style,
     );
   }
@@ -68,9 +68,11 @@ class _ExpandableCommentContentState extends State<_ExpandableCommentContent> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 长评论展开时高度差很大，且首帧要排版全文容易掉帧；
+            // easeOut 会把大部分位移压在开头几帧，看起来像瞬间展开，故改用两端缓动。
             AnimatedSize(
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeOutCubic,
+              duration: const Duration(milliseconds: 360),
+              curve: Curves.easeInOutCubic,
               alignment: Alignment.topLeft,
               clipBehavior: Clip.hardEdge,
               child: SelectionArea(

@@ -309,12 +309,12 @@ class SourceCategoryCapability {
       await facade.ensureInitialized();
       final engine = facade.js.engine;
       if (engine == null) {
-        throw Exception('婕敾婧愬皻鏈垵濮嬪寲瀹屾垚');
+        throw Exception('source_not_initialized');
       }
 
       final option = rankingOption.trim();
       if (option.isEmpty) {
-        throw Exception('鎺掕姒滃弬鏁颁笉鑳戒负绌?');
+        throw StateError('ranking_option_required');
       }
       final dynamic result = await operationContext.evaluate(
         engine,

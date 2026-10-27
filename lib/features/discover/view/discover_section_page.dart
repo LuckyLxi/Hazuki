@@ -13,8 +13,9 @@ import 'discover_section_page_widgets.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/navigation/route_transition_settled.dart';
 
-/// 涓撴爮婕敾鍒楄〃锟?/// 锟?[section.viewMoreUrl] 涓嶄负绌猴紝鍒欒繘鍏ラ〉鍚庡姞杞借椤甸潰鑷繁鐨勭涓€椤垫暟鎹紱
-/// 鑻ヤ负绌猴紝鍒欑洿鎺ュ睍锟?[section.comics]
+/// 专栏漫画列表页
+/// 若 [section.viewMoreUrl] 不为空，则进入页后加载该页面自己的第一页数据；
+/// 若为空，则直接展示 [section.comics]
 class DiscoverSectionPage extends StatefulWidget {
   final SourceTaskControlGateway taskControl;
   const DiscoverSectionPage({

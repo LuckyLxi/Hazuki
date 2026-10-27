@@ -208,15 +208,14 @@ class ComicDetailMetaRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (useMobileStyle)
-            SizedBox(
-              width: 56,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 5, right: 8),
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+            // 标签名按自身宽度单行显示，后面跟固定间距，长标签名只推开本行的 chips。
+            Padding(
+              padding: const EdgeInsets.only(top: 5, right: 8),
+              child: Text(
+                label,
+                softWrap: false,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             )

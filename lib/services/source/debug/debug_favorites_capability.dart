@@ -69,7 +69,7 @@ class SourceFavoritesDebugCapability {
       }
       final engine = facade.js.engine;
       if (engine == null) {
-        throw Exception('漫画源尚未初始化完成');
+        throw Exception('source_not_initialized');
       }
       if (includeNetworkCalls && facade.isLogged) {
         await _ensureFavoriteSessionReady();
