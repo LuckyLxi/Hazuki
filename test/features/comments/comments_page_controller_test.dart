@@ -341,6 +341,60 @@ void main() {
     },
   );
 
+  test(
+    'liking a quoted floor updates every occurrence and disables one-way unlike',
+    () async {
+      final quote = _comment('quote').copyWith(score: 4, canUnlike: false);
+      final parent = _comment('parent').copyWith(quotedComments: [quote]);
+      await load([parent, quote]);
+      controller.state.replyComments['other'] = [parent];
+      final pending = controller.toggleCommentLike(quote);
+      expect(controller.state.comments.first.quotedComments.single.score, 5);
+      expect(controller.state.comments.last.score, 5);
+      expect(
+        controller
+            .state
+            .replyComments['other']!
+            .single
+            .quotedComments
+            .single
+            .isLiked,
+        isTrue,
+      );
+      await controller.toggleCommentLike(quote);
+      expect(source.likes.length, 1);
+      source.likes.single.result.complete();
+      await pending;
+      await controller.toggleCommentLike(
+        controller.state.comments.first.quotedComments.single,
+      );
+      expect(source.likes.length, 1);
+      controller.setReplyTarget(
+        controller.state.comments.first.quotedComments.single,
+      );
+      expect(controller.state.replyToComment!.id, 'quote');
+    },
+  );
+
+  test(
+    'a failed quoted-floor like preserves each occurrence and its own quotes',
+    () async {
+      final first = _comment('first');
+      final quote = _comment('quote').copyWith(score: 4);
+      final quotedMain = quote.copyWith(quotedComments: [first]);
+      final parent = _comment(
+        'parent',
+      ).copyWith(quotedComments: [first, quote]);
+      await load([parent, quotedMain]);
+      final pending = controller.toggleCommentLike(quote);
+      source.likes.single.result.completeError(StateError('denied'));
+      await pending;
+      expect(controller.state.comments.first.quotedComments.last, same(quote));
+      expect(controller.state.comments.last.score, 4);
+      expect(controller.state.comments.last.quotedComments.single, same(first));
+    },
+  );
+
   test('a failed old like cannot overwrite refreshed comment data', () async {
     final old = _comment('a');
     await load([old]);

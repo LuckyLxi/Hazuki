@@ -503,6 +503,88 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets(
+    'quoted floors show their authors and can be liked and replied to independently',
+    (tester) async {
+      const quote = ComicCommentData(
+        id: 'quoted-floor',
+        avatar: '',
+        userName: 'Quoted reader',
+        time: '',
+        content: 'Quoted content',
+        score: 4,
+        canUnlike: false,
+      );
+      state.comments = [
+        _parent.copyWith(quotedComments: [quote]),
+      ];
+      await pumpComments(tester);
+      expect(find.text('Quoted reader'), findsOneWidget);
+      expect(
+        find.textContaining('Quoted content', findRichText: true),
+        findsOneWidget,
+      );
+      await tester.tap(find.byIcon(Icons.favorite_border).first);
+      await tester.pump();
+      expect(source.lastLikedId, 'quoted-floor');
+      expect(state.comments.single.quotedComments.single.score, 5);
+      source.likeResult.complete();
+      await tester.pumpAndSettle();
+      final likedButton = tester.widget<TextButton>(
+        find.ancestor(
+          of: find.byIcon(Icons.favorite),
+          matching: find.byType(TextButton),
+        ),
+      );
+      expect(likedButton.onPressed, isNull);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Reply').first);
+      await tester.pumpAndSettle();
+      expect(state.replyToComment!.id, 'quoted-floor');
+      await tester.enterText(find.byType(TextField), 'Reply to quoted floor');
+      await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+      await tester.pumpAndSettle();
+      expect(source.sentReplyTo, 'quoted-floor');
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('long quote chains show first and last floors until expanded', (
+    tester,
+  ) async {
+    state.comments = [
+      _parent.copyWith(
+        quotedComments: List.generate(
+          5,
+          (i) => ComicCommentData(
+            id: 'quote-$i',
+            avatar: '',
+            userName: 'Floor $i',
+            time: '',
+            content: 'Content $i',
+          ),
+        ),
+      ),
+    ];
+    await pumpComments(tester);
+    expect(find.text('Floor 0'), findsOneWidget);
+    expect(find.text('Floor 4'), findsOneWidget);
+    expect(find.text('Floor 2'), findsNothing);
+    await tester.ensureVisible(find.text('Expand'));
+    await tester.tap(find.text('Expand'));
+    await tester.pumpAndSettle();
+    expect(find.text('Floor 2'), findsOneWidget);
+    await tester.ensureVisible(find.text('Collapse'));
+    await tester.tap(find.text('Collapse'));
+    await tester.pumpAndSettle();
+    expect(find.text('Floor 2'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('read-only sources retain content without card actions', (
     tester,
   ) async {
@@ -549,6 +631,7 @@ class _Source extends Fake
       sortOptions;
   bool supportActions = true;
   int likeCount = 0;
+  String? lastLikedId;
   final likeResult = Completer<void>();
   String? sentContent;
   String? sentReplyTo;
@@ -594,6 +677,7 @@ class _Source extends Fake
     SourceTaskOrigin? taskOrigin,
   }) {
     likeCount++;
+    lastLikedId = commentId;
     return likeResult.future;
   }
 

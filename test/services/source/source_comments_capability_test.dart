@@ -70,6 +70,36 @@ void main() {
   });
 
   test(
+    'quoted floors retain IDs, actions and one-way likes without recursive nesting',
+    () async {
+      await target.evaluate(
+        '''globalThis.__hazuki_source.comic.loadComments = async () => ({
+      comments: [{id:'3', content:'Latest', quotedComments:[
+        {id:'1',userName:'First',content:'Original',score:7,isLiked:true,canUnlike:false,
+         quotedComments:[{id:'ignored',content:'nested'}]},
+        {id:'2',content:'Second'}
+      ]}], maxPage:1
+    });''',
+      );
+      final result = await comments.loadCommentsPage(
+        comicId: 'comic',
+        sourceKey: 'target',
+      );
+      final main = result.comments.single;
+      expect(main.content, 'Latest');
+      expect(main.canUnlike, isTrue);
+      expect(main.quotedComments.map((quote) => quote.id), ['1', '2']);
+      final quote = main.quotedComments.first;
+      expect(quote.userName, 'First');
+      expect(quote.score, 7);
+      expect(quote.isLiked, isTrue);
+      expect(quote.canUnlike, isFalse);
+      expect(quote.quotedComments, isEmpty);
+      expect(main.copyWith(score: 1).quotedComments, same(main.quotedComments));
+    },
+  );
+
+  test(
     'passes normalized order after replyTo for comic and chapter requests',
     () async {
       final result = await comments.loadCommentsPage(

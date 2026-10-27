@@ -287,7 +287,12 @@ class CommentsPageController extends ChangeNotifier
 
   Future<void> toggleCommentLike(ComicCommentData comment) async {
     final id = comment.id;
-    if (_disposed || id == null || state.likingCommentIds.contains(id)) return;
+    if (_disposed ||
+        id == null ||
+        state.likingCommentIds.contains(id) ||
+        (comment.isLiked == true && !comment.canUnlike)) {
+      return;
+    }
     final epoch = state.loadEpoch;
     final nextLiked = !(comment.isLiked ?? false);
     _update(() {
@@ -316,7 +321,15 @@ class CommentsPageController extends ChangeNotifier
       _emit(nextLiked ? CommentsEffectType.liked : CommentsEffectType.unliked);
     } catch (error) {
       if (_isCurrent(epoch)) {
-        _update(() => _updateCommentById(id, (_) => comment));
+        _update(
+          () => _updateCommentById(
+            id,
+            (current) =>
+                identical(current.quotedComments, comment.quotedComments)
+                ? comment
+                : comment.copyWith(quotedComments: current.quotedComments),
+          ),
+        );
       }
       if (!(isSourceUiCancellation(error) || isSourceTaskCancellation(error))) {
         _emit(CommentsEffectType.likeFailed, error: error);
@@ -330,9 +343,13 @@ class CommentsPageController extends ChangeNotifier
     String id,
     ComicCommentData Function(ComicCommentData) update,
   ) {
-    List<ComicCommentData> replace(List<ComicCommentData> comments) => comments
-        .map((comment) => comment.id == id ? update(comment) : comment)
-        .toList();
+    List<ComicCommentData> replace(List<ComicCommentData> comments) =>
+        comments.map((comment) {
+          final next = comment.id == id ? update(comment) : comment;
+          return next.quotedComments.isEmpty
+              ? next
+              : next.copyWith(quotedComments: replace(next.quotedComments));
+        }).toList();
     state.comments = replace(state.comments);
     for (final entry in state.replyComments.entries) {
       state.replyComments[entry.key] = replace(entry.value);

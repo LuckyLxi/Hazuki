@@ -9,6 +9,8 @@ class ComicCommentData {
     this.isLiked,
     this.score,
     this.voteStatus,
+    this.quotedComments = const [],
+    this.canUnlike = true,
   });
 
   final String avatar;
@@ -20,6 +22,8 @@ class ComicCommentData {
   final bool? isLiked;
   final int? score;
   final int? voteStatus;
+  final List<ComicCommentData> quotedComments;
+  final bool canUnlike;
 
   ComicCommentData copyWith({
     String? avatar,
@@ -31,6 +35,8 @@ class ComicCommentData {
     bool? isLiked,
     int? score,
     int? voteStatus,
+    List<ComicCommentData>? quotedComments,
+    bool? canUnlike,
   }) {
     return ComicCommentData(
       avatar: avatar ?? this.avatar,
@@ -42,6 +48,8 @@ class ComicCommentData {
       isLiked: isLiked ?? this.isLiked,
       score: score ?? this.score,
       voteStatus: voteStatus ?? this.voteStatus,
+      quotedComments: quotedComments ?? this.quotedComments,
+      canUnlike: canUnlike ?? this.canUnlike,
     );
   }
 }

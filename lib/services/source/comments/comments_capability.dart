@@ -125,18 +125,24 @@ class SourceCommentsCapability {
         );
       }
 
-      final all = commentsRaw.whereType<Map>().map((e) {
-        final map = Map<String, dynamic>.from(e);
-        return ComicCommentData(
-          avatar: map['avatar']?.toString() ?? '',
-          userName: map['userName']?.toString() ?? '',
-          time: map['time']?.toString() ?? '',
-          content: map['content']?.toString() ?? '',
-          id: map['id']?.toString() ?? map['commentId']?.toString(),
-          replyCount: jsAsInt(map['replyCount']),
-          isLiked: map['isLiked'] is bool ? map['isLiked'] as bool : null,
-          score: jsAsInt(map['score']),
-          voteStatus: jsAsInt(map['voteStatus']),
+      ComicCommentData parseComment(Map map) => ComicCommentData(
+        avatar: map['avatar']?.toString() ?? '',
+        userName: map['userName']?.toString() ?? '',
+        time: map['time']?.toString() ?? '',
+        content: map['content']?.toString() ?? '',
+        id: map['id']?.toString() ?? map['commentId']?.toString(),
+        replyCount: jsAsInt(map['replyCount']),
+        isLiked: map['isLiked'] is bool ? map['isLiked'] as bool : null,
+        score: jsAsInt(map['score']),
+        voteStatus: jsAsInt(map['voteStatus']),
+        canUnlike: map['canUnlike'] != false,
+      );
+      final all = commentsRaw.whereType<Map>().map((map) {
+        final quotes = map['quotedComments'];
+        return parseComment(map).copyWith(
+          quotedComments: quotes is List
+              ? quotes.whereType<Map>().map(parseComment).toList()
+              : const [],
         );
       }).toList();
 
