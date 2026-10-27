@@ -377,7 +377,7 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int64_t d)
     (void)&ctx;
     JSValue v;
     v.tag = JS_TAG_SHORT_BIG_INT;
-    v.u.short_big_int = d;
+    v.u.short_big_int = (int32_t)d;
     return v;
 }
 

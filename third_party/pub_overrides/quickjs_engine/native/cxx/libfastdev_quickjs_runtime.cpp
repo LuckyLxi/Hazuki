@@ -586,7 +586,7 @@ extern "C"
     {
         auto *opaque = static_cast<RuntimeOpaque *>(data);
         if (opaque->control) {
-            int reason = hazuki_tasks::work(rt, 5, JS_GetHostWorkContext(rt), 0, opaque->control.get());
+            int reason = static_cast<int>(hazuki_tasks::work(rt, 5, JS_GetHostWorkContext(rt), 0, opaque->control.get()));
             if (reason) { JS_SetHostStopReason(rt, reason); return 1; }
         }
         if (opaque->timeout > 0 && std::chrono::steady_clock::now() >= opaque->deadline)
