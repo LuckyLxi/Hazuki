@@ -12,15 +12,6 @@ class _Scroll extends ScrollController {
   }
 }
 
-class _Page extends PageController {
-  bool disposed = false;
-  @override
-  void dispose() {
-    disposed = true;
-    super.dispose();
-  }
-}
-
 class _Focus extends FocusNode {
   int requests = 0;
   bool disposed = false;
@@ -47,7 +38,6 @@ class _Zoom extends TransformationController {
 
 class _Harness {
   final scroll = _Scroll();
-  final page = _Page();
   final focus = _Focus();
   final zoom = _Zoom();
   final noImages = ValueNotifier(false);
@@ -56,7 +46,6 @@ class _Harness {
   int noImageEvents = 0;
   late final bindings = ReaderViewBindings(
     scrollController: scroll,
-    pageController: page,
     focusNode: focus,
     zoomController: zoom,
     noImageMode: noImages,
@@ -67,44 +56,53 @@ class _Harness {
 
   void dispose() {
     bindings.dispose();
+    scroll.dispose();
+    focus.dispose();
+    zoom.dispose();
     noImages.dispose();
   }
 }
 
 void main() {
-  test('attaches listeners once and releases only owned resources', () {
-    final h = _Harness();
-    addTearDown(h.dispose);
-    h.bindings.attach();
-    h.bindings.attach();
-    h.scroll.emit();
-    h.zoom.value = Matrix4.diagonal3Values(2, 2, 1);
-    h.noImages.value = true;
-    expect([h.scrollEvents, h.zoomEvents, h.noImageEvents], [1, 1, 1]);
-    h.bindings.dispose();
-    expect([
-      h.scroll.disposed,
-      h.page.disposed,
-      h.focus.disposed,
-      h.zoom.disposed,
-    ], everyElement(isTrue));
-    h.noImages.value = false;
-    expect(h.noImageEvents, 1);
-  });
+  test(
+    'attaches listeners once and detaches without disposing controllers',
+    () {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.bindings.attach();
+      h.bindings.attach();
+      h.scroll.emit();
+      h.zoom.value = Matrix4.diagonal3Values(2, 2, 1);
+      h.noImages.value = true;
+      expect([h.scrollEvents, h.zoomEvents, h.noImageEvents], [1, 1, 1]);
+      h.bindings.dispose();
+      h.bindings.dispose();
+      expect([
+        h.scroll.disposed,
+        h.focus.disposed,
+        h.zoom.disposed,
+      ], everyElement(isFalse));
+      h.scroll.emit();
+      h.zoom.value = Matrix4.identity();
+      h.noImages.value = false;
+      expect([h.scrollEvents, h.zoomEvents, h.noImageEvents], [1, 1, 1]);
+    },
+  );
 
   test('dispose before attach is safe and prevents later subscriptions', () {
     final h = _Harness();
     addTearDown(h.dispose);
     h.bindings.dispose();
     h.bindings.attach();
+    h.scroll.emit();
+    h.zoom.value = Matrix4.diagonal3Values(2, 2, 1);
     h.noImages.value = true;
-    expect(h.noImageEvents, 0);
+    expect([h.scrollEvents, h.zoomEvents, h.noImageEvents], [0, 0, 0]);
     expect([
       h.scroll.disposed,
-      h.page.disposed,
       h.focus.disposed,
       h.zoom.disposed,
-    ], everyElement(isTrue));
+    ], everyElement(isFalse));
   });
 
   testWidgets('requests focus after the frame only while mounted', (

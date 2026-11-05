@@ -401,9 +401,12 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       final runtimeState = ReaderRuntimeState();
       final scrollController = ScrollController();
-      final pageController = PageController();
       final focusNode = FocusNode();
       final transformationController = TransformationController();
+      addTearDown(runtimeState.dispose);
+      addTearDown(scrollController.dispose);
+      addTearDown(focusNode.dispose);
+      addTearDown(transformationController.dispose);
       var appliedInitialImages = false;
       var loadChapterImagesCount = 0;
       final displayBridge = ReaderDisplayBridge(
@@ -417,7 +420,6 @@ void main() {
       final sessionController = ReaderSessionController(
         viewBindings: ReaderViewBindings(
           scrollController: scrollController,
-          pageController: pageController,
           focusNode: focusNode,
           zoomController: transformationController,
           onNoImageModeChanged: () {},
@@ -456,6 +458,10 @@ void main() {
       expect(loadChapterImagesCount, 0);
 
       sessionController.dispose();
+      void listener() {}
+
+      runtimeState.pageIndexNotifier.addListener(listener);
+      runtimeState.pageIndexNotifier.removeListener(listener);
     });
 
     testWidgets('turning off immersive mode shows system overlays', (
@@ -511,9 +517,12 @@ void main() {
 
       final runtimeState = ReaderRuntimeState();
       final scrollController = ScrollController();
-      final pageController = PageController();
       final focusNode = FocusNode();
       final transformationController = TransformationController();
+      addTearDown(runtimeState.dispose);
+      addTearDown(scrollController.dispose);
+      addTearDown(focusNode.dispose);
+      addTearDown(transformationController.dispose);
       final displayBridge = ReaderDisplayBridge(
         onVolumeButtonPressed: (_) async {},
       );
@@ -525,7 +534,6 @@ void main() {
       final sessionController = ReaderSessionController(
         viewBindings: ReaderViewBindings(
           scrollController: scrollController,
-          pageController: pageController,
           focusNode: focusNode,
           zoomController: transformationController,
           onNoImageModeChanged: () {},
@@ -819,6 +827,9 @@ void main() {
         final precacheCompleter = Completer<void>();
         var updateCount = 0;
         late ReaderImagePipelineController controller;
+        addTearDown(runtimeState.dispose);
+        addTearDown(zoomController.dispose);
+        addTearDown(pipelineState.dispose);
 
         await tester.pumpWidget(
           MaterialApp(
@@ -862,6 +873,7 @@ void main() {
           ),
         );
 
+        addTearDown(controller.dispose);
         final providerFuture = controller.getImageProvider('image-url');
         await tester.pump();
 
@@ -893,6 +905,9 @@ void main() {
         final evictedMemoryUrls = <String>[];
         final evictedDiskUrls = <String>[];
         late ReaderImagePipelineController controller;
+        addTearDown(runtimeState.dispose);
+        addTearDown(zoomController.dispose);
+        addTearDown(pipelineState.dispose);
 
         await tester.pumpWidget(
           MaterialApp(
@@ -940,6 +955,7 @@ void main() {
           ),
         );
 
+        addTearDown(controller.dispose);
         await controller.retryImage('retry-url');
         await tester.pump();
 
@@ -964,6 +980,7 @@ void main() {
       late ReaderImagePipelineController controller;
       addTearDown(zoomController.dispose);
       addTearDown(runtimeState.dispose);
+      addTearDown(pipelineState.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -999,6 +1016,7 @@ void main() {
         ),
       );
 
+      addTearDown(controller.dispose);
       controller.prefetchAround(3);
       await tester.pump();
 
@@ -1017,6 +1035,7 @@ void main() {
       late ReaderImagePipelineController controller;
       addTearDown(zoomController.dispose);
       addTearDown(runtimeState.dispose);
+      addTearDown(pipelineState.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -1047,6 +1066,7 @@ void main() {
         ),
       );
 
+      addTearDown(controller.dispose);
       expect(controller.resolvePlaceholderAspectRatio(1), 0.6);
 
       pipelineState.imageAspectRatioCache['img2'] = 1.1;

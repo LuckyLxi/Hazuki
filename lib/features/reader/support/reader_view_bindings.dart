@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Owns reader view subscriptions and the lifetime of its Flutter controllers.
+/// 管理页面级控制器的视图监听订阅与延迟焦点调度。
 class ReaderViewBindings {
   ReaderViewBindings({
     required ScrollController scrollController,
-    required PageController pageController,
     required FocusNode focusNode,
     required TransformationController zoomController,
     required Listenable noImageMode,
@@ -12,7 +11,6 @@ class ReaderViewBindings {
     required VoidCallback onScrollPositionChanged,
     required VoidCallback onZoomChanged,
   }) : _scrollController = scrollController,
-       _pageController = pageController,
        _focusNode = focusNode,
        _zoomController = zoomController,
        _noImageMode = noImageMode,
@@ -21,7 +19,6 @@ class ReaderViewBindings {
        _onZoomChanged = onZoomChanged;
 
   final ScrollController _scrollController;
-  final PageController _pageController;
   final FocusNode _focusNode;
   final TransformationController _zoomController;
   final Listenable _noImageMode;
@@ -52,11 +49,7 @@ class ReaderViewBindings {
     if (_attached) {
       _noImageMode.removeListener(_onNoImageModeChanged);
       _scrollController.removeListener(_onScrollPositionChanged);
+      _zoomController.removeListener(_onZoomChanged);
     }
-    _scrollController.dispose();
-    _pageController.dispose();
-    _focusNode.dispose();
-    if (_attached) _zoomController.removeListener(_onZoomChanged);
-    _zoomController.dispose();
   }
 }

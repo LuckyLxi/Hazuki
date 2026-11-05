@@ -383,7 +383,6 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       ReaderSessionController(
         viewBindings: ReaderViewBindings(
           scrollController: _scrollController,
-          pageController: _pageController,
           focusNode: _readerKeyFocusNode,
           zoomController: _zoomController,
           onNoImageModeChanged: () {
@@ -874,6 +873,12 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     _sessionController.dispose();
     _imagePipelineController.dispose();
     _actionsController.dispose();
+    _scrollController.dispose();
+    _pageController.dispose();
+    _readerKeyFocusNode.dispose();
+    _zoomController.dispose();
+    _imagePipelineState.dispose();
+    _runtimeState.dispose();
     super.dispose();
   }
 

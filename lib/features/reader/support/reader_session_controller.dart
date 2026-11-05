@@ -113,7 +113,6 @@ class ReaderSessionController {
     final lastVisiblePageIndex = _runtimeState.pageIndexNotifier.value;
     _displayBridge.detach();
     _viewBindings.dispose();
-    _runtimeState.dispose();
     _logEvent(
       'Reader session closed',
       source: 'reader_lifecycle',

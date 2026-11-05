@@ -107,6 +107,7 @@ void main() {
     addTearDown(transform.dispose);
     addTearDown(state.dispose);
     addTearDown(tasks.dispose);
+    addTearDown(pipeline.dispose);
     controller = ReaderImagePipelineController(
       runtimeState: state,
       pipelineState: pipeline,
@@ -206,6 +207,7 @@ void main() {
         SourceTaskStopReason.ownerDisposed,
       );
       expect(state.loadImagesError, isNull);
+      expect(pipeline.disposed, isFalse);
     },
   );
 

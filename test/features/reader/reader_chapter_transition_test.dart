@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,6 +11,7 @@ import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_host.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
+import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
@@ -31,6 +34,70 @@ void main() {
     final previous = hazukiNoImageModeNotifier.value;
     hazukiNoImageModeNotifier.value = true;
     addTearDown(() => hazukiNoImageModeNotifier.value = previous);
+  });
+
+  testWidgets('exiting during chapter load ignores the late response', (
+    tester,
+  ) async {
+    final source = _PendingReader();
+    await _mountReader(
+      tester,
+      _reader(sourceReader: source, offlineMode: false),
+    );
+    expect(find.byType(ReaderLoadingStateView), findsOneWidget);
+    final cancellation = source.origin!.cancellation!;
+    expect(cancellation.reason, isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(cancellation.reason, SourceTaskStopReason.ownerDisposed);
+    source.images.complete(['late-image']);
+    await tester.pumpAndSettle();
+
+    expect(source.logs, contains('Reader session closed'));
+    expect(
+      source.logs,
+      isNot(contains('Reader chapter images loading finished')),
+    );
+    expect(find.byType(ReaderPage), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('exiting mid zoom reset releases each reader visit', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      ReaderSettingsStore.windowsShortcutsGuideSeenKey: true,
+      ReaderSettingsStore.readingModeKey: 'right_to_left',
+      ReaderSettingsStore.pinchToZoomKey: true,
+    });
+
+    for (var visit = 0; visit < 2; visit++) {
+      await _mountReader(tester, _reader());
+      await tester.pumpAndSettle();
+      final host = _host(tester);
+      final pageIndex = host.runtimeState.pageIndexNotifier;
+      final page = tester.widget<PageView>(find.byType(PageView)).controller!;
+      final transform = tester
+          .widget<InteractiveViewer>(find.byType(InteractiveViewer))
+          .transformationController!;
+      transform.value = Matrix4.diagonal3Values(2, 2, 1);
+      await tester.pump();
+      host.onResetZoom();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(
+        transform.value.getMaxScaleOnAxis(),
+        allOf(greaterThan(1), lessThan(2)),
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderPage), findsNothing);
+      expect(tester.takeException(), isNull);
+      for (final controller in [pageIndex, page, transform]) {
+        expect(() => controller.addListener(() {}), throwsFlutterError);
+      }
+    }
   });
 
   for (final selectQuality in [false, true]) {
@@ -364,15 +431,35 @@ void main() {
 ReaderOverlayHost _host(WidgetTester tester) =>
     tester.widget<ReaderOverlayHost>(find.byType(ReaderOverlayHost));
 
-ReaderPage _reader({SourceSettingsGateway? sourceSettings}) => ReaderPage(
+Future<void> _mountReader(WidgetTester tester, ReaderPage reader) async {
+  final titleBar = _TitleBar();
+  addTearDown(titleBar.dispose);
+  await tester.pumpWidget(
+    MaterialApp(
+      locale: const Locale('en'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      builder: (context, child) => withTestSourcePresentation(
+        HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
+      ),
+      home: reader,
+    ),
+  );
+}
+
+ReaderPage _reader({
+  SourceSettingsGateway? sourceSettings,
+  SourceReaderGateway? sourceReader,
+  bool offlineMode = true,
+}) => ReaderPage(
   title: 'Comic',
   chapterTitle: 'Chapter 1',
   comicId: 'comic',
   epId: 'ep1',
   chapterIndex: 0,
-  images: const ['image-1'],
+  images: offlineMode ? const ['image-1'] : const [],
   sourceKey: 'picacg',
-  offlineMode: true,
+  offlineMode: offlineMode,
   offlineChapters: const [
     ReaderOfflineChapterData(
       epId: 'ep1',
@@ -394,10 +481,11 @@ ReaderPage _reader({SourceSettingsGateway? sourceSettings}) => ReaderPage(
     ),
   ],
   dependencies: ReaderDependencies(
-    sourceReader: sl<SourceReaderGateway>(),
+    sourceReader: sourceReader ?? sl<SourceReaderGateway>(),
     sourceSettings: sourceSettings ?? sl<SourceSettingsGateway>(),
     readingProgressService: sl<ReadingProgressService>(),
     downloader: sl<MangaDownloadService>(),
+    taskControl: sourceReader == null ? null : sl<SourceTaskControlGateway>(),
   ),
   commentsWidgetBuilder:
       ({
@@ -412,6 +500,33 @@ ReaderPage _reader({SourceSettingsGateway? sourceSettings}) => ReaderPage(
 );
 
 class _SourceSettings extends Mock implements SourceSettingsGateway {}
+
+class _PendingReader extends Fake implements SourceReaderGateway {
+  final images = Completer<List<String>>();
+  final logs = <String>[];
+  SourceTaskOrigin? origin;
+
+  @override
+  Future<List<String>> loadChapterImages({
+    required String comicId,
+    required String epId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) {
+    origin = taskOrigin;
+    return images.future;
+  }
+
+  @override
+  void addReaderLog({
+    required String level,
+    required String title,
+    Object? content,
+    String source = 'reader',
+  }) {
+    logs.add(title);
+  }
+}
 
 class _TitleBar extends ChangeNotifier implements WindowTitleBarControl {
   @override

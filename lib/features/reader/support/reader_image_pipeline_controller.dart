@@ -553,7 +553,6 @@ class ReaderImagePipelineController {
 
   void dispose() {
     retire(SourceTaskStopReason.ownerDisposed);
-    _pipelineState.dispose();
   }
 
   void _notifyImageAspectRatioResolved(String url) {

@@ -336,8 +336,9 @@ void main() {
         loadImagesErrorBuilder: (error) => 'failed:$error',
         sourceService: source,
       );
-      addTearDown(controller.dispose);
       addTearDown(transform.dispose);
+      addTearDown(pipeline.dispose);
+      addTearDown(controller.dispose);
     });
 
     for (final images in <List<String>>[
