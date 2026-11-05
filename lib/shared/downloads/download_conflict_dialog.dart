@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_models.dart';
 
-enum DownloadedChapterConflictAction { skip, continueToRedownload }
+import 'chapter_download_flow.dart';
 
 Future<DownloadedChapterConflictAction?> showSkipDownloadedChaptersDialog(
   BuildContext context, {

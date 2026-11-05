@@ -1,14 +1,15 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/reader/support/reader_image_actions_service.dart';
+import 'package:hazuki/services/media/image_actions_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('hazuki.comics/media');
-  const service = ReaderImageActionsService();
+  const service = ImageActionsService();
   final bytes = Uint8List.fromList([1, 2, 3]);
   final calls = <MethodCall>[];
 
@@ -94,6 +95,28 @@ void main() {
     );
     expect(calls, isEmpty);
   });
+
+  test('Windows saves bytes beside the executable', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final directory = Directory(
+      '${File(Platform.resolvedExecutable).parent.path}/Saved_Images',
+    );
+    final existed = await directory.exists();
+    final fileName = 'hazuki_test_${DateTime.now().microsecondsSinceEpoch}.png';
+    final file = File('${directory.path}/$fileName');
+    addTearDown(() async {
+      if (await file.exists()) await file.delete();
+      if (!existed &&
+          await directory.exists() &&
+          await directory.list().isEmpty) {
+        await directory.delete();
+      }
+    });
+
+    expect(await service.saveImage(bytes, 'png', fileName), file.path);
+    expect(await file.readAsBytes(), bytes);
+    expect(calls, isEmpty);
+  }, skip: !Platform.isWindows);
 
   test('a missing gallery result cannot report a successful save', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

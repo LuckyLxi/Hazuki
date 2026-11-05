@@ -1,4 +1,4 @@
-part of 'comic_detail_chapters_panel.dart';
+part of 'comic_chapters_panel.dart';
 
 /// 纯黑模式下各级容器色都等于背景色，改用前景色叠加出可见的底色。
 Color _visibleContainer(ColorScheme cs, Color container, double alpha) =>

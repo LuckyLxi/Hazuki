@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/reader/support/reader_image_actions_service.dart';
+import 'package:hazuki/services/media/image_actions_service.dart';
 import 'package:hazuki/features/reader/support/reader_save_image_controller.dart';
 import 'package:hazuki/features/reader/view/reader_image_actions_sheet.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -13,7 +13,7 @@ import 'package:mocktail/mocktail.dart';
 
 class _Source extends Mock implements SourceReaderGateway {}
 
-class _ImageActions extends Mock implements ReaderImageActionsService {}
+class _ImageActions extends Mock implements ImageActionsService {}
 
 void main() {
   const url = 'https://example.com/page.jpg';

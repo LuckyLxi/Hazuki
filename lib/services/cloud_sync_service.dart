@@ -7,7 +7,6 @@ import 'cloud_sync/cloud_sync_config_store.dart';
 import 'cloud_sync/cloud_sync_models.dart';
 import 'cloud_sync/cloud_sync_participant_set.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
-import 'cloud_sync/cloud_sync_restore_applier.dart';
 import 'cloud_sync/cloud_sync_snapshot_codec.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
@@ -40,9 +39,6 @@ class CloudSyncService {
   _remoteClientFactory;
   final CloudSyncConfigStore _configStore = CloudSyncConfigStore();
   late final CloudSyncSnapshotCodec _snapshotCodec = CloudSyncSnapshotCodec(
-    participants: _participants,
-  );
-  late final CloudSyncRestoreApplier _restoreApplier = CloudSyncRestoreApplier(
     participants: _participants,
   );
   bool _autoSyncRunning = false;
@@ -294,11 +290,12 @@ class CloudSyncService {
     final searchHistoryText = await client.getBackupFile(
       CloudSyncConfigStore.searchHistoryFileName,
     );
-    final settingsResult = await _restoreApplier.applySettingsJson(
+    final settingsResult = await _participants.settings.restoreSnapshot(
       settingsText,
     );
-    await _restoreApplier.applyReadingSnapshot(readingText);
-    await _restoreApplier.applySearchHistoryJsonl(searchHistoryText);
+    await _participants.commentFilter.reloadAfterExternalChange();
+    await _participants.reading.restoreSnapshot(readingText);
+    await _participants.searchHistory.restoreSnapshot(searchHistoryText);
 
     return CloudSyncRestoreResult(
       restoredSettings: true,

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
-import 'package:hazuki/features/reader/support/reader_image_actions_service.dart';
+import 'package:hazuki/services/media/image_actions_service.dart';
 import 'package:hazuki/features/reader/view/reader_image_actions_sheet.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -22,7 +22,7 @@ class ReaderSaveImageController {
     required String comicId,
     required String epId,
     required String sourceKey,
-    ReaderImageActionsService imageActions = const ReaderImageActionsService(),
+    ImageActionsService imageActions = const ImageActionsService(),
   }) : _context = context,
        _resolveReaderTheme = resolveReaderTheme,
        _sourceReader = sourceReader,
@@ -43,7 +43,7 @@ class ReaderSaveImageController {
   final String _comicId;
   final String _epId;
   final String _sourceKey;
-  final ReaderImageActionsService _imageActions;
+  final ImageActionsService _imageActions;
   bool _actionsOpen = false;
 
   Future<void> showSaveImageDialog(

@@ -1,6 +1,7 @@
 {
   "@@locale": "en",
   "translationTitle": "Manga translation",
+  "translationSettingsTitle": "Manga translation (experimental)",
   "translationSettingsSubtitle": "Translation engines, target language, and reading options",
   "translationEnable": "Enable manga translation",
   "translationPrivacy": "Images are sent to your selected AI provider",
@@ -193,7 +194,7 @@
   "displayLiquidGlassTitle": "Liquid glass effects",
   "displayLiquidGlassSubtitle": "When off, use the classic interface style throughout the app",
   "displayHomeTabCutTransitionTitle": "Panel cut tab transition",
-  "displayHomeTabCutTransitionSubtitle": "Use a slanted manga-panel cut when switching between Discover and Favorites; may stutter with liquid glass on",
+  "displayHomeTabCutTransitionSubtitle": "Use a slanted manga-panel cut when switching between Discover and Favorites",
   "displayDynamicColorTitle": "Dynamic color",
   "displayDynamicColorSubtitle": "Use wallpaper colors automatically (Android 12+)",
   "displayComicDynamicColorTitle": "Comic detail dynamic color",

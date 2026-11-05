@@ -29,7 +29,6 @@ class ComicDetailDependencies {
     return ComicDetailFeatureFacade(
       source: source,
       local: localFavorites,
-      downloader: downloader,
       readingProgress: readingProgress,
       readHistory: readHistory,
       sourceKey: sourceKey,

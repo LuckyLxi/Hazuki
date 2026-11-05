@@ -1,12 +1,14 @@
 import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/services/source/gateways/source_image_gateways.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -16,6 +18,58 @@ void main() {
     return MaterialApp(
       home: Scaffold(body: Center(child: child)),
     );
+  }
+
+  for (final saved in [true, false]) {
+    testWidgets('avatar saving reports the gallery result ($saved)', (
+      tester,
+    ) async {
+      final gateway = _Images(failures: 0);
+      final calls = <MethodCall>[];
+      const channel = MethodChannel('hazuki.comics/media');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return saved ? 'content://gallery/avatar' : null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(channel, null);
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => saveHomeAvatarToDownloads(
+                  context,
+                  imageUrl: 'https://example/avatar',
+                  sourceService: gateway,
+                ),
+                child: const Text('save avatar'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('save avatar'));
+      await tester.pumpAndSettle();
+      expect(calls.single.method, 'saveImage');
+      expect(calls.single.arguments['bytes'], gateway.bytes);
+      expect(calls.single.arguments['extension'], 'jpg');
+      expect(calls.single.arguments['fileName'], startsWith('hazuki_avatar_'));
+      expect(find.text('Avatar saved'), saved ? findsOneWidget : findsNothing);
+      expect(
+        find.textContaining('Failed to save avatar:'),
+        saved ? findsNothing : findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
   }
 
   testWidgets('shows guest avatar when not loading and avatar url is empty', (

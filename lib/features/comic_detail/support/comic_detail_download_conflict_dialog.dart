@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/downloads/download_conflict_dialog.dart';
+import 'package:hazuki/shared/downloads/chapter_download_flow.dart';
 import 'package:hazuki/services/manga_download/manga_download_models.dart';
 
 typedef ComicDetailDownloadedChapterAction = DownloadedChapterConflictAction;

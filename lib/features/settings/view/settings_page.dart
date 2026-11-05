@@ -138,7 +138,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   if (dependencies.translation case final translation?)
                     _SettingsEntryTile(
                       icon: Icons.translate_rounded,
-                      title: strings.translationTitle,
+                      title: strings.translationSettingsTitle,
                       subtitle: strings.translationSettingsSubtitle,
                       onTap: () => _open(
                         (_) => MangaTranslationSettingsPage(

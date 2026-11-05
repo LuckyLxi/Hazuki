@@ -1,7 +1,5 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:hazuki/services/media/image_actions_service.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
@@ -266,7 +264,7 @@ class _HomeSourceSwitchDialog extends StatelessWidget {
 
 Future<void> saveHomeAvatarToDownloads(
   BuildContext context, {
-  required MethodChannel mediaChannel,
+  ImageActionsService imageActions = const ImageActionsService(),
   required String imageUrl,
   required SourceImageGateway sourceService,
 }) async {
@@ -278,15 +276,9 @@ Future<void> saveHomeAvatarToDownloads(
   final strings = l10n(context);
   try {
     final bytes = await sourceService.downloadImageBytes(normalized);
-    final directory = Directory('/storage/emulated/0/Pictures/Hazuki');
-    if (!await directory.exists()) {
-      await directory.create(recursive: true);
-    }
-    final file = File(
-      '${directory.path}/hazuki_avatar_${DateTime.now().millisecondsSinceEpoch}.jpg',
-    );
-    await file.writeAsBytes(bytes, flush: true);
-    await mediaChannel.invokeMethod<bool>('scanFile', {'path': file.path});
+    final fileName =
+        'hazuki_avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    await imageActions.saveImage(bytes, 'jpg', fileName);
     if (!context.mounted) {
       return;
     }

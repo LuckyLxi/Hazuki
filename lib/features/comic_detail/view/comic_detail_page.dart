@@ -2,7 +2,6 @@ import 'package:hazuki/shared/source_presentation.dart';
 import 'comic_detail_destination_route.dart';
 import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
@@ -22,13 +21,9 @@ import 'comic_detail_app_bar.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 
 import 'comic_detail_background.dart';
-import 'comic_detail_chapters_panel.dart';
+import 'package:hazuki/widgets/comic_chapters_panel.dart';
 import 'comic_detail_cover.dart';
 import 'comic_detail_scaffold.dart';
-
-const MethodChannel _comicDetailMediaChannel = MethodChannel(
-  'hazuki.comics/media',
-);
 
 class ComicDetailPage extends StatefulWidget {
   const ComicDetailPage({
@@ -109,7 +104,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
         ) !=
         null;
     _pluginTabsController = ComicDetailPluginTabsController(
-      repository: _repository,
+      loadDetailTab: _repository.loadDetailTab,
       comicId: widget.comic.id,
       tabs: sourceDetailTabs(comicSourceKey, context: context, listen: false),
     );
@@ -158,11 +153,14 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       taskControl: widget.dependencies.taskControl,
     );
     _themeController = ComicDetailThemeController(
-      repository: _repository,
+      loadDynamicColorEnabled: _repository.loadComicDynamicColorEnabled,
+      loadCoverBytes: (url) =>
+          _repository.downloadImageBytes(url, keepInMemory: true),
       comicCoverUrl: widget.comic.cover,
       detailsFutureGetter: () => _sessionController.future,
     );
     _actionsController = ComicDetailActionsController(
+      downloader: widget.dependencies.downloader,
       taskControl: widget.dependencies.taskControl,
       destinationRouteBuilder: (builder) =>
           buildComicDetailDestinationRoute(context, builder),
@@ -196,7 +194,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             required onChapterTap,
             readingProgress,
             onResume,
-          }) => ComicDetailChaptersPanel(
+          }) => ComicChaptersPanel(
             details: details,
             onDownloadConfirm: onDownloadConfirm,
             onChapterTap: onChapterTap,
@@ -244,7 +242,6 @@ class _ComicDetailPageState extends State<ComicDetailPage>
         isDesktopPanel: widget.isDesktopPanel,
         onCloseRequested: widget.onCloseRequested,
       ),
-      mediaChannel: _comicDetailMediaChannel,
     );
     _sessionController = ComicDetailSessionController(
       taskControl: widget.dependencies.taskControl,

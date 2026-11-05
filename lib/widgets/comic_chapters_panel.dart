@@ -8,10 +8,10 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 
-part 'comic_detail_chapters_panel_widgets.dart';
+part 'comic_chapters_panel_widgets.dart';
 
-class ComicDetailChaptersPanel extends StatefulWidget {
-  const ComicDetailChaptersPanel({
+class ComicChaptersPanel extends StatefulWidget {
+  const ComicChaptersPanel({
     super.key,
     required this.details,
     required this.onChapterTap,
@@ -33,11 +33,10 @@ class ComicDetailChaptersPanel extends StatefulWidget {
   final void Function(BuildContext cardContext)? onResume;
 
   @override
-  State<ComicDetailChaptersPanel> createState() =>
-      _ComicDetailChaptersPanelState();
+  State<ComicChaptersPanel> createState() => _ComicChaptersPanelState();
 }
 
-class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel>
+class _ComicChaptersPanelState extends State<ComicChaptersPanel>
     with TickerProviderStateMixin {
   static const _gridSpacing = 8.0;
   static const _listSpacing = 4.0;

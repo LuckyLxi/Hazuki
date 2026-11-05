@@ -3,6 +3,7 @@ import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_cover.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_header.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_header_favorite_row.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_header_cover.dart';
@@ -29,6 +31,8 @@ import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_commands.dart'
+    show MangaDownloadCommands;
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
@@ -36,12 +40,13 @@ import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/widgets/source_image_gateway_scope.dart';
+import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/widgets/cached_image_widgets.dart';
 import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
-import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
+import 'package:hazuki/widgets/comic_chapters_panel.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 import 'package:hazuki/shared/favorites/source_favorite_folders_repository.dart';
@@ -75,11 +80,13 @@ ReaderDependencies _readerDependencies() {
   );
 }
 
-ComicDetailDependencies _comicDetailDependencies() {
+ComicDetailDependencies _comicDetailDependencies({
+  MangaDownloadCommands? downloader,
+}) {
   return ComicDetailDependencies(
     source: sl<SourceComicDetailGateway>(),
     localFavorites: sl<LocalFavoritesRepository>(),
-    downloader: sl<MangaDownloadService>(),
+    downloader: downloader ?? sl<MangaDownloadService>(),
     readingProgress: sl<ReadingProgressService>(),
     readHistory: sl<ReadHistoryService>(),
     imageGateway: sl<SourceImageGateway>(),
@@ -93,11 +100,87 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await ensureTestServiceLocator();
   });
+  for (final saved in [true, false]) {
+    testWidgets('cover saving reports the gallery result ($saved)', (
+      tester,
+    ) async {
+      final facade = _CoverSaveDetailFacade();
+      final noImageMode = hazukiNoImageModeNotifier.value;
+      hazukiNoImageModeNotifier.value = true;
+      addTearDown(() => hazukiNoImageModeNotifier.value = noImageMode);
+      const channel = MethodChannel('hazuki.comics/media');
+      final calls = <MethodCall>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return saved ? 'content://gallery/cover' : null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(channel, null);
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => SourceImageGatewayScope(
+            gateway: sl<SourceImageGateway>(),
+            child: child!,
+          ),
+          home: _buildDesktopTestDetail(
+            comic: const ExploreComic(
+              id: 'cover-save',
+              sourceKey: 'copy_manga',
+              title: 'Comic',
+              subTitle: '',
+              cover: '',
+            ),
+            facade: facade,
+            shouldAnimateInitialRevealOverride: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scope = find.byType(ComicDetailScope);
+      unawaited(
+        tester
+            .widget<ComicDetailScope>(scope)
+            .actions
+            .showCoverPreview(
+              tester.element(scope),
+              'https://example.test/cover.PNG',
+            ),
+      );
+      await tester.pumpAndSettle();
+      tester
+          .widget<ComicCoverPreviewPage>(find.byType(ComicCoverPreviewPage))
+          .onLongPress();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(calls.single.method, 'saveImage');
+      expect(calls.single.arguments, {
+        'bytes': facade.bytes,
+        'extension': 'png',
+        'fileName': 'cover.PNG',
+      });
+      expect(find.text('Saved'), saved ? findsOneWidget : findsNothing);
+      expect(
+        find.textContaining('Failed to save:'),
+        saved ? findsNothing : findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+  }
+
   for (final multiSelect in [null, false, true]) {
     testWidgets(
       'download confirmation queues every selected chapter regardless of legacy declaration ($multiSelect)',
       (tester) async {
         final facade = _DownloadSelectionDetailFacade();
+        final downloader = _DownloadSelectionCommands();
         await tester.pumpWidget(
           MaterialApp(
             theme: ThemeData(platform: TargetPlatform.android),
@@ -130,6 +213,7 @@ void main() {
                 cover: '',
               ),
               facade: facade,
+              downloader: downloader,
               shouldAnimateInitialRevealOverride: false,
             ),
           ),
@@ -139,12 +223,10 @@ void main() {
         await tester.pumpAndSettle();
         // Legacy plugin metadata must not truncate a batch download.
         tester
-            .widget<ComicDetailChaptersPanel>(
-              find.byType(ComicDetailChaptersPanel),
-            )
+            .widget<ComicChaptersPanel>(find.byType(ComicChaptersPanel))
             .onDownloadConfirm({'2', '1'});
         await tester.pumpAndSettle();
-        expect(facade.queued, ['1', '2']);
+        expect(downloader.queued, ['1', '2']);
         expect(tester.takeException(), isNull);
         await tester.pump(const Duration(seconds: 3));
         await tester.pumpAndSettle();
@@ -914,9 +996,7 @@ void main() {
           if (!disableAnimations) {
             // A repeated selection during expansion must not open two readers.
             tester
-                .widget<ComicDetailChaptersPanel>(
-                  find.byType(ComicDetailChaptersPanel),
-                )
+                .widget<ComicChaptersPanel>(find.byType(ComicChaptersPanel))
                 .onChapterTap('1', 'Chapter 1', 0);
             await tester.pump(const Duration(milliseconds: 180));
             final expandingRect = tester.getRect(sheet);
@@ -944,7 +1024,7 @@ void main() {
             await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
             await tester.pumpAndSettle();
             final sheetContext = tester.element(
-              find.byType(ComicDetailChaptersPanel),
+              find.byType(ComicChaptersPanel),
             );
             final sheetRoute = ModalRoute.of(sheetContext)!;
             final navigator = Navigator.of(sheetContext);
@@ -1171,7 +1251,7 @@ void main() {
     expect(tester.widget<Opacity>(buttonOpacity).opacity, 1);
     await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
     await tester.pumpAndSettle();
-    expect(find.byType(ComicDetailChaptersPanel), findsOneWidget);
+    expect(find.byType(ComicChaptersPanel), findsOneWidget);
     expect(find.text('Chapter 1'), findsOneWidget);
     expect(tester.takeException(), isNull);
     tester.state<NavigatorState>(find.byType(Navigator)).pop();
@@ -2002,7 +2082,6 @@ class _DesktopDetailFacade extends ComicDetailFeatureFacade {
     : super(
         source: sl<SourceComicDetailGateway>(),
         local: sl<LocalFavoritesRepository>(),
-        downloader: sl<MangaDownloadService>(),
         readingProgress: sl<ReadingProgressService>(),
         readHistory: sl<ReadHistoryService>(),
         sourceKey: 'copy_manga',
@@ -2048,6 +2127,17 @@ class _DesktopDetailFacade extends ComicDetailFeatureFacade {
   );
 }
 
+class _CoverSaveDetailFacade extends _DesktopDetailFacade {
+  final bytes = Uint8List.fromList([1, 2, 3]);
+
+  @override
+  Future<Uint8List> downloadImageBytes(
+    String url, {
+    bool keepInMemory = false,
+    String sourceKey = '',
+  }) async => bytes;
+}
+
 class _PluginTabsDetailFacade extends _DesktopDetailFacade {
   final requests = <String>[];
   var failBroken = true;
@@ -2074,8 +2164,6 @@ class _PluginTabsDetailFacade extends _DesktopDetailFacade {
 }
 
 class _DownloadSelectionDetailFacade extends _DesktopDetailFacade {
-  final queued = <String>[];
-
   @override
   Future<ComicDetailsData> loadComicDetails(
     String id, {
@@ -2085,6 +2173,10 @@ class _DownloadSelectionDetailFacade extends _DesktopDetailFacade {
   }) async => (await super.loadComicDetails(
     id,
   )).copyWith(chapters: const {'1': 'Chapter 1', '2': 'Chapter 2'});
+}
+
+class _DownloadSelectionCommands implements MangaDownloadCommands {
+  final queued = <String>[];
 
   @override
   Future<MangaDownloadConflict> checkDownloadConflict({
@@ -2379,12 +2471,13 @@ class _SlowMorphFavoriteFolders extends _MobileFavoriteFolders {
 Widget _buildDesktopTestDetail({
   required ExploreComic comic,
   required ComicDetailFeatureFacade facade,
+  MangaDownloadCommands? downloader,
   bool? shouldAnimateInitialRevealOverride,
   int initialTabIndex = 0,
 }) {
   return ComicDetailPage(
     comic: comic,
-    dependencies: _comicDetailDependencies(),
+    dependencies: _comicDetailDependencies(downloader: downloader),
     repository: facade,
     heroTag: 'test-${comic.id}',
     initialTabIndex: initialTabIndex,

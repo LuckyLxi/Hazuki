@@ -7,7 +7,7 @@ import 'package:hazuki/shared/source_task_owner.dart';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
+import 'package:hazuki/widgets/comic_chapters_panel.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -21,6 +21,7 @@ import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/downloads/download_conflict_dialog.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
+import 'package:hazuki/shared/downloads/chapter_download_flow.dart';
 
 class ReaderActionsController {
   ReaderActionsController({
@@ -281,7 +282,7 @@ class ReaderActionsController {
               child: ExpandingChapterSheet(
                 cornerRadius: 28,
                 safePadding: MediaQuery.paddingOf(context),
-                builder: (sheetContext) => ComicDetailChaptersPanel(
+                builder: (sheetContext) => ComicChaptersPanel(
                   details: details,
                   initialChapterId: _pageContext.epId,
                   onDownloadConfirm: (selectedEpIds) {
@@ -365,7 +366,9 @@ class ReaderActionsController {
       return;
     }
 
-    var queuedTargets = targets;
+    bool isActive() => !_closed && _isMounted() && context.mounted;
+    late final int queuedCount;
+    ThemeData? dialogTheme;
     try {
       _logEvent(
         'Reader chapter downloads requested',
@@ -375,91 +378,38 @@ class ReaderActionsController {
           'targetChapterCount': targets.length,
         }),
       );
-      final taskConflict = await _downloader.checkDownloadTaskConflict(
+      final outcome = await enqueueChapterDownloads(
+        downloader: _downloader,
         details: details,
-        chapters: targets,
-      );
-      if (!_isMounted() || !context.mounted) {
-        return;
-      }
-      if (taskConflict.hasConflict) {
-        final queuedEpIds = taskConflict.existingChapters
-            .map((chapter) => chapter.epId)
-            .toSet();
-        queuedTargets = targets
-            .where((chapter) => !queuedEpIds.contains(chapter.epId))
-            .toList(growable: false);
-      }
-      if (queuedTargets.isEmpty) {
-        unawaited(
-          showHazukiPrompt(context, l10n(context).downloadsAlreadyInQueue),
-        );
-        return;
-      }
-
-      final downloadConflictTargets = queuedTargets;
-      final conflict = await _downloader.checkDownloadConflict(
-        details: details,
-        chapters: downloadConflictTargets,
-      );
-      if (!_isMounted() || !context.mounted) {
-        return;
-      }
-      var redownloadExisting = false;
-      if (conflict.hasConflict) {
-        final hasUndownloadedChapters =
-            conflict.existingChapters.length < queuedTargets.length;
-        final dialogTheme = _pageContext.comicTheme ?? Theme.of(context);
-        if (hasUndownloadedChapters) {
-          final action = await showSkipDownloadedChaptersDialog(
-            context,
-            conflict: conflict,
-            dialogTheme: dialogTheme,
-            key: const Key('reader-skip-downloaded-dialog'),
-          );
-          if (action == null || !_isMounted() || !context.mounted) {
-            return;
-          }
-          if (action == DownloadedChapterConflictAction.skip) {
-            final existingEpIds = conflict.existingChapters
-                .map((chapter) => chapter.epId)
-                .toSet();
-            queuedTargets = queuedTargets
-                .where((chapter) => !existingEpIds.contains(chapter.epId))
-                .toList(growable: false);
-          } else {
-            await Future<void>.delayed(const Duration(milliseconds: 260));
-            if (!_isMounted() || !context.mounted) {
-              return;
-            }
-          }
-        }
-        if (!hasUndownloadedChapters ||
-            queuedTargets.length == downloadConflictTargets.length) {
-          redownloadExisting = await showDownloadConflictDialog(
-            context,
-            conflict: conflict,
-            dialogTheme: dialogTheme,
-            key: const Key('reader-download-conflict-dialog'),
-          );
-          if (!redownloadExisting || !_isMounted() || !context.mounted) {
-            return;
-          }
-        }
-      }
-
-      final result = await _downloader.enqueueDownload(
-        details: details,
+        targets: targets,
         coverUrl: details.cover.trim().isNotEmpty
             ? details.cover
             : _pageContext.coverUrl,
-        description: details.description,
-        chapters: queuedTargets,
-        redownloadExisting: redownloadExisting,
+        isActive: isActive,
+        chooseDownloadedAction: (conflict) async {
+          final action = await showSkipDownloadedChaptersDialog(
+            context,
+            conflict: conflict,
+            dialogTheme: dialogTheme ??=
+                _pageContext.comicTheme ?? Theme.of(context),
+            key: const Key('reader-skip-downloaded-dialog'),
+          );
+          if (action == DownloadedChapterConflictAction.continueToRedownload &&
+              isActive()) {
+            await Future<void>.delayed(const Duration(milliseconds: 260));
+          }
+          return action;
+        },
+        confirmRedownload: (conflict) => showDownloadConflictDialog(
+          context,
+          conflict: conflict,
+          dialogTheme: dialogTheme ??=
+              _pageContext.comicTheme ?? Theme.of(context),
+          key: const Key('reader-download-conflict-dialog'),
+        ),
       );
-      if (!_isMounted() || !context.mounted) {
-        return;
-      }
+      if (outcome == null || !isActive()) return;
+      final result = outcome.result;
       if (result == MangaDownloadEnqueueResult.alreadyQueued) {
         unawaited(
           showHazukiPrompt(context, l10n(context).downloadsAlreadyInQueue),
@@ -469,6 +419,7 @@ class ReaderActionsController {
       if (result == MangaDownloadEnqueueResult.nothingToQueue) {
         return;
       }
+      queuedCount = outcome.chapterCount;
     } catch (error) {
       _logEvent(
         'Reader chapter downloads failed',
@@ -476,7 +427,7 @@ class ReaderActionsController {
         source: 'reader_download',
         content: _logPayload({'error': '$error'}),
       );
-      if (!_isMounted() || !context.mounted) {
+      if (!isActive()) {
         return;
       }
       unawaited(
@@ -492,16 +443,13 @@ class ReaderActionsController {
     _logEvent(
       'Reader chapter downloads queued',
       source: 'reader_download',
-      content: _logPayload({'queuedChapterCount': queuedTargets.length}),
+      content: _logPayload({'queuedChapterCount': queuedCount}),
     );
-    if (!_isMounted() || !context.mounted) {
+    if (!isActive()) {
       return;
     }
     unawaited(
-      showHazukiPrompt(
-        context,
-        l10n(context).downloadsQueued('${queuedTargets.length}'),
-      ),
+      showHazukiPrompt(context, l10n(context).downloadsQueued('$queuedCount')),
     );
   }
 

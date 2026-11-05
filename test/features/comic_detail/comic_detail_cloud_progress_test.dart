@@ -6,7 +6,6 @@ import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
-import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _Source extends Fake
@@ -38,8 +37,6 @@ class _Source extends Fake
 
 class _Local extends Fake implements LocalFavoritesRepository {}
 
-class _Downloads extends Fake implements MangaDownloadCommands {}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
@@ -62,7 +59,6 @@ void main() {
       final repository = ComicDetailFeatureFacade(
         source: source,
         local: _Local(),
-        downloader: _Downloads(),
         readingProgress: local,
         readHistory: ReadHistoryService(database: db),
         sourceKey: 'sample',

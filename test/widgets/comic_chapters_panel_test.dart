@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/comic_detail_models.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
-import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
+import 'package:hazuki/widgets/comic_chapters_panel.dart';
 
 void main() {
   testWidgets(
@@ -247,7 +247,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await _openPanel(tester);
-    final panel = find.byType(ComicDetailChaptersPanel);
+    final panel = find.byType(ComicChaptersPanel);
     final halfHeight = tester.getSize(panel).height;
     await tester.drag(find.text('Chapters'), const Offset(0, -300));
     await tester.pumpAndSettle();
@@ -292,16 +292,16 @@ void main() {
     expect(controller.offset, greaterThan(0));
     await tester.drag(gridFinder, const Offset(0, 120));
     await tester.pumpAndSettle();
-    expect(find.byType(ComicDetailChaptersPanel), findsOneWidget);
+    expect(find.byType(ComicChaptersPanel), findsOneWidget);
     controller.jumpTo(0);
     await tester.pump();
     // 已在顶部：短距离下拉回弹，长距离下拉关闭
     await tester.drag(gridFinder, const Offset(0, 80));
     await tester.pumpAndSettle();
-    expect(find.byType(ComicDetailChaptersPanel), findsOneWidget);
+    expect(find.byType(ComicChaptersPanel), findsOneWidget);
     await tester.drag(gridFinder, const Offset(0, 400));
     await tester.pumpAndSettle();
-    expect(find.byType(ComicDetailChaptersPanel), findsNothing);
+    expect(find.byType(ComicChaptersPanel), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -327,12 +327,12 @@ void main() {
     expect(controller.offset, closeTo(offset, 0.1));
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byType(ComicDetailChaptersPanel), findsOneWidget);
+    expect(find.byType(ComicChaptersPanel), findsOneWidget);
     expect(find.text('Chapters'), findsOneWidget);
     expect(controller.offset, closeTo(offset, 0.1));
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byType(ComicDetailChaptersPanel), findsNothing);
+    expect(find.byType(ComicChaptersPanel), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -353,7 +353,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byType(ComicDetailChaptersPanel), findsNothing);
+    expect(find.byType(ComicChaptersPanel), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -495,7 +495,7 @@ Future<void> _openPanel(
               isScrollControlled: true,
               useSafeArea: true,
               backgroundColor: Colors.transparent,
-              builder: (context) => ComicDetailChaptersPanel(
+              builder: (context) => ComicChaptersPanel(
                 details: ComicDetailsData(
                   id: 'comic',
                   title: 'A comic title',

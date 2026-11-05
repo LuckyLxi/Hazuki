@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart';
 
 import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
@@ -45,10 +44,6 @@ class HomeCoordinator extends ChangeNotifier {
     favoriteActionsBinding.addListener(_relayChange);
     _sourceService.addListener(_handleSourceChanged);
   }
-
-  static const MethodChannel _mediaChannel = MethodChannel(
-    'hazuki.comics/media',
-  );
 
   final SourceTaskControlGateway _taskControl;
   final SourceHomeGateway _sourceService;
@@ -201,7 +196,6 @@ class HomeCoordinator extends ChangeNotifier {
       profileController: _profileController,
       sourceService: _sourceService,
       imageService: _imageService,
-      mediaChannel: _mediaChannel,
       syncUserProfile: () => syncUserProfile(context),
     );
   }

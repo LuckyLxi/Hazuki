@@ -3,8 +3,8 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
-import 'package:hazuki/shared/reading/reader_entry_position.dart';
 import 'dart:io';
+import 'package:hazuki/shared/reading/reader_entry_position.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,9 +15,11 @@ import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:hazuki/shared/category_tag_navigation.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/manga_download/manga_download_models.dart';
+import 'package:hazuki/services/manga_download/manga_download_commands.dart';
+import 'package:hazuki/services/media/image_actions_service.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
 import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
+import 'package:hazuki/shared/downloads/chapter_download_flow.dart';
 
 import '../repository/comic_detail_repository.dart';
 import 'comic_detail_controller_support.dart';
@@ -27,18 +29,19 @@ class ComicDetailActionsController extends ChangeNotifier {
   ComicDetailActionsController({
     required SourceTaskControlGateway taskControl,
     required ComicDetailFeatureFacade repository,
+    required MangaDownloadCommands downloader,
     required ExploreComic comic,
     required String heroTag,
     required ThemeData Function(ThemeData) detailThemeApplier,
     required Map<String, dynamic>? Function() lastReadProgressGetter,
     required Future<void> Function() reloadReadingProgress,
     required ComicDetailCoverPreviewPageBuilder coverPreviewPageBuilder,
-    required ComicDetailChaptersPanelBuilder chaptersPanelBuilder,
+    required ComicChaptersPanelBuilder chaptersPanelBuilder,
     required ComicDetailReaderPageBuilder readerPageBuilder,
     required ComicDetailSearchPageBuilder searchPageBuilder,
     required ComicDetailNestedPageBuilder comicDetailPageBuilder,
     ComicDetailCategoryPageBuilder? categoryPageBuilder,
-    required MethodChannel mediaChannel,
+    ImageActionsService imageActions = const ImageActionsService(),
     required Route<void> Function(WidgetBuilder) destinationRouteBuilder,
     required Route<void> Function(WidgetBuilder) expandedReaderRouteBuilder,
   }) : _readTasks = SourceTaskOwner(taskControl),
@@ -46,6 +49,7 @@ class ComicDetailActionsController extends ChangeNotifier {
        _destinationRouteBuilder = destinationRouteBuilder,
        _expandedReaderRouteBuilder = expandedReaderRouteBuilder,
        _repository = repository,
+       _downloader = downloader,
        _comic = comic,
        _heroTag = heroTag,
        _detailThemeApplier = detailThemeApplier,
@@ -57,23 +61,24 @@ class ComicDetailActionsController extends ChangeNotifier {
        _searchPageBuilder = searchPageBuilder,
        _comicDetailPageBuilder = comicDetailPageBuilder,
        _categoryPageBuilder = categoryPageBuilder,
-       _mediaChannel = mediaChannel;
+       _imageActions = imageActions;
 
   final Route<void> Function(WidgetBuilder) _destinationRouteBuilder;
   final Route<void> Function(WidgetBuilder) _expandedReaderRouteBuilder;
   final ComicDetailFeatureFacade _repository;
+  final MangaDownloadCommands _downloader;
   final ExploreComic _comic;
   final String _heroTag;
   final ThemeData Function(ThemeData) _detailThemeApplier;
   final Map<String, dynamic>? Function() _lastReadProgressGetter;
   final Future<void> Function() _reloadReadingProgress;
   final ComicDetailCoverPreviewPageBuilder _coverPreviewPageBuilder;
-  final ComicDetailChaptersPanelBuilder _chaptersPanelBuilder;
+  final ComicChaptersPanelBuilder _chaptersPanelBuilder;
   final ComicDetailReaderPageBuilder _readerPageBuilder;
   final ComicDetailSearchPageBuilder _searchPageBuilder;
   final ComicDetailNestedPageBuilder _comicDetailPageBuilder;
   final ComicDetailCategoryPageBuilder? _categoryPageBuilder;
-  final MethodChannel _mediaChannel;
+  final ImageActionsService _imageActions;
 
   final SourceTaskOwner _readTasks;
   final SourceTaskOwner _progressTasks;
@@ -501,21 +506,12 @@ class ComicDetailActionsController extends ChangeNotifier {
       final fileName = lastSegment.isEmpty
           ? defaultName
           : lastSegment.split('?').first;
-      Directory directory;
-      if (Platform.isWindows) {
-        final exeDir = File(Platform.resolvedExecutable).parent.path;
-        directory = Directory('$exeDir/Saved_Images');
-      } else {
-        directory = Directory('/storage/emulated/0/Pictures/Hazuki');
-      }
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
-      }
-      final file = File('${directory.path}/$fileName');
-      await file.writeAsBytes(bytes, flush: true);
-      if (Platform.isAndroid) {
-        await _mediaChannel.invokeMethod<bool>('scanFile', {'path': file.path});
-      }
+      final extension =
+          RegExp(
+            r'\.([a-zA-Z0-9]{1,10})$',
+          ).firstMatch(fileName)?.group(1)?.toLowerCase() ??
+          'jpg';
+      await _imageActions.saveImage(bytes, extension, fileName);
       if (_disposed) return;
       unawaited(
         showHazukiPrompt(context, l10n(context).comicDetailSavedToPath),
@@ -603,81 +599,37 @@ class ComicDetailActionsController extends ChangeNotifier {
       }
     }
     if (targets.isEmpty) return;
-    var queuedTargets = targets;
+    bool isActive() => !_disposed && context.mounted;
+    late final int queuedCount;
     try {
-      final taskConflict = await _repository.checkDownloadTaskConflict(
+      final outcome = await enqueueChapterDownloads(
+        downloader: _downloader,
         details: details,
-        chapters: targets,
-      );
-      if (_disposed || !context.mounted) return;
-      if (taskConflict.hasConflict) {
-        final queuedEpIds = taskConflict.existingChapters
-            .map((chapter) => chapter.epId)
-            .toSet();
-        queuedTargets = targets
-            .where((chapter) => !queuedEpIds.contains(chapter.epId))
-            .toList(growable: false);
-      }
-      if (queuedTargets.isEmpty) {
-        if (_disposed || !context.mounted) return;
-        unawaited(
-          showHazukiPrompt(context, l10n(context).downloadsAlreadyInQueue),
-        );
-        return;
-      }
-      final downloadConflictTargets = queuedTargets;
-      final conflict = await _repository.checkDownloadConflict(
-        details: details,
-        chapters: downloadConflictTargets,
-      );
-      if (_disposed || !context.mounted) return;
-      var redownloadExisting = false;
-      if (conflict.hasConflict) {
-        final hasUndownloadedChapters =
-            conflict.existingChapters.length < queuedTargets.length;
-        if (hasUndownloadedChapters) {
+        targets: targets,
+        coverUrl: details.cover.trim().isNotEmpty
+            ? details.cover
+            : _comic.cover,
+        isActive: isActive,
+        chooseDownloadedAction: (conflict) async {
           final action = await showComicDetailSkipDownloadedChaptersDialog(
             context,
             conflict: conflict,
             dialogTheme: _detailThemeApplier(Theme.of(context)),
           );
-          if (action == null || _disposed || !context.mounted) {
-            return;
-          }
-          if (action == ComicDetailDownloadedChapterAction.skip) {
-            final existingEpIds = conflict.existingChapters
-                .map((chapter) => chapter.epId)
-                .toSet();
-            queuedTargets = queuedTargets
-                .where((chapter) => !existingEpIds.contains(chapter.epId))
-                .toList(growable: false);
-          } else {
+          if (action == DownloadedChapterConflictAction.continueToRedownload &&
+              isActive()) {
             await Future<void>.delayed(const Duration(milliseconds: 260));
-            if (_disposed || !context.mounted) return;
           }
-        }
-        if (!hasUndownloadedChapters ||
-            queuedTargets.length == downloadConflictTargets.length) {
-          redownloadExisting = await showComicDetailDownloadConflictDialog(
-            context,
-            conflict: conflict,
-            dialogTheme: _detailThemeApplier(Theme.of(context)),
-          );
-          if (!redownloadExisting || _disposed || !context.mounted) {
-            return;
-          }
-        }
-      }
-      final result = await _repository.enqueueDownload(
-        details: details,
-        coverUrl: details.cover.trim().isNotEmpty
-            ? details.cover
-            : _comic.cover,
-        description: details.description,
-        chapters: queuedTargets,
-        redownloadExisting: redownloadExisting,
+          return action;
+        },
+        confirmRedownload: (conflict) => showComicDetailDownloadConflictDialog(
+          context,
+          conflict: conflict,
+          dialogTheme: _detailThemeApplier(Theme.of(context)),
+        ),
       );
-      if (_disposed || !context.mounted) return;
+      if (outcome == null || !isActive()) return;
+      final result = outcome.result;
       if (result == MangaDownloadEnqueueResult.alreadyQueued) {
         unawaited(
           showHazukiPrompt(context, l10n(context).downloadsAlreadyInQueue),
@@ -687,6 +639,7 @@ class ComicDetailActionsController extends ChangeNotifier {
       if (result == MangaDownloadEnqueueResult.nothingToQueue) {
         return;
       }
+      queuedCount = outcome.chapterCount;
     } catch (error) {
       if (_disposed || !context.mounted) return;
       unawaited(
@@ -700,10 +653,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     }
     if (_disposed || !context.mounted) return;
     unawaited(
-      showHazukiPrompt(
-        context,
-        l10n(context).downloadsQueued('${queuedTargets.length}'),
-      ),
+      showHazukiPrompt(context, l10n(context).downloadsQueued('$queuedCount')),
     );
   }
 

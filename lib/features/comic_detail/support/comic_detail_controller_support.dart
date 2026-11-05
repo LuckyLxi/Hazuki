@@ -10,7 +10,7 @@ typedef ComicDetailCoverPreviewPageBuilder =
       required VoidCallback onLongPress,
     });
 
-typedef ComicDetailChaptersPanelBuilder =
+typedef ComicChaptersPanelBuilder =
     Widget Function({
       required ComicDetailsData details,
       required ValueChanged<Set<String>> onDownloadConfirm,

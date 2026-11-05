@@ -5,8 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
-import '../repository/comic_detail_repository.dart';
-
 enum ComicDetailPluginTabStatus { loading, ready, failed }
 
 class ComicDetailPluginTabState {
@@ -29,13 +27,21 @@ class ComicDetailPluginTabState {
 /// 管理插件声明的详情页标签页：打开详情时并行预取，各标签页独立失败与重试。
 class ComicDetailPluginTabsController extends ChangeNotifier {
   ComicDetailPluginTabsController({
-    required ComicDetailFeatureFacade repository,
+    required Future<List<SourceDetailTabBlock>> Function({
+      required String comicId,
+      required String tabId,
+    })
+    loadDetailTab,
     required String comicId,
     required this.tabs,
-  }) : _repository = repository,
+  }) : _loadDetailTab = loadDetailTab,
        _comicId = comicId;
 
-  final ComicDetailFeatureFacade _repository;
+  final Future<List<SourceDetailTabBlock>> Function({
+    required String comicId,
+    required String tabId,
+  })
+  _loadDetailTab;
   final String _comicId;
   final List<SourceDetailTab> tabs;
 
@@ -69,7 +75,7 @@ class ComicDetailPluginTabsController extends ChangeNotifier {
     ComicDetailPluginTabState next;
     try {
       final blocks = await _sourceUi.run(
-        () => _repository.loadDetailTab(comicId: _comicId, tabId: tabId),
+        () => _loadDetailTab(comicId: _comicId, tabId: tabId),
       );
       next = ComicDetailPluginTabState.ready(blocks);
     } catch (error) {

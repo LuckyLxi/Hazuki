@@ -9,7 +9,6 @@ import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
-import 'package:hazuki/services/cloud_sync/cloud_sync_restore_applier.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
@@ -107,7 +106,7 @@ void main() {
   });
   tearDown(() => _fixture.dispose());
 
-  group('CloudSyncRestoreApplier source-scoped reading data', () {
+  group('source-scoped reading restore', () {
     setUp(() {
       SharedPreferences.setMockInitialValues(const {});
     });
@@ -115,9 +114,7 @@ void main() {
     test(
       'restores progress with sourceKey in the preference key and payload',
       () async {
-        await CloudSyncRestoreApplier(
-          participants: _participants,
-        ).applyReadingSnapshot(
+        await _participants.reading.restoreSnapshot(
           jsonEncode({
             'history': [
               {
@@ -445,9 +442,7 @@ void main() {
 
       final snapshot = await historyService.exportSyncJsonl();
       await historyService.clear();
-      await CloudSyncRestoreApplier(
-        participants: _participants,
-      ).applySearchHistoryJsonl(snapshot);
+      await _participants.searchHistory.restoreSnapshot(snapshot);
 
       expect(await historyService.load(), ['keyword']);
     });
@@ -458,9 +453,7 @@ void main() {
         (index) => jsonEncode({'keyword': 'keyword-$index'}),
       ).join('\n');
 
-      await CloudSyncRestoreApplier(
-        participants: _participants,
-      ).applySearchHistoryJsonl(backupSearchHistory);
+      await _participants.searchHistory.restoreSnapshot(backupSearchHistory);
 
       final history = await _fixture.searchHistory.load();
       expect(history, hasLength(hazukiSearchHistoryMaxCount));
@@ -541,9 +534,7 @@ void main() {
     });
 
     test('restores local favorites into Drift', () async {
-      await CloudSyncRestoreApplier(
-        participants: _participants,
-      ).applySettingsJson(
+      await _participants.settings.restoreSnapshot(
         jsonEncode({
           'version': 2,
           'data': {

@@ -2,9 +2,9 @@ import 'package:hazuki/shared/source_task_owner.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/media/image_actions_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
@@ -21,7 +21,7 @@ class HomeProfileFlow {
     required this.profileController,
     required this.sourceService,
     required this.imageService,
-    required this.mediaChannel,
+    this.imageActions = const ImageActionsService(),
     required this.syncUserProfile,
   });
 
@@ -31,7 +31,7 @@ class HomeProfileFlow {
   final HomeProfileController profileController;
   final SourceHomeGateway sourceService;
   final SourceImageGateway imageService;
-  final MethodChannel mediaChannel;
+  final ImageActionsService imageActions;
   final Future<void> Function() syncUserProfile;
 
   Future<HomeLoginDialogProfile> handleLoginSubmit(
@@ -187,7 +187,7 @@ class HomeProfileFlow {
     }
     await saveHomeAvatarToDownloads(
       context,
-      mediaChannel: mediaChannel,
+      imageActions: imageActions,
       imageUrl: avatarUrl,
       sourceService: imageService,
     );

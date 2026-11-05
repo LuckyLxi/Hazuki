@@ -4,8 +4,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-class ReaderImageActionsService {
-  const ReaderImageActionsService();
+class ImageActionsService {
+  const ImageActionsService();
 
   static const _channel = MethodChannel('hazuki.comics/media');
 

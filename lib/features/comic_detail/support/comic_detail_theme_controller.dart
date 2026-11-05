@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
 
-import '../repository/comic_detail_repository.dart';
 import 'package:hazuki/shared/lru_cache.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 
@@ -45,14 +44,17 @@ void _putComicDynamicColorScheme(
 
 class ComicDetailThemeController extends ChangeNotifier {
   ComicDetailThemeController({
-    required ComicDetailFeatureFacade repository,
+    required Future<bool> Function() loadDynamicColorEnabled,
+    required Future<Uint8List> Function(String url) loadCoverBytes,
     required String comicCoverUrl,
     required Future<ComicDetailsData> Function() detailsFutureGetter,
-  }) : _repository = repository,
+  }) : _loadDynamicColorEnabled = loadDynamicColorEnabled,
+       _loadCoverBytes = loadCoverBytes,
        _comicCoverUrl = comicCoverUrl,
        _detailsFutureGetter = detailsFutureGetter;
 
-  final ComicDetailFeatureFacade _repository;
+  final Future<bool> Function() _loadDynamicColorEnabled;
+  final Future<Uint8List> Function(String url) _loadCoverBytes;
   final String _comicCoverUrl;
   final Future<ComicDetailsData> Function() _detailsFutureGetter;
 
@@ -117,7 +119,7 @@ class ComicDetailThemeController extends ChangeNotifier {
   }
 
   Future<void> _loadDynamicColorSetting() async {
-    final enabled = await _repository.loadComicDynamicColorEnabled();
+    final enabled = await _loadDynamicColorEnabled();
     await _applyComicDynamicColorSetting(enabled, immediate: false);
   }
 
@@ -250,10 +252,7 @@ class ComicDetailThemeController extends ChangeNotifier {
         createdFuture = false;
       } else {
         future = () async {
-          final bytes = await _repository.downloadImageBytes(
-            normalizedUrl,
-            keepInMemory: true,
-          );
+          final bytes = await _loadCoverBytes(normalizedUrl);
           final imgProvider = MemoryImage(bytes);
           final light = await ColorScheme.fromImageProvider(
             provider: imgProvider,

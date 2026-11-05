@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
-import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
@@ -14,7 +13,6 @@ class ComicDetailFeatureFacade {
   ComicDetailFeatureFacade({
     required SourceComicDetailGateway source,
     required LocalFavoritesRepository local,
-    required MangaDownloadCommands downloader,
     required ReadingProgressService readingProgress,
     required ReadHistoryService readHistory,
     String sourceKey = '',
@@ -22,7 +20,6 @@ class ComicDetailFeatureFacade {
         const HazukiGeneralPreferencesStore(),
   }) : _source = source,
        _local = local,
-       _downloader = downloader,
        _readingProgress = readingProgress,
        _readHistory = readHistory,
        _preferences = preferences,
@@ -32,7 +29,6 @@ class ComicDetailFeatureFacade {
 
   final SourceComicDetailGateway _source;
   final LocalFavoritesRepository _local;
-  final MangaDownloadCommands _downloader;
   final ReadingProgressService _readingProgress;
   final ReadHistoryService _readHistory;
   final HazukiGeneralPreferencesStore _preferences;
@@ -128,35 +124,6 @@ class ComicDetailFeatureFacade {
     String comicId, {
     String sourceKey = '',
   }) => _local.isComicFavorited(comicId, sourceKey: sourceKey);
-
-  // ── Downloads ────────────────────────────────────────────────────────────
-
-  Future<MangaDownloadEnqueueResult> enqueueDownload({
-    required ComicDetailsData details,
-    required String coverUrl,
-    required String description,
-    required List<MangaChapterDownloadTarget> chapters,
-    bool redownloadExisting = false,
-  }) => _downloader.enqueueDownload(
-    details: details,
-    coverUrl: coverUrl,
-    description: description,
-    chapters: chapters,
-    redownloadExisting: redownloadExisting,
-  );
-
-  Future<MangaDownloadConflict> checkDownloadConflict({
-    required ComicDetailsData details,
-    required List<MangaChapterDownloadTarget> chapters,
-  }) => _downloader.checkDownloadConflict(details: details, chapters: chapters);
-
-  Future<MangaDownloadConflict> checkDownloadTaskConflict({
-    required ComicDetailsData details,
-    required List<MangaChapterDownloadTarget> chapters,
-  }) => _downloader.checkDownloadTaskConflict(
-    details: details,
-    chapters: chapters,
-  );
 
   // ── Persistence ──────────────────────────────────────────────────────────
 
