@@ -2,13 +2,10 @@ import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
 import 'dart:convert';
-import 'source_cloud_reading.dart';
-import 'source_reading_progress_uploads.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../common/source_json_coerce.dart';
 import '../runtime/source_runtime_host.dart';
-import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_initialization_operations.dart';
 import '../plugins/source_sort_options.dart';
 import '../models/source_contract_models.dart';
@@ -16,77 +13,21 @@ import '../runtime/source_script_engine.dart';
 import '../models/source_script_execution.dart';
 import '../debug/debug_log_internals.dart';
 import '../debug/source_task_log_recorder.dart';
-import '../gateways/source_content_gateways.dart';
 
-class SourceContentOperations
-    implements
-        SourceReadingProgressGateway,
-        SourceCloudReadingGateway,
-        SourceCloudReadingEvents {
+class SourceContentOperations {
   SourceContentOperations({
     required SourceRuntimeHost runtimeHost,
     required SourceRuntimeInitializationOperations initialization,
-    this.loadCloudReadRuntime,
   }) : _runtimeHost = runtimeHost,
-       _initialization = initialization {
-    _cloud;
-    _uploads;
-  }
+       _initialization = initialization;
 
   final SourceRuntimeHost _runtimeHost;
   final SourceRuntimeInitializationOperations _initialization;
-  late final _uploads = SourceReadingProgressUploads(_runtimeHost);
   List<SourceTaskSnapshot> get activeSearchTasks => _runtimeHost
       .tasks
       .activeTasks
       .where((task) => task.method == 'search.load')
       .toList(growable: false);
-  final Future<void> Function(SourceRuntimeHandle)? loadCloudReadRuntime;
-  late final _cloud = SourceCloudReadingCapability(
-    _runtimeHost,
-    _initialization,
-    loadReadRuntime: loadCloudReadRuntime,
-  );
-  Future<void> get whenCloudReadingSettled => _cloud.whenSettled;
-  Future<void> get whenSettled =>
-      Future.wait([_cloud.whenSettled, _uploads.whenSettled]);
-  void dispose() {
-    _cloud.dispose();
-    _uploads.dispose();
-  }
-
-  @override
-  void addListener(void Function() listener) => _cloud.addListener(listener);
-  @override
-  void removeListener(void Function() listener) =>
-      _cloud.removeListener(listener);
-  @override
-  Future<bool> usesCloudReading(
-    String sourceKey, {
-    SourceTaskOrigin? taskOrigin,
-  }) => _cloud.usesCloudReading(sourceKey, taskOrigin: taskOrigin);
-  @override
-  Future<Map<String, dynamic>?> loadCloudReadingProgress(
-    String sourceKey,
-    String comicId, {
-    SourceTaskOrigin? taskOrigin,
-  }) => _cloud.loadCloudReadingProgress(
-    sourceKey,
-    comicId,
-    taskOrigin: taskOrigin,
-  );
-  @override
-  Future<List<ExploreComic>> refreshCloudReadingHistory(
-    String sourceKey, {
-    SourceTaskOrigin? taskOrigin,
-  }) => _cloud.refreshCloudReadingHistory(sourceKey, taskOrigin: taskOrigin);
-
-  @override
-  Future<void> reportReadingProgress(
-    Map<String, Object> progress, {
-    required String sourceKey,
-    SourceTaskOrigin? taskOrigin,
-  }) => _uploads.report(progress, sourceKey, origin: taskOrigin);
 
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
     String sourceKey = '',

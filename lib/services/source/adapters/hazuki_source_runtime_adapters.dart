@@ -2,8 +2,9 @@ import '../models/source_task.dart';
 import '../account/source_login_interaction.dart';
 
 import '../../../models/hazuki_models.dart';
-import '../account/source_account_operations.dart';
-import '../favorites/source_favorites_operations.dart';
+import '../account/account_session_capability.dart';
+import '../account/source_daily_check_in_capability.dart';
+import '../debug/debug_favorites_capability.dart';
 import '../gateways/source_runtime_gateways.dart';
 import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
@@ -17,10 +18,10 @@ import 'hazuki_source_adapter_base.dart';
 
 /// 运行时、账号与脚本三组 Gateway 共用一个实现。
 class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
-    with _InteractiveAccountAdapter
     implements
         SourceRuntimeGateway,
         SourceAccountGateway,
+        SourceInteractiveAccountGateway,
         SourceHomeGateway,
         SourceScriptGateway {
   HazukiSourceRuntimeAdapter({
@@ -29,24 +30,25 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
     required SourceScriptEditingOperations scriptEditing,
     required SourceUpdateOperations updates,
     required SourceRuntimeRecoveryOperations recovery,
-    required SourceAccountOperations account,
-    required SourceFavoritesOperations favorites,
+    required SourceAccountSessionCapability account,
+    required SourceDailyCheckInCapability dailyCheckIn,
+    required SourceFavoritesDebugCapability favoritesDebug,
   }) : _initialization = initialization,
        _scriptEditing = scriptEditing,
        _updates = updates,
        _recovery = recovery,
        _account = account,
-       _favorites = favorites,
+       _dailyCheckIn = dailyCheckIn,
+       _favoritesDebug = favoritesDebug,
        super(runtime);
 
   final SourceRuntimeInitializationOperations _initialization;
   final SourceScriptEditingOperations _scriptEditing;
   final SourceUpdateOperations _updates;
   final SourceRuntimeRecoveryOperations _recovery;
-  final SourceAccountOperations _account;
-  @override
-  SourceAccountOperations get interactiveAccountOperations => _account;
-  final SourceFavoritesOperations _favorites;
+  final SourceAccountSessionCapability _account;
+  final SourceDailyCheckInCapability _dailyCheckIn;
+  final SourceFavoritesDebugCapability _favoritesDebug;
 
   @override
   String? get activeSourceKey => runtime.activeSourceKey;
@@ -95,7 +97,7 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   Future<void> prewarmInBackground() => runtime.prewarmInBackground();
   @override
   Future<void> warmUpFavoritesDebugInfo() =>
-      _favorites.warmUpFavoritesDebugInfo();
+      _favoritesDebug.warmUpFavoritesDebugInfo();
   @override
   Future<void> login({
     required String account,
@@ -114,11 +116,11 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
       _account.loadCurrentAvatarUrl(taskOrigin: taskOrigin);
   @override
   Future<bool> isDailyCheckInCompletedToday({SourceTaskOrigin? taskOrigin}) =>
-      _account.isDailyCheckInCompletedToday(taskOrigin: taskOrigin);
+      _dailyCheckIn.isCompletedToday(taskOrigin: taskOrigin);
   @override
   Future<DailyCheckInResult> performDailyCheckIn({
     SourceTaskOrigin? taskOrigin,
-  }) => _account.performDailyCheckIn(taskOrigin: taskOrigin);
+  }) => _dailyCheckIn.perform(taskOrigin: taskOrigin);
   @override
   Future<bool> hasLocalJmSourceFile() =>
       _scriptEditing.hasLocalActiveSourceFile();
@@ -164,6 +166,32 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   @override
   Future<bool> refreshSourceOnNetworkRecovery() =>
       _recovery.refreshSourceOnNetworkRecovery();
+
+  @override
+  void cancelPendingLogin() => _account.interactive?.cancelPendingLogin();
+  @override
+  Future<List<SourceLoginMethod>> loadLoginMethods({
+    SourceTaskOrigin? taskOrigin,
+  }) =>
+      _account.interactive?.loadLoginMethods(taskOrigin: taskOrigin) ??
+      Future.value(const []);
+
+  @override
+  Future<void> loginInteractive({
+    required String account,
+    required String password,
+    required String method,
+    required SourceLoginPresenter present,
+    required SourceLoginCancellation cancellation,
+    SourceTaskOrigin? taskOrigin,
+  }) => _account.interactive!.loginInteractive(
+    account: account,
+    password: password,
+    method: method,
+    present: present,
+    cancellation: cancellation,
+    taskOrigin: taskOrigin,
+  );
 }
 
 class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
@@ -239,32 +267,4 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
       _image.setImageCacheAutoCleanMode(mode);
   @override
   Future<void> clearImageCache() => _image.clearImageCache();
-}
-
-mixin _InteractiveAccountAdapter implements SourceInteractiveAccountGateway {
-  SourceAccountOperations get interactiveAccountOperations;
-  @override
-  void cancelPendingLogin() =>
-      interactiveAccountOperations.cancelPendingLogin();
-  @override
-  Future<List<SourceLoginMethod>> loadLoginMethods({
-    SourceTaskOrigin? taskOrigin,
-  }) => interactiveAccountOperations.loadLoginMethods(taskOrigin: taskOrigin);
-
-  @override
-  Future<void> loginInteractive({
-    required String account,
-    required String password,
-    required String method,
-    required SourceLoginPresenter present,
-    required SourceLoginCancellation cancellation,
-    SourceTaskOrigin? taskOrigin,
-  }) => interactiveAccountOperations.loginInteractive(
-    account: account,
-    password: password,
-    method: method,
-    present: present,
-    cancellation: cancellation,
-    taskOrigin: taskOrigin,
-  );
 }

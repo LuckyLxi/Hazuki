@@ -6,9 +6,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/source/account/source_account_operations.dart';
+import 'package:hazuki/services/source/account/account_session_capability.dart';
+import 'package:hazuki/services/source/account/source_daily_check_in_capability.dart';
+import 'package:hazuki/services/source/debug/debug_favorites_capability.dart';
 import 'package:hazuki/services/source/content/source_content_operations.dart';
-import 'package:hazuki/services/source/favorites/source_favorites_operations.dart';
+import 'package:hazuki/services/source/favorites/source_favorites_capability.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_recovery_operations.dart';
@@ -130,12 +132,15 @@ void main() {
       final initialization = _FakeInitializationOperations();
       final scriptEditing = _FakeScriptEditingOperations();
       final recovery = _FakeRecoveryOperations();
-      final favorites = _FakeFavoritesOperations();
-      final account = _FakeAccountOperations();
+      final favorites = _FakeFavoritesCapability();
+      final account = _FakeAccountCapability();
+      final changes = StreamController<void>.broadcast();
+      addTearDown(changes.close);
       final favorite = HazukiSourceFavoriteAdapter(
         runtime: runtime,
         account: account,
         favorites: favorites,
+        cloudFavoritesChangedStream: changes.stream,
         initialization: initialization,
       );
       final received = <void>[];
@@ -149,10 +154,11 @@ void main() {
         updates: _FakeUpdateOperations(),
         recovery: recovery,
         account: account,
-        favorites: favorites,
+        dailyCheckIn: _FakeDailyCheckIn(),
+        favoritesDebug: _FakeFavoritesDebug(),
       );
 
-      favorites.emitChanged();
+      changes.add(null);
       await Future<void>.delayed(Duration.zero);
       await sync.writeLocalActiveSource('edited source');
       await sync.reloadFromLocalSourceFiles();
@@ -168,7 +174,6 @@ void main() {
       expect(recovery.reloadCalls, 1);
       expect(favorites.renameCalls, [('shelf', 'Renamed', 'picacg')]);
       await subscription.cancel();
-      await favorites.dispose();
     },
   );
 
@@ -180,8 +185,9 @@ void main() {
       scriptEditing: _FakeScriptEditingOperations(),
       updates: _FakeUpdateOperations(),
       recovery: _FakeRecoveryOperations(),
-      account: _FakeAccountOperations(),
-      favorites: _FakeFavoritesOperations(),
+      account: _FakeAccountCapability(),
+      dailyCheckIn: _FakeDailyCheckIn(),
+      favoritesDebug: _FakeFavoritesDebug(),
     );
     void onProgress(int _, int _) {}
 
@@ -244,8 +250,7 @@ class _FakeContentOperations implements SourceContentOperations {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _FakeFavoritesOperations implements SourceFavoritesOperations {
-  final _changes = StreamController<void>.broadcast();
+class _FakeFavoritesCapability implements SourceFavoritesCapability {
   final renameCalls = <(String, String, String)>[];
 
   @override
@@ -261,23 +266,22 @@ class _FakeFavoritesOperations implements SourceFavoritesOperations {
     renameCalls.add((folderId, name, sourceKey));
   }
 
-  void emitChanged() => _changes.add(null);
-  Future<void> dispose() => _changes.close();
-
-  @override
-  Stream<void> get changedStream => _changes.stream;
-
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _FakeAccountOperations implements SourceAccountOperations {
+class _FakeAccountCapability implements SourceAccountSessionCapability {
   @override
   bool get isLogged => false;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
+
+class _FakeDailyCheckIn extends Fake implements SourceDailyCheckInCapability {}
+
+class _FakeFavoritesDebug extends Fake
+    implements SourceFavoritesDebugCapability {}
 
 class _FakeInitializationOperations
     implements SourceRuntimeInitializationOperations {

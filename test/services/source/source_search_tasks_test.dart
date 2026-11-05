@@ -12,6 +12,7 @@ import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _Operations extends Mock
     implements SourceRuntimeInitializationOperations {}
@@ -80,7 +81,33 @@ void main() {
       runtimeHost: host,
       initialization: operations,
     );
-    addTearDown(content.dispose);
+  });
+
+  test('search does not start cloud history for a signed-in source', () async {
+    SharedPreferences.setMockInitialValues({});
+    final engine = await install('() => ({comics: []})');
+    await engine.evaluate('''
+      globalThis.historyLoads = 0;
+      globalThis.__hazuki_source.comic = {
+        loadReadingProgress: () => null,
+        loadReadingHistory: () => {
+          historyLoads++;
+          return {items: []};
+        }
+      };
+    ''');
+    await host.activeHandle.session.ensurePrefs();
+    await host.activeHandle.session.saveSourceData(
+      'one',
+      'login_session',
+      'account',
+    );
+    host.notifyActiveRuntimeChanged('one');
+
+    await content.searchComics(keyword: 'comic', page: 1);
+
+    verify(() => operations.ensureSourceInitialized('one')).called(1);
+    expect(await engine.evaluate('historyLoads'), 0);
   });
 
   for (final asynchronous in [false, true]) {

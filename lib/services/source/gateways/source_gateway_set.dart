@@ -2,14 +2,18 @@ import '../comic/comic_details_capability.dart';
 import '../comic/comic_detail_tab_capability.dart';
 import '../category/source_category_capability.dart';
 import '../content/explore_capability.dart';
-import '../account/source_account_operations.dart';
+import '../account/account_session_capability.dart';
+import '../account/source_daily_check_in_capability.dart';
+import '../debug/debug_favorites_capability.dart';
 import '../adapters/hazuki_source_content_adapters.dart';
 import '../adapters/hazuki_source_image_adapters.dart';
 import '../adapters/hazuki_source_runtime_adapters.dart';
 import '../comments/comments_capability.dart';
+import '../content/source_cloud_reading.dart';
 import '../content/source_content_operations.dart';
+import '../content/source_reading_progress_uploads.dart';
 import '../debug/source_debug_operations.dart';
-import '../favorites/source_favorites_operations.dart';
+import '../favorites/source_favorites_capability.dart';
 import '../image/source_image_operations.dart';
 import '../image/source_image_preparation_capability.dart';
 import '../runtime/source_localization_operations.dart';
@@ -40,14 +44,19 @@ class SourceGatewaySet {
     required SourceRuntimeRecoveryOperations recovery,
     required SourceLocalizationOperations localization,
     required SourceSettingsOperations settings,
-    required SourceAccountOperations account,
+    required SourceAccountSessionCapability account,
+    required SourceDailyCheckInCapability dailyCheckIn,
     required SourceCommentsCapability comments,
     required SourceContentOperations content,
+    required SourceCloudReadingCapability cloudReading,
+    required SourceReadingProgressUploads readingProgressUploads,
     required SourceComicDetailsCapability comicDetails,
     required SourceComicDetailTabCapability detailTabs,
     required SourceCategoryCapability category,
     required SourceExploreCapability explore,
-    required SourceFavoritesOperations favorites,
+    required SourceFavoritesCapability favorites,
+    required SourceFavoritesDebugCapability favoritesDebug,
+    required Stream<void> cloudFavoritesChangedStream,
     required SourceImageOperations image,
     required SourceImagePreparationCapability imagePreparation,
     required SourceDebugOperations debug,
@@ -67,10 +76,12 @@ class SourceGatewaySet {
       runtime: runtime,
       account: account,
       favorites: favorites,
+      cloudFavoritesChangedStream: cloudFavoritesChangedStream,
       initialization: initialization,
     );
     reader = HazukiSourceReaderAdapter(
-      content: content,
+      cloudReading: cloudReading,
+      readingProgressUploads: readingProgressUploads,
       comicDetails: comicDetails,
       imagePreparation: imagePreparation,
       image: image,
@@ -103,7 +114,8 @@ class SourceGatewaySet {
       updates: updates,
       recovery: recovery,
       account: account,
-      favorites: favorites,
+      dailyCheckIn: dailyCheckIn,
+      favoritesDebug: favoritesDebug,
     );
     accountGateway = runtimeAdapter;
     runtimeGateway = runtimeAdapter;
@@ -122,7 +134,7 @@ class SourceGatewaySet {
       runtime: runtime,
       account: account,
       favorites: favorites,
-      content: content,
+      cloudReading: cloudReading,
       comicDetails: comicDetails,
       category: category,
       detailTabs: detailTabs,

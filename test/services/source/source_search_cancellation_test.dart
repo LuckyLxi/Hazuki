@@ -97,7 +97,6 @@ void main() {
       runtimeHost: host,
       initialization: operations,
     );
-    addTearDown(content.dispose);
     gateway = _SearchGateway(host, content);
     addTearDown(gateway.dispose);
     engine = SourceScriptEngine(pluginId: 'one');

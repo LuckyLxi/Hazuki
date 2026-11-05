@@ -7,7 +7,6 @@ import '../../../models/hazuki_models.dart';
 import '../account/account_session_capability.dart';
 import '../account/source_interactive_login_operations.dart';
 import '../account/source_login_interaction.dart';
-import '../account/source_account_operations.dart';
 import '../account/source_daily_check_in_capability.dart';
 import '../account/source_relogin_coordinator.dart';
 import '../category/source_category_capability.dart';
@@ -16,13 +15,14 @@ import '../comic/comic_detail_tab_capability.dart';
 import '../comic/source_comic_details_cache.dart';
 import '../comments/comments_capability.dart';
 import '../common/source_json_coerce.dart';
+import '../content/source_cloud_reading.dart';
 import '../content/source_content_operations.dart';
+import '../content/source_reading_progress_uploads.dart';
 import '../debug/debug_favorites_capability.dart';
 import '../debug/debug_report_capability.dart';
 import '../debug/source_debug_operations.dart';
 import '../content/explore_capability.dart';
 import '../favorites/source_favorites_capability.dart';
-import '../favorites/source_favorites_operations.dart';
 import '../gateways/source_gateway_set.dart';
 import '../image/image_cache_capability.dart';
 import '../image/source_image_operations.dart';
@@ -192,7 +192,7 @@ class SourceRuntimeAssembly {
     );
     _favoritesDebugCapability = SourceFavoritesDebugCapability(
       activeFacade: () => _facade,
-      currentAccount: () => _accountOperations.currentAccount,
+      currentAccount: () => _accountCapability.currentAccount,
       ensureFavoriteSessionReady: () => _ensureFavoriteSessionReady(),
       loadFavoriteComics: ({required page, required folderId}) =>
           _favoritesCapability.loadFavoriteComics(
@@ -202,7 +202,7 @@ class SourceRuntimeAssembly {
     );
     _debugReportCapability = SourceDebugReportCapability(
       activeFacade: () => _facade,
-      currentAccount: () => _accountOperations.currentAccount,
+      currentAccount: () => _accountCapability.currentAccount,
       logStore: _logStore,
     );
   }
@@ -239,11 +239,6 @@ class SourceRuntimeAssembly {
         _runtimeHost,
         localRuntime: _runtimeCapability.localRuntime,
       );
-  late final SourceAccountOperations _accountOperations =
-      SourceAccountOperations(
-        accountSession: _accountCapability,
-        dailyCheckIn: _dailyCheckInCapability,
-      );
   late final SourceCommentsCapability _commentsCapability;
   late final SourceDebugOperations _debugOperations = SourceDebugOperations(
     activeDebugLog: () => _activeHandle.debugLog,
@@ -266,16 +261,17 @@ class SourceRuntimeAssembly {
   );
   late final SourceContentOperations _contentOperations =
       SourceContentOperations(
-        loadCloudReadRuntime: _runtimeCapability.loadLoginRuntime,
         runtimeHost: _runtimeHost,
         initialization: _runtimeCapability.initialization,
       );
-  late final SourceFavoritesOperations _favoritesOperations =
-      SourceFavoritesOperations(
-        favorites: _favoritesCapability,
-        debug: _favoritesDebugCapability,
-        changedStream: _cloudFavoritesChangedController.stream,
+  late final SourceCloudReadingCapability _cloudReading =
+      SourceCloudReadingCapability(
+        _runtimeHost,
+        _runtimeCapability.initialization,
+        loadReadRuntime: _runtimeCapability.loadLoginRuntime,
       );
+  late final SourceReadingProgressUploads _readingProgressUploads =
+      SourceReadingProgressUploads(_runtimeHost);
   late final SourceGatewaySet gateways = SourceGatewaySet(
     taskControl: _runtimeHost.tasks,
     runtime: _runtimeView,
@@ -286,14 +282,19 @@ class SourceRuntimeAssembly {
     recovery: _runtimeCapability.sourceRecovery,
     localization: _localizationOperations,
     settings: _settingsOperations,
-    account: _accountOperations,
+    account: _accountCapability,
+    dailyCheckIn: _dailyCheckInCapability,
     comments: _commentsCapability,
     content: _contentOperations,
+    cloudReading: _cloudReading,
+    readingProgressUploads: _readingProgressUploads,
     explore: _exploreCapability,
     category: _categoryCapability,
     comicDetails: _comicDetailsCapability,
     detailTabs: _detailTabsCapability,
-    favorites: _favoritesOperations,
+    favorites: _favoritesCapability,
+    favoritesDebug: _favoritesDebugCapability,
+    cloudFavoritesChangedStream: _cloudFavoritesChangedController.stream,
     image: _imageOperations,
     imagePreparation: _imagePreparationCapability,
     debug: _debugOperations,
@@ -342,10 +343,10 @@ class SourceRuntimeAssembly {
     diagnostics: _runtimeCapability.diagnostics,
     scriptEditing: _runtimeCapability.scriptEditing,
     comments: _commentsCapability,
-    favorites: _favoritesOperations,
+    favorites: _favoritesCapability,
     image: _imageOperations,
     settings: _settingsOperations,
-    account: _accountOperations,
+    account: _accountCapability,
     debug: _debugOperations,
     activeFacade: () => _facade,
     handleFor: _handleFor,
@@ -458,10 +459,14 @@ class SourceRuntimeAssembly {
     return comics;
   }
 
-  Future<void> get whenSettled => _contentOperations.whenSettled;
+  Future<void> get whenSettled => Future.wait([
+    _cloudReading.whenSettled,
+    _readingProgressUploads.whenSettled,
+  ]);
 
   void dispose() {
-    _contentOperations.dispose();
+    _cloudReading.dispose();
+    _readingProgressUploads.dispose();
     _applicationHandle.requestDispose();
     for (final handle in _retainedImageHandles.values) {
       handle.requestDispose();
@@ -509,10 +514,10 @@ class SourceRuntimeTestAccess {
   final SourceRuntimeDiagnosticsOperations diagnostics;
   final SourceScriptEditingOperations scriptEditing;
   final SourceCommentsCapability comments;
-  final SourceFavoritesOperations favorites;
+  final SourceFavoritesCapability favorites;
   final SourceImageOperations image;
   final SourceSettingsOperations settings;
-  final SourceAccountOperations account;
+  final SourceAccountSessionCapability account;
   final SourceDebugOperations debug;
   final HazukiSourceFacade Function() _activeFacade;
   final SourceRuntimeHandle Function(String) _handleFor;

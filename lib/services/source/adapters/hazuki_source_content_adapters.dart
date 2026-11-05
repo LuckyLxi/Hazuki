@@ -9,11 +9,13 @@ import '../plugins/source_detail_tabs.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
-import '../account/source_account_operations.dart';
+import '../account/account_session_capability.dart';
 import '../comments/comments_capability.dart';
+import '../content/source_cloud_reading.dart';
 import '../content/source_content_operations.dart';
+import '../content/source_reading_progress_uploads.dart';
 import '../debug/source_debug_operations.dart';
-import '../favorites/source_favorites_operations.dart';
+import '../favorites/source_favorites_capability.dart';
 import '../gateways/source_content_gateways.dart';
 import '../image/source_image_operations.dart';
 import '../image/source_image_preparation_capability.dart';
@@ -23,10 +25,10 @@ import '../runtime/source_runtime_view.dart';
 import '../models/source_task.dart';
 import 'hazuki_source_adapter_base.dart';
 
-/// 把云端阅读能力转发给内容操作；放在 Adapter 层，避免 content 内部的循环依赖。
+/// 将同一个云端阅读组件暴露给详情页和阅读器。
 mixin SourceCloudReadingAdapter
     implements SourceCloudReadingGateway, SourceCloudReadingEvents {
-  SourceContentOperations get cloudReadingDelegate;
+  SourceCloudReadingCapability get cloudReadingDelegate;
   @override
   void addListener(VoidCallback listener) =>
       cloudReadingDelegate.addListener(listener);
@@ -130,7 +132,7 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
     required SourceRuntimeView runtime,
     required SourceExploreCapability explore,
     required SourceCategoryCapability category,
-    required SourceAccountOperations account,
+    required SourceAccountSessionCapability account,
   }) : _explore = explore,
        _category = category,
        _account = account,
@@ -138,7 +140,7 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
 
   final SourceExploreCapability _explore;
   final SourceCategoryCapability _category;
-  final SourceAccountOperations _account;
+  final SourceAccountSessionCapability _account;
 
   @override
   String? get sourceRevision => runtime.sourceRevision;
@@ -240,14 +242,14 @@ class HazukiSourceCategoryAdapter implements SourceCategoryGateway {
 class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
   const HazukiSourceCommentsAdapter({
     required SourceCommentsCapability comments,
-    required SourceAccountOperations account,
+    required SourceAccountSessionCapability account,
     required SourceDebugOperations debug,
   }) : _comments = comments,
        _account = account,
        _debug = debug;
 
   final SourceCommentsCapability _comments;
-  final SourceAccountOperations _account;
+  final SourceAccountSessionCapability _account;
   final SourceDebugOperations _debug;
 
   @override
@@ -345,28 +347,28 @@ class HazukiSourceComicDetailAdapter
     with SourceCloudReadingAdapter
     implements SourceComicDetailGateway {
   @override
-  SourceContentOperations get cloudReadingDelegate => _content;
+  SourceCloudReadingCapability get cloudReadingDelegate => _cloudReading;
   HazukiSourceComicDetailAdapter({
     required SourceRuntimeView runtime,
-    required SourceAccountOperations account,
-    required SourceFavoritesOperations favorites,
-    required SourceContentOperations content,
+    required SourceAccountSessionCapability account,
+    required SourceFavoritesCapability favorites,
+    required SourceCloudReadingCapability cloudReading,
     required SourceComicDetailsCapability comicDetails,
     required SourceCategoryCapability category,
     required SourceComicDetailTabCapability detailTabs,
     required SourceImageOperations image,
   }) : _account = account,
        _favorites = favorites,
-       _content = content,
+       _cloudReading = cloudReading,
        _comicDetails = comicDetails,
        _category = category,
        _detailTabs = detailTabs,
        _image = image,
        _runtime = runtime;
 
-  final SourceAccountOperations _account;
-  final SourceFavoritesOperations _favorites;
-  final SourceContentOperations _content;
+  final SourceAccountSessionCapability _account;
+  final SourceFavoritesCapability _favorites;
+  final SourceCloudReadingCapability _cloudReading;
   final SourceComicDetailsCapability _comicDetails;
   final SourceCategoryCapability _category;
   final SourceComicDetailTabCapability _detailTabs;
@@ -541,16 +543,17 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
     implements SourceFavoriteGateway {
   HazukiSourceFavoriteAdapter({
     required SourceRuntimeView runtime,
-    required SourceAccountOperations account,
-    required SourceFavoritesOperations favorites,
+    required SourceAccountSessionCapability account,
+    required SourceFavoritesCapability favorites,
+    required this.cloudFavoritesChangedStream,
     required SourceRuntimeInitializationOperations initialization,
   }) : _account = account,
        _favorites = favorites,
        _initialization = initialization,
        super(runtime);
 
-  final SourceAccountOperations _account;
-  final SourceFavoritesOperations _favorites;
+  final SourceAccountSessionCapability _account;
+  final SourceFavoritesCapability _favorites;
   final SourceRuntimeInitializationOperations _initialization;
 
   @override
@@ -579,7 +582,7 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   @override
   List<String> get favoriteSortOrders => _favorites.favoriteSortOrders;
   @override
-  Stream<void> get cloudFavoritesChangedStream => _favorites.changedStream;
+  final Stream<void> cloudFavoritesChangedStream;
   @override
   SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
@@ -668,14 +671,16 @@ class HazukiSourceReaderAdapter
         SourceReaderSessionGateway,
         SourceDownloadSessionGateway {
   @override
-  SourceContentOperations get cloudReadingDelegate => _content;
+  SourceCloudReadingCapability get cloudReadingDelegate => _cloudReading;
   HazukiSourceReaderAdapter({
-    required SourceContentOperations content,
+    required SourceCloudReadingCapability cloudReading,
+    required SourceReadingProgressUploads readingProgressUploads,
     required SourceComicDetailsCapability comicDetails,
     required SourceImagePreparationCapability imagePreparation,
     required SourceImageOperations image,
     required SourceDebugOperations debug,
-  }) : _content = content,
+  }) : _cloudReading = cloudReading,
+       _readingProgressUploads = readingProgressUploads,
        _comicDetails = comicDetails,
        _imagePreparation = imagePreparation,
        _image = image,
@@ -689,7 +694,8 @@ class HazukiSourceReaderAdapter
   SourceDownloadSession acquireDownloadSession(String sourceKey) =>
       _imagePreparation.acquireDownloadSession(sourceKey);
 
-  final SourceContentOperations _content;
+  final SourceCloudReadingCapability _cloudReading;
+  final SourceReadingProgressUploads _readingProgressUploads;
   final SourceComicDetailsCapability _comicDetails;
   final SourceImagePreparationCapability _imagePreparation;
   final SourceImageOperations _image;
@@ -700,11 +706,7 @@ class HazukiSourceReaderAdapter
     Map<String, Object> progress, {
     required String sourceKey,
     SourceTaskOrigin? taskOrigin,
-  }) => _content.reportReadingProgress(
-    progress,
-    sourceKey: sourceKey,
-    taskOrigin: taskOrigin,
-  );
+  }) => _readingProgressUploads.report(progress, sourceKey, origin: taskOrigin);
 
   @override
   Future<ComicDetailsData> loadComicDetails(
