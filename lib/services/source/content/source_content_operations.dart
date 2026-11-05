@@ -6,12 +6,7 @@ import 'source_cloud_reading.dart';
 import 'source_reading_progress_uploads.dart';
 
 import '../../../models/hazuki_models.dart';
-import '../category/source_category_capability.dart';
-import '../comic/comic_details_capability.dart';
-import '../comic/comic_detail_tab_capability.dart';
-import '../plugins/source_detail_tabs.dart';
 import '../common/source_json_coerce.dart';
-import 'explore_capability.dart';
 import '../runtime/source_runtime_host.dart';
 import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_initialization_operations.dart';
@@ -31,29 +26,15 @@ class SourceContentOperations
   SourceContentOperations({
     required SourceRuntimeHost runtimeHost,
     required SourceRuntimeInitializationOperations initialization,
-    required SourceExploreCapability explore,
-    required SourceCategoryCapability category,
-    required SourceComicDetailsCapability comicDetails,
-    SourceComicDetailTabCapability? detailTabs,
     this.loadCloudReadRuntime,
   }) : _runtimeHost = runtimeHost,
-       _initialization = initialization,
-       _explore = explore,
-       _category = category,
-       _comicDetails = comicDetails,
-       _detailTabs =
-           detailTabs ??
-           SourceComicDetailTabCapability(runtimeHost: runtimeHost) {
+       _initialization = initialization {
     _cloud;
     _uploads;
   }
 
   final SourceRuntimeHost _runtimeHost;
   final SourceRuntimeInitializationOperations _initialization;
-  final SourceExploreCapability _explore;
-  final SourceCategoryCapability _category;
-  final SourceComicDetailsCapability _comicDetails;
-  final SourceComicDetailTabCapability _detailTabs;
   late final _uploads = SourceReadingProgressUploads(_runtimeHost);
   List<SourceTaskSnapshot> get activeSearchTasks => _runtimeHost
       .tasks
@@ -193,96 +174,6 @@ class SourceContentOperations
       return List.unmodifiable(items);
     });
   }
-
-  Future<List<ExploreSection>> loadExploreSections({
-    bool forceRefresh = false,
-    SourceTaskOrigin? taskOrigin,
-  }) => _explore.load(forceRefresh: forceRefresh, taskOrigin: taskOrigin);
-  Future<ComicDetailsData> loadComicDetails(
-    String comicId, {
-    String sourceKey = '',
-    bool forceRefresh = false,
-    SourceTaskOrigin? taskOrigin,
-  }) => _comicDetails.loadComicDetails(
-    comicId,
-    sourceKey: sourceKey,
-    forceRefresh: forceRefresh,
-    taskOrigin: taskOrigin,
-  );
-  Future<List<SourceDetailTabBlock>> loadDetailTab({
-    required String comicId,
-    required String tabId,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  }) => _detailTabs.loadDetailTab(
-    comicId: comicId,
-    tabId: tabId,
-    sourceKey: sourceKey,
-    taskOrigin: taskOrigin,
-  );
-  Future<List<String>> loadChapterImages({
-    required String comicId,
-    required String epId,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  }) => _comicDetails.loadChapterImages(
-    comicId: comicId,
-    epId: epId,
-    sourceKey: sourceKey,
-    taskOrigin: taskOrigin,
-  );
-  Future<ComicHeaderActionResult> runComicHeaderAction({
-    required String comicId,
-    required String actionId,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  }) => _comicDetails.runComicHeaderAction(
-    comicId: comicId,
-    actionId: actionId,
-    sourceKey: sourceKey,
-    taskOrigin: taskOrigin,
-  );
-  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
-    bool forceRefresh = false,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  }) => _category.loadTagGroups(
-    forceRefresh: forceRefresh,
-    sourceKey: sourceKey,
-    taskOrigin: taskOrigin,
-  );
-  Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
-    SourceTaskOrigin? taskOrigin,
-  }) => _category.loadRankingOptions(taskOrigin: taskOrigin);
-  Future<CategoryComicsResult> loadCategoryRankingComics({
-    required String rankingOption,
-    required int page,
-    SourceTaskOrigin? taskOrigin,
-  }) => _category.loadRankingComics(
-    rankingOption: rankingOption,
-    page: page,
-    taskOrigin: taskOrigin,
-  );
-  Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
-    required String viewMoreUrl,
-    SourceTaskOrigin? taskOrigin,
-  }) => _category.loadOptionGroupsByViewMore(
-    viewMoreUrl: viewMoreUrl,
-    taskOrigin: taskOrigin,
-  );
-  Future<CategoryComicsResult> loadCategoryComicsByViewMore({
-    required String viewMoreUrl,
-    required int page,
-    String order = '',
-    List<String>? orders,
-    SourceTaskOrigin? taskOrigin,
-  }) => _category.loadComicsByViewMore(
-    viewMoreUrl: viewMoreUrl,
-    page: page,
-    order: order,
-    orders: orders,
-    taskOrigin: taskOrigin,
-  );
 
   Future<SearchComicsResult> searchComics({
     required String keyword,

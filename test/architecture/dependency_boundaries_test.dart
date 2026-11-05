@@ -25,6 +25,20 @@ void main() {
       );
     });
 
+    test('cloud reading consumers depend on contracts', () {
+      final implementation = File(
+        'lib/services/source/content/source_cloud_reading.dart',
+      ).absolute.uri;
+      final violations = [
+        for (final entry in sources.entries)
+          if ((entry.key.path.contains('/features/') ||
+                  entry.key.path.contains('/app/')) &&
+              _dependencyUris(entry.value, entry.key).contains(implementation))
+            entry.key,
+      ];
+      expect(violations, isEmpty);
+    });
+
     test('source public exports do not expose implementations', () {
       final exports = _libraryDependencyGraph(sources, exportsOnly: true);
       final entry = File(
@@ -34,6 +48,7 @@ void main() {
         (uri) =>
             uri.path.contains('/services/source/adapters/') ||
             uri.path.contains('/services/source/runtime/') ||
+            uri.path.endsWith('/content/source_cloud_reading.dart') ||
             uri.path.endsWith('/gateways/source_gateway_set.dart'),
       );
       expect(violations, isEmpty, reason: 'Source implementation exports');

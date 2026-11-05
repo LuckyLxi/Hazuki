@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import '../support/fake_source_task_control.dart';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -15,6 +16,8 @@ import 'package:hazuki/services/source/adapters/hazuki_source_image_adapters.dar
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../support/test_service_locator.dart';
+
+class _ComicDetails extends Fake implements SourceComicDetailsCapability {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -148,6 +151,7 @@ void main() {
           runtime: source.testRuntimeView,
           image: source.testing.image,
           content: source.testContent,
+          comicDetails: _ComicDetails(),
         ),
         taskControl: FakeSourceTaskControl(),
       );
@@ -167,6 +171,7 @@ void main() {
           runtime: source.testRuntimeView,
           image: source.testing.image,
           content: source.testContent,
+          comicDetails: _ComicDetails(),
         ),
         taskControl: FakeSourceTaskControl(),
       );
@@ -186,6 +191,7 @@ void main() {
           runtime: source.testRuntimeView,
           image: source.testing.image,
           content: source.testContent,
+          comicDetails: _ComicDetails(),
         ),
         taskControl: FakeSourceTaskControl(),
       );

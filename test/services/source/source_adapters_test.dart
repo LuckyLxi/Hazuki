@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import '../../support/source_catalog_fixtures.dart';
 import 'dart:async';
 
@@ -21,6 +22,8 @@ import 'package:hazuki/services/source/adapters/hazuki_source_runtime_adapters.d
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/test_service_locator.dart';
+
+class _ComicDetails extends Fake implements SourceComicDetailsCapability {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -94,6 +97,7 @@ void main() {
       final adapter = HazukiSourceSearchAdapter(
         runtime: runtime,
         content: content,
+        comicDetails: _ComicDetails(),
       );
       var notifications = 0;
       void onChanged() => notifications++;

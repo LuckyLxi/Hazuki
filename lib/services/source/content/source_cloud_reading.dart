@@ -1,5 +1,9 @@
+import '../gateways/source_content_gateways.dart';
+
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+
 import '../models/source_task.dart';
 import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
@@ -10,26 +14,6 @@ import '../../../models/hazuki_models.dart';
 import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_host.dart';
 import '../runtime/source_runtime_initialization_operations.dart';
-
-/// Optional capability. No cloud position ever enters the local progress DB or
-/// the WebDAV participant. This account-scoped cache is for display only.
-abstract interface class SourceCloudReadingGateway {
-  Future<bool> usesCloudReading(
-    String sourceKey, {
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<Map<String, dynamic>?> loadCloudReadingProgress(
-    String sourceKey,
-    String comicId, {
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<List<ExploreComic>> refreshCloudReadingHistory(
-    String sourceKey, {
-    SourceTaskOrigin? taskOrigin,
-  });
-}
-
-abstract interface class SourceCloudReadingEvents implements Listenable {}
 
 class SourceCloudReadingCapability extends ChangeNotifier
     implements SourceCloudReadingGateway, SourceCloudReadingEvents {

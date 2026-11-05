@@ -1,3 +1,7 @@
+import '../comic/comic_details_capability.dart';
+import '../comic/comic_detail_tab_capability.dart';
+import '../category/source_category_capability.dart';
+import '../content/explore_capability.dart';
 import '../account/source_account_operations.dart';
 import '../adapters/hazuki_source_content_adapters.dart';
 import '../adapters/hazuki_source_image_adapters.dart';
@@ -39,15 +43,24 @@ class SourceGatewaySet {
     required SourceAccountOperations account,
     required SourceCommentsCapability comments,
     required SourceContentOperations content,
+    required SourceComicDetailsCapability comicDetails,
+    required SourceComicDetailTabCapability detailTabs,
+    required SourceCategoryCapability category,
+    required SourceExploreCapability explore,
     required SourceFavoritesOperations favorites,
     required SourceImageOperations image,
     required SourceImagePreparationCapability imagePreparation,
     required SourceDebugOperations debug,
   }) {
-    search = HazukiSourceSearchAdapter(runtime: runtime, content: content);
-    discover = HazukiSourceDiscoverAdapter(
+    search = HazukiSourceSearchAdapter(
       runtime: runtime,
       content: content,
+      comicDetails: comicDetails,
+    );
+    discover = HazukiSourceDiscoverAdapter(
+      runtime: runtime,
+      explore: explore,
+      category: category,
       account: account,
     );
     favorite = HazukiSourceFavoriteAdapter(
@@ -58,6 +71,7 @@ class SourceGatewaySet {
     );
     reader = HazukiSourceReaderAdapter(
       content: content,
+      comicDetails: comicDetails,
       imagePreparation: imagePreparation,
       image: image,
       debug: debug,
@@ -80,6 +94,7 @@ class SourceGatewaySet {
       runtime: runtime,
       image: image,
       content: content,
+      comicDetails: comicDetails,
     );
     final runtimeAdapter = HazukiSourceRuntimeAdapter(
       runtime: runtime,
@@ -94,7 +109,10 @@ class SourceGatewaySet {
     runtimeGateway = runtimeAdapter;
     home = runtimeAdapter;
     script = runtimeAdapter;
-    category = HazukiSourceCategoryAdapter(content: content, debug: debug);
+    this.category = HazukiSourceCategoryAdapter(
+      category: category,
+      debug: debug,
+    );
     commentsGateway = HazukiSourceCommentsAdapter(
       comments: comments,
       account: account,
@@ -105,6 +123,9 @@ class SourceGatewaySet {
       account: account,
       favorites: favorites,
       content: content,
+      comicDetails: comicDetails,
+      category: category,
+      detailTabs: detailTabs,
       image: image,
     );
     localizationGateway = localization;

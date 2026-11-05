@@ -1,13 +1,13 @@
-import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:hazuki/features/reader/support/reader_input_controller.dart';
-import 'package:hazuki/features/reader/support/reader_navigation_prefetch.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
+
 import 'dart:async';
+
 import 'package:hazuki/shared/reading/reader_entry_position.dart';
-import 'package:hazuki/services/source/content/source_cloud_reading.dart';
+
 import '../support/reader_progress_reporter.dart';
-import 'package:hazuki/services/source/gateways/source_content_gateways.dart';
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -19,6 +19,7 @@ import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/reading/reader_filter_color.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
+import 'package:hazuki/features/reader/state/reader_entry_restore_state.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
@@ -40,7 +41,9 @@ import 'package:hazuki/features/reader/view/reader_overlay_host.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/features/reader/view/reader_windows_shortcuts_dialog.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/ui_flags.dart';
+
 import '../state/reader_scroll_state.dart';
 import '../support/reader_translation_controller.dart';
 import 'reader_translation_actions_sheet.dart';
@@ -353,15 +356,6 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         chapterTitle: widget.page.chapterTitle,
         chapterIndex: widget.page.chapterIndex,
       );
-  late final ReaderNavigationPrefetch _navigationPrefetch =
-      ReaderNavigationPrefetch(
-        noImageModeEnabled: () => _noImageModeEnabled,
-        prefetchAround: (index) {
-          _imagePipelineController.prefetchAround(index);
-          _translationController?.updateWindow(index);
-        },
-        requestPrefetchAhead: _imagePipelineController.requestPrefetchAhead,
-      );
   late final ReaderNavigationController _navigationController =
       ReaderNavigationController(
         runtimeState: _runtimeState,
@@ -376,8 +370,11 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         logVisiblePageChange: _logVisiblePageChange,
         resetZoomImmediately: _readerZoomController.resetZoomImmediately,
         onPageTargetChanged: (index) {
-          _cancelEntryRestore();
-          _navigationPrefetch.onPageTargetChanged(index);
+          _entryRestore.cancel();
+          if (_noImageModeEnabled) return;
+          _imagePipelineController.prefetchAround(index);
+          _translationController?.updateWindow(index);
+          _imagePipelineController.requestPrefetchAhead(index);
         },
         onVisiblePageChanged: (_) => _scheduleViewportReport(),
         toggleControlsVisibility: _toggleControlsVisibility,
@@ -427,7 +424,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
               );
         },
         onSettingsReady: () {
-          _entrySettingsReady = true;
+          _entryRestore.settingsReady = true;
           _maybeRestoreEntry();
         },
       );
@@ -607,48 +604,22 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   bool _frameReportQueued = false;
 
   final _displayedImages = <int>{};
-  Map<String, dynamic>? _entryPosition;
-  bool _entryReady = false;
-  bool _entrySettingsReady = false;
-  bool _entryStarted = false;
-  // 为空表示开关尚未读取，读取完成前不执行入口恢复。
-  bool? _restorePagePosition;
-  int? _restoringImage;
-
-  void _cancelEntryRestore() {
-    _entryStarted = true;
-    _restoringImage = null;
-  }
+  final _entryRestore = ReaderEntryRestoreState();
 
   void _maybeRestoreEntry() {
-    if (!mounted ||
-        !_entryReady ||
-        !_entrySettingsReady ||
-        _entryStarted ||
-        _restorePagePosition == null ||
-        _runtimeState.imageCount == 0) {
-      return;
-    }
-    _entryStarted = true;
-    final position = _entryPosition;
-    if (_restorePagePosition != true || position?['epId'] != widget.page.epId) {
-      _scheduleViewportReport();
-      return;
-    }
-    final rawPage = position?['imagePage'];
-    final oldPage = position?['pageIndex'];
-    final target =
-        (rawPage is int
-                ? rawPage - 1
-                : (oldPage is int
-                      ? oldPage * _runtimeState.readerSpreadSize
-                      : 0))
-            .clamp(0, _runtimeState.imageCount - 1);
-    _restoringImage = target;
-    _navigationController.syncPositionToImageIndex(
-      target,
-      trigger: 'entry_restore',
+    if (!mounted || _entryRestore.started) return;
+    final target = _entryRestore.takeTarget(
+      epId: widget.page.epId,
+      imageCount: _runtimeState.imageCount,
+      spreadSize: _runtimeState.readerSpreadSize,
     );
+    if (!_entryRestore.started) return;
+    if (target != null) {
+      _navigationController.syncPositionToImageIndex(
+        target,
+        trigger: 'entry_restore',
+      );
+    }
     _scheduleViewportReport();
   }
 
@@ -690,7 +661,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   void _reportActualViewport() {
     _maybeRestoreEntry();
     if (!mounted ||
-        !_entryStarted ||
+        !_entryRestore.started ||
         !_foreground ||
         widget.page.offlineMode ||
         _noImageModeEnabled ||
@@ -733,11 +704,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     if (first == null || last == null || !_displayedImages.contains(first)) {
       return;
     }
-    final target = _restoringImage;
-    if (target != null) {
-      if (target < first || target > last) return;
-      _restoringImage = null;
-    }
+    if (!_entryRestore.canReportVisibleRange(first, last)) return;
     _progressReporter.observe(
       firstImage: first,
       lastImage: last,
@@ -836,30 +803,30 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_entryReady) {
-      _entryReady = true;
+    if (!_entryRestore.positionReady) {
       unawaited(
         _readerSettingsStore.loadRestorePagePosition().then(
           (value) {
             if (!mounted) return;
             // 读取完成前用户可能已在侧栏切换，以用户操作为准。
-            _restorePagePosition ??= value;
+            _entryRestore.restorePagePosition ??= value;
             _maybeRestoreEntry();
           },
           onError: (Object _) {
             if (!mounted) return;
-            _restorePagePosition = false;
+            _entryRestore.restorePagePosition = false;
             _maybeRestoreEntry();
           },
         ),
       );
-      _entryPosition = widget.restoreEntry
+      final entryPosition = widget.restoreEntry
           ? ReaderEntryPosition.of(context)
           : null;
+      _entryRestore.resolvePosition(entryPosition);
       if (widget.page.offlineMode &&
           widget.restoreEntry &&
-          _entryPosition == null) {
-        _entryReady = false;
+          entryPosition == null) {
+        _entryRestore.positionReady = false;
         unawaited(
           widget.page.dependencies.readingProgressService
               .load(
@@ -870,13 +837,12 @@ class _ReaderPageState extends State<_ReaderChapterPage>
               .then(
                 (position) {
                   if (!mounted) return;
-                  _entryPosition = position;
-                  _entryReady = true;
+                  _entryRestore.resolvePosition(position);
                   _maybeRestoreEntry();
                 },
                 onError: (Object _) {
                   if (mounted) {
-                    _entryReady = true;
+                    _entryRestore.positionReady = true;
                     _maybeRestoreEntry();
                   }
                 },
@@ -958,7 +924,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
           autofocus: true,
           focusNode: _readerKeyFocusNode,
           onKeyEvent: (node, event) {
-            if (event is KeyDownEvent) _cancelEntryRestore();
+            if (event is KeyDownEvent) _entryRestore.cancel();
             return _inputController.handleKeyEvent(node, event);
           },
           child: SafeArea(
@@ -1008,7 +974,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
               child: Listener(
                 behavior: HitTestBehavior.translucent,
                 onPointerDown: (event) {
-                  _cancelEntryRestore();
+                  _entryRestore.cancel();
                   _readerZoomController.handlePointerDown(event);
                 },
                 onPointerUp: _readerZoomController.handlePointerEnd,
@@ -1083,9 +1049,9 @@ class _ReaderPageState extends State<_ReaderChapterPage>
           _settingsController.toggleVolumeButtonTurnPage,
       onPinchToZoomChanged: _settingsController.togglePinchToZoom,
       // 只影响下次进入阅读器，本次已完成的入口恢复不会重新执行。
-      restorePagePosition: _restorePagePosition ?? false,
+      restorePagePosition: _entryRestore.restorePagePosition ?? false,
       onRestorePagePositionChanged: (value) {
-        setState(() => _restorePagePosition = value);
+        setState(() => _entryRestore.restorePagePosition = value);
         unawaited(_readerSettingsStore.saveRestorePagePosition(value));
       },
       onImmersiveModeChanged: _settingsController.toggleImmersiveMode,

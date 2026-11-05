@@ -1,13 +1,17 @@
+import '../comic/comic_details_capability.dart';
+import '../comic/comic_detail_tab_capability.dart';
+import '../category/source_category_capability.dart';
+import '../content/explore_capability.dart';
 import '../plugins/source_search_capabilities.dart';
 import '../plugins/source_sort_options.dart';
 import '../plugins/source_detail_tabs.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../account/source_account_operations.dart';
 import '../comments/comments_capability.dart';
 import '../content/source_content_operations.dart';
-import '../content/source_cloud_reading.dart';
 import '../debug/source_debug_operations.dart';
 import '../favorites/source_favorites_operations.dart';
 import '../gateways/source_content_gateways.dart';
@@ -64,10 +68,13 @@ class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
   const HazukiSourceSearchAdapter({
     required SourceRuntimeView runtime,
     required SourceContentOperations content,
+    required SourceComicDetailsCapability comicDetails,
   }) : _content = content,
+       _comicDetails = comicDetails,
        super(runtime);
 
   final SourceContentOperations _content;
+  final SourceComicDetailsCapability _comicDetails;
 
   @override
   String? get activeSourceKey => runtime.activeSourceKey;
@@ -110,7 +117,7 @@ class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
     String comicId, {
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadComicDetails(
+  }) => _comicDetails.loadComicDetails(
     comicId,
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
@@ -121,13 +128,16 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
     implements SourceDiscoverGateway {
   HazukiSourceDiscoverAdapter({
     required SourceRuntimeView runtime,
-    required SourceContentOperations content,
+    required SourceExploreCapability explore,
+    required SourceCategoryCapability category,
     required SourceAccountOperations account,
-  }) : _content = content,
+  }) : _explore = explore,
+       _category = category,
        _account = account,
        super(runtime);
 
-  final SourceContentOperations _content;
+  final SourceExploreCapability _explore;
+  final SourceCategoryCapability _category;
   final SourceAccountOperations _account;
 
   @override
@@ -152,15 +162,12 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadExploreSections(
-    forceRefresh: forceRefresh,
-    taskOrigin: taskOrigin,
-  );
+  }) => _explore.load(forceRefresh: forceRefresh, taskOrigin: taskOrigin);
   @override
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadCategoryOptionGroupsByViewMore(
+  }) => _category.loadOptionGroupsByViewMore(
     viewMoreUrl: viewMoreUrl,
     taskOrigin: taskOrigin,
   );
@@ -171,7 +178,7 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
     String order = '',
     List<String>? orders,
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadCategoryComicsByViewMore(
+  }) => _category.loadComicsByViewMore(
     viewMoreUrl: viewMoreUrl,
     page: page,
     order: order,
@@ -182,12 +189,12 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
 
 class HazukiSourceCategoryAdapter implements SourceCategoryGateway {
   const HazukiSourceCategoryAdapter({
-    required SourceContentOperations content,
+    required SourceCategoryCapability category,
     required SourceDebugOperations debug,
-  }) : _content = content,
+  }) : _category = category,
        _debug = debug;
 
-  final SourceContentOperations _content;
+  final SourceCategoryCapability _category;
   final SourceDebugOperations _debug;
 
   @override
@@ -197,7 +204,7 @@ class HazukiSourceCategoryAdapter implements SourceCategoryGateway {
     bool forceRefresh = false,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadCategoryTagGroups(
+  }) => _category.loadTagGroups(
     forceRefresh: forceRefresh,
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
@@ -205,13 +212,13 @@ class HazukiSourceCategoryAdapter implements SourceCategoryGateway {
   @override
   Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadCategoryRankingOptions(taskOrigin: taskOrigin);
+  }) => _category.loadRankingOptions(taskOrigin: taskOrigin);
   @override
   Future<CategoryComicsResult> loadCategoryRankingComics({
     required String rankingOption,
     required int page,
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadCategoryRankingComics(
+  }) => _category.loadRankingComics(
     rankingOption: rankingOption,
     page: page,
     taskOrigin: taskOrigin,
@@ -344,16 +351,25 @@ class HazukiSourceComicDetailAdapter
     required SourceAccountOperations account,
     required SourceFavoritesOperations favorites,
     required SourceContentOperations content,
+    required SourceComicDetailsCapability comicDetails,
+    required SourceCategoryCapability category,
+    required SourceComicDetailTabCapability detailTabs,
     required SourceImageOperations image,
   }) : _account = account,
        _favorites = favorites,
        _content = content,
+       _comicDetails = comicDetails,
+       _category = category,
+       _detailTabs = detailTabs,
        _image = image,
        _runtime = runtime;
 
   final SourceAccountOperations _account;
   final SourceFavoritesOperations _favorites;
   final SourceContentOperations _content;
+  final SourceComicDetailsCapability _comicDetails;
+  final SourceCategoryCapability _category;
+  final SourceComicDetailTabCapability _detailTabs;
   final SourceImageOperations _image;
   final SourceRuntimeView _runtime;
 
@@ -383,7 +399,7 @@ class HazukiSourceComicDetailAdapter
     String sourceKey = '',
     bool forceRefresh = false,
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadComicDetails(
+  }) => _comicDetails.loadComicDetails(
     comicId,
     sourceKey: sourceKey,
     forceRefresh: forceRefresh,
@@ -394,7 +410,7 @@ class HazukiSourceComicDetailAdapter
     bool forceRefresh = false,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadCategoryTagGroups(
+  }) => _category.loadTagGroups(
     forceRefresh: forceRefresh,
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
@@ -425,7 +441,7 @@ class HazukiSourceComicDetailAdapter
     required String epId,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadChapterImages(
+  }) => _comicDetails.loadChapterImages(
     comicId: comicId,
     epId: epId,
     sourceKey: sourceKey,
@@ -437,7 +453,7 @@ class HazukiSourceComicDetailAdapter
     required String tabId,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadDetailTab(
+  }) => _detailTabs.loadDetailTab(
     comicId: comicId,
     tabId: tabId,
     sourceKey: sourceKey,
@@ -513,7 +529,7 @@ class HazukiSourceComicDetailAdapter
     required String actionId,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.runComicHeaderAction(
+  }) => _comicDetails.runComicHeaderAction(
     comicId: comicId,
     actionId: actionId,
     sourceKey: sourceKey,
@@ -655,10 +671,12 @@ class HazukiSourceReaderAdapter
   SourceContentOperations get cloudReadingDelegate => _content;
   HazukiSourceReaderAdapter({
     required SourceContentOperations content,
+    required SourceComicDetailsCapability comicDetails,
     required SourceImagePreparationCapability imagePreparation,
     required SourceImageOperations image,
     required SourceDebugOperations debug,
   }) : _content = content,
+       _comicDetails = comicDetails,
        _imagePreparation = imagePreparation,
        _image = image,
        _debug = debug;
@@ -672,6 +690,7 @@ class HazukiSourceReaderAdapter
       _imagePreparation.acquireDownloadSession(sourceKey);
 
   final SourceContentOperations _content;
+  final SourceComicDetailsCapability _comicDetails;
   final SourceImagePreparationCapability _imagePreparation;
   final SourceImageOperations _image;
   final SourceDebugOperations _debug;
@@ -692,7 +711,7 @@ class HazukiSourceReaderAdapter
     String comicId, {
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadComicDetails(
+  }) => _comicDetails.loadComicDetails(
     comicId,
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,
@@ -703,7 +722,7 @@ class HazukiSourceReaderAdapter
     required String epId,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadChapterImages(
+  }) => _comicDetails.loadChapterImages(
     comicId: comicId,
     epId: epId,
     sourceKey: sourceKey,

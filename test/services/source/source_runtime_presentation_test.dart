@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
@@ -22,6 +23,8 @@ class _Initialization extends Mock
     implements SourceRuntimeInitializationOperations {}
 
 class _Diagnostics extends Mock implements SourceRuntimeDiagnosticsOperations {}
+
+class _ComicDetails extends Fake implements SourceComicDetailsCapability {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +57,7 @@ void main() {
         diagnostics: _Diagnostics(),
       ),
       content: _Content(),
+      comicDetails: _ComicDetails(),
     );
   });
   tearDown(() => host.dispose());

@@ -260,18 +260,15 @@ class SourceRuntimeAssembly {
   late final SourceCategoryCapability _categoryCapability;
   late final SourceImagePreparationCapability _imagePreparationCapability;
   late final SourceFavoritesCapability _favoritesCapability;
+  late final _detailTabsCapability = SourceComicDetailTabCapability(
+    runtimeHost: _runtimeHost,
+    reloginCoordinator: _reloginCoordinator,
+  );
   late final SourceContentOperations _contentOperations =
       SourceContentOperations(
         loadCloudReadRuntime: _runtimeCapability.loadLoginRuntime,
         runtimeHost: _runtimeHost,
         initialization: _runtimeCapability.initialization,
-        explore: _exploreCapability,
-        category: _categoryCapability,
-        comicDetails: _comicDetailsCapability,
-        detailTabs: SourceComicDetailTabCapability(
-          runtimeHost: _runtimeHost,
-          reloginCoordinator: _reloginCoordinator,
-        ),
       );
   late final SourceFavoritesOperations _favoritesOperations =
       SourceFavoritesOperations(
@@ -292,6 +289,10 @@ class SourceRuntimeAssembly {
     account: _accountOperations,
     comments: _commentsCapability,
     content: _contentOperations,
+    explore: _exploreCapability,
+    category: _categoryCapability,
+    comicDetails: _comicDetailsCapability,
+    detailTabs: _detailTabsCapability,
     favorites: _favoritesOperations,
     image: _imageOperations,
     imagePreparation: _imagePreparationCapability,
@@ -340,7 +341,6 @@ class SourceRuntimeAssembly {
     initialization: _runtimeCapability.initialization,
     diagnostics: _runtimeCapability.diagnostics,
     scriptEditing: _runtimeCapability.scriptEditing,
-    content: _contentOperations,
     comments: _commentsCapability,
     favorites: _favoritesOperations,
     image: _imageOperations,
@@ -480,7 +480,6 @@ class SourceRuntimeTestAccess {
     required this.initialization,
     required this.diagnostics,
     required this.scriptEditing,
-    required this.content,
     required this.comments,
     required this.favorites,
     required this.image,
@@ -509,7 +508,6 @@ class SourceRuntimeTestAccess {
   final SourceRuntimeInitializationOperations initialization;
   final SourceRuntimeDiagnosticsOperations diagnostics;
   final SourceScriptEditingOperations scriptEditing;
-  final SourceContentOperations content;
   final SourceCommentsCapability comments;
   final SourceFavoritesOperations favorites;
   final SourceImageOperations image;

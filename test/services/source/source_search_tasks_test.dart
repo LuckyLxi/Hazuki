@@ -4,10 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/source_meta.dart';
 import 'package:hazuki/services/logging/app_log_event.dart';
 import 'package:hazuki/services/logging/app_log_store.dart';
-import 'package:hazuki/services/source/category/source_category_capability.dart';
-import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import 'package:hazuki/services/source/content/source_content_operations.dart';
-import 'package:hazuki/services/source/content/explore_capability.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_handle.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
@@ -18,12 +15,6 @@ import 'package:mocktail/mocktail.dart';
 
 class _Operations extends Mock
     implements SourceRuntimeInitializationOperations {}
-
-class _Explore extends Mock implements SourceExploreCapability {}
-
-class _Category extends Mock implements SourceCategoryCapability {}
-
-class _Comic extends Mock implements SourceComicDetailsCapability {}
 
 class _Engine extends Mock implements SourceScriptEngine {}
 
@@ -88,9 +79,6 @@ void main() {
     content = SourceContentOperations(
       runtimeHost: host,
       initialization: operations,
-      explore: _Explore(),
-      category: _Category(),
-      comicDetails: _Comic(),
     );
     addTearDown(content.dispose);
   });

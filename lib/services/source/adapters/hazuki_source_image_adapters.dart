@@ -1,3 +1,4 @@
+import '../comic/comic_details_capability.dart';
 import '../plugins/source_search_capabilities.dart';
 import 'package:flutter/foundation.dart';
 
@@ -111,11 +112,14 @@ class HazukiSourceDailyRecommendationAdapter
     required SourceRuntimeView runtime,
     required SourceImageOperations image,
     required SourceContentOperations content,
+    required SourceComicDetailsCapability comicDetails,
   }) : _content = content,
+       _comicDetails = comicDetails,
        _image = image,
        super(runtime);
 
   final SourceContentOperations _content;
+  final SourceComicDetailsCapability _comicDetails;
   final SourceImageOperations _image;
 
   @override
@@ -169,7 +173,7 @@ class HazukiSourceDailyRecommendationAdapter
     String comicId, {
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) => _content.loadComicDetails(
+  }) => _comicDetails.loadComicDetails(
     comicId,
     sourceKey: sourceKey,
     taskOrigin: taskOrigin,

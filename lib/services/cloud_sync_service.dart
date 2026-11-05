@@ -45,15 +45,11 @@ class CloudSyncService {
   late final CloudSyncRestoreApplier _restoreApplier = CloudSyncRestoreApplier(
     participants: _participants,
   );
-  late final CloudSyncFacade facade = CloudSyncFacade._(
-    configStore: _configStore,
-    snapshotCodec: _snapshotCodec,
-    restoreApplier: _restoreApplier,
-    remoteClientFactory: (config) => _remoteClientFactory(config, _configStore),
-  );
-
   bool _autoSyncRunning = false;
   Future<void> _uploadQueue = Future<void>.value();
+
+  CloudSyncRemoteClient _remoteClient(CloudSyncConfig config) =>
+      _remoteClientFactory(config, _configStore);
 
   Future<CloudSyncConfig> loadConfig() => _configStore.loadConfig();
 
@@ -91,7 +87,7 @@ class CloudSyncService {
         checkedAt: DateTime.now(),
       );
     }
-    return facade.remoteClient(config).testConnection();
+    return _remoteClient(config).testConnection();
   }
 
   Future<void> uploadBackup({
@@ -121,7 +117,7 @@ class CloudSyncService {
     final lastSyncedRemoteTs = await _configStore.loadLastSyncedRemoteTs(
       config,
     );
-    final client = facade.remoteClient(config);
+    final client = _remoteClient(config);
     await client.ensureRootDir();
     await client.ensureBackupDirs();
 
@@ -290,7 +286,7 @@ class CloudSyncService {
       throw Exception('cloud_sync_config_incomplete');
     }
 
-    final client = facade.remoteClient(config);
+    final client = _remoteClient(config);
     final settingsText = await client.getBackupFile(
       CloudSyncConfigStore.settingsFileName,
     );
@@ -311,25 +307,5 @@ class CloudSyncService {
       appliedPlatformFilteredKeys: settingsResult.appliedPlatformFilteredKeys,
       skippedKeys: settingsResult.skippedKeys,
     );
-  }
-}
-
-class CloudSyncFacade {
-  CloudSyncFacade._({
-    required this.configStore,
-    required this.snapshotCodec,
-    required this.restoreApplier,
-    required CloudSyncRemoteClient Function(CloudSyncConfig config)
-    remoteClientFactory,
-  }) : _remoteClientFactory = remoteClientFactory;
-
-  final CloudSyncConfigStore configStore;
-  final CloudSyncSnapshotCodec snapshotCodec;
-  final CloudSyncRestoreApplier restoreApplier;
-  final CloudSyncRemoteClient Function(CloudSyncConfig config)
-  _remoteClientFactory;
-
-  CloudSyncRemoteClient remoteClient(CloudSyncConfig config) {
-    return _remoteClientFactory(config);
   }
 }

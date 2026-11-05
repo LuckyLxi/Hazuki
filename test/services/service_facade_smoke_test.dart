@@ -1,18 +1,35 @@
 import '../support/source_catalog_fixtures.dart';
+
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
+
 import 'package:hazuki/app/service_locator.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
+import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
+import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/debug/debug_log_internals.dart';
 import 'package:hazuki/services/source/common/source_prefs_keys.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../support/test_service_locator.dart';
+
+class _ConnectionTestClient extends CloudSyncRemoteClient {
+  _ConnectionTestClient(super.config, {required super.configStore});
+
+  @override
+  Future<CloudSyncConnectionStatus> testConnection() async =>
+      CloudSyncConnectionStatus(
+        ok: true,
+        message: 'connected',
+        checkedAt: DateTime(2026),
+      );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -163,7 +180,7 @@ void main() {
   });
 
   test(
-    'CloudSyncFacade keeps config and remote client access reachable',
+    'cloud sync loads config and passes it to the remote client factory',
     () async {
       const config = CloudSyncConfig(
         enabled: true,
@@ -172,10 +189,22 @@ void main() {
         password: 'secret',
       );
 
-      await sl<CloudSyncService>().saveConfig(config);
-      final restored = await sl<CloudSyncService>().facade.configStore
-          .loadConfig();
-      final client = sl<CloudSyncService>().facade.remoteClient(restored);
+      late CloudSyncConfig clientConfig;
+      late _ConnectionTestClient client;
+      final service = CloudSyncService(
+        participants: sl<CloudSyncParticipantSet>(),
+        remoteClientFactory: (config, store) {
+          clientConfig = config;
+          return client = _ConnectionTestClient(config, configStore: store);
+        },
+      );
+      await service.saveConfig(config);
+      final restored = await service.loadConfig();
+      final status = await service.testConnection();
+      expect(status.ok, isTrue);
+      expect(clientConfig.url, restored.url);
+      expect(clientConfig.username, config.username);
+      expect(clientConfig.password, config.password);
 
       expect(restored.enabled, isTrue);
       expect(restored.url, 'https://example.com');
