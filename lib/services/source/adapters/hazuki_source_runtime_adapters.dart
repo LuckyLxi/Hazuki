@@ -94,7 +94,7 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   Future<void> activateSource(String sourceKey) =>
       runtime.activateSource(sourceKey);
   @override
-  Future<void> prewarmInBackground() => runtime.prewarmInBackground();
+  Future<void> prewarmInBackground() => _initialization.prewarmInBackground();
   @override
   Future<void> warmUpFavoritesDebugInfo() =>
       _favoritesDebug.warmUpFavoritesDebugInfo();

@@ -10,10 +10,16 @@ class ReaderDependencies {
     required this.readingProgressService,
     required this.downloader,
     this.taskControl,
+    this.readerSessions,
+    this.readingProgressUploads,
+    this.cloudReading,
     this.translation,
   });
 
   final SourceReaderGateway sourceReader;
+  final SourceReaderSessionGateway? readerSessions;
+  final SourceReadingProgressGateway? readingProgressUploads;
+  final SourceCloudReadingGateway? cloudReading;
   final SourceSettingsGateway sourceSettings;
   final ReadingProgressService readingProgressService;
   final MangaDownloadCommands downloader;

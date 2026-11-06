@@ -166,6 +166,7 @@ void main() {
     beforePublish = null;
     service = MangaDownloadService(
       sourceReader: reader,
+      downloadSessions: reader,
       taskControl: control,
       access: access,
       files: MangaDownloadFiles(

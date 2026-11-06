@@ -64,5 +64,12 @@ void main() {
 
     expect(services<SourceRuntimeAssembly>(), same(assembly));
     expect(services<SourceSearchGateway>(), same(assembly.gateways.search));
+    final reader = services<SourceReaderGateway>();
+    expect(services<SourceReaderSessionGateway>(), same(reader));
+    expect(services<SourceDownloadSessionGateway>(), same(reader));
+    expect(services<SourceReadingProgressGateway>(), same(reader));
+    final cloudReading = services<SourceCloudReadingGateway>();
+    expect(cloudReading, same(assembly.gateways.cloudReading));
+    expect(services<SourceCloudReadingEvents>(), same(cloudReading));
   });
 }

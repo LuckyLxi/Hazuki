@@ -16,12 +16,16 @@ class HistoryPageController extends ChangeNotifier {
     required ReadHistoryService readHistoryService,
     required SourceRuntimeGateway sourceService,
     SourceReaderGateway? readerService,
+    SourceCloudReadingGateway? cloudReading,
+    SourceCloudReadingEvents? cloudReadingEvents,
     SourceTaskControlGateway? taskControl,
     SourcePresentationReader presentationFor = emptySourcePresentation,
   }) : _cloudTasks = SourceTaskOwner(taskControl),
        _readHistoryService = readHistoryService,
        _sourceService = sourceService,
        _readerService = readerService,
+       _cloudReading = cloudReading,
+       _cloudReadingEvents = cloudReadingEvents,
        _presentationFor = presentationFor,
        _activeSourceKey = _normalizeSourceKey(
          (sourceService.activeSourceKey ?? ''),
@@ -31,17 +35,14 @@ class HistoryPageController extends ChangeNotifier {
         .join('|');
     _readHistoryService.addListener(_handleReadHistoryChanged);
     _sourceService.addListener(_handleSourceChanged);
-    final reader = _readerService;
-    if (reader is SourceCloudReadingEvents) {
-      (reader as SourceCloudReadingEvents).addListener(
-        _handleCloudSessionChanged,
-      );
-    }
+    _cloudReadingEvents?.addListener(_handleCloudSessionChanged);
   }
 
   final ReadHistoryService _readHistoryService;
   final SourceRuntimeGateway _sourceService;
   final SourceReaderGateway? _readerService;
+  final SourceCloudReadingGateway? _cloudReading;
+  final SourceCloudReadingEvents? _cloudReadingEvents;
   final SourcePresentationReader _presentationFor;
   final HistoryPageData _state = HistoryPageData();
 
@@ -213,11 +214,13 @@ class HistoryPageController extends ChangeNotifier {
             .toSet(),
       ),
     );
-    final reader = _readerService;
-    if (reader is SourceCloudReadingGateway) {
+    final cloudReading = _cloudReading;
+    if (cloudReading != null) {
       try {
-        final cloud = await (reader as SourceCloudReadingGateway)
-            .refreshCloudReadingHistory(sourceKey, taskOrigin: origin);
+        final cloud = await cloudReading.refreshCloudReadingHistory(
+          sourceKey,
+          taskOrigin: origin,
+        );
         final ids = history.map((c) => c.scopedId.storageKey).toSet();
         history.addAll(cloud.where((c) => ids.add(c.scopedId.storageKey)));
       } catch (_) {
@@ -400,12 +403,7 @@ class HistoryPageController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _cloudTasks.dispose();
-    final reader = _readerService;
-    if (reader is SourceCloudReadingEvents) {
-      (reader as SourceCloudReadingEvents).removeListener(
-        _handleCloudSessionChanged,
-      );
-    }
+    _cloudReadingEvents?.removeListener(_handleCloudSessionChanged);
     _readHistoryService.removeListener(_handleReadHistoryChanged);
     _sourceService.removeListener(_handleSourceChanged);
     super.dispose();

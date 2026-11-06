@@ -17,9 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/test_service_locator.dart';
 
-class _Reader extends Fake
-    implements SourceReaderGateway, SourceReadingProgressGateway {
-  final events = <Map<String, Object>>[];
+class _Reader extends Fake implements SourceReaderGateway {
   @override
   bool isLocalImagePath(String value) => true;
   @override
@@ -41,6 +39,11 @@ class _Reader extends Fake
     Iterable<String> urls, {
     String sourceKey = '',
   }) async {}
+}
+
+class _ProgressUploads implements SourceReadingProgressGateway {
+  final events = <Map<String, Object>>[];
+
   @override
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {
@@ -96,7 +99,7 @@ void main() {
           }))!;
           final directory = files.directory;
           final images = files.images;
-          final reader = _Reader();
+          final uploads = _ProgressUploads();
           final titleBar = _TitleBar();
           addTearDown(titleBar.dispose);
           await tester.pumpWidget(
@@ -116,7 +119,8 @@ void main() {
                 images: images,
                 sourceKey: 'jm',
                 dependencies: ReaderDependencies(
-                  sourceReader: reader,
+                  sourceReader: _Reader(),
+                  readingProgressUploads: uploads,
                   sourceSettings: sl<SourceSettingsGateway>(),
                   readingProgressService: sl<ReadingProgressService>(),
                   downloader: sl<MangaDownloadService>(),
@@ -151,12 +155,12 @@ void main() {
           expect(find.text('Retranslate image'), findsNothing);
           await tester.tap(find.text('Cancel'));
           await tester.pumpAndSettle();
-          expect(reader.events, isNotEmpty);
-          expect(reader.events.first['page'], 1);
-          expect(reader.events.first['totalPages'], 6);
+          expect(uploads.events, isNotEmpty);
+          expect(uploads.events.first['page'], 1);
+          expect(uploads.events.first['totalPages'], 6);
           if (mode == 'right_to_left') {
             expect(
-              reader.events.first['visiblePages'],
+              uploads.events.first['visiblePages'],
               doublePage ? [1, 2] : [1],
             );
             final page = tester.widget<PageView>(find.byType(PageView));
@@ -166,7 +170,7 @@ void main() {
               curve: Curves.linear,
             );
             // Starting an animation has not changed the visible page yet.
-            expect(reader.events.last['page'], 1);
+            expect(uploads.events.last['page'], 1);
             await tester.pump();
             await tester.pump(const Duration(milliseconds: 240));
             await future;
@@ -178,20 +182,20 @@ void main() {
           }
           await decode();
           await tester.pump(const Duration(seconds: 5));
-          expect(reader.events.last['page'], greaterThan(1));
+          expect(uploads.events.last['page'], greaterThan(1));
           tester.binding.handleAppLifecycleStateChanged(
             AppLifecycleState.inactive,
           );
           await tester.pump();
-          expect(reader.events.last['reason'], 'background');
+          expect(uploads.events.last['reason'], 'background');
           tester.binding.handleAppLifecycleStateChanged(
             AppLifecycleState.resumed,
           );
-          final before = reader.events.last['page'];
+          final before = uploads.events.last['page'];
           await tester.pumpWidget(const SizedBox.shrink());
           await tester.pump();
-          expect(reader.events.last['reason'], 'exit');
-          expect(reader.events.last['page'], before);
+          expect(uploads.events.last['reason'], 'exit');
+          expect(uploads.events.last['page'], before);
           expect(tester.takeException(), isNull);
           await tester.runAsync(() => directory.delete(recursive: true));
         },

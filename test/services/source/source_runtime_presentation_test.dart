@@ -11,18 +11,14 @@ import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.d
 import 'package:hazuki/services/source/content/source_content_operations.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_diagnostics_operations.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_recovery_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_view.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _Content extends Mock implements SourceContentOperations {}
 
-class _Initialization extends Mock
-    implements SourceRuntimeInitializationOperations {}
-
-class _Diagnostics extends Mock implements SourceRuntimeDiagnosticsOperations {}
+class _Recovery extends Mock implements SourceRuntimeRecoveryOperations {}
 
 class _ComicDetails extends Fake implements SourceComicDetailsCapability {}
 
@@ -51,11 +47,8 @@ void main() {
       isLoggedForSource: (_) => false,
     );
     source = HazukiSourceSearchAdapter(
-      runtime: SourceRuntimeView(
-        runtimeHost: host,
-        initialization: _Initialization(),
-        diagnostics: _Diagnostics(),
-      ),
+      runtime: SourceRuntimeView(runtimeHost: host),
+      recovery: _Recovery(),
       content: _Content(),
       comicDetails: _ComicDetails(),
     );

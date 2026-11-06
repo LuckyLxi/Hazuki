@@ -2,6 +2,7 @@ import '../account/source_relogin_coordinator.dart';
 import '../models/source_contract_models.dart';
 import '../plugins/source_plugin_exception.dart';
 import '../plugins/source_plugin_manager.dart';
+import 'source_runtime_diagnostics_operations.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_host.dart';
 import 'source_runtime_loader.dart';
@@ -12,12 +13,14 @@ import 'source_script_editing_operations.dart';
 class SourceRuntimeRecoveryOperations {
   SourceRuntimeRecoveryOperations({
     required SourceRuntimeHost runtimeHost,
+    required SourceRuntimeDiagnosticsOperations diagnostics,
     required SourcePluginManager plugins,
     required SourceRuntimeLoadClient runtimeLoader,
     required SourceScriptEditingOperations scriptEditing,
     required SourceRuntimeStateController runtimeStateController,
     required SourceReloginCoordinator reloginCoordinator,
   }) : _runtimeHost = runtimeHost,
+       _diagnostics = diagnostics,
        _plugins = plugins,
        _runtimeLoader = runtimeLoader,
        _scriptEditing = scriptEditing,
@@ -25,11 +28,18 @@ class SourceRuntimeRecoveryOperations {
        _reloginCoordinator = reloginCoordinator;
 
   final SourceRuntimeHost _runtimeHost;
+  final SourceRuntimeDiagnosticsOperations _diagnostics;
   final SourcePluginManager _plugins;
   final SourceRuntimeLoadClient _runtimeLoader;
   final SourceScriptEditingOperations _scriptEditing;
   final SourceRuntimeStateController _runtimeStateController;
   final SourceReloginCoordinator _reloginCoordinator;
+
+  void requestRuntimeRetry(String trigger) {
+    if (!_runtimeHost.hasActiveSource) return;
+    _runtimeHost.activeHandle.clearRuntimeFault();
+    _diagnostics.logRuntimeRetryRequested(trigger);
+  }
 
   Future<void> downloadSourceFile(
     String sourceKey, {

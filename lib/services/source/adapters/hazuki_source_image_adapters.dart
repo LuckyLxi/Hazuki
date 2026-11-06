@@ -11,6 +11,7 @@ import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
 import '../runtime/source_runtime_diagnostics_operations.dart';
 import '../runtime/source_runtime_view.dart';
+import '../runtime/source_runtime_recovery_operations.dart';
 import '../models/source_task.dart';
 import 'hazuki_source_adapter_base.dart';
 
@@ -110,14 +111,17 @@ class HazukiSourceDailyRecommendationAdapter
     implements SourceDailyRecommendationGateway {
   HazukiSourceDailyRecommendationAdapter({
     required SourceRuntimeView runtime,
+    required SourceRuntimeRecoveryOperations recovery,
     required SourceImageOperations image,
     required SourceContentOperations content,
     required SourceComicDetailsCapability comicDetails,
   }) : _content = content,
        _comicDetails = comicDetails,
        _image = image,
+       _recovery = recovery,
        super(runtime);
 
+  final SourceRuntimeRecoveryOperations _recovery;
   final SourceContentOperations _content;
   final SourceComicDetailsCapability _comicDetails;
   final SourceImageOperations _image;
@@ -152,8 +156,8 @@ class HazukiSourceDailyRecommendationAdapter
   List<SourceCatalogEntry> get allowedSources =>
       runtime.runtimeRegistry.allowedSources;
   @override
-  void logRuntimeRetryRequested(String value) =>
-      runtime.logRuntimeRetryRequested(value);
+  void requestRuntimeRetry(String trigger) =>
+      _recovery.requestRuntimeRetry(trigger);
   @override
   Future<SearchComicsResult> searchComics({
     required String keyword,

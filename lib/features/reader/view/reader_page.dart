@@ -93,14 +93,11 @@ class ReaderPage extends StatefulWidget {
 class _ReaderPageHostState extends State<ReaderPage> {
   final _chapterNavigatorKey = GlobalKey<NavigatorState>();
   late ReaderPage _chapter = widget;
-  late final SourceReaderSession? _readerSession = () {
-    final reader = widget.dependencies.sourceReader;
-    return !widget.offlineMode && reader is SourceReaderSessionGateway
-        ? (reader as SourceReaderSessionGateway).acquireReaderSession(
-            widget.sourceKey,
-          )
-        : null;
-  }();
+  late final SourceReaderSession? _readerSession = widget.offlineMode
+      ? null
+      : widget.dependencies.readerSessions?.acquireReaderSession(
+          widget.sourceKey,
+        );
   bool _chapterCanHandlePop = false;
   bool _settingsDrawerOpen = false;
 
@@ -415,12 +412,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         widgetImages: widget.page.images,
         readingProgressService: widget.page.dependencies.readingProgressService,
         offlineMode: widget.page.offlineMode,
-        cloudReading: () {
-          final source = widget.page.dependencies.sourceReader;
-          return source is SourceCloudReadingGateway
-              ? source as SourceCloudReadingGateway
-              : null;
-        }(),
+        cloudReading: widget.page.dependencies.cloudReading,
         onSettingsReady: () {
           _entryRestore.settingsReady = true;
           _maybeRestoreEntry();
@@ -639,14 +631,12 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     comicId: widget.page.comicId,
     chapterId: widget.page.epId,
     send: (progress) {
-      final gateway = widget.page.dependencies.sourceReader;
-      return gateway is SourceReadingProgressGateway
-          ? (gateway as SourceReadingProgressGateway).reportReadingProgress(
-              progress,
-              sourceKey:
-                  (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
-            )
-          : Future<void>.value();
+      final uploads = widget.page.dependencies.readingProgressUploads;
+      return uploads?.reportReadingProgress(
+            progress,
+            sourceKey: widget.readerSession?.sourceKey ?? widget.page.sourceKey,
+          ) ??
+          Future<void>.value();
     },
   );
 

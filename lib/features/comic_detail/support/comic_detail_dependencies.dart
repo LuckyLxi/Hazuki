@@ -11,6 +11,7 @@ class ComicDetailDependencies {
   const ComicDetailDependencies({
     required this.taskControl,
     required this.source,
+    this.cloudReading,
     required this.localFavorites,
     required this.downloader,
     required this.readingProgress,
@@ -19,6 +20,7 @@ class ComicDetailDependencies {
   });
 
   final SourceComicDetailGateway source;
+  final SourceCloudReadingGateway? cloudReading;
   final LocalFavoritesRepository localFavorites;
   final MangaDownloadCommands downloader;
   final ReadingProgressService readingProgress;
@@ -28,6 +30,7 @@ class ComicDetailDependencies {
   ComicDetailFeatureFacade createFacade({String sourceKey = ''}) {
     return ComicDetailFeatureFacade(
       source: source,
+      cloudReading: cloudReading,
       local: localFavorites,
       readingProgress: readingProgress,
       readHistory: readHistory,

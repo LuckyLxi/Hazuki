@@ -15,7 +15,7 @@ abstract interface class SourceSearchGateway implements Listenable {
   SourceRuntimeState get runtimeState;
   List<SourceCatalogEntry> get allowedSources;
 
-  void logRuntimeRetryRequested(String source);
+  void requestRuntimeRetry(String trigger);
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
@@ -37,7 +37,7 @@ abstract interface class SourceDiscoverGateway implements Listenable {
   bool get isLogged;
   SourceRuntimeState get runtimeState;
 
-  void logRuntimeRetryRequested(String source);
+  void requestRuntimeRetry(String trigger);
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
     SourceTaskOrigin? taskOrigin,
@@ -219,7 +219,7 @@ abstract interface class SourceFavoriteGateway implements Listenable {
   Stream<void> get cloudFavoritesChangedStream;
   SourceRuntimeState get runtimeState;
 
-  void logRuntimeRetryRequested(String source);
+  void requestRuntimeRetry(String trigger);
   Future<void> ensureInitialized();
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,
@@ -307,17 +307,17 @@ abstract interface class SourceReaderGateway {
   });
 }
 
-/// Optional extension for production readers; offline/fake readers need no lease.
+/// Provides a source lease for an online reader visit.
 abstract interface class SourceReaderSessionGateway {
   SourceReaderSession acquireReaderSession(String sourceKey);
 }
 
-/// Optional download lifetime extension; offline/fake readers need no lease.
+/// Provides a source lease for a download run.
 abstract interface class SourceDownloadSessionGateway {
   SourceDownloadSession acquireDownloadSession(String sourceKey);
 }
 
-/// Optional reader extension; old gateway implementations remain valid.
+/// Optional progress upload capability for the reader.
 abstract interface class SourceReadingProgressGateway {
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {

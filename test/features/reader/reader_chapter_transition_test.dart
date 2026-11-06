@@ -40,16 +40,24 @@ void main() {
     tester,
   ) async {
     final source = _PendingReader();
+    final sessions = _ReaderSessions();
     await _mountReader(
       tester,
-      _reader(sourceReader: source, offlineMode: false),
+      _reader(
+        sourceReader: source,
+        readerSessions: sessions,
+        offlineMode: false,
+      ),
     );
     expect(find.byType(ReaderLoadingStateView), findsOneWidget);
     final cancellation = source.origin!.cancellation!;
+    expect(source.origin!.readerSession, same(sessions.session));
+    expect(sessions.releases, 0);
     expect(cancellation.reason, isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
     expect(cancellation.reason, SourceTaskStopReason.ownerDisposed);
+    expect(sessions.releases, 1);
     source.images.complete(['late-image']);
     await tester.pumpAndSettle();
 
@@ -450,6 +458,7 @@ Future<void> _mountReader(WidgetTester tester, ReaderPage reader) async {
 ReaderPage _reader({
   SourceSettingsGateway? sourceSettings,
   SourceReaderGateway? sourceReader,
+  SourceReaderSessionGateway? readerSessions,
   bool offlineMode = true,
 }) => ReaderPage(
   title: 'Comic',
@@ -482,6 +491,7 @@ ReaderPage _reader({
   ],
   dependencies: ReaderDependencies(
     sourceReader: sourceReader ?? sl<SourceReaderGateway>(),
+    readerSessions: readerSessions,
     sourceSettings: sourceSettings ?? sl<SourceSettingsGateway>(),
     readingProgressService: sl<ReadingProgressService>(),
     downloader: sl<MangaDownloadService>(),
@@ -500,6 +510,15 @@ ReaderPage _reader({
 );
 
 class _SourceSettings extends Mock implements SourceSettingsGateway {}
+
+class _ReaderSessions implements SourceReaderSessionGateway {
+  late SourceReaderSession session;
+  var releases = 0;
+
+  @override
+  SourceReaderSession acquireReaderSession(String sourceKey) =>
+      session = SourceReaderSession(sourceKey, () => releases++);
+}
 
 class _PendingReader extends Fake implements SourceReaderGateway {
   final images = Completer<List<String>>();

@@ -186,6 +186,8 @@ void main() {
             offlineMode: true,
             dependencies: ReaderDependencies(
               sourceReader: reader,
+              cloudReading: reader,
+              readingProgressUploads: reader,
               sourceSettings: sl<SourceSettingsGateway>(),
               readingProgressService: progress,
               downloader: sl<MangaDownloadService>(),
@@ -297,6 +299,8 @@ void main() {
                     sourceKey: 'jm',
                     dependencies: ReaderDependencies(
                       sourceReader: reader,
+                      cloudReading: reader,
+                      readingProgressUploads: reader,
                       sourceSettings: sl<SourceSettingsGateway>(),
                       readingProgressService: sl<ReadingProgressService>(),
                       downloader: sl<MangaDownloadService>(),

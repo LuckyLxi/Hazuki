@@ -39,6 +39,26 @@ void registerSourceServices(GetIt services) {
   _registerGateway<SourceDiscoverGateway>(services, (a) => a.gateways.discover);
   _registerGateway<SourceFavoriteGateway>(services, (a) => a.gateways.favorite);
   _registerGateway<SourceReaderGateway>(services, (a) => a.gateways.reader);
+  _registerGateway<SourceReaderSessionGateway>(
+    services,
+    (a) => a.gateways.readerSessions,
+  );
+  _registerGateway<SourceDownloadSessionGateway>(
+    services,
+    (a) => a.gateways.downloadSessions,
+  );
+  _registerGateway<SourceReadingProgressGateway>(
+    services,
+    (a) => a.gateways.readingProgressUploads,
+  );
+  _registerGateway<SourceCloudReadingGateway>(
+    services,
+    (a) => a.gateways.cloudReading,
+  );
+  _registerGateway<SourceCloudReadingEvents>(
+    services,
+    (a) => a.gateways.cloudReadingEvents,
+  );
   _registerGateway<SourceSettingsGateway>(
     services,
     (a) => a.gateways.settingsGateway,

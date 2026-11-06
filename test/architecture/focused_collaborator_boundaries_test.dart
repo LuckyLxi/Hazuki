@@ -3,6 +3,30 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('plugin remote access is separate from local plugin management', () {
+    const directory = 'lib/services/source/plugins';
+    final manager = File(
+      '$directory/source_plugin_manager.dart',
+    ).readAsStringSync();
+    expect(manager, isNot(contains('package:dio/')));
+
+    final client = File(
+      '$directory/source_plugin_remote_client.dart',
+    ).readAsStringSync();
+    for (final dependency in [
+      'source_plugin_manager.dart',
+      'dart:io',
+      'package:path_provider/',
+      'package:shared_preferences/',
+      'package:flutter/',
+      '/storage/',
+      '/features/',
+      '/widgets/',
+    ]) {
+      expect(client, isNot(contains(dependency)), reason: dependency);
+    }
+  });
+
   test(
     'favorite folder workflow depends on narrow state and injected callbacks',
     () {

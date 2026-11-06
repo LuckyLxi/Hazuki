@@ -242,6 +242,7 @@ void registerApplicationServices(GetIt services) {
     services.registerLazySingleton<MangaDownloadService>(
       () => MangaDownloadService(
         sourceReader: services<SourceReaderGateway>(),
+        downloadSessions: services<SourceDownloadSessionGateway>(),
         taskControl: services<SourceTaskControlGateway>(),
       ),
     );

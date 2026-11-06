@@ -20,6 +20,7 @@ class MangaDownloadQueueExecutor {
     required bool Function() shouldSuspendDownloads,
     required bool Function() shouldRecoverTransientNetworkError,
     required SourceReaderGateway? sourceReader,
+    SourceDownloadSessionGateway? downloadSessions,
     SourceTaskControlGateway? taskControl,
   }) : _state = state,
        _files = files,
@@ -29,12 +30,14 @@ class MangaDownloadQueueExecutor {
        _shouldSuspendDownloads = shouldSuspendDownloads,
        _shouldRecoverTransientNetworkError = shouldRecoverTransientNetworkError,
        _sourceReader = sourceReader,
+       _downloadSessions = downloadSessions,
        _taskControl = taskControl;
 
   final MangaDownloadState _state;
   final MangaDownloadFiles _files;
   final MangaDownloadAccess _access;
   final SourceReaderGateway? _sourceReader;
+  final SourceDownloadSessionGateway? _downloadSessions;
   final SourceTaskControlGateway? _taskControl;
   final MangaDownloadLogCallback _logDownload;
   final Future<void> Function() _flushState;
@@ -188,11 +191,7 @@ class MangaDownloadQueueExecutor {
     }
 
     try {
-      final reader = _sourceReader;
-      if (reader is SourceDownloadSessionGateway) {
-        session = (reader as SourceDownloadSessionGateway)
-            .acquireDownloadSession(selected.sourceKey);
-      }
+      session = _downloadSessions?.acquireDownloadSession(selected.sourceKey);
       final run = MangaDownloadRun(
         ownerId: _ownerId,
         control: _taskControl,

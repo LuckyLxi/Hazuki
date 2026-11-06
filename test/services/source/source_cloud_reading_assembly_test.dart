@@ -55,7 +55,7 @@ void main() {
       await owner.session.saveSourceData('cloud', 'login_session', 'account');
       assembly.testing.notifyRuntimeView();
 
-      final progress = assembly.gateways.reader as SourceReadingProgressGateway;
+      final progress = assembly.gateways.readingProgressUploads;
       final upload = progress.reportReadingProgress({
         'comicId': 'comic',
         'chapterId': 'ep',

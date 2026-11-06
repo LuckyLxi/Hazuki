@@ -80,6 +80,7 @@ class SourceRuntimeCapability {
   late final SourceRuntimeRecoveryOperations sourceRecovery =
       SourceRuntimeRecoveryOperations(
         runtimeHost: _runtimeHost,
+        diagnostics: diagnostics,
         plugins: _scriptStorage,
         runtimeLoader: _runtimeLoader,
         scriptEditing: scriptEditing,

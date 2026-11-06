@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:hazuki/services/source/gateways/source_content_gateways.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 import 'package:dio/dio.dart';
 import 'dart:convert';
@@ -185,7 +184,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
       final details = await assembly.gateways.reader.loadComicDetails('comic');
       expect(details.chapters.keys, ['10', '2', '1']);
       final handle = assembly.testing.handleFor('independent');
-      final reporter = assembly.gateways.reader as SourceReadingProgressGateway;
+      final reporter = assembly.gateways.readingProgressUploads;
       Map<String, Object> event(int page, String reason) => {
         'comicId': 'comic',
         'chapterId': '10',

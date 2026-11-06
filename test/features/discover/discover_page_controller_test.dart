@@ -227,7 +227,7 @@ class _DiscoverGateway extends ChangeNotifier implements SourceDiscoverGateway {
   @override
   SourceRuntimeState get runtimeState => const SourceRuntimeState.idle();
   @override
-  void logRuntimeRetryRequested(String source) {}
+  void requestRuntimeRetry(String source) {}
   @override
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,

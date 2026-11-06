@@ -9,6 +9,7 @@ import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_handle.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_loader.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_diagnostics_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_recovery_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_state_controller.dart';
 import 'package:hazuki/services/source/runtime/source_script_editing_operations.dart';
@@ -47,6 +48,7 @@ void main() {
     final stateController = SourceRuntimeStateController();
     recovery = SourceRuntimeRecoveryOperations(
       runtimeHost: host,
+      diagnostics: SourceRuntimeDiagnosticsOperations(runtimeHost: host),
       plugins: plugins,
       runtimeLoader: loader,
       scriptEditing: SourceScriptEditingOperations(
@@ -76,6 +78,18 @@ void main() {
       expect(plugins.edited['copy_manga'], isFalse);
     },
   );
+
+  test('manual retry has no effect without an active source', () async {
+    await host.replaceCatalog(const []);
+    await host.logStore.setCaptureEnabled(true);
+    final eventsBeforeRetry = host.logStore.events;
+
+    recovery.requestRuntimeRetry('test');
+
+    expect(host.hasActiveSource, isFalse);
+    expect(host.logStore.events, eventsBeforeRetry);
+    expect(loader.metadataSourceKeys, isEmpty);
+  });
 
   test('manual download rejects plugins without a repository', () async {
     plugins.hasRepository = false;

@@ -23,6 +23,8 @@ class HistoryPage extends StatefulWidget {
     required this.readHistoryService,
     required this.sourceService,
     this.readerService,
+    this.cloudReading,
+    this.cloudReadingEvents,
     this.taskControl,
     required this.imageGateway,
     required this.comicDetailPageBuilder,
@@ -33,6 +35,8 @@ class HistoryPage extends StatefulWidget {
   final ReadHistoryService readHistoryService;
   final SourceRuntimeGateway sourceService;
   final SourceReaderGateway? readerService;
+  final SourceCloudReadingGateway? cloudReading;
+  final SourceCloudReadingEvents? cloudReadingEvents;
   final SourceTaskControlGateway? taskControl;
   final SourceImageGateway imageGateway;
   final ComicDetailPageBuilder comicDetailPageBuilder;
@@ -57,6 +61,8 @@ class _HistoryPageState extends State<HistoryPage> {
       readHistoryService: widget.readHistoryService,
       sourceService: widget.sourceService,
       readerService: widget.readerService,
+      cloudReading: widget.cloudReading,
+      cloudReadingEvents: widget.cloudReadingEvents,
       taskControl: widget.taskControl,
       presentationFor:
           SourcePresentationScope.read(context)?.presentationFor ??

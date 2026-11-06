@@ -98,6 +98,7 @@ void main() {
       final content = _FakeContentOperations();
       final adapter = HazukiSourceSearchAdapter(
         runtime: runtime,
+        recovery: _FakeRecoveryOperations(),
         content: content,
         comicDetails: _ComicDetails(),
       );
@@ -138,6 +139,7 @@ void main() {
       addTearDown(changes.close);
       final favorite = HazukiSourceFavoriteAdapter(
         runtime: runtime,
+        recovery: recovery,
         account: account,
         favorites: favorites,
         cloudFavoritesChangedStream: changes.stream,

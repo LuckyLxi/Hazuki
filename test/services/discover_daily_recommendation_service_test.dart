@@ -10,12 +10,15 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_view.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_recovery_operations.dart';
 import 'package:hazuki/services/source/content/source_content_operations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_image_adapters.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../support/test_service_locator.dart';
+
+class _UnusedRecovery extends Fake implements SourceRuntimeRecoveryOperations {}
 
 class _ComicDetails extends Fake implements SourceComicDetailsCapability {}
 
@@ -149,6 +152,7 @@ void main() {
       final service = DiscoverDailyRecommendationService(
         source: HazukiSourceDailyRecommendationAdapter(
           runtime: source.testRuntimeView,
+          recovery: _UnusedRecovery(),
           image: source.testing.image,
           content: source.testContent,
           comicDetails: _ComicDetails(),
@@ -169,6 +173,7 @@ void main() {
       final service = DiscoverDailyRecommendationService(
         source: HazukiSourceDailyRecommendationAdapter(
           runtime: source.testRuntimeView,
+          recovery: _UnusedRecovery(),
           image: source.testing.image,
           content: source.testContent,
           comicDetails: _ComicDetails(),
@@ -189,6 +194,7 @@ void main() {
       final service = DiscoverDailyRecommendationService(
         source: HazukiSourceDailyRecommendationAdapter(
           runtime: source.testRuntimeView,
+          recovery: _UnusedRecovery(),
           image: source.testing.image,
           content: source.testContent,
           comicDetails: _ComicDetails(),
@@ -404,10 +410,6 @@ class _SearchCountingRuntimeView extends ChangeNotifier
   Future<void> activateSource(String sourceKey) async {}
   @override
   Future<void> loadActiveSourcePreference() async {}
-  @override
-  Future<void> prewarmInBackground() async {}
-  @override
-  void logRuntimeRetryRequested(String source) {}
 }
 
 List<DiscoverDailyRecommendationEntry> _recommendationEntries(

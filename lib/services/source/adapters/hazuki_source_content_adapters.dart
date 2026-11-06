@@ -11,7 +11,6 @@ import 'package:flutter/foundation.dart';
 import '../../../models/hazuki_models.dart';
 import '../account/account_session_capability.dart';
 import '../comments/comments_capability.dart';
-import '../content/source_cloud_reading.dart';
 import '../content/source_content_operations.dart';
 import '../content/source_reading_progress_uploads.dart';
 import '../debug/source_debug_operations.dart';
@@ -21,60 +20,24 @@ import '../image/source_image_operations.dart';
 import '../image/source_image_preparation_capability.dart';
 import '../models/source_contract_models.dart';
 import '../runtime/source_runtime_initialization_operations.dart';
+import '../runtime/source_runtime_recovery_operations.dart';
 import '../runtime/source_runtime_view.dart';
 import '../models/source_task.dart';
 import 'hazuki_source_adapter_base.dart';
-
-/// 将同一个云端阅读组件暴露给详情页和阅读器。
-mixin SourceCloudReadingAdapter
-    implements SourceCloudReadingGateway, SourceCloudReadingEvents {
-  SourceCloudReadingCapability get cloudReadingDelegate;
-  @override
-  void addListener(VoidCallback listener) =>
-      cloudReadingDelegate.addListener(listener);
-
-  @override
-  void removeListener(VoidCallback listener) =>
-      cloudReadingDelegate.removeListener(listener);
-
-  @override
-  Future<bool> usesCloudReading(
-    String sourceKey, {
-    SourceTaskOrigin? taskOrigin,
-  }) =>
-      cloudReadingDelegate.usesCloudReading(sourceKey, taskOrigin: taskOrigin);
-
-  @override
-  Future<Map<String, dynamic>?> loadCloudReadingProgress(
-    String sourceKey,
-    String comicId, {
-    SourceTaskOrigin? taskOrigin,
-  }) => cloudReadingDelegate.loadCloudReadingProgress(
-    sourceKey,
-    comicId,
-    taskOrigin: taskOrigin,
-  );
-
-  @override
-  Future<List<ExploreComic>> refreshCloudReadingHistory(
-    String sourceKey, {
-    SourceTaskOrigin? taskOrigin,
-  }) => cloudReadingDelegate.refreshCloudReadingHistory(
-    sourceKey,
-    taskOrigin: taskOrigin,
-  );
-}
 
 class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
     implements SourceSearchGateway {
   const HazukiSourceSearchAdapter({
     required SourceRuntimeView runtime,
+    required SourceRuntimeRecoveryOperations recovery,
     required SourceContentOperations content,
     required SourceComicDetailsCapability comicDetails,
   }) : _content = content,
        _comicDetails = comicDetails,
+       _recovery = recovery,
        super(runtime);
 
+  final SourceRuntimeRecoveryOperations _recovery;
   final SourceContentOperations _content;
   final SourceComicDetailsCapability _comicDetails;
 
@@ -98,8 +61,8 @@ class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
   void removeListener(VoidCallback listener) =>
       runtime.runtimeRegistry.removeListener(listener);
   @override
-  void logRuntimeRetryRequested(String value) =>
-      runtime.logRuntimeRetryRequested(value);
+  void requestRuntimeRetry(String trigger) =>
+      _recovery.requestRuntimeRetry(trigger);
   @override
   Future<SearchComicsResult> searchComics({
     required String keyword,
@@ -130,14 +93,17 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
     implements SourceDiscoverGateway {
   HazukiSourceDiscoverAdapter({
     required SourceRuntimeView runtime,
+    required SourceRuntimeRecoveryOperations recovery,
     required SourceExploreCapability explore,
     required SourceCategoryCapability category,
     required SourceAccountSessionCapability account,
   }) : _explore = explore,
        _category = category,
        _account = account,
+       _recovery = recovery,
        super(runtime);
 
+  final SourceRuntimeRecoveryOperations _recovery;
   final SourceExploreCapability _explore;
   final SourceCategoryCapability _category;
   final SourceAccountSessionCapability _account;
@@ -158,8 +124,8 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
   @override
   SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
-  void logRuntimeRetryRequested(String value) =>
-      runtime.logRuntimeRetryRequested(value);
+  void requestRuntimeRetry(String trigger) =>
+      _recovery.requestRuntimeRetry(trigger);
   @override
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
@@ -343,23 +309,17 @@ class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
   );
 }
 
-class HazukiSourceComicDetailAdapter
-    with SourceCloudReadingAdapter
-    implements SourceComicDetailGateway {
-  @override
-  SourceCloudReadingCapability get cloudReadingDelegate => _cloudReading;
+class HazukiSourceComicDetailAdapter implements SourceComicDetailGateway {
   HazukiSourceComicDetailAdapter({
     required SourceRuntimeView runtime,
     required SourceAccountSessionCapability account,
     required SourceFavoritesCapability favorites,
-    required SourceCloudReadingCapability cloudReading,
     required SourceComicDetailsCapability comicDetails,
     required SourceCategoryCapability category,
     required SourceComicDetailTabCapability detailTabs,
     required SourceImageOperations image,
   }) : _account = account,
        _favorites = favorites,
-       _cloudReading = cloudReading,
        _comicDetails = comicDetails,
        _category = category,
        _detailTabs = detailTabs,
@@ -368,7 +328,6 @@ class HazukiSourceComicDetailAdapter
 
   final SourceAccountSessionCapability _account;
   final SourceFavoritesCapability _favorites;
-  final SourceCloudReadingCapability _cloudReading;
   final SourceComicDetailsCapability _comicDetails;
   final SourceCategoryCapability _category;
   final SourceComicDetailTabCapability _detailTabs;
@@ -543,6 +502,7 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
     implements SourceFavoriteGateway {
   HazukiSourceFavoriteAdapter({
     required SourceRuntimeView runtime,
+    required SourceRuntimeRecoveryOperations recovery,
     required SourceAccountSessionCapability account,
     required SourceFavoritesCapability favorites,
     required this.cloudFavoritesChangedStream,
@@ -550,8 +510,10 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   }) : _account = account,
        _favorites = favorites,
        _initialization = initialization,
+       _recovery = recovery,
        super(runtime);
 
+  final SourceRuntimeRecoveryOperations _recovery;
   final SourceAccountSessionCapability _account;
   final SourceFavoritesCapability _favorites;
   final SourceRuntimeInitializationOperations _initialization;
@@ -586,8 +548,8 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   @override
   SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
-  void logRuntimeRetryRequested(String value) =>
-      runtime.logRuntimeRetryRequested(value);
+  void requestRuntimeRetry(String trigger) =>
+      _recovery.requestRuntimeRetry(trigger);
   @override
   Future<void> ensureInitialized() => _initialization.ensureInitialized();
   @override
@@ -664,23 +626,18 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
 }
 
 class HazukiSourceReaderAdapter
-    with SourceCloudReadingAdapter
     implements
         SourceReaderGateway,
         SourceReadingProgressGateway,
         SourceReaderSessionGateway,
         SourceDownloadSessionGateway {
-  @override
-  SourceCloudReadingCapability get cloudReadingDelegate => _cloudReading;
   HazukiSourceReaderAdapter({
-    required SourceCloudReadingCapability cloudReading,
     required SourceReadingProgressUploads readingProgressUploads,
     required SourceComicDetailsCapability comicDetails,
     required SourceImagePreparationCapability imagePreparation,
     required SourceImageOperations image,
     required SourceDebugOperations debug,
-  }) : _cloudReading = cloudReading,
-       _readingProgressUploads = readingProgressUploads,
+  }) : _readingProgressUploads = readingProgressUploads,
        _comicDetails = comicDetails,
        _imagePreparation = imagePreparation,
        _image = image,
@@ -694,7 +651,6 @@ class HazukiSourceReaderAdapter
   SourceDownloadSession acquireDownloadSession(String sourceKey) =>
       _imagePreparation.acquireDownloadSession(sourceKey);
 
-  final SourceCloudReadingCapability _cloudReading;
   final SourceReadingProgressUploads _readingProgressUploads;
   final SourceComicDetailsCapability _comicDetails;
   final SourceImagePreparationCapability _imagePreparation;

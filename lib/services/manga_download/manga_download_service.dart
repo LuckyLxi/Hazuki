@@ -22,6 +22,7 @@ class MangaDownloadService extends ChangeNotifier
     implements MangaDownloadCommands, MangaDownloadLibrary {
   MangaDownloadService({
     SourceReaderGateway? sourceReader,
+    SourceDownloadSessionGateway? downloadSessions,
     SourceTaskControlGateway? taskControl,
     MangaDownloadFiles? files,
     MangaDownloadAccess? access,
@@ -54,6 +55,7 @@ class MangaDownloadService extends ChangeNotifier
       shouldRecoverTransientNetworkError: () =>
           _lifecycle.shouldRecoverTransientNetworkError,
       sourceReader: sourceReader,
+      downloadSessions: downloadSessions,
       taskControl: taskControl,
     );
   }

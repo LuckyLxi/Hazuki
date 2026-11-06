@@ -12,6 +12,7 @@ import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart'
 class ComicDetailFeatureFacade {
   ComicDetailFeatureFacade({
     required SourceComicDetailGateway source,
+    SourceCloudReadingGateway? cloudReading,
     required LocalFavoritesRepository local,
     required ReadingProgressService readingProgress,
     required ReadHistoryService readHistory,
@@ -19,6 +20,7 @@ class ComicDetailFeatureFacade {
     HazukiGeneralPreferencesStore preferences =
         const HazukiGeneralPreferencesStore(),
   }) : _source = source,
+       _cloudReading = cloudReading,
        _local = local,
        _readingProgress = readingProgress,
        _readHistory = readHistory,
@@ -28,6 +30,7 @@ class ComicDetailFeatureFacade {
            : sourceKey.trim();
 
   final SourceComicDetailGateway _source;
+  final SourceCloudReadingGateway? _cloudReading;
   final LocalFavoritesRepository _local;
   final ReadingProgressService _readingProgress;
   final ReadHistoryService _readHistory;
@@ -131,13 +134,13 @@ class ComicDetailFeatureFacade {
     String comicId, {
     SourceTaskOrigin? taskOrigin,
   }) async {
-    final source = _source;
-    if (source is SourceCloudReadingGateway &&
-        await (source as SourceCloudReadingGateway).usesCloudReading(
+    final cloudReading = _cloudReading;
+    if (cloudReading != null &&
+        await cloudReading.usesCloudReading(
           _sourceKey,
           taskOrigin: taskOrigin,
         )) {
-      return (source as SourceCloudReadingGateway).loadCloudReadingProgress(
+      return cloudReading.loadCloudReadingProgress(
         _sourceKey,
         comicId,
         taskOrigin: taskOrigin,
@@ -149,12 +152,9 @@ class ComicDetailFeatureFacade {
   Future<bool> usesWebsiteReadingProgress({
     SourceTaskOrigin? taskOrigin,
   }) async {
-    final source = _source;
-    return source is SourceCloudReadingGateway &&
-        await (source as SourceCloudReadingGateway).usesCloudReading(
-          _sourceKey,
-          taskOrigin: taskOrigin,
-        );
+    final cloudReading = _cloudReading;
+    return cloudReading != null &&
+        await cloudReading.usesCloudReading(_sourceKey, taskOrigin: taskOrigin);
   }
 
   Stream<void> watchReadingProgressChanges({

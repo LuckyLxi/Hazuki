@@ -539,7 +539,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       return;
     }
     if (_resultsController.canRetry) {
-      _resultsController.logRuntimeRetryRequested('search_results_page');
+      _resultsController.requestRuntimeRetry('search_results_page');
     }
     await _resultsController.search(
       searchMessages(context),

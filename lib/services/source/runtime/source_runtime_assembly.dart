@@ -226,8 +226,6 @@ class SourceRuntimeAssembly {
   late final SourceRuntimeCapability _runtimeCapability;
   late final SourceRuntimeView _runtimeView = SourceRuntimeView(
     runtimeHost: _runtimeHost,
-    initialization: _runtimeCapability.initialization,
-    diagnostics: _runtimeCapability.diagnostics,
   );
   late final SourceLocalizationOperations _localizationOperations =
       SourceLocalizationOperations(_runtimeHost);

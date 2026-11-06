@@ -87,8 +87,8 @@ class SearchResultsController extends ChangeNotifier {
   SourceRuntimeState get sourceRuntimeState => _sourceService.runtimeState;
   bool get canRetry => sourceRuntimeState.canRetry;
 
-  void logRuntimeRetryRequested(String source) =>
-      _sourceService.logRuntimeRetryRequested(source);
+  void requestRuntimeRetry(String trigger) =>
+      _sourceService.requestRuntimeRetry(trigger);
 
   String _normalizeSearchOrder(String order) => normalizeSourceSearchOrder(
     order,

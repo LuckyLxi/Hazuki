@@ -118,7 +118,7 @@ class FavoritePageController extends ChangeNotifier {
 
   void retrySourceRuntime() {
     if (_sourceService.runtimeState.canRetry) {
-      _sourceService.logRuntimeRetryRequested('favorite_page');
+      _sourceService.requestRuntimeRetry('favorite_page');
     }
   }
 

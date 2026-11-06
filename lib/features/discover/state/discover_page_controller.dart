@@ -159,7 +159,7 @@ class DiscoverPageController extends ChangeNotifier {
       return;
     }
     if (_sourceService.runtimeState.canRetry) {
-      _sourceService.logRuntimeRetryRequested('discover_page');
+      _sourceService.requestRuntimeRetry('discover_page');
     }
 
     _state.refreshing = true;

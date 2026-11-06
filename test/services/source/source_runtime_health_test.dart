@@ -212,7 +212,11 @@ void main() {
       expect(await fixture.recovery.refreshSourceOnNetworkRecovery(), isFalse);
       expect(fixture.loader.loads, 2);
 
-      fixture.diagnostics.logRuntimeRetryRequested('test');
+      final fault = handle.runtimeFault;
+      fixture.diagnostics.logRuntimeRetryRequested('diagnostics_only');
+      expect(handle.runtimeFault, same(fault));
+
+      fixture.recovery.requestRuntimeRetry('test');
       expect(handle.runtimeFault, isNull);
       await fixture.init.ensureSourceInitialized('jm');
       expect(fixture.loader.loads, 3);
@@ -367,8 +371,10 @@ class _Fixture {
       jsBridgeCookieCapability: bridge,
       runtimeStateController: state,
     );
+    final diagnostics = SourceRuntimeDiagnosticsOperations(runtimeHost: host);
     final recovery = SourceRuntimeRecoveryOperations(
       runtimeHost: host,
+      diagnostics: diagnostics,
       plugins: store,
       runtimeLoader: loader,
       scriptEditing: SourceScriptEditingOperations(
@@ -388,7 +394,7 @@ class _Fixture {
       loader,
       init,
       recovery,
-      SourceRuntimeDiagnosticsOperations(runtimeHost: host),
+      diagnostics,
       files,
     );
     final monitor = SourceRuntimeHealthMonitor(

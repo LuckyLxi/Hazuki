@@ -8,8 +8,9 @@ import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _Source extends Fake
-    implements SourceComicDetailGateway, SourceCloudReadingGateway {
+class _Source extends Fake implements SourceComicDetailGateway {}
+
+class _CloudReading extends Fake implements SourceCloudReadingGateway {
   bool cloud = true;
   bool fail = false;
   Map<String, dynamic>? progress;
@@ -55,9 +56,10 @@ void main() {
         pageIndex: 50,
       );
       final original = await local.exportJsonList();
-      final source = _Source();
+      final cloudReading = _CloudReading();
       final repository = ComicDetailFeatureFacade(
-        source: source,
+        source: _Source(),
+        cloudReading: cloudReading,
         local: _Local(),
         readingProgress: local,
         readHistory: ReadHistoryService(database: db),
@@ -65,19 +67,23 @@ void main() {
       );
       expect(await repository.loadReadingProgress('comic'), isNull);
       expect(await repository.watchReadingProgressChanges().toList(), isEmpty);
-      source.fail = true;
+      cloudReading.fail = true;
       await expectLater(
         repository.loadReadingProgress('comic'),
         throwsStateError,
       );
-      source.fail = false;
-      source.progress = {'cloud': true, 'epId': 'website', 'imagePage': 7};
+      cloudReading.fail = false;
+      cloudReading.progress = {
+        'cloud': true,
+        'epId': 'website',
+        'imagePage': 7,
+      };
       expect(
         (await repository.loadReadingProgress('comic'))?['epId'],
         'website',
       );
       expect(await local.exportJsonList(), original);
-      source.cloud = false;
+      cloudReading.cloud = false;
       expect(
         (await repository.loadReadingProgress('comic'))?['epId'],
         'old-local',

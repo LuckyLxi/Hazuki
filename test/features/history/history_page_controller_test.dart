@@ -31,7 +31,7 @@ void main() {
       await service.importJsonList([
         _historyJson(_comicA, timestamp: 1),
       ], replace: true);
-      final reader = _CloudHistoryReader()
+      final reader = _CloudHistory()
         ..records = [
           _comicA,
           const ExploreComic(
@@ -45,7 +45,8 @@ void main() {
       final controller = HistoryPageController(
         readHistoryService: service,
         sourceService: sl<SourceRuntimeGateway>(),
-        readerService: reader,
+        cloudReading: reader,
+        cloudReadingEvents: reader,
       );
       addTearDown(controller.dispose);
       addTearDown(reader.dispose);
@@ -208,11 +209,12 @@ void main() {
   test(
     'history replacement and disposal release only their cloud subscriptions',
     () async {
-      final reader = _CloudHistoryReader();
+      final reader = _CloudHistory();
       final controller = HistoryPageController(
         readHistoryService: sl<ReadHistoryService>(),
         sourceService: sl<SourceRuntimeGateway>(),
-        readerService: reader,
+        cloudReading: reader,
+        cloudReadingEvents: reader,
       );
       reader.waitForCancellation = true;
       final first = controller.loadInitial();
@@ -406,12 +408,9 @@ const _picacgDetails = ComicDetailsData(
   sourceKey: 'picacg',
 );
 
-class _CloudHistoryReader extends Fake
+class _CloudHistory extends Fake
     with ChangeNotifier
-    implements
-        SourceReaderGateway,
-        SourceCloudReadingGateway,
-        SourceCloudReadingEvents {
+    implements SourceCloudReadingGateway, SourceCloudReadingEvents {
   List<ExploreComic> records = [];
   bool waitForCancellation = false;
   final origins = <SourceTaskOrigin>[];

@@ -123,6 +123,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
   );
   final comicDetailDependencies = ComicDetailDependencies(
     source: sl<SourceComicDetailGateway>(),
+    cloudReading: sl<SourceCloudReadingGateway>(),
     localFavorites: sl<LocalFavoritesRepository>(),
     downloader: sl<MangaDownloadService>(),
     readingProgress: sl<ReadingProgressService>(),
@@ -151,6 +152,9 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     translation: translationDependencies,
     taskControl: sl<SourceTaskControlGateway>(),
     sourceReader: sl<SourceReaderGateway>(),
+    readerSessions: sl<SourceReaderSessionGateway>(),
+    readingProgressUploads: sl<SourceReadingProgressGateway>(),
+    cloudReading: sl<SourceCloudReadingGateway>(),
     sourceSettings: sl<SourceSettingsGateway>(),
     readingProgressService: sl<ReadingProgressService>(),
     downloader: sl<MangaDownloadService>(),
@@ -329,6 +333,8 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             readHistoryService: sl<ReadHistoryService>(),
             sourceService: sl<SourceRuntimeGateway>(),
             readerService: sl<SourceReaderGateway>(),
+            cloudReading: sl<SourceCloudReadingGateway>(),
+            cloudReadingEvents: sl<SourceCloudReadingEvents>(),
             imageGateway: sl<SourceImageGateway>(),
             comicDetailPageBuilder: comicDetailPageBuilder,
             onFavoriteRequested: onFavoriteRequested,

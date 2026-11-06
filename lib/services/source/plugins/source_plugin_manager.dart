@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -13,6 +12,7 @@ import '../../../shared/preferences/hazuki_preference_keys.dart';
 import '../../../shared/preferences/software_update_source.dart';
 import '../models/source_contract_models.dart';
 import 'source_plugin_models.dart';
+import 'source_plugin_remote_client.dart';
 import 'source_presentation_metadata.dart';
 import 'source_plugin_script_inspector.dart';
 import 'source_plugin_repository.dart';
@@ -31,13 +31,17 @@ class SourcePluginManager extends ChangeNotifier {
     this.validatePackage,
     this.onCatalogChanged,
   }) : _directory = directory ?? _defaultDirectory,
-       _download = download ?? _downloadBytes,
        _loadUpdateSource =
            loadUpdateSource ?? loadSoftwareUpdateSourcePreference,
-       _legacyDirectories = legacyDirectories;
+       _legacyDirectories = legacyDirectories {
+    _remote = SourcePluginRemoteClient(
+      download: download,
+      loadUpdateSource: _loadUpdateSource,
+    );
+  }
 
   final Future<Directory> Function() _directory;
-  final Future<List<int>> Function(Uri url) _download;
+  late final SourcePluginRemoteClient _remote;
   final Future<SoftwareUpdateSource> Function() _loadUpdateSource;
   final List<Directory>? _legacyDirectories;
   PluginPackageValidator? validatePackage;
@@ -130,24 +134,6 @@ class SourcePluginManager extends ChangeNotifier {
     _notify();
   }
 
-  Future<List<int>> _downloadPluginIndexBytes(Uri url) async =>
-      _download(resolveSourcePluginIndexUrl(url, await _loadUpdateSource()));
-
-  /// 内置仓库的插件包跟随更新源下载；所选线路失败时回退到索引原始地址。
-  Future<List<int>> _downloadPackage(String repository, Uri url) async {
-    if (repository != sourcePluginsRepositoryUrl) return _download(url);
-    final routed = resolveSourcePluginPackageUrl(
-      url,
-      await _loadUpdateSource(),
-    );
-    if (routed == url) return _download(url);
-    try {
-      return await _download(routed);
-    } catch (_) {
-      return _download(url);
-    }
-  }
-
   List<SourceCatalogEntry> get catalog => _installed.values
       .where(
         (plugin) =>
@@ -170,49 +156,6 @@ class SourcePluginManager extends ChangeNotifier {
   static Future<Directory> _defaultDirectory() async => Directory(
     p.join((await getApplicationSupportDirectory()).path, 'source_plugins'),
   );
-
-  /// 网络失败时带上底层原因，避免只显示 `DioException [unknown]: null`。
-  static Future<List<int>> _downloadBytes(Uri url) async {
-    try {
-      return await _downloadBytesOnce(url);
-    } on DioException catch (error) {
-      final status = error.response?.statusCode;
-      final cause = error.error ?? error.message;
-      throw SourcePluginException(
-        'plugin_download_failed',
-        [
-          error.type.name,
-          if (status != null) 'HTTP $status',
-          if (cause != null) '$cause',
-        ].join(': '),
-      );
-    }
-  }
-
-  static Future<List<int>> _downloadBytesOnce(Uri url) async {
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 20),
-        receiveTimeout: const Duration(seconds: 60),
-      ),
-    );
-    try {
-      final response = await dio.get<ResponseBody>(
-        url.toString(),
-        options: Options(responseType: ResponseType.stream),
-      );
-      final result = <int>[];
-      await for (final bytes in response.data!.stream) {
-        result.addAll(bytes);
-        if (result.length > 8 * 1024 * 1024) {
-          throw const SourcePluginException('plugin_download_too_large');
-        }
-      }
-      return result;
-    } finally {
-      dio.close(force: true);
-    }
-  }
 
   Future<void> initialize() => _initializing ??= _initialize();
 
@@ -386,52 +329,7 @@ class SourcePluginManager extends ChangeNotifier {
     String address, {
     String? branch,
     String path = 'plugins.json',
-  }) async {
-    final uri = Uri.tryParse(address.trim());
-    if (uri == null ||
-        uri.scheme != 'https' ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty) {
-      throw const SourcePluginException('plugin_invalid_repository');
-    }
-    if (uri.host != 'github.com') return uri;
-    final parts = uri.pathSegments;
-    if (parts.length < 2 || !isPluginPath(path)) {
-      throw const SourcePluginException('plugin_invalid_repository');
-    }
-    final owner = parts[0];
-    final repo = parts[1].replaceFirst(RegExp(r'\.git$'), '');
-    var selectedBranch = branch;
-    var selectedPath = path;
-    if (parts.length > 3 && (parts[2] == 'tree' || parts[2] == 'blob')) {
-      selectedBranch ??= parts[3];
-      final branchParts = selectedBranch.split('/');
-      final branchLength =
-          parts.skip(3).take(branchParts.length).join('/') == selectedBranch
-          ? branchParts.length
-          : 1;
-      if (parts.length > 3 + branchLength) {
-        selectedPath = parts.skip(3 + branchLength).join('/');
-        if (parts[2] == 'tree') selectedPath = '$selectedPath/$path';
-      }
-    }
-    if (selectedBranch == null || selectedBranch.isEmpty) {
-      final info = jsonDecode(
-        utf8.decode(
-          await _download(Uri.https('api.github.com', '/repos/$owner/$repo')),
-        ),
-      );
-      selectedBranch = (info as Map)['default_branch'] as String?;
-      if (selectedBranch == null || selectedBranch.isEmpty) {
-        throw const SourcePluginException('plugin_repository_not_found');
-      }
-    }
-    return Uri(
-      scheme: 'https',
-      host: 'raw.githubusercontent.com',
-      pathSegments: [owner, repo, selectedBranch, ...selectedPath.split('/')],
-    );
-  }
+  }) => _remote.resolveRepository(address, branch: branch, path: path);
 
   Future<String> addRepository(
     String address, {
@@ -456,7 +354,7 @@ class SourcePluginManager extends ChangeNotifier {
   });
 
   Future<List<SourcePluginIndexEntry>> _readIndex(Uri uri) async {
-    final data = await _downloadPluginIndexBytes(uri);
+    final data = await _remote.downloadIndex(uri);
     if (data.length > 2 * 1024 * 1024) {
       throw const SourcePluginException('plugin_index_too_large');
     }
@@ -524,7 +422,7 @@ class SourcePluginManager extends ChangeNotifier {
     }
     // Downloads are independent; catalog changes and registry writes must
     // still commit one at a time.
-    final bytes = await _downloadPackage(repository, entry.downloadUrl);
+    final bytes = await _remote.downloadPackage(repository, entry.downloadUrl);
     await _serialize(() async {
       if (!_repositories.contains(repository)) {
         throw const SourcePluginException('plugin_repository_not_added');

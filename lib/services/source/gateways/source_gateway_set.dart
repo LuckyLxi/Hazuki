@@ -63,30 +63,38 @@ class SourceGatewaySet {
   }) {
     search = HazukiSourceSearchAdapter(
       runtime: runtime,
+      recovery: recovery,
       content: content,
       comicDetails: comicDetails,
     );
     discover = HazukiSourceDiscoverAdapter(
       runtime: runtime,
+      recovery: recovery,
       explore: explore,
       category: category,
       account: account,
     );
     favorite = HazukiSourceFavoriteAdapter(
       runtime: runtime,
+      recovery: recovery,
       account: account,
       favorites: favorites,
       cloudFavoritesChangedStream: cloudFavoritesChangedStream,
       initialization: initialization,
     );
-    reader = HazukiSourceReaderAdapter(
-      cloudReading: cloudReading,
+    final readerAdapter = HazukiSourceReaderAdapter(
       readingProgressUploads: readingProgressUploads,
       comicDetails: comicDetails,
       imagePreparation: imagePreparation,
       image: image,
       debug: debug,
     );
+    reader = readerAdapter;
+    readerSessions = readerAdapter;
+    downloadSessions = readerAdapter;
+    this.readingProgressUploads = readerAdapter;
+    this.cloudReading = cloudReading;
+    cloudReadingEvents = cloudReading;
     settingsGateway = HazukiSourceSettingsAdapter(
       runtime: runtime,
       settings: settings,
@@ -103,6 +111,7 @@ class SourceGatewaySet {
     recommendation = imageAdapter;
     dailyRecommendation = HazukiSourceDailyRecommendationAdapter(
       runtime: runtime,
+      recovery: recovery,
       image: image,
       content: content,
       comicDetails: comicDetails,
@@ -134,7 +143,6 @@ class SourceGatewaySet {
       runtime: runtime,
       account: account,
       favorites: favorites,
-      cloudReading: cloudReading,
       comicDetails: comicDetails,
       category: category,
       detailTabs: detailTabs,
@@ -148,6 +156,11 @@ class SourceGatewaySet {
   late final SourceDiscoverGateway discover;
   late final SourceFavoriteGateway favorite;
   late final SourceReaderGateway reader;
+  late final SourceReaderSessionGateway readerSessions;
+  late final SourceDownloadSessionGateway downloadSessions;
+  late final SourceReadingProgressGateway readingProgressUploads;
+  late final SourceCloudReadingGateway cloudReading;
+  late final SourceCloudReadingEvents cloudReadingEvents;
   late final SourceSettingsGateway settingsGateway;
   late final SourceAccountGateway accountGateway;
   late final SourceDebugGateway debugGateway;
