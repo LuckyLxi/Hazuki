@@ -76,7 +76,7 @@ class ReaderTranslationController extends ChangeNotifier {
   final _retranslateTargets = <String>{};
   Set<String> _window = {}, _visible = {};
   int _index = 0, _failures = 0;
-  bool _disposed = false, _tripped = false;
+  bool _retired = false, _tripped = false;
   late TranslationReasoningEffort _reasoningEffort;
   late String _customSystemPrompt;
   late TranslationTextLocator _textLocator;
@@ -92,24 +92,27 @@ class ReaderTranslationController extends ChangeNotifier {
 
   /// 加载翻译设置与已安装模型，并按最新状态同步翻译窗口。
   Future<void> load() async {
+    if (_retired) return;
     await settings.load();
+    if (_retired) return;
     // 未开启“自动开启翻译”时，每次进入阅读器都从关闭状态开始，避免不需要翻译的漫画被自动翻译。
     if (!settings.autoEnableReaderMode && settings.readerModeOn) {
       await settings.setReaderModeOn(false);
+      if (_retired) return;
     }
     await models.load();
     _settingsChanged();
   }
 
   Future<void> toggleMode() async {
-    if (!ready) return;
+    if (_retired || !ready) return;
     _failures = 0;
     _tripped = false;
     await settings.setReaderModeOn(!settings.readerModeOn);
   }
 
   void _settingsChanged() {
-    if (_disposed) return;
+    if (_retired) return;
     if (_reasoningEffort != settings.reasoningEffort ||
         _customSystemPrompt != settings.customSystemPrompt ||
         _textLocator != settings.textLocator ||
@@ -131,8 +134,9 @@ class ReaderTranslationController extends ChangeNotifier {
   }
 
   void updateWindow(int index) {
+    if (_retired) return;
     _index = index;
-    if (_disposed || !modeOn) return;
+    if (!modeOn) return;
     final images = _images();
     final visibleIndices = _spreadImageIndices(index);
     _visible = {
@@ -177,7 +181,7 @@ class ReaderTranslationController extends ChangeNotifier {
   }
 
   void _pump() {
-    while (!_disposed && modeOn && _active.length < 2 && _queue.isNotEmpty) {
+    while (!_retired && modeOn && _active.length < 2 && _queue.isNotEmpty) {
       final url = _queue.removeFirst();
       final token = CancelToken();
       _active[url] = token;
@@ -214,14 +218,14 @@ class ReaderTranslationController extends ChangeNotifier {
         bypassCache: bypassCache,
         cancelToken: token,
       );
-      if (_disposed || token.isCancelled) return;
+      if (_retired || token.isCancelled) return;
       _failures = 0;
       _state(url).value = PageTranslationView(
         status: PageTranslationStatus.done,
         result: result,
       );
     } catch (error) {
-      if (_disposed || token.isCancelled) return;
+      if (_retired || token.isCancelled) return;
       final failure = TranslationFailure.from(error);
       if (failure.kind == TranslationFailureKind.cancelled) {
         _state(url).value = PageTranslationView();
@@ -240,7 +244,7 @@ class ReaderTranslationController extends ChangeNotifier {
         _cancelAll();
         unawaited(_service.releaseDetector());
         await settings.setReaderModeOn(false);
-        if (!_disposed) _onFailure(failure);
+        if (!_retired) _onFailure(failure);
       }
     } finally {
       if (identical(_active[url], token)) {
@@ -248,12 +252,12 @@ class ReaderTranslationController extends ChangeNotifier {
         _sent.remove(url);
         if (!token.isCancelled) _retranslateTargets.remove(url);
       }
-      if (!_disposed && modeOn && _window.isNotEmpty) updateWindow(_index);
+      if (!_retired && modeOn && _window.isNotEmpty) updateWindow(_index);
     }
   }
 
   void retry(String url) {
-    if (_disposed || !modeOn) return;
+    if (_retired || !modeOn) return;
     if (!_window.contains(url)) {
       retranslate(url);
       return;
@@ -263,7 +267,7 @@ class ReaderTranslationController extends ChangeNotifier {
   }
 
   void retranslateVisible() {
-    if (_disposed || !modeOn) return;
+    if (_retired || !modeOn) return;
     for (final url in _visible) {
       _active[url]?.cancel();
       _sent.remove(url);
@@ -274,7 +278,7 @@ class ReaderTranslationController extends ChangeNotifier {
   }
 
   void retranslate(String url) {
-    if (_disposed || !modeOn || !_images().contains(url)) return;
+    if (_retired || !modeOn || !_images().contains(url)) return;
     _active[url]?.cancel();
     _sent.remove(url);
     _retranslateTargets.add(url);
@@ -284,7 +288,7 @@ class ReaderTranslationController extends ChangeNotifier {
   }
 
   void toggleRegion(String url, String regionId) {
-    if (_disposed) return;
+    if (_retired) return;
     final state = _state(url);
     final current = state.value;
     if (current.result == null ||
@@ -319,6 +323,11 @@ class ReaderTranslationController extends ChangeNotifier {
   }
 
   void reset() {
+    if (_retired) return;
+    _resetPages();
+  }
+
+  void _resetPages() {
     _cancelAll();
     _failures = 0;
     for (final state in _states.values) {
@@ -326,12 +335,17 @@ class ReaderTranslationController extends ChangeNotifier {
     }
   }
 
+  void retire() {
+    if (_retired) return;
+    _retired = true;
+    settings.removeListener(_settingsChanged);
+    _resetPages();
+    unawaited(_service.releaseDetector());
+  }
+
   @override
   void dispose() {
-    _disposed = true;
-    settings.removeListener(_settingsChanged);
-    _cancelAll();
-    unawaited(_service.releaseDetector());
+    retire();
     for (final state in _states.values) {
       state.dispose();
     }

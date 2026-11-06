@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
@@ -19,9 +20,11 @@ import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/shared/reading/reader_filter_color.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
+import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
+import 'package:hazuki/features/reader/support/reader_progress_reporter.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
 import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
@@ -37,6 +40,12 @@ import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import '../../support/test_service_locator.dart';
+
+class _ImagePipeline extends Mock implements ReaderImagePipelineController {}
+
+class _Actions extends Mock implements ReaderActionsController {}
+
+class _ProgressReporter extends Mock implements ReaderProgressReporter {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -407,8 +416,10 @@ void main() {
       addTearDown(scrollController.dispose);
       addTearDown(focusNode.dispose);
       addTearDown(transformationController.dispose);
-      var appliedInitialImages = false;
-      var loadChapterImagesCount = 0;
+      final imagePipeline = _ImagePipeline();
+      when(
+        () => imagePipeline.loadChapterImages(trigger: any(named: 'trigger')),
+      ).thenAnswer((_) async {});
       final displayBridge = ReaderDisplayBridge(
         onVolumeButtonPressed: (_) async {},
       );
@@ -431,14 +442,9 @@ void main() {
         displayBridge: displayBridge,
         displaySession: displaySession,
         settingsStore: const ReaderSettingsStore(),
-        applyInitialImages: (images, {required trigger}) {
-          appliedInitialImages = true;
-          expect(images, isEmpty);
-          expect(trigger, 'offline_constructor_images');
-        },
-        loadChapterImages: ({trigger = 'manual'}) async {
-          loadChapterImagesCount++;
-        },
+        imagePipeline: imagePipeline,
+        actions: _Actions(),
+        progressReporter: _ProgressReporter(),
         isMounted: () => false,
         updateState: (update) => update(),
         logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
@@ -454,8 +460,15 @@ void main() {
 
       sessionController.initialize();
 
-      expect(appliedInitialImages, isTrue);
-      expect(loadChapterImagesCount, 0);
+      verify(
+        () => imagePipeline.applyInitialImages(
+          [],
+          trigger: 'offline_constructor_images',
+        ),
+      ).called(1);
+      verifyNever(
+        () => imagePipeline.loadChapterImages(trigger: any(named: 'trigger')),
+      );
 
       sessionController.dispose();
       void listener() {}
@@ -545,8 +558,9 @@ void main() {
         displayBridge: displayBridge,
         displaySession: displaySession,
         settingsStore: const ReaderSettingsStore(),
-        applyInitialImages: (_, {required trigger}) {},
-        loadChapterImages: ({trigger = 'manual'}) async {},
+        imagePipeline: _ImagePipeline(),
+        actions: _Actions(),
+        progressReporter: _ProgressReporter(),
         isMounted: () => true,
         updateState: (update) => update(),
         logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
@@ -557,6 +571,7 @@ void main() {
         chapterIndex: 0,
         widgetImages: const [],
         readingProgressService: sl<ReadingProgressService>(),
+        offlineMode: true,
       );
 
       sessionController.initialize();

@@ -261,7 +261,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       sourceKey: _pageContext.sourceKey,
       comicId: widget.page.comicId,
       onFailure: (failure) {
-        if (mounted) {
+        if (mounted && _sessionController.isActive) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -399,8 +399,10 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         displayBridge: _displayBridge,
         displaySession: _displaySession,
         settingsStore: _readerSettingsStore,
-        applyInitialImages: _imagePipelineController.applyInitialImages,
-        loadChapterImages: _imagePipelineController.loadChapterImages,
+        imagePipeline: _imagePipelineController,
+        actions: _actionsController,
+        progressReporter: _progressReporter,
+        translation: _translationController,
         isMounted: () => mounted,
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
@@ -413,15 +415,12 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         widgetImages: widget.page.images,
         readingProgressService: widget.page.dependencies.readingProgressService,
         offlineMode: widget.page.offlineMode,
-        shouldSaveLocalProgress: () async {
-          if (widget.page.offlineMode) return true;
+        cloudReading: () {
           final source = widget.page.dependencies.sourceReader;
-          return source is! SourceCloudReadingGateway ||
-              !await (source as SourceCloudReadingGateway).usesCloudReading(
-                (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
-                taskOrigin: _cloudReadOrigin,
-              );
-        },
+          return source is SourceCloudReadingGateway
+              ? source as SourceCloudReadingGateway
+              : null;
+        }(),
         onSettingsReady: () {
           _entryRestore.settingsReady = true;
           _maybeRestoreEntry();
@@ -453,11 +452,9 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         readerSession: widget.readerSession,
         pageContext: _pageContext,
         onChapterChanged: (chapter, {animate = true}) {
-          _progressReporter.close('chapter');
-          _imagePipelineController.retire();
-          _translationController?.reset();
-          _actionsController.dispose(SourceTaskStopReason.superseded);
-          widget.onChapterChanged(chapter, animate: animate);
+          if (_sessionController.retireForChapterChange()) {
+            widget.onChapterChanged(chapter, animate: animate);
+          }
         },
         downloader: widget.page.dependencies.downloader,
       );
@@ -466,7 +463,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         context: () => context,
         resolveReaderTheme: _resolveReaderTheme,
         sourceReader: widget.page.dependencies.sourceReader,
-        isMounted: () => mounted,
+        isMounted: () => _isChapterActive,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
         comicId: widget.page.comicId,
@@ -476,12 +473,14 @@ class _ReaderPageState extends State<_ReaderChapterPage>
 
   WindowTitleBarControl? _windowsTitleBarController;
 
+  bool get _isChapterActive => mounted && _sessionController.isActive;
+
   void _translationModeChanged() {
     if (mounted) setState(() {});
   }
 
   void _updateTranslationWindow() {
-    if (mounted && !_noImageModeEnabled) {
+    if (_isChapterActive && !_noImageModeEnabled) {
       _translationController?.updateWindow(_runtimeState.currentPageIndex);
     }
   }
@@ -493,7 +492,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       await controller.load();
       _updateTranslationWindow();
     } catch (_) {
-      if (mounted) {
+      if (mounted && _sessionController.isActive) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n(context).translationSettingsFailed)),
         );
@@ -502,6 +501,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   }
 
   Future<void> _toggleTranslation() async {
+    if (!_isChapterActive) return;
     final controller = _translationController;
     if (controller == null) return;
     if (!controller.settings.isConfigured) {
@@ -519,7 +519,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     try {
       await controller.toggleMode();
     } catch (_) {
-      if (mounted) {
+      if (mounted && _sessionController.isActive) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n(context).translationSettingsFailed)),
         );
@@ -528,6 +528,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   }
 
   Future<void> _translationMenu() async {
+    if (!_isChapterActive) return;
     final controller = _translationController;
     if (controller == null) return;
     final action = await showModalBottomSheet<ReaderTranslationAction>(
@@ -536,7 +537,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       isScrollControlled: true,
       builder: (_) => const ReaderTranslationActionsSheet(),
     );
-    if (!mounted || action == null) return;
+    if (!mounted || !_sessionController.isActive || action == null) return;
     switch (action) {
       case ReaderTranslationAction.retranslate:
         controller.retranslateVisible();
@@ -549,14 +550,14 @@ class _ReaderPageState extends State<_ReaderChapterPage>
               ReaderTranslationGlossarySheet(controller: controller),
         );
       case ReaderTranslationAction.clearGlossary:
-        if (await confirmTranslationClear(context)) {
+        if (await confirmTranslationClear(context) && _isChapterActive) {
           try {
             await controller.glossary.clear(
               controller.sourceKey,
               controller.comicId,
             );
           } catch (_) {
-            if (mounted) {
+            if (mounted && _sessionController.isActive) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(l10n(context).translationUnknown)),
               );
@@ -606,7 +607,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   final _entryRestore = ReaderEntryRestoreState();
 
   void _maybeRestoreEntry() {
-    if (!mounted || _entryRestore.started) return;
+    if (!_isChapterActive || _entryRestore.started) return;
     final target = _entryRestore.takeTarget(
       epId: widget.page.epId,
       imageCount: _runtimeState.imageCount,
@@ -633,14 +634,6 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     });
   }
 
-  final _cloudReadCancellation = SourceTaskCancellation();
-  late final _cloudReadOrigin = SourceTaskOrigin(
-    ownerId: createSourceTaskId(),
-    groupId: createSourceTaskId(),
-    requestSequence: 0,
-    cancellation: _cloudReadCancellation,
-  );
-
   bool _foreground = true;
   late final _progressReporter = ReaderProgressReporter(
     comicId: widget.page.comicId,
@@ -659,7 +652,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
 
   void _reportActualViewport() {
     _maybeRestoreEntry();
-    if (!mounted ||
+    if (!_isChapterActive ||
         !_entryRestore.started ||
         !_foreground ||
         widget.page.offlineMode ||
@@ -746,26 +739,26 @@ class _ReaderPageState extends State<_ReaderChapterPage>
 
   Future<void> _openFavoriteDialogAndRestoreFocus() async {
     await _actionsController.openFavoriteDialog();
-    if (!mounted) {
+    if (!_isChapterActive) {
       return;
     }
     _readerKeyFocusNode.requestFocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (_isChapterActive) {
         _readerKeyFocusNode.requestFocus();
       }
     });
   }
 
   Future<void> _showWindowsShortcutsGuide() async {
-    if (!Platform.isWindows || !mounted) {
+    if (!Platform.isWindows || !mounted || !_sessionController.isActive) {
       return;
     }
     await showReaderWindowsShortcutsDialog(
       context,
       theme: _resolveReaderTheme(context),
     );
-    if (mounted) {
+    if (_isChapterActive) {
       _readerKeyFocusNode.requestFocus();
     }
   }
@@ -773,7 +766,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   Future<void> _showInitialWindowsShortcutsGuideIfNeeded() async {
     if (!Platform.isWindows ||
         await _readerSettingsStore.hasSeenWindowsShortcutsGuide() ||
-        !mounted) {
+        !_isChapterActive) {
       return;
     }
     await _showWindowsShortcutsGuide();
@@ -802,17 +795,17 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_entryRestore.positionReady) {
+    if (_isChapterActive && !_entryRestore.positionReady) {
       unawaited(
         _readerSettingsStore.loadRestorePagePosition().then(
           (value) {
-            if (!mounted) return;
+            if (!_isChapterActive) return;
             // 读取完成前用户可能已在侧栏切换，以用户操作为准。
             _entryRestore.restorePagePosition ??= value;
             _maybeRestoreEntry();
           },
           onError: (Object _) {
-            if (!mounted) return;
+            if (!_isChapterActive) return;
             _entryRestore.restorePagePosition = false;
             _maybeRestoreEntry();
           },
@@ -835,12 +828,12 @@ class _ReaderPageState extends State<_ReaderChapterPage>
               )
               .then(
                 (position) {
-                  if (!mounted) return;
+                  if (!_isChapterActive) return;
                   _entryRestore.resolvePosition(position);
                   _maybeRestoreEntry();
                 },
                 onError: (Object _) {
-                  if (mounted) {
+                  if (_isChapterActive) {
                     _entryRestore.positionReady = true;
                     _maybeRestoreEntry();
                   }
@@ -865,14 +858,10 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   void dispose() {
     _windowsTitleBarController?.releaseCustomTitleBarSuppression(this);
     _runtimeState.pageIndexNotifier.removeListener(_updateTranslationWindow);
-    _translationController?.dispose();
+    _translationController?.removeListener(_translationModeChanged);
     _resetAnimController.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    _cloudReadCancellation.cancel(SourceTaskStopReason.ownerDisposed);
-    _progressReporter.close('exit');
     _sessionController.dispose();
-    _imagePipelineController.dispose();
-    _actionsController.dispose();
     _scrollController.dispose();
     _pageController.dispose();
     _readerKeyFocusNode.dispose();
@@ -1109,8 +1098,9 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     );
   }
 
-  Future<void> _handlePlatformVolumeButtonPressed(String? direction) {
-    return _navigationController.handlePlatformVolumeButtonPressed(direction);
+  Future<void> _handlePlatformVolumeButtonPressed(String? direction) async {
+    if (!_isChapterActive) return;
+    await _navigationController.handlePlatformVolumeButtonPressed(direction);
   }
 
   void _handleImageAspectRatioResolved({

@@ -14,6 +14,7 @@ class _Source extends Fake implements SourceReaderGateway {
   _Source(this.tasks);
   final SourceTaskRegistry tasks;
   final chapters = <(SourceTaskOrigin?, Completer<List<String>>)>[];
+  final byteRequests = <String>[];
   final images =
       <
         String,
@@ -78,7 +79,10 @@ class _Source extends Fake implements SourceReaderGateway {
     bool priority = false,
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
-  }) async => Uint8List(0);
+  }) async {
+    byteRequests.add(url);
+    return Uint8List(0);
+  }
 }
 
 Future<void> _flush() => Future<void>.delayed(Duration.zero);
@@ -208,6 +212,48 @@ void main() {
       );
       expect(state.loadImagesError, isNull);
       expect(pipeline.disposed, isFalse);
+    },
+  );
+
+  test(
+    'retiring preserves cached images and blocks late chapter work',
+    () async {
+      noImages = false;
+      state.applyImages(['old', 'ahead']);
+      pipeline.resetForImages(state.images);
+      const cached = AssetImage('old');
+      pipeline.providerCache['old'] = cached;
+
+      final chapter = controller.loadChapterImages();
+      final image = controller.getImageProvider('ahead');
+      final imageCancelled = expectLater(
+        image,
+        throwsA(isA<SourceTaskCancelled>()),
+      );
+      await _flush();
+      final request = source.images['ahead']!.single;
+      controller.retire();
+      await imageCancelled;
+      await chapter;
+      expect(request.$1!.cancellation!.reason, SourceTaskStopReason.superseded);
+      expect(
+        source.chapters.single.$1!.cancellation!.reason,
+        SourceTaskStopReason.superseded,
+      );
+
+      controller.prefetchAround(0);
+      controller.requestPrefetchAhead(0);
+      controller.handleNoImageModeChanged();
+      await controller.loadChapterImages();
+      request.$2.complete(_image(2));
+      source.chapters.single.$2.complete(['late']);
+      await _flush();
+
+      expect(source.chapters, hasLength(1));
+      expect(source.images['ahead'], hasLength(1));
+      expect(source.byteRequests, isEmpty);
+      expect(state.images, ['old', 'ahead']);
+      expect(pipeline.providerCache, {'old': cached});
     },
   );
 

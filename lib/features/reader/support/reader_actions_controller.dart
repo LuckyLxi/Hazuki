@@ -78,6 +78,8 @@ class ReaderActionsController {
       CommentsInteractionState();
 
   bool get chapterPanelLoading => _chapterPanelLoading;
+  bool get _isActive => !_closed && _isMounted();
+
   bool get commentsEnabled =>
       !_pageContext.offlineMode &&
       _isMounted() &&
@@ -150,6 +152,7 @@ class ReaderActionsController {
   }
 
   Future<void> openFavoriteDialog() async {
+    if (!_isActive) return;
     _logEvent('Reader favorite dialog requested', source: 'reader_ui');
     final onFavoriteRequested = _pageContext.onFavoriteRequested;
     if (onFavoriteRequested == null) {
@@ -173,13 +176,13 @@ class ReaderActionsController {
   }
 
   Future<void> openCommentsSheet() async {
-    if (!commentsEnabled) {
+    if (!_isActive || !commentsEnabled) {
       return;
     }
     _logEvent('Reader comments sheet requested', source: 'reader_ui');
     try {
       final details = await loadReaderComicDetails();
-      if (!_isMounted() || !commentsEnabled) {
+      if (!_isActive || !commentsEnabled) {
         return;
       }
       final context = _context();
@@ -228,7 +231,7 @@ class ReaderActionsController {
   }
 
   Future<void> openChaptersPanel() async {
-    if (_chapterPanelLoading) {
+    if (!_isActive || _chapterPanelLoading) {
       return;
     }
     final hadCachedChapterDetails = _chapterDetailsCache != null;
@@ -244,7 +247,7 @@ class ReaderActionsController {
     );
     try {
       final details = await loadReaderComicDetails();
-      if (!_isMounted()) {
+      if (!_isActive) {
         return;
       }
       _logEvent(
@@ -312,6 +315,7 @@ class ReaderActionsController {
         ),
       );
     } catch (error) {
+      if (!_isActive || isSourceTaskCancellation(error)) return;
       _logEvent(
         'Reader chapters panel failed',
         level: 'error',
@@ -321,9 +325,6 @@ class ReaderActionsController {
           'error': '$error',
         }),
       );
-      if (!_isMounted()) {
-        return;
-      }
       final context = _context();
       unawaited(
         showHazukiPrompt(
@@ -333,7 +334,7 @@ class ReaderActionsController {
         ),
       );
     } finally {
-      if (_isMounted()) {
+      if (_isActive) {
         _updateState(() {
           _chapterPanelLoading = false;
         });
@@ -346,7 +347,8 @@ class ReaderActionsController {
     ComicDetailsData details, {
     required Set<String> selectedEpIds,
   }) async {
-    if (selectedEpIds.isEmpty) {
+    bool isActive() => _isActive && context.mounted;
+    if (!isActive() || selectedEpIds.isEmpty) {
       return;
     }
     final targets = <MangaChapterDownloadTarget>[];
@@ -366,7 +368,6 @@ class ReaderActionsController {
       return;
     }
 
-    bool isActive() => !_closed && _isMounted() && context.mounted;
     late final int queuedCount;
     ThemeData? dialogTheme;
     try {
@@ -421,15 +422,13 @@ class ReaderActionsController {
       }
       queuedCount = outcome.chapterCount;
     } catch (error) {
+      if (!isActive() || isSourceTaskCancellation(error)) return;
       _logEvent(
         'Reader chapter downloads failed',
         level: 'error',
         source: 'reader_download',
         content: _logPayload({'error': '$error'}),
       );
-      if (!isActive()) {
-        return;
-      }
       unawaited(
         showHazukiPrompt(
           context,
@@ -459,6 +458,7 @@ class ReaderActionsController {
     String chapterTitle,
     int index,
   ) async {
+    if (!_isActive || !routeContext.mounted) return;
     if (epId == _pageContext.epId) {
       Navigator.of(routeContext).pop();
       _logEvent(
@@ -484,7 +484,7 @@ class ReaderActionsController {
     );
     final navigator = Navigator.of(routeContext);
     final sheetRoute = ModalRoute.of(routeContext)!;
-    if (!await ExpandingChapterSheet.expand(routeContext) || !_isMounted()) {
+    if (!await ExpandingChapterSheet.expand(routeContext) || !_isActive) {
       return;
     }
     navigator.removeRoute(sheetRoute);
@@ -499,10 +499,12 @@ class ReaderActionsController {
   }
 
   Future<void> jumpToAdjacentChapter(int offset) async {
+    if (!_isActive) return;
     final context = _context();
     final strings = l10n(context);
     try {
       final details = await loadReaderComicDetails();
+      if (!_isActive) return;
       final chapterEntries = details.chapters.entries.toList(growable: false);
       if (chapterEntries.isEmpty) {
         return;

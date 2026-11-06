@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../support/source_presentation_fixtures.dart';
 import 'package:hazuki/features/reader/view/reader_comments_sheet.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -22,12 +24,19 @@ void main() {
     bool offline = false,
     String sourceKey = 'picacg',
     BuildContext? context,
+    List<String>? logs,
+    VoidCallback? onStateUpdate,
   }) => ReaderActionsController(
     context: () =>
         context ?? (throw StateError('No UI context needed to load details')),
     isMounted: () => true,
-    updateState: (update) => update(),
-    logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
+    updateState: (update) {
+      update();
+      onStateUpdate?.call();
+    },
+    logEvent: (title, {level = 'info', source = 'reader_ui', content}) {
+      logs?.add(title);
+    },
     logPayload: ([extra]) => extra ?? {},
     sourceReader: source,
     pageContext: ReaderPageContext(
@@ -195,6 +204,38 @@ void main() {
     ).thenAnswer((_) async => details);
     expect(await actions.loadReaderComicDetails(), same(details));
   });
+
+  for (final fails in [false, true]) {
+    test(
+      'retired chapter ignores panel detail response (fails=$fails)',
+      () async {
+        final pending = Completer<ComicDetailsData>();
+        when(
+          () => source.loadComicDetails('comic', sourceKey: 'picacg'),
+        ).thenAnswer((_) => pending.future);
+        final logs = <String>[];
+        var updates = 0;
+        final actions = controller(logs: logs, onStateUpdate: () => updates++);
+        final opening = actions.openChaptersPanel();
+        actions.dispose(SourceTaskStopReason.superseded);
+        if (fails) {
+          pending.completeError(StateError('late failure'));
+        } else {
+          pending.complete(_Details());
+        }
+        await opening;
+        await actions.jumpToAdjacentChapter(1);
+        await actions.openFavoriteDialog();
+        await actions.openChaptersPanel();
+
+        verify(
+          () => source.loadComicDetails('comic', sourceKey: 'picacg'),
+        ).called(1);
+        expect(logs, ['Reader chapters panel requested']);
+        expect(updates, 1);
+      },
+    );
+  }
 
   test(
     'offline details preserve chapter order without accessing a source',

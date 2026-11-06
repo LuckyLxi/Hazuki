@@ -1,11 +1,16 @@
 import 'dart:async';
 
+import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
+import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
+import 'package:hazuki/features/reader/support/reader_progress_reporter.dart';
+import 'package:hazuki/features/reader/support/reader_translation_controller.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
 
 class ReaderSessionController {
@@ -15,9 +20,10 @@ class ReaderSessionController {
     required ReaderDisplaySession displaySession,
     required ReaderSettingsStore settingsStore,
     required ReaderViewBindings viewBindings,
-    required void Function(List<String> images, {required String trigger})
-    applyInitialImages,
-    required Future<void> Function({String trigger}) loadChapterImages,
+    required ReaderImagePipelineController imagePipeline,
+    required ReaderActionsController actions,
+    required ReaderProgressReporter progressReporter,
+    ReaderTranslationController? translation,
     required ReaderIsMounted isMounted,
     required ReaderStateUpdate updateState,
     required ReaderLogEvent logEvent,
@@ -30,15 +36,18 @@ class ReaderSessionController {
     required List<String> widgetImages,
     required ReadingProgressService readingProgressService,
     bool offlineMode = false,
-    this.shouldSaveLocalProgress,
+    SourceCloudReadingGateway? cloudReading,
     this.onSettingsReady,
   }) : _runtimeState = runtimeState,
        _displayBridge = displayBridge,
        _displaySession = displaySession,
        _settingsStore = settingsStore,
        _viewBindings = viewBindings,
-       _applyInitialImages = applyInitialImages,
-       _loadChapterImages = loadChapterImages,
+       _imagePipeline = imagePipeline,
+       _actions = actions,
+       _progressReporter = progressReporter,
+       _translation = translation,
+       _cloudReading = cloudReading,
        _isMounted = isMounted,
        _updateState = updateState,
        _logEvent = logEvent,
@@ -56,9 +65,11 @@ class ReaderSessionController {
   final ReaderDisplayBridge _displayBridge;
   final ReaderSettingsStore _settingsStore;
   final ReaderViewBindings _viewBindings;
-  final void Function(List<String> images, {required String trigger})
-  _applyInitialImages;
-  final Future<void> Function({String trigger}) _loadChapterImages;
+  final ReaderImagePipelineController _imagePipeline;
+  final ReaderActionsController _actions;
+  final ReaderProgressReporter _progressReporter;
+  final ReaderTranslationController? _translation;
+  final SourceCloudReadingGateway? _cloudReading;
   final ReaderIsMounted _isMounted;
   final ReaderStateUpdate _updateState;
   final ReaderLogEvent _logEvent;
@@ -73,14 +84,18 @@ class ReaderSessionController {
   final bool _offlineMode;
   final ReaderDisplaySession _displaySession;
   bool _closed = false;
-  final Future<bool> Function()? shouldSaveLocalProgress;
+  int? _retiredPageIndex;
   final void Function()? onSettingsReady;
+
+  bool get isActive => !_closed && _retiredPageIndex == null;
 
   void initialize() {
     _displayBridge.attach();
     _viewBindings.attach();
     unawaited(loadReadingSettings());
-    _viewBindings.requestFocusAfterFrame(isMounted: _isMounted);
+    _viewBindings.requestFocusAfterFrame(
+      isMounted: () => isActive && _isMounted(),
+    );
 
     final initialImages = _widgetImages
         .where((entry) => entry.trim().isNotEmpty)
@@ -94,25 +109,48 @@ class ReaderSessionController {
       }),
     );
     if (initialImages.isNotEmpty) {
-      _applyInitialImages(initialImages, trigger: 'constructor_images');
+      _imagePipeline.applyInitialImages(
+        initialImages,
+        trigger: 'constructor_images',
+      );
       return;
     }
     if (_offlineMode) {
-      _applyInitialImages(
+      _imagePipeline.applyInitialImages(
         const <String>[],
         trigger: 'offline_constructor_images',
       );
       return;
     }
-    unawaited(_loadChapterImages(trigger: 'initial_load'));
+    unawaited(_imagePipeline.loadChapterImages(trigger: 'initial_load'));
+  }
+
+  bool retireForChapterChange() {
+    if (!isActive) return false;
+    _retiredPageIndex = _runtimeState.pageIndexNotifier.value;
+    _displaySession.close();
+    _progressReporter.close('chapter');
+    _imagePipeline.retire();
+    _actions.dispose(SourceTaskStopReason.superseded);
+    _translation?.retire();
+    return true;
   }
 
   void dispose() {
+    if (_closed) return;
     _closed = true;
-    _displaySession.close();
-    final lastVisiblePageIndex = _runtimeState.pageIndexNotifier.value;
+    final lastVisiblePageIndex =
+        _retiredPageIndex ?? _runtimeState.pageIndexNotifier.value;
+    final exitingReader = _retiredPageIndex == null;
+    if (exitingReader) _displaySession.close();
     _displayBridge.detach();
     _viewBindings.dispose();
+    if (exitingReader) {
+      _progressReporter.close('exit');
+      _imagePipeline.dispose();
+      _actions.dispose();
+    }
+    _translation?.dispose();
     _logEvent(
       'Reader session closed',
       source: 'reader_lifecycle',
@@ -124,12 +162,12 @@ class ReaderSessionController {
       }),
     );
     unawaited(_recordReadingProgress(lastPageIndex: lastVisiblePageIndex));
-    unawaited(restoreReaderDisplay());
+    if (exitingReader) unawaited(_displaySession.restore());
   }
 
   Future<void> loadReadingSettings() async {
     final settings = await _settingsStore.load();
-    if (_closed || !_isMounted()) {
+    if (!isActive || !_isMounted()) {
       return;
     }
     _updateState(() {
@@ -140,25 +178,19 @@ class ReaderSessionController {
       source: 'reader_settings',
       content: _logPayload({'settingsLoaded': true}),
     );
-    await applyReaderDisplaySettings();
-    if (_closed) {
+    await _displaySession.apply();
+    if (!isActive) {
       return;
     }
-    await syncVolumeButtonPagingPlatformState();
-    if (!_closed) onSettingsReady?.call();
+    await _displaySession.syncVolumeButtonPaging();
+    if (isActive) onSettingsReady?.call();
   }
 
-  Future<void> applyReaderDisplaySettings() => _displaySession.apply();
-
-  Future<void> syncVolumeButtonPagingPlatformState({bool? enabled}) =>
-      _displaySession.syncVolumeButtonPaging(enabled: enabled);
-
-  Future<void> restoreReaderDisplay() => _displaySession.restore();
-
-  Future<void> _recordReadingProgress({int lastPageIndex = 0}) async {
+  Future<void> _recordReadingProgress({required int lastPageIndex}) async {
     try {
-      if (shouldSaveLocalProgress != null &&
-          !await shouldSaveLocalProgress!()) {
+      if (!_offlineMode &&
+          _cloudReading != null &&
+          await _cloudReading.usesCloudReading(_sourceKey)) {
         return;
       }
       await _readingProgressService.save(

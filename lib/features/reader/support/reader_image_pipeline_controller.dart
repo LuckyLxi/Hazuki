@@ -150,12 +150,19 @@ class ReaderImagePipelineController {
   late final ReaderImageLoader _imageLoader;
   late final ReaderImagePrefetchScheduler _prefetchScheduler;
 
-  void prefetchAround(int index) => SourceUiScope.withoutInteractionSync(
-    () => _prefetchScheduler.prefetchAround(index),
-  );
-  void requestPrefetchAhead(int index) => SourceUiScope.withoutInteractionSync(
-    () => _prefetchScheduler.requestPrefetchAhead(index),
-  );
+  void prefetchAround(int index) {
+    if (_closed) return;
+    SourceUiScope.withoutInteractionSync(
+      () => _prefetchScheduler.prefetchAround(index),
+    );
+  }
+
+  void requestPrefetchAhead(int index) {
+    if (_closed) return;
+    SourceUiScope.withoutInteractionSync(
+      () => _prefetchScheduler.requestPrefetchAhead(index),
+    );
+  }
 
   void _logDecodedAspectRatio(String url, double aspectRatio) {
     final index = _pipelineState.imageIndexMap[url];
@@ -318,6 +325,7 @@ class ReaderImagePipelineController {
   }
 
   void handleNoImageModeChanged() {
+    if (_closed) return;
     _stopImages();
     _pipelineState.queuedPrefetchAheadIndex = null;
     _pipelineState.clearProviderCaches();
@@ -431,6 +439,7 @@ class ReaderImagePipelineController {
       await _evictImageCacheEntries([normalized]);
       if (_closed || generation != _pipelineState.generation) return;
       await _getImageProvider(normalized, useDiskCache: false, priority: true);
+      if (_closed || generation != _pipelineState.generation) return;
       _logEvent(
         'Reader image retry finished',
         source: 'reader_data',

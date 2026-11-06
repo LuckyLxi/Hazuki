@@ -66,9 +66,16 @@ class _Models extends TranslationDetectorModelStore {
   bool get isRuntimeInstalled => runtimeInstalled;
 }
 
+class _Settings extends MangaTranslationSettingsStore {
+  Future<void>? pendingLoad;
+
+  @override
+  Future<void> load() => pendingLoad ?? super.load();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  late MangaTranslationSettingsStore settings;
+  late _Settings settings;
   late _Models models;
   late _Service service;
   late ReaderTranslationController controller;
@@ -77,10 +84,26 @@ void main() {
   final empty = PageTranslationResult(regions: [], terms: []);
   Future<void> tick() => Future<void>.delayed(Duration.zero);
 
+  ReaderTranslationController newController() => ReaderTranslationController(
+    service: service,
+    settings: settings,
+    models: models,
+    glossary: TranslationGlossaryStore(),
+    resolveImageBytes: (url) async => Uint8List.fromList([int.parse(url)]),
+    images: () => List.generate(10, (index) => '$index'),
+    spreadImageIndices: (index) =>
+        List.generate(size, (offset) => index * size + offset),
+    spreadStartIndex: (index) => index * size,
+    spreadSize: () => size,
+    sourceKey: 'source',
+    comicId: 'comic',
+    onFailure: failures.add,
+  );
+
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
-    settings = MangaTranslationSettingsStore();
+    settings = _Settings();
     await settings.setEnabled(true);
     await settings.setReaderModeOn(true);
     await settings.updateProvider(
@@ -93,21 +116,7 @@ void main() {
     size = 1;
     service = _Service();
     failures = [];
-    controller = ReaderTranslationController(
-      service: service,
-      settings: settings,
-      models: models,
-      glossary: TranslationGlossaryStore(),
-      resolveImageBytes: (url) async => Uint8List.fromList([int.parse(url)]),
-      images: () => List.generate(10, (index) => '$index'),
-      spreadImageIndices: (index) =>
-          List.generate(size, (offset) => index * size + offset),
-      spreadStartIndex: (index) => index * size,
-      spreadSize: () => size,
-      sourceKey: 'source',
-      comicId: 'comic',
-      onFailure: failures.add,
-    );
+    controller = newController();
   });
   tearDown(() {
     controller.dispose();
@@ -170,6 +179,56 @@ void main() {
     await controller.load();
     expect(settings.readerModeOn, isTrue);
   });
+
+  test(
+    'retiring during settings load leaves the shared mode unchanged',
+    () async {
+      final pending = Completer<void>();
+      settings.pendingLoad = pending.future;
+      final loading = controller.load();
+      controller.retire();
+      pending.complete();
+      await loading;
+
+      expect(settings.readerModeOn, isTrue);
+      expect(service.calls, isEmpty);
+    },
+  );
+
+  test(
+    'retired chapter ignores late work and cannot release the next detector',
+    () async {
+      controller.updateWindow(0);
+      await tick();
+      final outgoing = controller;
+      final firstPage = outgoing.pageState('0');
+      outgoing.retire();
+      outgoing.retire();
+      expect(service.releases, 1);
+      expect(service.calls, hasLength(2));
+      expect(service.calls.every((call) => call.$2.isCancelled), isTrue);
+      expect(firstPage.value.status, PageTranslationStatus.idle);
+      expect(outgoing.pageState('2').value.status, PageTranslationStatus.idle);
+
+      await settings.setCustomSystemPrompt('New chapter prompt');
+      outgoing.updateWindow(3);
+      outgoing.retranslate('4');
+      service.pending[0].complete(empty);
+      service.pending[1].completeError(StateError('late failure'));
+      await tick();
+      expect(service.calls, hasLength(2));
+      expect(firstPage.value.status, PageTranslationStatus.idle);
+      expect(failures, isEmpty);
+
+      controller = newController();
+      controller.updateWindow(5);
+      await tick();
+      expect(service.calls.skip(2).map((call) => call.$1), [5, 6]);
+      outgoing.dispose();
+      expect(service.releases, 1);
+      expect(service.calls.last.$2.isCancelled, isFalse);
+    },
+  );
 
   test(
     'zero prefetch translates only visible pages and disabling cancels everything',
