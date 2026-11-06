@@ -13,6 +13,8 @@ class _MockSelection extends Mock implements SourceRuntimeGateway {}
 
 class _MockDependencies extends Mock implements SettingsCoreDependencies {}
 
+class _MockPlugins extends Mock implements SourcePluginGateway {}
+
 void main() {
   late _MockSelection selection;
   late _MockDependencies dependencies;
@@ -26,6 +28,9 @@ void main() {
     when(() => selection.supportsDailyRecommendation).thenReturn(false);
     dependencies = _MockDependencies();
     when(() => dependencies.sourceRuntime).thenReturn(selection);
+    final plugins = _MockPlugins();
+    when(() => plugins.installed).thenReturn([]);
+    when(() => dependencies.sourcePlugins).thenReturn(plugins);
   });
 
   Widget app() => MaterialApp(

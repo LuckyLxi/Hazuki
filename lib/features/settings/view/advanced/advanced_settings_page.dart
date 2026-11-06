@@ -9,27 +9,21 @@ import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'advanced_settings_content.dart';
+import '../debug/favorites_debug_page.dart';
 import '../settings_group.dart';
+import '../source_editor/source_editor_page.dart';
 import '../../support/other_settings_actions.dart';
 import '../plugins/source_plugin_action_widgets.dart';
 
 class AdvancedSettingsPage extends StatefulWidget {
   const AdvancedSettingsPage({
     super.key,
-    required this.logsPageBuilder,
-    required this.comicSourceEditorPageBuilder,
-    required this.restoreComicSource,
-    this.redownloadComicSource,
     required this.sourceService,
     required this.debugGateway,
     required this.softwareUpdateService,
     this.sourcePlugins,
   });
 
-  final WidgetBuilder logsPageBuilder;
-  final WidgetBuilder comicSourceEditorPageBuilder;
-  final Future<bool> Function(BuildContext context) restoreComicSource;
-  final Future<bool> Function(BuildContext context)? redownloadComicSource;
   final SourceScriptGateway sourceService;
   final SourceDebugGateway debugGateway;
   final SoftwareUpdateService softwareUpdateService;
@@ -131,7 +125,9 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   Future<void> _openComicSourceEditor() async {
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: widget.comicSourceEditorPageBuilder),
+      MaterialPageRoute<void>(
+        builder: (_) => ComicSourceEditorPage(sourceService: _sourceService),
+      ),
     );
     if (!mounted) {
       return;
@@ -140,7 +136,11 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   }
 
   Future<void> _restoreComicSource() async {
-    final restored = await widget.restoreComicSource(context);
+    final restored = await showComicSourceRestoreDialog(
+      context,
+      sourceService: _sourceService,
+      backupService: _sourceService,
+    );
     if (!mounted || !restored) {
       return;
     }
@@ -153,7 +153,10 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   }
 
   Future<void> _redownloadComicSource() async {
-    final restored = await widget.redownloadComicSource!(context);
+    final restored = await showComicSourceRestoreDialog(
+      context,
+      sourceService: _sourceService,
+    );
     if (!mounted || !restored) return;
     await _refreshSourceBackupState();
     if (!mounted) return;
@@ -243,8 +246,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           softwareUpdateSource: _softwareUpdateSource,
           hasSourceBackup: _hasSourceBackup,
           onRedownloadComicSource:
-              widget.redownloadComicSource != null &&
-                  widget.sourcePlugins?.pluginFor(sourceKey)?.repository != null
+              widget.sourcePlugins?.pluginFor(sourceKey)?.repository != null
               ? _redownloadComicSource
               : null,
           sourceDeviceAction:
@@ -270,7 +272,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
                     onTap: activate,
                   ),
                 ),
-          logsPageBuilder: widget.logsPageBuilder,
+          logsPageBuilder: (_) => LogsPage(debugGateway: widget.debugGateway),
           onToggleNoImageMode: _toggleNoImageMode,
           onToggleSoftwareLogCaptureEnabled: _toggleSoftwareLogCaptureEnabled,
           onToggleAutoSourceUpdateCheck: _toggleAutoSourceUpdateCheck,

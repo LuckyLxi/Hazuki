@@ -204,12 +204,11 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                         unawaited(_editMangaDownloadPath()),
                     onCommentFilter: () => unawaited(_openCommentFilter()),
                   ),
-                  if (widget.dependencies.sourcePlugins case final plugins?)
-                    SourcePluginActionList(
-                      gateway: plugins,
-                      location: SourcePluginActionLocation.other,
-                      title: strings.otherSectionPlugins,
-                    ),
+                  SourcePluginActionList(
+                    gateway: widget.dependencies.sourcePlugins,
+                    location: SourcePluginActionLocation.other,
+                    title: strings.otherSectionPlugins,
+                  ),
                 ],
               ),
       ),

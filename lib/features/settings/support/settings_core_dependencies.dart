@@ -21,7 +21,7 @@ class SettingsCoreDependencies {
     required this.downloader,
     required this.sourceRuntime,
     required this.sourceScript,
-    this.sourcePlugins,
+    required this.sourcePlugins,
     this.translation,
   });
 
@@ -36,6 +36,6 @@ class SettingsCoreDependencies {
   final MangaDownloadService downloader;
   final SourceRuntimeGateway sourceRuntime;
   final SourceScriptGateway sourceScript;
-  final SourcePluginGateway? sourcePlugins;
+  final SourcePluginGateway sourcePlugins;
   final MangaTranslationDependencies? translation;
 }

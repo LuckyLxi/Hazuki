@@ -7,8 +7,11 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'about_page.dart';
+import 'advanced/advanced_settings_page.dart';
 import 'appearance/appearance_settings_page.dart';
 import 'cache_settings_page.dart';
+import 'debug/lab_settings_page.dart';
+import 'network/cloud_sync_page.dart';
 import 'other/other_settings_page.dart';
 import 'reading_settings_page.dart';
 import 'plugins/source_plugins_page.dart';
@@ -24,9 +27,6 @@ class SettingsPage extends StatefulWidget {
     required this.onAppearanceChanged,
     required this.locale,
     required this.onLocaleChanged,
-    required this.cloudSyncPageBuilder,
-    required this.labSettingsPageBuilder,
-    required this.advancedSettingsPageBuilder,
     required this.coreDependencies,
   });
 
@@ -34,9 +34,6 @@ class SettingsPage extends StatefulWidget {
   final AppearanceSettingsApplyCallback onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
-  final WidgetBuilder cloudSyncPageBuilder;
-  final WidgetBuilder labSettingsPageBuilder;
-  final WidgetBuilder advancedSettingsPageBuilder;
   final SettingsCoreDependencies coreDependencies;
 
   @override
@@ -151,19 +148,23 @@ class _SettingsPageState extends State<SettingsPage> {
               _SettingsSection(
                 title: strings.settingsSectionContentData,
                 entries: [
-                  if (dependencies.sourcePlugins case final plugins?)
-                    _SettingsEntryTile(
-                      icon: Icons.extension_outlined,
-                      title: strings.settingsPluginsTitle,
-                      subtitle: strings.settingsPluginsSubtitle,
-                      onTap: () =>
-                          _open((_) => SourcePluginsPage(manager: plugins)),
+                  _SettingsEntryTile(
+                    icon: Icons.extension_outlined,
+                    title: strings.settingsPluginsTitle,
+                    subtitle: strings.settingsPluginsSubtitle,
+                    onTap: () => _open(
+                      (_) => SourcePluginsPage(
+                        manager: dependencies.sourcePlugins,
+                      ),
                     ),
+                  ),
                   _SettingsEntryTile(
                     icon: Icons.cloud_sync_outlined,
                     title: strings.settingsCloudSyncTitle,
                     subtitle: strings.settingsCloudSyncSubtitle,
-                    onTap: () => _open(widget.cloudSyncPageBuilder),
+                    onTap: () => _open(
+                      (_) => CloudSyncPage(service: dependencies.cloudSync),
+                    ),
                   ),
                   _SettingsEntryTile(
                     icon: Icons.cached_outlined,
@@ -214,13 +215,24 @@ class _SettingsPageState extends State<SettingsPage> {
                     icon: Icons.science_outlined,
                     title: strings.settingsLabTitle,
                     subtitle: strings.settingsLabSubtitle,
-                    onTap: () => _open(widget.labSettingsPageBuilder),
+                    onTap: () => _open(
+                      (_) => LabSettingsPage(
+                        sourcePlugins: dependencies.sourcePlugins,
+                      ),
+                    ),
                   ),
                   _SettingsEntryTile(
                     icon: Icons.settings_applications_outlined,
                     title: strings.settingsAdvancedTitle,
                     subtitle: strings.settingsAdvancedSubtitle,
-                    onTap: () => _open(widget.advancedSettingsPageBuilder),
+                    onTap: () => _open(
+                      (_) => AdvancedSettingsPage(
+                        sourceService: dependencies.sourceScript,
+                        debugGateway: dependencies.sourceDebug,
+                        sourcePlugins: dependencies.sourcePlugins,
+                        softwareUpdateService: dependencies.softwareUpdate,
+                      ),
+                    ),
                   ),
                 ],
               ),

@@ -17,6 +17,7 @@ import 'package:hazuki/models/source_meta.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:re_editor/re_editor.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _MockSelection extends Mock implements SourceRuntimeGateway {}
@@ -182,11 +183,26 @@ void main() {
       'advanced backup actions appear after editing and animate away for ${market ? 'market' : 'local'} plugins',
       (tester) async {
         var hasBackup = false;
-        var restores = 0;
-        var downloads = 0;
         final advanced = _MockAdvanced();
         final debug = _MockDebug();
         when(advanced.hasActiveSourceBackup).thenAnswer((_) async => hasBackup);
+        when(
+          advanced.loadEditableActiveSource,
+        ).thenAnswer((_) async => 'const version = 1;');
+        when(
+          () => advanced.saveEditedActiveSource('const version = 2;'),
+        ).thenAnswer((_) async {
+          hasBackup = true;
+        });
+        when(advanced.restoreActiveSourceBackup).thenAnswer((_) async {
+          hasBackup = false;
+          return true;
+        });
+        when(
+          () => advanced.downloadActiveSourceAndReload(
+            onProgress: any(named: 'onProgress'),
+          ),
+        ).thenAnswer((_) async => false);
         when(
           debug.loadSoftwareLogCaptureEnabled,
         ).thenAnswer((_) async => false);
@@ -211,25 +227,6 @@ void main() {
                 debugGateway: debug,
                 sourcePlugins: plugins,
                 softwareUpdateService: software,
-                logsPageBuilder: (_) => const SizedBox.shrink(),
-                comicSourceEditorPageBuilder: (context) => Scaffold(
-                  body: TextButton(
-                    onPressed: () {
-                      hasBackup = true;
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('Save source edit'),
-                  ),
-                ),
-                restoreComicSource: (_) async {
-                  restores++;
-                  hasBackup = false;
-                  return true;
-                },
-                redownloadComicSource: (_) async {
-                  downloads++;
-                  return false;
-                },
               ),
               activeSourceKey: 'fixture',
               catalog: const [
@@ -256,7 +253,18 @@ void main() {
         await tester.scrollUntilVisible(editorButton, 250);
         await tester.tap(editorButton);
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Save source edit'));
+        final editor = find.byType(CodeEditor);
+        final strings = AppLocalizations.of(tester.element(editor))!;
+        tester.widget<CodeEditor>(editor).controller!.text =
+            'const version = 2;';
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(strings.commonSave));
+        await tester.pumpAndSettle();
+        verify(
+          () => advanced.saveEditedActiveSource('const version = 2;'),
+        ).called(1);
+        await _finishPrompt(tester);
+        await tester.pageBack();
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(backupButton, 250);
         await tester.pumpAndSettle();
@@ -265,7 +273,16 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(onlineButton);
           await tester.pumpAndSettle();
-          expect(downloads, 1);
+          await tester.tap(
+            find.widgetWithText(FilledButton, strings.commonConfirm),
+          );
+          await tester.pumpAndSettle();
+          verify(
+            () => advanced.downloadActiveSourceAndReload(
+              onProgress: any(named: 'onProgress'),
+            ),
+          ).called(1);
+          await _finishPrompt(tester);
         } else {
           expect(
             find.byKey(const ValueKey('redownload-comic-source')),
@@ -275,6 +292,10 @@ void main() {
         await tester.ensureVisible(backupButton);
         await tester.pumpAndSettle();
         await tester.tap(backupButton);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.widgetWithText(FilledButton, strings.commonConfirm),
+        );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 120));
         if (market) {
@@ -301,7 +322,7 @@ void main() {
           expect(size.sizeFactor.value, lessThan(1));
         }
         await tester.pumpAndSettle();
-        expect(restores, 1);
+        verify(advanced.restoreActiveSourceBackup).called(1);
         expect(backupButton, findsNothing);
         expect(onlineButton, findsNothing);
         expect(plugins.installed.single.customEdited, true);
@@ -342,9 +363,6 @@ void main() {
                 debugGateway: debug,
                 sourcePlugins: plugins,
                 softwareUpdateService: softwareUpdate,
-                logsPageBuilder: (_) => const SizedBox.shrink(),
-                comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
-                restoreComicSource: (_) async => false,
               ),
               activeSourceKey: 'fixture',
               catalog: [
@@ -420,9 +438,6 @@ void main() {
             sourceService: advanced,
             debugGateway: debug,
             softwareUpdateService: softwareUpdate,
-            logsPageBuilder: (_) => const SizedBox.shrink(),
-            comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
-            restoreComicSource: (_) async => false,
           ),
         ),
       );
@@ -667,9 +682,6 @@ void main() {
               debugGateway: debug,
               sourcePlugins: plugins,
               softwareUpdateService: softwareUpdate,
-              logsPageBuilder: (_) => const SizedBox.shrink(),
-              comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
-              restoreComicSource: (_) async => false,
             ),
             SourcePluginActionLocation.lines => LineSettingsPage(
               sourceService: settings,

@@ -215,6 +215,7 @@ void main() {
         downloader: sl<MangaDownloadService>(),
         sourceRuntime: sl<SourceRuntimeGateway>(),
         sourceScript: sl<SourceScriptGateway>(),
+        sourcePlugins: sl<SourcePluginGateway>(),
       ),
       appearanceSettings: const AppearanceSettingsData(
         themeMode: ThemeMode.system,
@@ -228,20 +229,6 @@ void main() {
       onAppearanceChanged: (_, {revealOrigin, revealSyncRegion}) async {},
       locale: const Locale('en'),
       onLocaleChanged: (_) async {},
-      cloudSyncPageBuilder: (_) =>
-          CloudSyncPage(service: sl<CloudSyncService>()),
-      labSettingsPageBuilder: (_) =>
-          LabSettingsPage(sourcePlugins: sl<SourcePluginGateway>()),
-      advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
-        sourceService: sl<SourceScriptGateway>(),
-        debugGateway: sl<SourceDebugGateway>(),
-        softwareUpdateService: sl<SoftwareUpdateService>(),
-        logsPageBuilder: (_) =>
-            LogsPage(debugGateway: sl<SourceDebugGateway>()),
-        comicSourceEditorPageBuilder: (_) =>
-            ComicSourceEditorPage(sourceService: sl<SourceScriptGateway>()),
-        restoreComicSource: (_) async => false,
-      ),
     );
     final reader = ReaderPage(
       title: 'Hazuki',
