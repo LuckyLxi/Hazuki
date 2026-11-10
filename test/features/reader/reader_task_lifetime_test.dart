@@ -257,6 +257,23 @@ void main() {
     },
   );
 
+  test('corrupt cached image retry publishes the recovered provider', () async {
+    noImages = false;
+    final pending = controller.getImageProvider('image');
+    await _flush();
+    source.images['image']!.first.$2.completeError(
+      const SourceImageDecodeFailure(),
+    );
+    await _flush();
+    await _flush();
+    expect(source.images['image'], hasLength(2));
+    source.images['image']!.last.$2.complete(_image(2));
+    await pending;
+    expect(pipeline.providerCache, contains('image'));
+    expect(pipeline.providerFutureCache, contains('image'));
+    expect(pipeline.activeUnscrambleTasks, 0);
+  });
+
   test(
     'manual image retry uses a new group and leaves no permit behind',
     () async {

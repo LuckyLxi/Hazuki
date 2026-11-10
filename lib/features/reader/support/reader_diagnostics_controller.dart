@@ -53,91 +53,88 @@ class ReaderDiagnosticsController {
   final String chapterTitle;
   final int chapterIndex;
 
-  ReaderDiagnosticsSnapshot createSnapshot() {
-    final listSnapshot = _scrollController.hasClients
-        ? ReaderListDiagnosticsSnapshot(
-            pixels: normalizeReaderLogDouble(_scrollController.position.pixels),
-            maxScrollExtent: normalizeReaderLogDouble(
-              _scrollController.position.maxScrollExtent,
-            ),
-            minScrollExtent: normalizeReaderLogDouble(
-              _scrollController.position.minScrollExtent,
-            ),
-            viewportDimension: normalizeReaderLogDouble(
-              _scrollController.position.viewportDimension,
-            ),
-            extentBefore: normalizeReaderLogDouble(
-              _scrollController.position.extentBefore,
-            ),
-            extentAfter: normalizeReaderLogDouble(
-              _scrollController.position.extentAfter,
-            ),
-            atEdge: _scrollController.position.atEdge,
-            outOfRange: _scrollController.position.outOfRange,
-            userDirection: _scrollController.position.userScrollDirection.name,
-          )
-        : null;
-    final pageControllerPage = _pageController.hasClients
-        ? normalizeReaderLogDouble(
-            _pageController.page ?? _runtimeState.currentPageIndex.toDouble(),
-          )
-        : null;
-    return ReaderDiagnosticsSnapshot(
-      readerSessionId: _sessionId(),
-      comicId: comicId,
-      epId: epId,
-      chapterTitle: chapterTitle,
-      chapterIndex: chapterIndex,
-      readerMode: _runtimeState.readerMode.prefsValue,
-      doublePageMode: _runtimeState.doublePageMode,
-      currentPageIndex: _runtimeState.currentPageIndex,
-      currentPage: _runtimeState.images.isEmpty
+  Map<String, dynamic> buildLogPayload([Map<String, dynamic>? extra]) {
+    final lastObservedListPixels = _scrollState.lastObservedListPixels;
+    final payload = <String, dynamic>{
+      'sessionId': _sessionId(),
+      'comicId': comicId,
+      'epId': epId,
+      'chapterTitle': chapterTitle,
+      'chapterIndex': chapterIndex,
+      'readerMode': _runtimeState.readerMode.prefsValue,
+      'doublePageMode': _runtimeState.doublePageMode,
+      'currentPageIndex': _runtimeState.currentPageIndex,
+      'currentPage': _runtimeState.images.isEmpty
           ? 0
           : math.min(
               _runtimeState.currentPageIndex + 1,
               _runtimeState.readerSpreadCount,
             ),
-      pageIndicatorIndex: _runtimeState.pageIndexNotifier.value,
-      totalPages: _runtimeState.readerSpreadCount,
-      controlsVisible: _runtimeState.controlsVisible,
-      tapToTurnPage: _runtimeState.tapToTurnPage,
-      pageIndicator: _runtimeState.pageIndicator,
-      pinchToZoom: _runtimeState.pinchToZoom,
-      immersiveMode: _runtimeState.immersiveMode,
-      keepScreenOn: _runtimeState.keepScreenOn,
-      customBrightness: _runtimeState.customBrightness,
-      brightnessValue: _runtimeState.brightnessValue,
-      loadingImages: _runtimeState.loadingImages,
-      loadImagesError: _runtimeState.loadImagesError,
-      noImageModeEnabled: _noImageModeEnabled(),
-      isZoomed: _runtimeState.isZoomed,
-      zoomInteracting: _runtimeState.zoomInteracting,
-      zoomScale: normalizeReaderLogDouble(
+      'pageIndicatorIndex': _runtimeState.pageIndexNotifier.value,
+      'totalPages': _runtimeState.readerSpreadCount,
+      'controlsVisible': _runtimeState.controlsVisible,
+      'tapToTurnPage': _runtimeState.tapToTurnPage,
+      'pageIndicator': _runtimeState.pageIndicator,
+      'pinchToZoom': _runtimeState.pinchToZoom,
+      'immersiveMode': _runtimeState.immersiveMode,
+      'keepScreenOn': _runtimeState.keepScreenOn,
+      'customBrightness': _runtimeState.customBrightness,
+      'brightnessValue': _runtimeState.brightnessValue,
+      'loadingImages': _runtimeState.loadingImages,
+      'loadImagesError': _runtimeState.loadImagesError,
+      'noImageModeEnabled': _noImageModeEnabled(),
+      'isZoomed': _runtimeState.isZoomed,
+      'zoomInteracting': _runtimeState.zoomInteracting,
+      'zoomScale': normalizeReaderLogDouble(
         _zoomController.value.getMaxScaleOnAxis(),
       ),
-      activePointerCount: _runtimeState.activePointerCount,
-      providerCacheSize: _imagePipelineState.providerCache.length,
-      providerFutureCacheSize: _imagePipelineState.providerFutureCache.length,
-      aspectRatioCacheSize: _imagePipelineState.imageAspectRatioCache.length,
-      prefetchAheadRunning: _imagePipelineState.prefetchAheadRunning,
-      activeUnscrambleTasks: _imagePipelineState.activeUnscrambleTasks,
-      listUserScrollInProgress: _scrollState.listUserScrollInProgress,
-      activeProgrammaticListScrollReason:
+      'activePointerCount': _runtimeState.activePointerCount,
+      'providerCacheSize': _imagePipelineState.providerCache.length,
+      'providerFutureCacheSize': _imagePipelineState.providerFutureCache.length,
+      'aspectRatioCacheSize': _imagePipelineState.imageAspectRatioCache.length,
+      'prefetchAheadRunning': _imagePipelineState.prefetchAheadRunning,
+      'activeUnscrambleTasks': _imagePipelineState.activeUnscrambleTasks,
+      'listUserScrollInProgress': _scrollState.listUserScrollInProgress,
+      'activeProgrammaticListScrollReason':
           _scrollState.activeProgrammaticListScrollReason,
-      activeProgrammaticListTargetIndex:
+      'activeProgrammaticListTargetIndex':
           _scrollState.activeProgrammaticListTargetIndex,
-      lastCompletedProgrammaticListTargetIndex:
+      'lastCompletedProgrammaticListTargetIndex':
           _scrollState.lastCompletedProgrammaticListTargetIndex,
-      lastObservedListPixels: _scrollState.lastObservedListPixels == null
-          ? null
-          : normalizeReaderLogDouble(_scrollState.lastObservedListPixels!),
-      pageControllerPage: pageControllerPage,
-      listSnapshot: listSnapshot,
-    );
-  }
-
-  Map<String, dynamic> buildLogPayload([Map<String, dynamic>? extra]) {
-    return buildReaderLogPayload(snapshot: createSnapshot(), extra: extra);
+      if (lastObservedListPixels != null)
+        'lastObservedListPixels': normalizeReaderLogDouble(
+          lastObservedListPixels,
+        ),
+    };
+    if (_scrollController.hasClients) {
+      final position = _scrollController.position;
+      payload.addAll({
+        'listPixels': normalizeReaderLogDouble(position.pixels),
+        'listMaxScrollExtent': normalizeReaderLogDouble(
+          position.maxScrollExtent,
+        ),
+        'listMinScrollExtent': normalizeReaderLogDouble(
+          position.minScrollExtent,
+        ),
+        'listViewportDimension': normalizeReaderLogDouble(
+          position.viewportDimension,
+        ),
+        'listExtentBefore': normalizeReaderLogDouble(position.extentBefore),
+        'listExtentAfter': normalizeReaderLogDouble(position.extentAfter),
+        'listAtEdge': position.atEdge,
+        'listOutOfRange': position.outOfRange,
+        'listUserDirection': position.userScrollDirection.name,
+      });
+    }
+    if (_pageController.hasClients) {
+      payload['pageControllerPage'] = normalizeReaderLogDouble(
+        _pageController.page ?? _runtimeState.currentPageIndex.toDouble(),
+      );
+    }
+    if (extra != null) {
+      payload.addAll(extra);
+    }
+    return payload;
   }
 
   void logEvent(

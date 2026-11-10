@@ -9,9 +9,9 @@ import 'package:hazuki/shared/reading/reader_filter_color.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
-import 'package:hazuki/features/reader/view/reader_overlay_controls.dart';
-import 'package:hazuki/features/reader/view/reader_settings_drawer_content.dart';
+import 'package:hazuki/features/reader/view/reader_bottom_controls.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/widgets/reader_settings_content.dart';
 
 const Duration readerSliderHapticMinInterval = Duration(milliseconds: 90);
 
@@ -107,7 +107,8 @@ Widget buildReaderSettingsDrawer({
                 color: colorScheme.surface.withValues(
                   alpha: isDark ? 0.68 : 0.76,
                 ),
-                child: ReaderSettingsDrawerContent(
+                child: ReaderSettingsContent(
+                  surface: ReaderSettingsSurface.drawer,
                   readerMode: runtimeState.readerMode,
                   doublePageMode: runtimeState.doublePageMode,
                   tapToTurnPage: runtimeState.tapToTurnPage,
@@ -149,36 +150,6 @@ Widget buildReaderSettingsDrawer({
         );
       },
     ),
-  );
-}
-
-Widget buildReaderTopControls({
-  required BuildContext context,
-  required ReaderRuntimeState runtimeState,
-  required ThemeData readerTheme,
-  required String title,
-  required VoidCallback onBackPressed,
-  required VoidCallback onOpenSettingsDrawer,
-}) {
-  return ReaderTopControls(
-    readerTheme: readerTheme,
-    title: title,
-    settingsTooltip: l10n(context).readingSettingsTitle,
-    onBackPressed: onBackPressed,
-    onOpenSettingsDrawer: onOpenSettingsDrawer,
-  );
-}
-
-Widget buildReaderPageIndicator({
-  required ReaderRuntimeState runtimeState,
-  required ThemeData readerTheme,
-  required int chapterIndex,
-}) {
-  return ReaderPageIndicatorOverlay(
-    readerTheme: readerTheme,
-    pageIndexNotifier: runtimeState.pageIndexNotifier,
-    chapterIndex: chapterIndex,
-    imageCount: runtimeState.readerSpreadCount,
   );
 }
 

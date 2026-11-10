@@ -6,6 +6,9 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/view/reader_control_motion.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
+import 'package:hazuki/features/reader/view/reader_page_indicator_overlay.dart';
+import 'package:hazuki/features/reader/view/reader_top_controls.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 
 class ReaderOverlayHost extends StatelessWidget {
@@ -67,11 +70,10 @@ class ReaderOverlayHost extends StatelessWidget {
                 : const Offset(0, -1),
             duration: const Duration(milliseconds: 360),
             curve: Curves.easeOutBack,
-            child: buildReaderTopControls(
-              context: context,
-              runtimeState: runtimeState,
+            child: ReaderTopControls(
               readerTheme: readerTheme,
               title: title,
+              settingsTooltip: l10n(context).readingSettingsTitle,
               onBackPressed: onBackPressed,
               onOpenSettingsDrawer: onOpenSettingsDrawer,
             ),
@@ -89,10 +91,11 @@ class ReaderOverlayHost extends StatelessWidget {
                 : Offset.zero,
             duration: const Duration(milliseconds: 360),
             curve: Curves.easeOutBack,
-            child: buildReaderPageIndicator(
-              runtimeState: runtimeState,
+            child: ReaderPageIndicatorOverlay(
               readerTheme: readerTheme,
+              pageIndexNotifier: runtimeState.pageIndexNotifier,
               chapterIndex: chapterIndex,
+              imageCount: runtimeState.readerSpreadCount,
             ),
           ),
         ),

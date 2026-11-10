@@ -45,9 +45,6 @@ class ReaderImageLoader {
   final void Function(String url, double aspectRatio)? _onDecodedAspectRatio;
   Map<String, double> get imageAspectRatioCache =>
       _pipelineState.imageAspectRatioCache;
-  Map<String, ImageProvider> get providerCache => _pipelineState.providerCache;
-  Map<String, Future<ImageProvider>> get providerFutureCache =>
-      _pipelineState.providerFutureCache;
 
   Future<ImageProvider> load(
     String url, {
@@ -140,8 +137,6 @@ class ReaderImageLoader {
           _evictImageBytesFromMemory([url]);
           await _evictImageCacheEntries([url]);
           checkActive();
-          providerCache.remove(url);
-          providerFutureCache.remove(url);
           if (_noImageModeEnabled()) {
             throw StateError('no-image mode enabled');
           }

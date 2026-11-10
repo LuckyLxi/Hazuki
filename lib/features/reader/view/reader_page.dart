@@ -277,7 +277,8 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     epId: widget.page.epId,
     chapterIndex: widget.page.chapterIndex,
     images: widget.page.images,
-    sourceKey: (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
+    // 阅读会话绑定的源优先；其余位置一律读取这里解析后的结果。
+    sourceKey: widget.readerSession?.sourceKey ?? widget.page.sourceKey,
     coverUrl: widget.page.coverUrl,
     comicTheme: widget.page.comicTheme,
     onFavoriteRequested: widget.page.onFavoriteRequested,
@@ -313,7 +314,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         noImageModeEnabled: () => _noImageModeEnabled,
         comicId: widget.page.comicId,
         epId: widget.page.epId,
-        sourceKey: (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
+        sourceKey: _pageContext.sourceKey,
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
         onImageAspectRatioResolved: _handleImageAspectRatioResolved,
@@ -406,7 +407,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         logPayload: _readerLogPayload,
         comicId: widget.page.comicId,
         epId: widget.page.epId,
-        sourceKey: (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
+        sourceKey: _pageContext.sourceKey,
         chapterTitle: widget.page.chapterTitle,
         chapterIndex: widget.page.chapterIndex,
         widgetImages: widget.page.images,
@@ -567,7 +568,6 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     epId: widget.page.epId,
     comicTheme: widget.page.comicTheme,
     runtimeState: _runtimeState,
-    imagePipelineState: _imagePipelineState,
     zoomController: _zoomController,
     imagePipelineController: _imagePipelineController,
     navigationController: _navigationController,
@@ -634,7 +634,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       final uploads = widget.page.dependencies.readingProgressUploads;
       return uploads?.reportReadingProgress(
             progress,
-            sourceKey: widget.readerSession?.sourceKey ?? widget.page.sourceKey,
+            sourceKey: _pageContext.sourceKey,
           ) ??
           Future<void>.value();
     },
@@ -773,7 +773,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     unawaited(_loadTranslationSettings());
     _sourceImageQuality = ReaderSourceImageQualitySettings.load(
       _sourceSettings,
-      (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
+      _pageContext.sourceKey,
     );
     if (Platform.isWindows) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -813,8 +813,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
           widget.page.dependencies.readingProgressService
               .load(
                 comicId: widget.page.comicId,
-                sourceKey:
-                    (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
+                sourceKey: _pageContext.sourceKey,
               )
               .then(
                 (position) {
@@ -894,6 +893,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       );
     }
 
+    final imageViews = _imageViews;
     return AnimatedTheme(
       data: readerTheme,
       duration: const Duration(milliseconds: 320),
@@ -963,10 +963,10 @@ class _ReaderPageState extends State<_ReaderChapterPage>
                 },
                 onPointerUp: _readerZoomController.handlePointerEnd,
                 onPointerCancel: _readerZoomController.handlePointerEnd,
-                child: _wrapReaderTapPaging(
+                child: imageViews.wrapReaderTapPaging(
                   _runtimeState.readerMode == ReaderMode.rightToLeft
-                      ? _buildReaderPageView()
-                      : _buildTopToBottomReaderView(),
+                      ? imageViews.buildReaderPageView()
+                      : imageViews.buildTopToBottomReaderView(),
                 ),
               ),
             ),
@@ -977,17 +977,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   }
 
   ThemeData _resolveReaderTheme([BuildContext? buildContext]) {
-    return _imageViews.resolveReaderTheme(buildContext);
-  }
-
-  Widget _buildReaderPageView() => _imageViews.buildReaderPageView();
-
-  Widget _buildTopToBottomReaderView() {
-    return _imageViews.buildTopToBottomReaderView();
-  }
-
-  Widget _wrapReaderTapPaging(Widget child) {
-    return _imageViews.wrapReaderTapPaging(child);
+    return widget.page.comicTheme ?? Theme.of(buildContext ?? context);
   }
 
   Widget _wrapImageWidget(Widget imageWidget, String url) {
@@ -1066,7 +1056,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         });
         await ReaderSourceImageQualitySettings.updateImageQuality(
           _sourceSettings,
-          (widget.readerSession?.sourceKey ?? widget.page.sourceKey),
+          _pageContext.sourceKey,
           normalized,
         );
       },

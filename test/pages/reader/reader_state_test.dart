@@ -1487,7 +1487,7 @@ void main() {
   });
 
   group('ReaderDiagnosticsController', () {
-    test('creates a snapshot from reader runtime and pipeline state', () {
+    test('builds a log payload from reader runtime and pipeline state', () {
       final runtimeState = ReaderRuntimeState()
         ..applyImages(['a', 'b', 'c'])
         ..setCurrentPageIndex(1)
@@ -1526,21 +1526,22 @@ void main() {
         chapterIndex: 0,
       );
 
-      final snapshot = controller.createSnapshot();
+      final payload = controller.buildLogPayload({'trigger': 'test'});
 
-      expect(snapshot.readerSessionId, 'session-1');
-      expect(snapshot.comicId, 'comic-1');
-      expect(snapshot.currentPageIndex, 1);
-      expect(snapshot.currentPage, 2);
-      expect(snapshot.totalPages, 3);
-      expect(snapshot.controlsVisible, isTrue);
-      expect(snapshot.noImageModeEnabled, isTrue);
-      expect(snapshot.isZoomed, isTrue);
-      expect(snapshot.activeUnscrambleTasks, 2);
-      expect(snapshot.prefetchAheadRunning, isTrue);
-      expect(snapshot.lastObservedListPixels, 12.35);
-      expect(snapshot.listSnapshot, isNull);
-      expect(snapshot.pageControllerPage, isNull);
+      expect(payload['sessionId'], 'session-1');
+      expect(payload['comicId'], 'comic-1');
+      expect(payload['currentPageIndex'], 1);
+      expect(payload['currentPage'], 2);
+      expect(payload['totalPages'], 3);
+      expect(payload['controlsVisible'], isTrue);
+      expect(payload['noImageModeEnabled'], isTrue);
+      expect(payload['isZoomed'], isTrue);
+      expect(payload['activeUnscrambleTasks'], 2);
+      expect(payload['prefetchAheadRunning'], isTrue);
+      expect(payload['lastObservedListPixels'], 12.35);
+      expect(payload.containsKey('listPixels'), isFalse);
+      expect(payload.containsKey('pageControllerPage'), isFalse);
+      expect(payload['trigger'], 'test');
     });
 
     test('normalizes and deduplicates visible page logs', () {

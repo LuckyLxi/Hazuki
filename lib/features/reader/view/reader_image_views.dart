@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import 'package:hazuki/shared/reading/reader_mode.dart';
-import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
@@ -21,7 +20,6 @@ class ReaderImageViews {
     required this.epId,
     required this.comicTheme,
     required this.runtimeState,
-    required this.imagePipelineState,
     required this.zoomController,
     required this.imagePipelineController,
     required this.navigationController,
@@ -41,7 +39,6 @@ class ReaderImageViews {
   final String epId;
   final ThemeData? comicTheme;
   final ReaderRuntimeState runtimeState;
-  final ReaderImagePipelineState imagePipelineState;
   final TransformationController zoomController;
   final ReaderImagePipelineController imagePipelineController;
   final ReaderNavigationController navigationController;
@@ -60,7 +57,7 @@ class ReaderImageViews {
     return ReaderTranslatedImage(
       controller: controller,
       url: url,
-      aspectRatio: () => imagePipelineState.imageAspectRatioCache[url],
+      aspectRatio: () => imagePipelineController.imageAspectRatioCache[url],
       contain: contain,
       child: child,
     );
@@ -293,7 +290,7 @@ class ReaderImageViews {
     final readerPlaceholderColor = _resolveReaderPlaceholderColor(context);
 
     double? currentResolvedAspectRatio() {
-      return imagePipelineState.imageAspectRatioCache[url];
+      return imagePipelineController.imageAspectRatioCache[url];
     }
 
     double currentPlaceholderAspectRatio() {
