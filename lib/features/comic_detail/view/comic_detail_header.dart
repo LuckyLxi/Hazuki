@@ -174,12 +174,16 @@ class ComicDetailHeaderSection extends StatelessWidget {
                 key: headerTitleKey,
                 style:
                     (wide
-                            ? theme.textTheme.headlineMedium
+                            ? theme.textTheme.headlineSmall
                             : theme.textTheme.titleLarge)
-                        ?.copyWith(fontWeight: FontWeight.w700, height: 1.25),
+                        ?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.5,
+                          letterSpacing: -0.3,
+                        ),
               ),
               if (badges.hasContent(context)) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 badges,
               ],
             ],
@@ -193,50 +197,60 @@ class ComicDetailHeaderSection extends StatelessWidget {
                   child: title,
                 )
               : title;
-          final controls = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ComicDetailHeaderFavoriteRow(
-                details: details,
-                favoriteRowKey: favoriteRowKey,
-                skeletonColor: skeletonColor,
-                shouldAnimateInitialDetailReveal:
-                    shouldAnimateInitialDetailReveal,
-                isDesktop: true,
-              ),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: ComicDetailHeaderActionRow(
-                  details: details,
-                  actionButtonsKey: actionButtonsKey,
-                  shouldAnimateInitialDetailReveal:
-                      shouldAnimateInitialDetailReveal,
-                ),
-              ),
-            ],
+          final stats = ComicDetailHeaderFavoriteRow(
+            details: details,
+            favoriteRowKey: favoriteRowKey,
+            skeletonColor: skeletonColor,
+            shouldAnimateInitialDetailReveal: shouldAnimateInitialDetailReveal,
+            isDesktop: true,
+          );
+          // 沿用手机端的操作行样式：阅读、章节、收藏三个按钮同一行。
+          final actionRow = ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: ComicDetailHeaderActionRow(
+              details: details,
+              actionButtonsKey: actionButtonsKey,
+              shouldAnimateInitialDetailReveal:
+                  shouldAnimateInitialDetailReveal,
+              useMobileStyle: true,
+            ),
           );
           return Padding(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.only(bottom: 20),
             child: wide
                 ? Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       cover,
-                      const SizedBox(width: 36),
+                      const SizedBox(width: 32),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            animatedTitle,
-                            const SizedBox(height: 28),
-                            controls,
+                            // 上半部分至少撑到「封面高度 - 操作行高度」，
+                            // 标题短时操作行贴齐封面底边，标题长时自然下推。
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: coverHeight - 48,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  animatedTitle,
+                                  const SizedBox(height: 8),
+                                  stats,
+                                  const SizedBox(height: 16),
+                                ],
+                              ),
+                            ),
+                            actionRow,
                           ],
                         ),
                       ),
                     ],
                   )
                 : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,8 +260,10 @@ class ComicDetailHeaderSection extends StatelessWidget {
                           Expanded(child: animatedTitle),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      controls,
+                      const SizedBox(height: 16),
+                      stats,
+                      const SizedBox(height: 8),
+                      actionRow,
                     ],
                   ),
           );
@@ -329,8 +345,8 @@ class ComicDetailHeaderSection extends StatelessWidget {
               ComicDetailHeaderActionRow(
                 details: details,
                 actionButtonsKey: actionButtonsKey,
-                shouldAnimateInitialDetailReveal:
-                    shouldAnimateInitialDetailReveal,
+                // 手机端操作行不做下滑揭示动画。
+                shouldAnimateInitialDetailReveal: false,
                 useMobileStyle: true,
               ),
             ],

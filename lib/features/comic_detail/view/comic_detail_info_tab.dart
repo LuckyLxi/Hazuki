@@ -39,7 +39,7 @@ class ComicDetailInfoTab extends StatelessWidget {
     final actions = ComicDetailScope.of(context).actions;
     return ComicDetailMetaSection(
       details: details,
-      useMobileStyle: !isDesktop,
+      useMobileStyle: true,
       showComicId:
           sourceButton(
             details.sourceKey,
@@ -122,9 +122,8 @@ class ComicDetailInfoTab extends StatelessWidget {
               key: ValueKey<String>('comic-detail-info-${resolvedDetails.id}'),
               beginOffset: isDesktop ? const Offset(0, 20) : Offset.zero,
               enabled: shouldAnimate,
-              child: isDesktop
-                  ? _buildDesktopInfo(context, resolvedDetails, hasVisibleMeta)
-                  : _buildMobileInfo(context, resolvedDetails, hasVisibleMeta),
+              // 桌面端与手机端同一套无卡片排版：简介在上、信息栏在下。
+              child: _buildInfo(context, resolvedDetails, hasVisibleMeta),
             ),
           ),
         ),
@@ -136,7 +135,7 @@ class ComicDetailInfoTab extends StatelessWidget {
     );
   }
 
-  Widget _buildMobileInfo(
+  Widget _buildInfo(
     BuildContext context,
     ComicDetailsData details,
     bool hasVisibleMeta,
@@ -148,14 +147,16 @@ class ComicDetailInfoTab extends StatelessWidget {
         if (details.description.isNotEmpty) ...[
           Text(
             l10n(context).comicDetailSummary,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style:
+                (isDesktop
+                        ? theme.textTheme.titleMedium
+                        : theme.textTheme.titleSmall)
+                    ?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
           DefaultTextStyle.merge(
             style: theme.textTheme.bodyMedium?.copyWith(
-              fontSize: 13,
+              fontSize: isDesktop ? 14 : 13,
               color: theme.colorScheme.onSurfaceVariant,
               height: 1.9,
             ),
@@ -172,69 +173,6 @@ class ComicDetailInfoTab extends StatelessWidget {
           ),
         if (hasVisibleMeta) _buildMetaSection(context, details),
       ],
-    );
-  }
-
-  Widget _buildDesktopInfo(
-    BuildContext context,
-    ComicDetailsData details,
-    bool hasVisibleMeta,
-  ) {
-    final theme = Theme.of(context);
-    Widget card(Widget child) => Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: child,
-    );
-    final summary = details.description.isEmpty
-        ? null
-        : card(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n(context).comicDetailSummary,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ComicDetailExpandableDescription(text: details.description),
-              ],
-            ),
-          );
-    final metadata = hasVisibleMeta
-        ? card(_buildMetaSection(context, details))
-        : null;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth >= 860 &&
-            summary != null &&
-            metadata != null) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 5, child: summary),
-              const SizedBox(width: 20),
-              Expanded(flex: 6, child: metadata),
-            ],
-          );
-        }
-        return Column(
-          children: [
-            ?summary,
-            if (summary != null && metadata != null) const SizedBox(height: 20),
-            ?metadata,
-          ],
-        );
-      },
     );
   }
 }

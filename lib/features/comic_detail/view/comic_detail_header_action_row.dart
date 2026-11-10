@@ -33,7 +33,7 @@ class ComicDetailHeaderActionRow extends StatelessWidget {
         ? Duration.zero
         : const Duration(milliseconds: 220);
     final detailsReady = details != null;
-    final animateSlide = !useMobileStyle && shouldAnimateInitialDetailReveal;
+    final animateSlide = shouldAnimateInitialDetailReveal;
     final colors = Theme.of(context).colorScheme;
     final chaptersButton = AbsorbPointer(
       absorbing: !detailsReady,

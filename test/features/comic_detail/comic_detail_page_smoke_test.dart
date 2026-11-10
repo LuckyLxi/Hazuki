@@ -1592,27 +1592,31 @@ void main() {
         tester.getTopLeft(actions).dx,
         greaterThan(tester.getTopRight(cover).dx),
       );
-      expect(tester.getSize(actions).width, lessThanOrEqualTo(420));
+      expect(tester.getSize(actions).width, lessThanOrEqualTo(440));
+      // 桌面端沿用手机端样式：收藏按钮并入操作行，操作行贴齐封面底边。
       expect(
         tester.widget<ComicDetailHeaderActionRow>(actions).useMobileStyle,
-        isFalse,
+        isTrue,
       );
       expect(
         tester.widget<ComicDetailMetaSection>(metadata).useMobileStyle,
-        isFalse,
-      );
-      final favoriteButton = find.widgetWithIcon(
-        OutlinedButton,
-        Icons.favorite_border,
-      );
-      expect(favoriteButton, findsOneWidget);
-      expect(
-        tester.getTopLeft(favoriteButton).dx,
-        closeTo(tester.getTopLeft(actions).dx, 1),
+        isTrue,
       );
       expect(
-        tester.getTopLeft(metadata).dx,
-        greaterThan(tester.getTopRight(summary).dx),
+        find.descendant(
+          of: actions,
+          matching: find.byType(ComicDetailFavoriteButton),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getBottomLeft(actions).dy,
+        closeTo(tester.getBottomLeft(cover).dy, 1),
+      );
+      // 简介与信息栏上下排列，不再左右分卡片。
+      expect(
+        tester.getTopLeft(metadata).dy,
+        greaterThan(tester.getBottomLeft(summary).dy),
       );
 
       tester.view.physicalSize = const Size(560, 1000);
@@ -1733,9 +1737,13 @@ void main() {
           comic: const ExploreComic(
             id: 'desktop-title-resize',
             sourceKey: 'copy_manga',
+            // 标题需高过封面，操作行才会被推到封面底边以下。
             title:
                 'A deliberately long loading title that wraps across several lines '
-                'so the controls need to move upward when the shorter resolved title arrives',
+                'so the controls need to move upward when the shorter resolved title arrives '
+                'and it keeps going well past the cover height so the action row is pushed '
+                'below the cover bottom edge before the resolved details replace it with '
+                'something much shorter that fits beside the cover again',
             subTitle: 'Stable subtitle',
             cover: '',
           ),
@@ -1768,7 +1776,8 @@ void main() {
     facade.complete(title: 'Short title');
     await tester.pump();
     final animationStartTop = tester.getTopLeft(actions).dy;
-    await tester.pump(const Duration(milliseconds: 160));
+    // 标题收缩到封面高度以内后操作行即停在封面底边，取动画前段采样。
+    await tester.pump(const Duration(milliseconds: 40));
     final animationMiddleTop = tester.getTopLeft(actions).dy;
     await tester.pumpAndSettle();
     final resolvedTop = tester.getTopLeft(actions).dy;

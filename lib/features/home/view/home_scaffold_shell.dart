@@ -19,6 +19,7 @@ import 'package:hazuki/shared/discover_back_to_top_notification.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 import 'home_app_bar_actions.dart';
 import 'home_bottom_navigation.dart';
@@ -361,9 +362,23 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
             ),
           ),
           Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(22),
+            // 漫画详情面板打开时内容区左侧改为直角，关闭后恢复圆角。
+            child: ListenableBuilder(
+              listenable: WindowsComicDetailController.instance,
+              builder: (context, child) => TweenAnimationBuilder<double>(
+                tween: Tween<double>(
+                  // 按详情是否打开判断，打开阅读器等临时隐藏期间也保持直角。
+                  end: WindowsComicDetailController.instance.isOpen ? 0 : 22,
+                ),
+                duration: windowsComicDetailPanelAnimationDuration,
+                curve: Curves.easeOutCubic,
+                child: child,
+                builder: (context, radius, child) => ClipRRect(
+                  borderRadius: BorderRadius.horizontal(
+                    left: Radius.circular(radius),
+                  ),
+                  child: child,
+                ),
               ),
               child: ColoredBox(
                 color: Theme.of(context).colorScheme.surface,

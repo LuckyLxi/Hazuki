@@ -4,9 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import 'package:hazuki/shared/source_interaction/source_plugin_icons.dart';
-import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import '../support/comic_detail_scope.dart';
@@ -30,12 +28,8 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scope = ComicDetailScope.of(context);
-    final favorite = scope.favorite;
     final theme = Theme.of(context);
     final detailsReady = details != null;
-    final favoriteActive =
-        favorite.favoriteOverride ?? details?.isFavorite ?? false;
     final stats = ComicDetailHeaderStatsRow(details: details);
     Widget reserveButtonHeight(Widget content) => SizedBox(
       width: double.infinity,
@@ -65,62 +59,20 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     );
 
     if (isDesktop) {
-      ButtonStyle buttonStyle(bool active) => OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 40),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        foregroundColor: active
-            ? theme.colorScheme.onPrimaryContainer
-            : theme.colorScheme.onSurface,
-        backgroundColor: active
-            ? theme.colorScheme.primaryContainer
-            : Colors.transparent,
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      );
-      return Column(
+      // 收藏按钮已并入操作行，这里只剩统计行：与操作行同宽，
+      // 加载前后都按按钮高度占位，避免下方控件跳动。
+      return ConstrainedBox(
         key: favoriteRowKey,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 与下方操作按钮同宽，统计行不超出按钮区域；
-          // 加载前后都按按钮高度占位，避免下方控件跳动。
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: reserveButtonHeight(
-              detailsReady
-                  ? stats
-                  : ComicDetailSkeletonBlock(
-                      color: skeletonColor,
-                      width: 160,
-                      height: 16,
-                    ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            style: buttonStyle(favoriteActive),
-            onPressed: detailsReady && !favorite.isBusy
-                ? () => unawaited(
-                    favorite.showFoldersDialog(
-                      context,
-                      details!,
-                      (vm) => Theme(
-                        data: scope.theme.buildDetailTheme(theme),
-                        child: FavoriteFoldersMorphDialog(viewModel: vm),
-                      ),
-                    ),
-                  )
-                : null,
-            icon: Icon(
-              favoriteActive ? Icons.favorite : Icons.favorite_border,
-              size: 18,
-            ),
-            label: Text(
-              favoriteActive
-                  ? l10n(context).comicDetailUnfavorite
-                  : l10n(context).comicDetailFavorite,
-            ),
-          ),
-        ],
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: reserveButtonHeight(
+          detailsReady
+              ? stats
+              : ComicDetailSkeletonBlock(
+                  color: skeletonColor,
+                  width: 160,
+                  height: 16,
+                ),
+        ),
       );
     }
 
