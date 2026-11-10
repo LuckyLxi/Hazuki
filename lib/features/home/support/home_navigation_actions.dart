@@ -72,45 +72,52 @@ class HomeNavigationActions {
     );
   }
 
-  Future<void> openHistory() async {
-    await _openDrawerDestination(
-      hideComicDetailPanel: true,
-      (_) => featureEntrypoints.buildHistoryPage(
+  /// 构建侧栏页面；Windows 内容区与推入新路由共用同一套页面。
+  Widget buildDrawerDestinationPage(
+    BuildContext pageContext,
+    HomeDrawerDestination destination,
+  ) {
+    return switch (destination) {
+      HomeDrawerDestination.history => featureEntrypoints.buildHistoryPage(
         comicDetailPageBuilder: buildComicDetailPage,
         onFavoriteRequested: featureEntrypoints.onHistoryFavoriteRequested,
       ),
-    );
-  }
-
-  Future<void> openCategories() async {
-    await _openDrawerDestination(
-      hideComicDetailPanel: true,
-      (_) => featureEntrypoints.buildCategoriesPage(
-        searchPageBuilder: featureEntrypoints.buildSearchPage,
-        comicDetailPageBuilder: buildComicDetailPage,
-      ),
-    );
-  }
-
-  Future<void> openRanking() async {
-    await _openDrawerDestination(
-      hideComicDetailPanel: true,
-      (_) => featureEntrypoints.buildRankingPage(
+      HomeDrawerDestination.categories =>
+        featureEntrypoints.buildCategoriesPage(
+          searchPageBuilder: featureEntrypoints.buildSearchPage,
+          comicDetailPageBuilder: buildComicDetailPage,
+        ),
+      HomeDrawerDestination.ranking => featureEntrypoints.buildRankingPage(
         useLegacyRankingSection: useLegacyRankingSection,
-        legacyRankingTitle: l10n(context).rankingTitle,
+        legacyRankingTitle: l10n(pageContext).rankingTitle,
         comicDetailPageBuilder: buildComicDetailPage,
       ),
-    );
-  }
-
-  Future<void> openDownloads() async {
-    await _openDrawerDestination(
-      hideComicDetailPanel: true,
-      (_) => featureEntrypoints.buildDownloadsPage(
+      HomeDrawerDestination.downloads => featureEntrypoints.buildDownloadsPage(
         readerPageBuilder: downloadsReaderPageBuilder,
       ),
-    );
+      HomeDrawerDestination.settings => featureEntrypoints.buildSettingsPage(
+        appearanceSettings: appearanceSettings,
+        onAppearanceChanged: onAppearanceChanged,
+        locale: locale,
+        onLocaleChanged: onLocaleChanged,
+      ),
+      HomeDrawerDestination.lines => featureEntrypoints.buildLinesPage(
+        pageContext,
+      ),
+      HomeDrawerDestination.announcements =>
+        featureEntrypoints.buildAnnouncementsPage(pageContext),
+    };
   }
+
+  Future<void> openHistory() => _openDestination(HomeDrawerDestination.history);
+
+  Future<void> openCategories() =>
+      _openDestination(HomeDrawerDestination.categories);
+
+  Future<void> openRanking() => _openDestination(HomeDrawerDestination.ranking);
+
+  Future<void> openDownloads() =>
+      _openDestination(HomeDrawerDestination.downloads);
 
   Future<void> openDownloadsWithDefaultTransition() async {
     await Navigator.of(context).push<void>(
@@ -122,29 +129,18 @@ class HomeNavigationActions {
     );
   }
 
-  Future<void> openSettings() async {
-    await _openDrawerDestination(
-      hideComicDetailPanel: true,
-      (_) => featureEntrypoints.buildSettingsPage(
-        appearanceSettings: appearanceSettings,
-        onAppearanceChanged: onAppearanceChanged,
-        locale: locale,
-        onLocaleChanged: onLocaleChanged,
-      ),
-    );
-  }
+  Future<void> openSettings() =>
+      _openDestination(HomeDrawerDestination.settings);
 
-  Future<void> openLines() async {
-    await _openDrawerDestination(
-      hideComicDetailPanel: true,
-      featureEntrypoints.buildLinesPage,
-    );
-  }
+  Future<void> openLines() => _openDestination(HomeDrawerDestination.lines);
 
-  Future<void> openAnnouncements() async {
-    await _openDrawerDestination(
+  Future<void> openAnnouncements() =>
+      _openDestination(HomeDrawerDestination.announcements);
+
+  Future<void> _openDestination(HomeDrawerDestination destination) {
+    return _openDrawerDestination(
       hideComicDetailPanel: true,
-      featureEntrypoints.buildAnnouncementsPage,
+      (pageContext) => buildDrawerDestinationPage(pageContext, destination),
     );
   }
 

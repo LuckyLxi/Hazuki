@@ -505,3 +505,72 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
     );
   }
 }
+
+/// Windows 顶栏的下载任务胶囊：有任务时显示数量，点击打开下载任务页。
+class _HomeWindowsDownloadPill extends StatelessWidget {
+  const _HomeWindowsDownloadPill({
+    required this.visible,
+    required this.taskCount,
+    required this.onPressed,
+  });
+
+  final bool visible;
+  final int taskCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SizeTransition(
+          sizeFactor: animation,
+          axis: Axis.horizontal,
+          child: child,
+        ),
+      ),
+      child: !visible
+          ? const SizedBox.shrink(key: ValueKey('windows-download-pill-hidden'))
+          : Padding(
+              key: const ValueKey('windows-download-pill'),
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: Material(
+                  color: colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(999),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: onPressed,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox.square(
+                            dimension: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            l10n(context).homeDownloadTasksPill(taskCount),
+                            style: theme.textTheme.labelLarge,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+}

@@ -13,7 +13,13 @@ import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/discover_back_to_top_notification.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 
+import 'package:flutter/foundation.dart';
+import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+
+import '../state/discover_continue_reading_controller.dart';
 import '../state/discover_page_controller.dart';
+import 'discover_continue_reading_card.dart';
 import 'discover_announcement_card.dart';
 import 'discover_daily_recommendation_carousel.dart';
 import 'discover_daily_recommendation_carousel_widgets.dart';
@@ -44,6 +50,8 @@ class DiscoverPage extends StatefulWidget {
     this.allowInitialLoad = true,
     this.hideLoadingUntilInitialLoadAllowed = false,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
+    this.readHistoryService,
+    this.readingProgressService,
   });
 
   final SourceDiscoverGateway sourceService;
@@ -69,6 +77,10 @@ class DiscoverPage extends StatefulWidget {
   final bool hideLoadingUntilInitialLoadAllowed;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
+  /// 两者都提供时，Windows 端在每日推荐右侧显示“继续阅读”卡。
+  final ReadHistoryService? readHistoryService;
+  final ReadingProgressService? readingProgressService;
+
   @override
   State<DiscoverPage> createState() => _DiscoverPageState();
 }
@@ -77,7 +89,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
   static const _searchMorphDistance = kToolbarHeight;
 
   late final DiscoverPageController _controller;
+  DiscoverContinueReadingController? _continueReading;
   final ScrollController _scrollController = ScrollController();
+
+  // 继续阅读卡的宽度与轮播卡最大宽度一致，内容区过窄时不显示。
+  static const _continueReadingCardWidth = 300.0;
+  static const _continueReadingCardHeight = 213.0;
+  static const _continueReadingMinWidth = 900.0;
   double _searchMorphProgress = 0;
   bool _showBackToTop = false;
 
@@ -115,6 +133,19 @@ class _DiscoverPageState extends State<DiscoverPage> {
       },
       taskControl: widget.taskControl,
     );
+    final readHistory = widget.readHistoryService;
+    final readingProgress = widget.readingProgressService;
+    if (defaultTargetPlatform == TargetPlatform.windows &&
+        readHistory != null &&
+        readingProgress != null) {
+      _continueReading = DiscoverContinueReadingController(
+        readHistoryService: readHistory,
+        readingProgressService: readingProgress,
+        activeSourceKey: () => widget.sourceService.activeSourceKey,
+        sourceChanges: widget.sourceService,
+      );
+      unawaited(_continueReading!.load());
+    }
     _scrollController.addListener(_handleScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -159,6 +190,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       ..removeListener(_handleScroll)
       ..dispose();
     _controller.dispose();
+    _continueReading?.dispose();
     super.dispose();
   }
 
@@ -250,25 +282,63 @@ class _DiscoverPageState extends State<DiscoverPage> {
       padding: EdgeInsets.only(
         bottom: widget.announcementService?.latestDiscoverCard == null ? 20 : 8,
       ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: state.displayedRecommendations.isEmpty
-            ? DiscoverDailyRecommendationCarouselPlaceholder(
-                key: ValueKey(
-                  'discover_daily_recommendation_placeholder_${state.isLoading}',
+      child: _wrapWithContinueReading(
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: state.displayedRecommendations.isEmpty
+              ? DiscoverDailyRecommendationCarouselPlaceholder(
+                  key: ValueKey(
+                    'discover_daily_recommendation_placeholder_${state.isLoading}',
+                  ),
+                  loading: state.isLoading,
+                )
+              : DiscoverDailyRecommendationCarousel(
+                  key: const ValueKey('discover_daily_recommendation_carousel'),
+                  displayedRecommendations: state.displayedRecommendations,
+                  pendingRecommendations: state.pendingRecommendations,
+                  isPendingReady: state.isPendingReady,
+                  comicDetailPageBuilder: widget.comicDetailPageBuilder,
+                  comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+                  sourceService: widget.recommendationSource,
+                  recommendationService: widget.recommendationService,
                 ),
-                loading: state.isLoading,
-              )
-            : DiscoverDailyRecommendationCarousel(
-                key: const ValueKey('discover_daily_recommendation_carousel'),
-                displayedRecommendations: state.displayedRecommendations,
-                pendingRecommendations: state.pendingRecommendations,
-                isPendingReady: state.isPendingReady,
-                comicDetailPageBuilder: widget.comicDetailPageBuilder,
-                comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-                sourceService: widget.recommendationSource,
-                recommendationService: widget.recommendationService,
-              ),
+        ),
+      ),
+    );
+  }
+
+  // 轮播始终作为 Row 的首个子组件，继续阅读卡出现或消失时不重建轮播状态。
+  Widget _wrapWithContinueReading(Widget carousel) {
+    final continueReading = _continueReading;
+    if (continueReading == null) return carousel;
+    return ListenableBuilder(
+      listenable: continueReading,
+      child: carousel,
+      builder: (context, child) => LayoutBuilder(
+        builder: (context, constraints) {
+          final entries = continueReading.entries;
+          final showCard =
+              entries.isNotEmpty &&
+              constraints.maxWidth >= _continueReadingMinWidth;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: child!),
+              if (showCard) ...[
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: _continueReadingCardWidth,
+                  child: DiscoverContinueReadingCard(
+                    entries: entries,
+                    height: _continueReadingCardHeight,
+                    comicDetailPageBuilder: widget.comicDetailPageBuilder,
+                    comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }

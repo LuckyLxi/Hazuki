@@ -21,7 +21,13 @@ double resolveHomeDrawerWidth(BuildContext context) {
   return math.min(304.0, math.max(0.0, screenWidth - 56.0));
 }
 
-double resolveHomeWindowsSidebarWidth(BuildContext context) => 80.0;
+/// 窗口宽度不低于该值时 Windows 侧栏展开为带文字的导航。
+const homeWindowsSidebarExpandBreakpoint = 1100.0;
+
+double resolveHomeWindowsSidebarWidth(BuildContext context) =>
+    MediaQuery.sizeOf(context).width >= homeWindowsSidebarExpandBreakpoint
+    ? 232.0
+    : 80.0;
 
 class HomeDrawer extends StatelessWidget {
   const HomeDrawer({

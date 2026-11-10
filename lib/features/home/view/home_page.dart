@@ -52,6 +52,38 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     return widget.featureEntrypoints.buildComicDetailPage(comic, heroTag);
   }
 
+  // Windows 侧栏页面只在右侧内容区切换；其他平台仍推入抽屉展开路由。
+  void _openDrawerDestination(
+    HomeDrawerDestination destination,
+    Future<void> Function() pushRoute,
+  ) {
+    if (Platform.isWindows) {
+      _selectDrawerDestination(destination);
+      return;
+    }
+    setState(() {
+      _selectedDrawerDestination = destination;
+    });
+    unawaited(() async {
+      await pushRoute();
+      if (destination == HomeDrawerDestination.settings && mounted) {
+        await _coordinator.loadOtherSettings(context);
+      }
+    }());
+  }
+
+  void _selectDrawerDestination(HomeDrawerDestination? destination) {
+    final previous = _selectedDrawerDestination;
+    if (previous == destination) return;
+    setState(() {
+      _selectedDrawerDestination = destination;
+    });
+    // 离开设置页后重新读取可能被修改的设置。
+    if (previous == HomeDrawerDestination.settings) {
+      unawaited(_coordinator.loadOtherSettings(context));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -130,6 +162,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
               ? HomeWindowsSidebar(
                   profile: sidebarProfile,
                   actions: const HomeSidebarActions(),
+                  sourceSwitchService: _coordinator.sourceSwitchService,
                   currentIndex: _coordinator.currentIndex,
                   selectedDestination: _selectedDrawerDestination,
                   unreadAnnouncementCount:
@@ -285,63 +318,52 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           },
           sourceSwitchService: _coordinator.sourceSwitchService,
           onSourceSwitched: () => _coordinator.syncUserProfile(context),
-          onOpenHistory: () {
-            setState(() {
-              _selectedDrawerDestination = HomeDrawerDestination.history;
-            });
-            unawaited(navigation.openHistory());
-          },
-          onOpenCategories: () {
-            setState(() {
-              _selectedDrawerDestination = HomeDrawerDestination.categories;
-            });
-            unawaited(navigation.openCategories());
-          },
-          onOpenRanking: () {
-            setState(() {
-              _selectedDrawerDestination = HomeDrawerDestination.ranking;
-            });
-            unawaited(navigation.openRanking());
-          },
-          onOpenDownloads: () {
-            setState(() {
-              _selectedDrawerDestination = HomeDrawerDestination.downloads;
-            });
-            unawaited(navigation.openDownloads());
-          },
+          onOpenHistory: () => _openDrawerDestination(
+            HomeDrawerDestination.history,
+            navigation.openHistory,
+          ),
+          onOpenCategories: () => _openDrawerDestination(
+            HomeDrawerDestination.categories,
+            navigation.openCategories,
+          ),
+          onOpenRanking: () => _openDrawerDestination(
+            HomeDrawerDestination.ranking,
+            navigation.openRanking,
+          ),
+          onOpenDownloads: () => _openDrawerDestination(
+            HomeDrawerDestination.downloads,
+            navigation.openDownloads,
+          ),
           onOpenDownloadTasks: () {
+            if (Platform.isWindows) {
+              _openDrawerDestination(
+                HomeDrawerDestination.downloads,
+                navigation.openDownloads,
+              );
+              return;
+            }
             unawaited(navigation.openDownloadsWithDefaultTransition());
           },
-          onOpenSettings: () {
-            setState(() {
-              _selectedDrawerDestination = HomeDrawerDestination.settings;
-            });
-            unawaited(() async {
-              await navigation.openSettings();
-              if (!context.mounted) {
-                return;
-              }
-              await _coordinator.loadOtherSettings(context);
-            }());
-          },
-          onOpenAnnouncements: () {
-            setState(() {
-              _selectedDrawerDestination = HomeDrawerDestination.announcements;
-            });
-            unawaited(navigation.openAnnouncements());
-          },
-          onOpenLines: () {
-            setState(() {
-              _selectedDrawerDestination = HomeDrawerDestination.lines;
-            });
-            unawaited(navigation.openLines());
-          },
+          onOpenSettings: () => _openDrawerDestination(
+            HomeDrawerDestination.settings,
+            navigation.openSettings,
+          ),
+          onOpenAnnouncements: () => _openDrawerDestination(
+            HomeDrawerDestination.announcements,
+            navigation.openAnnouncements,
+          ),
+          onOpenLines: () => _openDrawerDestination(
+            HomeDrawerDestination.lines,
+            navigation.openLines,
+          ),
+          windowsDestinationBuilder: Platform.isWindows
+              ? navigation.buildDrawerDestinationPage
+              : null,
+          onWindowsDestinationClosed: () => _selectDrawerDestination(null),
           selectedDrawerDestination: _selectedDrawerDestination,
           unreadAnnouncementCount: _coordinator.announcementService.unreadCount,
           onDestinationSelected: (index) {
-            setState(() {
-              _selectedDrawerDestination = null;
-            });
+            _selectDrawerDestination(null);
             unawaited(_coordinator.handleDestinationSelected(index));
           },
         );

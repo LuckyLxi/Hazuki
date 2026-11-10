@@ -149,7 +149,7 @@ class DownloadedComicDetailPage extends StatelessWidget {
                     titleBarSuppressionOwner,
                   );
                   try {
-                    await Navigator.of(context).push(
+                    await Navigator.of(context, rootNavigator: true).push(
                       MaterialPageRoute<void>(
                         builder: (_) => readerPageBuilder(comic, chapter),
                       ),

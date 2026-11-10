@@ -385,7 +385,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     final titleBarSuppressionOwner = Object();
     titleBarController?.suppressCustomTitleBar(titleBarSuppressionOwner);
     try {
-      await Navigator.of(context).push(
+      await Navigator.of(context, rootNavigator: true).push(
         (fromExpandedChapterSheet
             ? _expandedReaderRouteBuilder
             : _destinationRouteBuilder)(

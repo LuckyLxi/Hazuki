@@ -1797,5 +1797,20 @@
   "sourceBrowserCookiesMissing": "缺少必要的登录 Cookie，请完成登录后重试。",
   "sourceCloudProgressUnavailable": "请登录或重试进度读取",
   "sourceCloudChapterMissing": "网站章节不存在，请选择章节",
-  "sourceExternalAuthorizationWaiting": "请在外部应用中完成授权，然后返回此处。"
+  "sourceExternalAuthorizationWaiting": "请在外部应用中完成授权，然后返回此处。",
+  "homeSidebarMoreGroup": "更多",
+  "homeDownloadTasksPill": "下载中 {count}",
+  "@homeDownloadTasksPill": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "discoverContinueReadingTitle": "继续阅读",
+  "discoverContinueReadingProgress": "{chapter} · 第 {page} 页",
+  "@discoverContinueReadingProgress": {
+    "placeholders": {
+      "chapter": {"type": "String"},
+      "page": {"type": "int"}
+    }
+  }
 }

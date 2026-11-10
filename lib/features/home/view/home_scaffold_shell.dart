@@ -24,6 +24,7 @@ import 'home_app_bar_actions.dart';
 import 'home_bottom_navigation.dart';
 import 'home_content_stack.dart';
 import 'home_drawer_snapshot.dart';
+import 'home_windows_destination_host.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 
 part 'home_scaffold_app_bar.dart';
@@ -75,6 +76,8 @@ class HomeScaffoldShell extends StatefulWidget {
     this.selectedDrawerDestination,
     this.unreadAnnouncementCount = 0,
     required this.onDestinationSelected,
+    this.windowsDestinationBuilder,
+    this.onWindowsDestinationClosed,
   });
 
   final GlobalKey<ScaffoldState> scaffoldKey;
@@ -120,6 +123,12 @@ class HomeScaffoldShell extends StatefulWidget {
   final HomeDrawerDestination? selectedDrawerDestination;
   final int unreadAnnouncementCount;
   final ValueChanged<int> onDestinationSelected;
+
+  /// Windows 下侧栏页面在右侧内容区内构建；为空时沿用推入新路由的方式。
+  final HomeWindowsDestinationBuilder? windowsDestinationBuilder;
+
+  /// Windows 内容区里的侧栏页面自行关闭时回调。
+  final VoidCallback? onWindowsDestinationClosed;
 
   @override
   State<HomeScaffoldShell> createState() => _HomeScaffoldShellState();
@@ -329,37 +338,50 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
       selectedDestination: selectedDrawerDestination,
       unreadAnnouncementCount: widget.unreadAnnouncementCount,
     );
-    final body = Platform.isWindows
-        ? Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: resolveHomeWindowsSidebarWidth(context),
-                child: HomeWindowsSidebar(
-                  key: ValueKey('home-windows-sidebar-$drawerVisualKey'),
-                  profile: sidebarProfile,
-                  sourceSwitchService: widget.sourceSwitchService,
-                  onSourceSwitched: widget.onSourceSwitched,
-                  actions: sidebarActions,
-                  currentIndex: currentIndex,
-                  selectedDestination: selectedDrawerDestination,
-                  unreadAnnouncementCount: widget.unreadAnnouncementCount,
-                ),
+    final body = HazukiDesktopPageContainer(child: homeContent);
+
+    // Windows：侧栏常驻左侧，顶栏与首页内容、侧栏页面都放在右侧圆角内容区。
+    Widget wrapWindowsLayout(Widget homeScaffold) {
+      if (!Platform.isWindows) return homeScaffold;
+      final destinationBuilder = widget.windowsDestinationBuilder;
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: resolveHomeWindowsSidebarWidth(context),
+            child: HomeWindowsSidebar(
+              key: ValueKey('home-windows-sidebar-$drawerVisualKey'),
+              profile: sidebarProfile,
+              sourceSwitchService: widget.sourceSwitchService,
+              onSourceSwitched: widget.onSourceSwitched,
+              actions: sidebarActions,
+              currentIndex: currentIndex,
+              selectedDestination: selectedDrawerDestination,
+              unreadAnnouncementCount: widget.unreadAnnouncementCount,
+            ),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.horizontal(
+                left: Radius.circular(22),
               ),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.horizontal(
-                    left: Radius.circular(22),
-                  ),
-                  child: ColoredBox(
-                    color: Theme.of(context).colorScheme.surface,
-                    child: HazukiDesktopPageContainer(child: homeContent),
-                  ),
-                ),
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.surface,
+                child: destinationBuilder == null
+                    ? homeScaffold
+                    : HomeWindowsDestinationHost(
+                        destination: selectedDrawerDestination,
+                        destinationBuilder: destinationBuilder,
+                        onCloseRequested:
+                            widget.onWindowsDestinationClosed ?? () {},
+                        homeChild: homeScaffold,
+                      ),
               ),
-            ],
-          )
-        : HazukiDesktopPageContainer(child: homeContent);
+            ),
+          ),
+        ],
+      );
+    }
 
     return PopScope(
       canPop: false,
@@ -384,160 +406,172 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
         child: HomeDrawerTransition(
           animation: _profileDrawerController,
           showNavigation: !Platform.isWindows,
-          child: WindowsComicDetailHost(
-            child: ListenableBuilder(
-              listenable: downloadStatus,
-              builder: (context, _) {
-                final hasDownloadTasks = downloadStatus.hasTasks;
-                return TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, leadingWidth, _) {
-                    // 属于某一页的应用栏组件仅在切口过渡开启时跟随裁剪。
-                    Widget cutClip(int index, Widget child) =>
-                        _cutTransitionEnabled
-                        ? HomeTabCutClip(
-                            transition: _tabTransition,
-                            index: index,
-                            child: child,
-                          )
-                        : child;
-                    // overlay 为切页期间叠在上方的进入页应用栏：背景透明，
-                    // 头像位只占位，确保组件位置与切换完成后的真实布局一致。
-                    PreferredSizeWidget buildAppBar(
-                      int index, {
-                      bool overlay = false,
-                    }) => hazukiFrostedAppBar(
-                      context: context,
-                      leading: Platform.isWindows
-                          ? null
-                          : overlay
-                          ? const SizedBox.shrink()
-                          : _HomeAppBarProfileButton(
-                              downloadStatus: downloadStatus,
-                              activeSourceKey: activeSourceKey,
-                              avatarUrl: avatarUrl,
-                              profileLoading: profileLoading,
-                              username: username,
-                              drawerContent: mobileDrawerContent,
-                              onOpenDownloads: onOpenDownloadTasks,
-                              onDrawerVisibilityChanged: _setProfileDrawerOpen,
-                              onDrawerCovered: _resetProfileDrawer,
+          child: wrapWindowsLayout(
+            WindowsComicDetailHost(
+              child: ListenableBuilder(
+                listenable: downloadStatus,
+                builder: (context, _) {
+                  final hasDownloadTasks = downloadStatus.hasTasks;
+                  return TweenAnimationBuilder<double>(
+                    tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, leadingWidth, _) {
+                      // 属于某一页的应用栏组件仅在切口过渡开启时跟随裁剪。
+                      Widget cutClip(int index, Widget child) =>
+                          _cutTransitionEnabled
+                          ? HomeTabCutClip(
+                              transition: _tabTransition,
+                              index: index,
+                              child: child,
+                            )
+                          : child;
+                      // overlay 为切页期间叠在上方的进入页应用栏：背景透明，
+                      // 头像位只占位，确保组件位置与切换完成后的真实布局一致。
+                      PreferredSizeWidget buildAppBar(
+                        int index, {
+                        bool overlay = false,
+                      }) => hazukiFrostedAppBar(
+                        context: context,
+                        leading: Platform.isWindows
+                            ? null
+                            : overlay
+                            ? const SizedBox.shrink()
+                            : _HomeAppBarProfileButton(
+                                downloadStatus: downloadStatus,
+                                activeSourceKey: activeSourceKey,
+                                avatarUrl: avatarUrl,
+                                profileLoading: profileLoading,
+                                username: username,
+                                drawerContent: mobileDrawerContent,
+                                onOpenDownloads: onOpenDownloadTasks,
+                                onDrawerVisibilityChanged:
+                                    _setProfileDrawerOpen,
+                                onDrawerCovered: _resetProfileDrawer,
+                              ),
+                        leadingWidth: Platform.isWindows ? null : leadingWidth,
+                        automaticallyImplyLeading: false,
+                        backgroundAlpha: overlay ? 0 : 0.72,
+                        title: index == 1
+                            ? null
+                            : cutClip(
+                                0,
+                                _HomeAppBarSearchBox(
+                                  onOpenSearch: onOpenSearch,
+                                  maxWidth: Platform.isWindows ? 520 : null,
+                                ),
+                              ),
+                        // Windows 搜索框靠左，与内容区左边距对齐。
+                        titleSpacing: Platform.isWindows ? 24 : 4,
+                        centerTitle: false,
+                        actions: [
+                          if (Platform.isWindows)
+                            _HomeWindowsDownloadPill(
+                              visible: hasDownloadTasks,
+                              taskCount: downloadStatus.taskCount,
+                              onPressed: onOpenDownloadTasks,
                             ),
-                      leadingWidth: Platform.isWindows ? null : leadingWidth,
-                      automaticallyImplyLeading: false,
-                      backgroundAlpha: overlay ? 0 : 0.72,
-                      title: index == 1
-                          ? null
-                          : cutClip(
-                              0,
-                              _HomeAppBarSearchBox(
-                                onOpenSearch: onOpenSearch,
-                                maxWidth: Platform.isWindows ? 320 : null,
+                          cutClip(
+                            1,
+                            HomeAppBarActions(
+                              currentIndex: index,
+                              discoverSearchMorphProgress:
+                                  discoverSearchMorphProgress,
+                              forceDiscoverSearchInAppBar:
+                                  usePinnedDiscoverSearch,
+                              favoriteAppBarActions: favoriteAppBarActions,
+                              sourcePlugins: widget.sourcePlugins,
+                              onOpenSearch: onOpenSearch,
+                              onFavoriteSortSelected: onFavoriteSortSelected,
+                              onFavoriteCreateFolderPressed:
+                                  onFavoriteCreateFolderPressed,
+                              onFavoriteModeTogglePressed:
+                                  onFavoriteModeTogglePressed,
+                            ),
+                          ),
+                        ],
+                      );
+                      final appBar = buildAppBar(currentIndex);
+                      return HazukiLiquidGlass.backdropScope(
+                        child: Scaffold(
+                          key: scaffoldKey,
+                          extendBody: true,
+                          appBar: PreferredSize(
+                            preferredSize: appBar.preferredSize,
+                            child: RepaintBoundary(
+                              key: const ValueKey(
+                                'home-app-bar-repaint-boundary',
+                              ),
+                              child: HomeDrawerSnapshot(
+                                animation: _profileDrawerController,
+                                enabled: !Platform.isWindows,
+                                contentAnimating: _homeContentAnimating,
+                                // The app bar normally composites over Scaffold's
+                                // background. Include it in the isolated raster
+                                // so its translucent glass keeps the same tint.
+                                child: ColoredBox(
+                                  color: Theme.of(
+                                    context,
+                                  ).scaffoldBackgroundColor,
+                                  // 切页期间真实应用栏保持退出页布局，进入页组件
+                                  // 由上层透明应用栏承载，两者按同一切口互补裁剪。
+                                  child: !_cutTransitionEnabled
+                                      ? Stack(children: [appBar])
+                                      : AnimatedBuilder(
+                                          animation: _tabTransition.animation,
+                                          builder: (context, _) {
+                                            if (!_tabTransition.isAnimating) {
+                                              return Stack(children: [appBar]);
+                                            }
+                                            return Stack(
+                                              children: [
+                                                buildAppBar(
+                                                  _tabTransition.outgoing,
+                                                ),
+                                                Positioned.fill(
+                                                  child: IgnorePointer(
+                                                    child: HeroMode(
+                                                      enabled: false,
+                                                      child: buildAppBar(
+                                                        _tabTransition.incoming,
+                                                        overlay: true,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                ),
                               ),
                             ),
-                      titleSpacing: Platform.isWindows ? null : 4,
-                      centerTitle: Platform.isWindows,
-                      actions: [
-                        cutClip(
-                          1,
-                          HomeAppBarActions(
-                            currentIndex: index,
-                            discoverSearchMorphProgress:
-                                discoverSearchMorphProgress,
-                            forceDiscoverSearchInAppBar:
-                                usePinnedDiscoverSearch,
-                            favoriteAppBarActions: favoriteAppBarActions,
-                            sourcePlugins: widget.sourcePlugins,
-                            onOpenSearch: onOpenSearch,
-                            onFavoriteSortSelected: onFavoriteSortSelected,
-                            onFavoriteCreateFolderPressed:
-                                onFavoriteCreateFolderPressed,
-                            onFavoriteModeTogglePressed:
-                                onFavoriteModeTogglePressed,
                           ),
-                        ),
-                      ],
-                    );
-                    final appBar = buildAppBar(currentIndex);
-                    return HazukiLiquidGlass.backdropScope(
-                      child: Scaffold(
-                        key: scaffoldKey,
-                        extendBody: true,
-                        appBar: PreferredSize(
-                          preferredSize: appBar.preferredSize,
-                          child: RepaintBoundary(
-                            key: const ValueKey(
-                              'home-app-bar-repaint-boundary',
-                            ),
+                          drawerEnableOpenDragGesture: false,
+                          drawer: null,
+                          // Cache the body and header separately. A full-page
+                          // snapshot would rasterize the cached header again and
+                          // allocate a second texture containing the same pixels.
+                          body: HazukiLiquidGlass.backdropSource(
                             child: HomeDrawerSnapshot(
                               animation: _profileDrawerController,
                               enabled: !Platform.isWindows,
                               contentAnimating: _homeContentAnimating,
-                              // The app bar normally composites over Scaffold's
-                              // background. Include it in the isolated raster
-                              // so its translucent glass keeps the same tint.
                               child: ColoredBox(
                                 color: Theme.of(
                                   context,
                                 ).scaffoldBackgroundColor,
-                                // 切页期间真实应用栏保持退出页布局，进入页组件
-                                // 由上层透明应用栏承载，两者按同一切口互补裁剪。
-                                child: !_cutTransitionEnabled
-                                    ? Stack(children: [appBar])
-                                    : AnimatedBuilder(
-                                        animation: _tabTransition.animation,
-                                        builder: (context, _) {
-                                          if (!_tabTransition.isAnimating) {
-                                            return Stack(children: [appBar]);
-                                          }
-                                          return Stack(
-                                            children: [
-                                              buildAppBar(
-                                                _tabTransition.outgoing,
-                                              ),
-                                              Positioned.fill(
-                                                child: IgnorePointer(
-                                                  child: HeroMode(
-                                                    enabled: false,
-                                                    child: buildAppBar(
-                                                      _tabTransition.incoming,
-                                                      overlay: true,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ),
+                                child: body,
                               ),
                             ),
                           ),
+                          bottomNavigationBar: null,
                         ),
-                        drawerEnableOpenDragGesture: false,
-                        drawer: null,
-                        // Cache the body and header separately. A full-page
-                        // snapshot would rasterize the cached header again and
-                        // allocate a second texture containing the same pixels.
-                        body: HazukiLiquidGlass.backdropSource(
-                          child: HomeDrawerSnapshot(
-                            animation: _profileDrawerController,
-                            enabled: !Platform.isWindows,
-                            contentAnimating: _homeContentAnimating,
-                            child: ColoredBox(
-                              color: Theme.of(context).scaffoldBackgroundColor,
-                              child: body,
-                            ),
-                          ),
-                        ),
-                        bottomNavigationBar: null,
-                      ),
-                    );
-                  },
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
           navigationBuilder: (context, drawerProgress, viewportSize) {

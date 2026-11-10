@@ -1797,5 +1797,20 @@
   "sourceBrowserCookiesMissing": "Required login cookies are missing. Finish signing in and try again.",
   "sourceCloudProgressUnavailable": "Sign in or retry progress",
   "sourceCloudChapterMissing": "Please choose a chapter",
-  "sourceExternalAuthorizationWaiting": "Complete authorization in the external app, then return here."
+  "sourceExternalAuthorizationWaiting": "Complete authorization in the external app, then return here.",
+  "homeSidebarMoreGroup": "More",
+  "homeDownloadTasksPill": "Downloading {count}",
+  "@homeDownloadTasksPill": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "discoverContinueReadingTitle": "Continue reading",
+  "discoverContinueReadingProgress": "{chapter} · Page {page}",
+  "@discoverContinueReadingProgress": {
+    "placeholders": {
+      "chapter": {"type": "String"},
+      "page": {"type": "int"}
+    }
+  }
 }

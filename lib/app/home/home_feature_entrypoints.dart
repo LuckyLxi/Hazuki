@@ -302,6 +302,8 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             onSearchTap: onSearchTap,
             onRequestLogin: onRequestLogin,
             taskControl: sl<SourceTaskControlGateway>(),
+            readHistoryService: sl<ReadHistoryService>(),
+            readingProgressService: sl<ReadingProgressService>(),
           );
         },
     buildFavoriteTab:
