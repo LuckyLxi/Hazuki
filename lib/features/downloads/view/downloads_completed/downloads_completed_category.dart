@@ -12,6 +12,22 @@ class DownloadsCategoryMorphLauncher extends StatelessWidget {
 
   static const double height = HazukiMorphCapsule.height;
   static const double cornerRadius = HazukiMorphCapsule.cornerRadius;
+  static const EdgeInsets _padding = EdgeInsets.fromLTRB(16, 10, 16, 0);
+
+  /// 计算胶囊在 [ancestor] 坐标系中的实际位置，供弹窗从胶囊处展开。
+  ///
+  /// Windows 下下载页位于右侧内容区，弹窗却铺满整个窗口，不能再假设胶囊居中于窗口。
+  static Rect? capsuleRectIn(BuildContext launcherContext, RenderBox ancestor) {
+    final box = launcherContext.findRenderObject();
+    if (box is! RenderBox || !box.hasSize || !box.attached) return null;
+    final origin = box.localToGlobal(Offset.zero, ancestor: ancestor);
+    final innerWidth = (box.size.width - _padding.horizontal).clamp(0.0, 420.0);
+    final left =
+        origin.dx +
+        _padding.left +
+        (box.size.width - _padding.horizontal - innerWidth) / 2;
+    return Rect.fromLTWH(left, origin.dy + _padding.top, innerWidth, height);
+  }
 
   final bool visible;
   final int landingVersion;
@@ -22,7 +38,7 @@ class DownloadsCategoryMorphLauncher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: _padding,
       child: HazukiMorphCapsule(
         visible: visible,
         landingVersion: landingVersion,
@@ -53,9 +69,13 @@ class DownloadsCategoryShellDialog extends StatefulWidget {
     required this.onRenameGroup,
     required this.onReorderGroups,
     required this.onDeleteGroup,
+    this.launcherRect,
   });
 
   static const double _dialogHeight = 420;
+
+  /// 胶囊在弹窗坐标系中的位置；为空时按胶囊居中于窗口估算。
+  final Rect? launcherRect;
   static const Duration _groupDeleteAnimationDuration = Duration(
     milliseconds: 260,
   );
@@ -105,14 +125,25 @@ class _DownloadsCategoryShellDialogState
         final dialogWidth = (constraints.maxWidth - 32).clamp(0.0, 420.0);
         final horizontalPosition = (constraints.maxWidth - dialogWidth) / 2;
         final startTop = mediaQuery.padding.top + kToolbarHeight + 56;
-        final startRect = Rect.fromLTWH(
-          horizontalPosition,
-          startTop,
-          dialogWidth,
-          DownloadsCategoryMorphLauncher.height,
+        final startRect =
+            widget.launcherRect ??
+            Rect.fromLTWH(
+              horizontalPosition,
+              startTop,
+              dialogWidth,
+              DownloadsCategoryMorphLauncher.height,
+            );
+        // 展开后的弹窗与胶囊水平居中对齐，保证收放动画首尾衔接。
+        final maxLeft = (constraints.maxWidth - dialogWidth - 16).clamp(
+          16.0,
+          double.infinity,
+        );
+        final endLeft = (startRect.center.dx - dialogWidth / 2).clamp(
+          16.0,
+          maxLeft,
         );
         final endRect = Rect.fromCenter(
-          center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
+          center: Offset(endLeft + dialogWidth / 2, constraints.maxHeight / 2),
           width: dialogWidth,
           height: DownloadsCategoryShellDialog._dialogHeight,
         );

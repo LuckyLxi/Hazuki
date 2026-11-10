@@ -564,6 +564,50 @@ void main() {
     );
   });
 
+  testWidgets('category dialog expands from an offset launcher', (
+    tester,
+  ) async {
+    // 模拟 Windows 侧栏常驻：下载页只占右侧内容区，弹窗仍铺满窗口。
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(width: 300),
+              Expanded(child: _buildTab()),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final launcher = find.byKey(
+      const ValueKey<String>('downloads_category_launcher'),
+    );
+    final launcherRect = tester.getRect(launcher);
+    expect(launcherRect.left, greaterThan(300));
+
+    await tester.tap(launcher);
+    await tester.pump();
+
+    final dialog = find.byKey(
+      const ValueKey<String>('downloads_category_dialog'),
+    );
+    final initialRect = tester.getRect(dialog);
+    expect(initialRect.left, closeTo(launcherRect.left, 0.5));
+    expect(initialRect.top, closeTo(launcherRect.top, 0.5));
+    expect(initialRect.width, closeTo(launcherRect.width, 0.5));
+
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(dialog).center.dx,
+      closeTo(launcherRect.center.dx, 0.5),
+    );
+  });
+
   testWidgets('category launcher visibly bounces after returning', (
     tester,
   ) async {
