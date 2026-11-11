@@ -32,15 +32,15 @@ flutter gen-l10n
 # Regenerate Drift code after changing the database schema
 dart run build_runner build --delete-conflicting-outputs
 
-# Verify formatting (CI uses this exact form)
+# Verify formatting
 dart format --output=none --set-exit-if-changed lib test
 
-# CI smoke builds
+# Local smoke builds
 flutter build apk --debug
 flutter build windows --debug
 ```
 
-`third_party/pub_overrides/quickjs_engine` and each package under `third_party/pub_overrides/` are **separate packages** — run their `flutter pub get` / `dart format` / `flutter analyze` / `flutter test` from that directory, not the repo root. The patched QuickJS tests need `LIBQUICKJSC_TEST_PATH` pointing at the library built by `tool/build_quickjs_test_library.dart` (see `.github/workflows/check.yml`). Do not overwrite the local `dependency_overrides` in `pubspec.yaml` (they patch upstream bugs); `third_party/pub_overrides/README.md` records why each exists and the pinned-version limits (`build_runner`, `dynamic_color`, `flutter_secure_storage`) — don't bump those without reading it.
+`third_party/pub_overrides/quickjs_engine` and each package under `third_party/pub_overrides/` are **separate packages** — run their `flutter pub get` / `dart format` / `flutter analyze` / `flutter test` from that directory, not the repo root. Build the test library with `dart run tool/build_quickjs_test_library.dart` from the repo root and set `LIBQUICKJSC_TEST_PATH` to its absolute path before running the patched QuickJS tests. The script writes the library to `packages/quickjs_engine/native/build/`. Do not overwrite the local `dependency_overrides` in `pubspec.yaml` (they patch upstream bugs); `third_party/pub_overrides/README.md` records why each exists and the pinned-version limits (`build_runner`, `dynamic_color`, `flutter_secure_storage`) — don't bump those without reading it.
 
 ## Architecture
 
