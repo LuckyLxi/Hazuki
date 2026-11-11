@@ -28,7 +28,7 @@ void main() {
   });
 
   test(
-    'favorite folder workflow depends on narrow state and injected callbacks',
+    'favorite folder requests do not own page state or call back into the page',
     () {
       for (final name in ['favorite_folder_coordinator.dart']) {
         final content = File(
@@ -39,6 +39,12 @@ void main() {
           'FavoritePageController',
           'favorite_page_state.dart',
           'FavoritePageData',
+          'favorite_folder_state.dart',
+          'FavoriteFolderState',
+          'favorite_selection_store.dart',
+          'selectFolder',
+          'notifyListeners',
+          'VoidCallback',
           '/view/',
           'BuildContext',
           'package:flutter/material.dart',
@@ -60,6 +66,22 @@ void main() {
       }
     },
   );
+
+  test('plugin operation state does not depend on views or dialogs', () {
+    final content = File(
+      'lib/features/settings/state/source_plugins_controller.dart',
+    ).readAsStringSync();
+    for (final forbidden in [
+      '/view/',
+      'BuildContext',
+      'package:flutter/material.dart',
+      'showDialog',
+      'showHazukiPrompt',
+      'package:file_selector/',
+    ]) {
+      expect(content, isNot(contains(forbidden)), reason: forbidden);
+    }
+  });
 
   test('reader controllers use narrow state contracts', () {
     for (final name in [

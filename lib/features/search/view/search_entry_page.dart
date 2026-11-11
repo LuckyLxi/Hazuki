@@ -273,7 +273,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     _idExtractController.hide();
     await _focusCoordinator.dismissKeyboard(context, parkOnPage: true);
     _focusCoordinator.syncText(rawKeyword);
-    final keyword = await normalizeSubmittedKeyword(
+    final keyword = normalizeSubmittedKeyword(
       rawKeyword,
       controller: _focusCoordinator.primaryController,
     );

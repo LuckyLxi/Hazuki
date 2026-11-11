@@ -25,6 +25,8 @@ flutter build apk --split-per-abi --target-platform android-arm64
 flutter analyze
 flutter test
 flutter test test/path/to/test_file.dart            # single test file
+flutter test test/services/source test/services/network_client_test.dart   # source runtime suite
+flutter test test/architecture                      # import/DI boundary rules
 
 # Regenerate localization code after editing lib/l10n/*.arb
 flutter gen-l10n
@@ -44,7 +46,7 @@ flutter build windows --debug
 
 ## Architecture
 
-Hazuki is a Flutter manga reader targeting Android. It fetches and renders manga from installable JavaScript source plugins (Hazuki Source API v1; default index `LuckyLxi/Sources`). The bundled JMComic / CopyManga / Picacg plugins were adapted from [venera-configs](https://github.com/venera-app/venera-configs) but now use only the Hazuki SDK; the host deliberately does **not** provide venera API compatibility (no `ComicSource`, `Network`, `UI`, `Image`, `fetch`, etc.), and only `Hazuki.registerSource` or `extends HazukiSource` registrations are accepted. No Provider/GetX/Riverpod — state is `ChangeNotifier` controllers consumed via `ListenableBuilder`/`AnimatedBuilder`.
+Hazuki is a Flutter manga reader for Android and Windows (own title bar, sidebar layout, `lib/app/windows/`, `lib/shared/windows/`). It fetches and renders manga from installable JavaScript source plugins (Hazuki Source API v1; default index `LuckyLxi/Sources`). The bundled JMComic / CopyManga / Picacg plugins were adapted from [venera-configs](https://github.com/venera-app/venera-configs) but now use only the Hazuki SDK; the host deliberately does **not** provide venera API compatibility (no `ComicSource`, `Network`, `UI`, `Image`, `fetch`, etc.), and only `Hazuki.registerSource` or `extends HazukiSource` registrations are accepted. No Provider/GetX/Riverpod — state is `ChangeNotifier` controllers consumed via `ListenableBuilder`/`AnimatedBuilder`.
 
 ### JS source runtime
 
@@ -72,7 +74,9 @@ ONNX Runtime is **not bundled**: `onnx_runtime_library.dart` downloads the platf
 
 ### Dependency injection
 
-Pure `get_it`. `lib/app/service_locator.dart` exposes `final GetIt sl` and `registerServices()`, which delegates to `registerSourceServices` + `registerApplicationServices` in [lib/app/di/](lib/app/di/). `sl<T>()` is used **only in `lib/main.dart` and `lib/app/`** (composition roots such as [home_feature_entrypoints.dart](lib/app/home/home_feature_entrypoints.dart), startup, and the app-level source runtime UI); `lib/features/`, `lib/shared/`, `lib/widgets/`, and `lib/services/` never call it. There are no `.instance` static singletons. Registrars accept an optional `GetIt` so tests can build an isolated graph.
+Pure `get_it`. `lib/app/service_locator.dart` exposes `final GetIt sl` and `registerServices()`, which delegates to `registerSourceServices` + `registerApplicationServices` in [lib/app/di/](lib/app/di/). `sl<T>()` is used **only in `lib/main.dart` and `lib/app/`** (composition roots such as [home_feature_entrypoints.dart](lib/app/home/home_feature_entrypoints.dart), startup, and the app-level source runtime UI); `lib/features/`, `lib/shared/`, `lib/widgets/`, and `lib/services/` never call it. Services have no `.instance` static singletons; the only process-wide statics are a few non-service brokers/caches (`SourceUiService`, `SourceExternalAuthorizationBroker`, `AnnouncementImageSessionCache`, `WindowsComicDetailController`) — do not add more. Registrars accept an optional `GetIt` so tests can build an isolated graph.
+
+These layering rules (no `sl` outside the app layer, services never import features or `lib/app/`, features never import source implementations, gateways never import runtime implementations, no import cycles) are enforced by `test/architecture/`. When a change moves code across layers, run those tests and update the rule lists there deliberately rather than working around them.
 
 ### Startup
 
@@ -105,11 +109,13 @@ The bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`) hosts features und
 
 ### Storage
 
-`lib/services/storage/hazuki_database.dart` is the Drift database (tables for read history, reading progress, search history, download groups), with generated code in `hazuki_database.g.dart` (never hand-edit). Tests use `HazukiDatabase.memory()`. App-level preference keys live in `lib/shared/preferences/hazuki_preference_keys.dart`.
+`lib/services/storage/hazuki_database.dart` is the Drift database (tables for read history, reading progress, search history, local favorites, download groups, plus tombstone tables that record deletions for cloud sync), with generated code in `hazuki_database.g.dart` (never hand-edit). Schema changes need a `schemaVersion` bump and a step in its `MigrationStrategy`. Tests use `HazukiDatabase.memory()`.
+
+`CloudSyncService` ([lib/services/cloud_sync_service.dart](lib/services/cloud_sync_service.dart)) syncs through participants in `lib/services/cloud_sync/` (reading, favorites, comment filter, settings); each participant owns its own snapshot format and merge rules, and receives its dependencies by constructor (no `sl`). Data that can be deleted locally must write a tombstone, otherwise a sync resurrects it. App-level preference keys live in `lib/shared/preferences/hazuki_preference_keys.dart`.
 
 ### Navigation & theme
 
-Navigation uses hero animations for comic-cover transitions; helpers live in [lib/shared/navigation_tags.dart](lib/shared/navigation_tags.dart) (`comicCoverHeroTag()`, `buildComicCoverHeroFlightShuttle()`, `comicCoverHeroBorderRadius()`). Android uses a bottom drawer; Windows gets a sidebar layout. Light/dark switching uses a circular reveal animation (`_ThemeRevealOverlay` in `main.dart`).
+Navigation uses hero animations for comic-cover transitions; helpers live in [lib/shared/navigation_tags.dart](lib/shared/navigation_tags.dart) (`comicCoverHeroTag()`, `buildComicCoverHeroFlightShuttle()`, `comicCoverHeroBorderRadius()`). Android uses a bottom drawer; Windows gets a sidebar layout. Light/dark switching uses a circular reveal animation (`ThemeRevealOverlay` in [lib/app/theme/theme_reveal_support.dart](lib/app/theme/theme_reveal_support.dart)).
 
 ### Localization
 
@@ -117,11 +123,12 @@ ARB files in `lib/l10n/`. Use `l10n(context)` from `lib/l10n/l10n.dart` to get `
 
 ### Tests
 
-Tests mirror the `lib/` structure under `test/`. Two patterns: **smoke tests** (instantiate controllers/pages to verify construction) and **controller unit tests** (drive state transitions directly on the `ChangeNotifier`). Use `mocktail` for fakes and `HazukiDatabase.memory()` for isolated storage.
+Tests mirror the `lib/` structure under `test/`. Two patterns: **smoke tests** (instantiate controllers/pages to verify construction) and **controller unit tests** (drive state transitions directly on the `ChangeNotifier`). Use `mocktail` for fakes and `HazukiDatabase.memory()` for isolated storage. Tests that go through `sl<T>()` call `ensureTestServiceLocator()` from `test/support/test_service_locator.dart` in `setUp`; other shared fakes and fixtures live in `test/support/`.
 
 ## Conventions
 
 - **Code comments must be written in Simplified Chinese** — docstrings and inline comments explaining *why/how*, kept concise and professional.
+- **UI changes need approval**: ask before changing UI appearance, visible page content, or animation behavior.
 - **Strict scope**: touch only the lines/functions required for the task; do not refactor unrelated code or delete existing behavior without asking first.
 - **Commits**: Conventional Commits, imperative and scoped (e.g. `feat(settings): …`, `fix(storage): …`). No casual/playful language.
 - **Release notes / `update.json` `log` field / git tag descriptions**: list items start with `- ` (never numeric ordering), separated by `\n`. Release tags must be annotated (`git tag -a`) and the message must contain Simplified Chinese — the `.githooks/pre-push` hook rejects lightweight tags and tag messages without Chinese, and the release workflow reads the tag message as the changelog.

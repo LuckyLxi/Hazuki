@@ -64,8 +64,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         results: _resultsController,
         sourceService: _sourceService,
         aggregateResults: _aggregateResultsController,
-        recordHistory: (keyword) =>
-            addSearchHistory(widget.historyService, keyword),
+        recordHistory: (keyword) => widget.historyService.add(keyword),
         isActive: () => mounted,
         openComic: (comic) async {
           await _focusCoordinator.dismissKeyboard(context);
@@ -452,7 +451,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     final activeController = _focusCoordinator.activeController;
     final rawKeyword = submittedText ?? activeController.text;
     _focusCoordinator.syncText(rawKeyword);
-    final keyword = await normalizeSubmittedKeyword(
+    final keyword = normalizeSubmittedKeyword(
       rawKeyword,
       controller: activeController,
     );

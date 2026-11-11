@@ -4,7 +4,6 @@ import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 import 'search_contracts.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
-import 'package:hazuki/services/search_history_service.dart';
 
 export 'search_contracts.dart';
 
@@ -68,23 +67,16 @@ Future<void> setSearchComicLayout(
   HazukiGeneralPreferencesStore store = const HazukiGeneralPreferencesStore(),
 }) => store.saveSearchComicLayoutName(layout.name);
 
-Future<String> normalizeSubmittedKeyword(
+String normalizeSubmittedKeyword(
   String rawKeyword, {
   TextEditingController? controller,
-}) async {
+}) {
   final keyword = rawKeyword.trim();
   controller?.value = TextEditingValue(
     text: keyword,
     selection: TextSelection.collapsed(offset: keyword.length),
   );
   return keyword;
-}
-
-Future<void> addSearchHistory(
-  SearchHistoryService historyService,
-  String keyword,
-) async {
-  await historyService.add(keyword);
 }
 
 SearchMessages searchMessages(BuildContext context) {

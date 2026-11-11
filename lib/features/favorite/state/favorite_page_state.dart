@@ -7,35 +7,28 @@ import 'favorite_folder_state.dart';
 
 export 'favorite_folder_state.dart' show defaultCloudFavoriteFolder;
 
-class FavoritePageData implements FavoriteFolderState {
+class FavoritePageData {
   bool isFirstLoad = true;
-  @override
   FavoritePageMode mode = FavoritePageMode.cloud;
   List<ExploreComic> comics = const <ExploreComic>[];
-  @override
   List<FavoriteFolder> folders = const <FavoriteFolder>[
     defaultCloudFavoriteFolder,
   ];
-  @override
   String selectedCloudFolderId = '0';
-  @override
   String selectedLocalFolderId = '';
   String? errorMessage;
   bool initialLoading = true;
   bool refreshing = false;
   bool loadingMore = false;
   bool hasMore = true;
-  @override
   bool loadingFolders = false;
   int currentPage = 1;
   String favoriteSortOrder = '';
 
-  @override
   String get selectedFolderId => mode == FavoritePageMode.local
       ? selectedLocalFolderId
       : selectedCloudFolderId;
 
-  @override
   void clearComicsForEmptyFolders() {
     comics = const <ExploreComic>[];
     errorMessage = null;

@@ -8,10 +8,9 @@ import 'package:hazuki/services/source/plugins/source_plugin_repository.dart';
 
 import 'package:hazuki/widgets/widgets.dart';
 import 'source_plugin_settings_page.dart';
+import '../../state/source_plugins_controller.dart';
 
 part 'source_plugins_widgets.dart';
-
-enum _PluginOperationPage { installed, available }
 
 enum _PluginMarketFilter { all, notInstalled, updates }
 
@@ -33,20 +32,14 @@ class SourcePluginsPage extends StatefulWidget {
 
 class _SourcePluginsPageState extends State<SourcePluginsPage> {
   late final SourcePluginGateway _manager;
-  _PluginOperationPage? _busyPage;
-  bool get _busy => _busyPage != null;
-  final Set<String> _installing = {};
-  final Map<String, bool> _pendingEnabled = {};
+  late final SourcePluginsController _controller;
   _PluginMarketFilter _marketFilter = _PluginMarketFilter.all;
-  bool _sorting = false;
-  // 排序模式下的乐观顺序，避免等待注册表写入时列表回跳。
-  List<String>? _sortOrder;
-  bool get _hasOperations => _busy || _installing.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
     _manager = widget.manager;
+    _controller = SourcePluginsController(_manager)..addListener(_onChanged);
     unawaited(_initialize());
   }
 
@@ -64,38 +57,24 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
   Future<void> _run(
     Future<void> Function() action, {
     String? pluginId,
-    _PluginOperationPage page = _PluginOperationPage.installed,
+    PluginOperationPage page = PluginOperationPage.installed,
   }) async {
-    if (_busy ||
-        (pluginId == null
-            ? _installing.isNotEmpty
-            : _installing.contains(pluginId))) {
-      return;
-    }
-    setState(() {
-      if (pluginId == null) {
-        _busyPage = page;
-      } else {
-        _installing.add(pluginId);
-      }
-    });
     try {
-      await action();
+      await _controller.run(action, pluginId: pluginId, page: page);
     } catch (error) {
       if (mounted) {
         unawaited(showHazukiPrompt(context, error.toString(), isError: true));
       }
-    } finally {
-      if (mounted) {
-        setState(() {
-          if (pluginId == null) {
-            _busyPage = null;
-          } else {
-            _installing.remove(pluginId);
-          }
-        });
-      }
     }
+  }
+
+  void _onChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onChanged);
+    _controller.dispose();
+    super.dispose();
   }
 
   Future<void> _import() async {
@@ -108,16 +87,12 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
   }
 
   Future<void> _setEnabled(String id, bool enabled) async {
-    if (_hasOperations || _pendingEnabled.containsKey(id)) return;
-    setState(() => _pendingEnabled[id] = enabled);
     try {
-      await _manager.setEnabled(id, enabled);
+      await _controller.setEnabled(id, enabled);
     } catch (error) {
       if (mounted) {
         unawaited(showHazukiPrompt(context, error.toString(), isError: true));
       }
-    } finally {
-      if (mounted) setState(() => _pendingEnabled.remove(id));
     }
   }
 
@@ -256,7 +231,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
         canCopyRepository: plugin.repository != null,
       ),
     );
-    if (action == null || !mounted || _hasOperations) return;
+    if (action == null || !mounted || _controller.hasOperations) return;
     switch (action) {
       case _PluginSheetAction.settings:
         unawaited(
@@ -295,7 +270,9 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
               animation: _manager,
               builder: (context, _) => IconButton(
                 tooltip: s.pluginsImportLocal,
-                onPressed: _hasOperations ? null : () => _run(_import),
+                onPressed: _controller.hasOperations
+                    ? null
+                    : () => _run(_import),
                 icon: const Icon(Icons.note_add_outlined),
               ),
             ),
@@ -329,38 +306,15 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     );
   }
 
-  List<InstalledSourcePlugin> _sortedInstalled() {
-    final installed = _manager.installed;
-    final order = _sortOrder;
-    if (order == null) return installed;
-    final byId = {for (final plugin in installed) plugin.manifest.id: plugin};
-    return [
-      for (final id in order) ?byId[id],
-      // 排序期间新安装的插件追加到末尾。
-      for (final plugin in installed)
-        if (!order.contains(plugin.manifest.id)) plugin,
-    ];
-  }
-
   Future<void> _movePlugin(int oldIndex, int newIndex) async {
-    final ids = [for (final plugin in _sortedInstalled()) plugin.manifest.id];
-    if (oldIndex == newIndex) return;
-    ids.insert(newIndex, ids.removeAt(oldIndex));
-    setState(() => _sortOrder = ids);
     try {
-      await _manager.reorder(ids);
+      await _controller.movePlugin(oldIndex, newIndex);
     } catch (error) {
-      if (!mounted) return;
-      // 写入失败时管理器已回滚，丢弃乐观顺序以显示真实顺序。
-      setState(() => _sortOrder = null);
-      unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+      if (mounted) {
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+      }
     }
   }
-
-  void _setSorting(bool sorting) => setState(() {
-    _sorting = sorting;
-    _sortOrder = null;
-  });
 
   Widget _installedTab(BuildContext context) => AnimatedSwitcher(
     duration: const Duration(milliseconds: 260),
@@ -373,7 +327,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
         child: child,
       ),
     ),
-    child: _sorting && _manager.installed.length > 1
+    child: _controller.sorting && _manager.installed.length > 1
         ? _installedSortList(context)
         : _installedList(context),
   );
@@ -388,7 +342,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
       children: [
         // 平滑收起进度条，避免卸载完成时列表上跳打断卡片退场动画。
         _PluginRevealSection(
-          visible: _busyPage == _PluginOperationPage.installed,
+          visible: _controller.busyPage == PluginOperationPage.installed,
           child: const Padding(
             padding: EdgeInsets.only(bottom: 16),
             child: LinearProgressIndicator(),
@@ -408,7 +362,9 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: _hasOperations ? null : () => _setSorting(true),
+                  onPressed: _controller.hasOperations
+                      ? null
+                      : () => _controller.setSorting(true),
                   icon: const Icon(Icons.swap_vert, size: 18),
                   label: Text(s.pluginsSort),
                 ),
@@ -437,7 +393,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     final s = l10n(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final plugins = _sortedInstalled();
+    final plugins = _controller.sortedInstalled;
     return ReorderableListView.builder(
       key: const PageStorageKey('installed-plugins-sort'),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -456,7 +412,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
             ),
             const SizedBox(width: 12),
             FilledButton.tonal(
-              onPressed: () => _setSorting(false),
+              onPressed: () => _controller.setSorting(false),
               child: Text(s.pluginsSortDone),
             ),
           ],
@@ -652,12 +608,12 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final id = plugin.manifest.id;
-    final enabled = _pendingEnabled[id] ?? plugin.enabled;
+    final enabled = _controller.enabledFor(plugin);
     final update = _canUpdate(plugin) ? _updateFor(id) : null;
     final error = _manager.errors[id];
     return _PluginSurface(
       child: InkWell(
-        onTap: _hasOperations ? null : () => _showActions(plugin),
+        onTap: _controller.hasOperations ? null : () => _showActions(plugin),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
           child: Column(
@@ -707,7 +663,8 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                     child: Switch(
                       value: enabled,
                       onChanged:
-                          _hasOperations || _pendingEnabled.containsKey(id)
+                          _controller.hasOperations ||
+                              _controller.isChangingEnabled(id)
                           ? null
                           : (value) => _setEnabled(id, value),
                     ),
@@ -737,7 +694,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                     tooltip: MaterialLocalizations.of(
                       context,
                     ).moreButtonTooltip,
-                    onPressed: _hasOperations
+                    onPressed: _controller.hasOperations
                         ? null
                         : () => _showActions(plugin),
                     icon: const Icon(Icons.more_horiz),
@@ -755,7 +712,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                         backgroundColor: scheme.tertiary,
                         foregroundColor: scheme.onTertiary,
                       ),
-                      onPressed: _hasOperations
+                      onPressed: _controller.hasOperations
                           ? null
                           : () => _run(() => _update(id)),
                       icon: const Icon(Icons.download_rounded, size: 18),
@@ -821,13 +778,13 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
             _PluginRefreshButton(
               tooltip: s.pluginsRefresh,
               refreshing:
-                  _busyPage == _PluginOperationPage.available ||
+                  _controller.busyPage == PluginOperationPage.available ||
                   _manager.checkingIndex,
-              onPressed: _hasOperations || _manager.checkingIndex
+              onPressed: _controller.hasOperations || _manager.checkingIndex
                   ? null
                   : () => _run(
                       () => _manager.refreshRepository(repository),
-                      page: _PluginOperationPage.available,
+                      page: PluginOperationPage.available,
                     ),
             ),
           ],
@@ -846,7 +803,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     final scheme = theme.colorScheme;
     final installed = _manager.pluginFor(entry.id);
     final hasUpdate = installed != null && _hasUpdate(entry.id);
-    final installing = _installing.contains(entry.id);
+    final installing = _controller.isInstalling(entry.id);
     final info = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -890,7 +847,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
             )
           : null,
       onPressed:
-          _busy ||
+          _controller.busyPage != null ||
               installing ||
               _manager.checkingIndex ||
               (installed != null && !hasUpdate)
