@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/services/source/plugins/source_favorite_menu.dart';
+import 'package:hazuki/services/source/plugins/source_menu.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_models.dart';
 
 SourcePluginManifest _manifest(Object? menu) => SourcePluginManifest.fromJson({
@@ -24,7 +24,7 @@ void main() {
       },
     ];
     final manifest = _manifest(menu);
-    final parsed = SourceFavoriteMenuEntry.parseList(
+    final parsed = SourceMenuEntry.parseList(
       manifest.presentation['favoriteMenu'],
     );
     expect(parsed.single.children.map((e) => e.order), ['dd', 'da', null]);
@@ -35,11 +35,11 @@ void main() {
       ).presentation['favoriteMenu'],
       menu,
     );
-    final copied = SourceFavoriteMenuEntry.parseList(menu);
+    final copied = SourceMenuEntry.parseList(menu);
     expect(parsed, copied);
     expect(parsed.single.hashCode, copied.single.hashCode);
-    expect(SourceFavoriteMenuEntry.parseList(null), isEmpty);
-    expect(SourceFavoriteMenuEntry.parseList([]), isEmpty);
+    expect(SourceMenuEntry.parseList(null), isEmpty);
+    expect(SourceMenuEntry.parseList([]), isEmpty);
   });
 
   test(

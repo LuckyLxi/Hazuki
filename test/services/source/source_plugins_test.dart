@@ -111,7 +111,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
         }}});''',
         ),
       );
-      final gateway = assembly.gateways.home as SourceInteractiveAccountGateway;
+      final gateway = assembly.gateways.home;
       expect((await gateway.loadLoginMethods()).single.id, 'sms');
       final before = assembly.testing.handleFor('independent');
       expect(before.facade.loadSourceData('independent', 'initRan'), isNull);

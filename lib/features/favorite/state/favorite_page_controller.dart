@@ -1,6 +1,6 @@
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 import 'dart:async';
-import 'package:hazuki/services/source/plugins/source_favorite_menu.dart';
+import 'package:hazuki/services/source/plugins/source_menu.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -148,7 +148,7 @@ class FavoritePageController extends ChangeNotifier {
         supportFavoriteFolderAdd: _cloudFlow.supportsFolderAdd,
         favoriteSortOrders: _favoriteSortOrders,
         sourceKey: _activeSourceKey,
-        favoriteMenu: SourceFavoriteMenuEntry.forLocation(
+        favoriteMenu: SourceMenuEntry.forLocation(
           _presentationFor(_activeSourceKey),
           'favorites.cloud.sort',
         ),

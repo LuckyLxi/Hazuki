@@ -10,7 +10,7 @@ import 'package:hazuki/services/manga_download/manga_download_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'downloaded_comic_detail_widgets.dart';
 import 'downloads_cover_widgets.dart';
-import '../support/downloads_shared.dart';
+import 'package:hazuki/shared/downloads/downloaded_comic_reader_page_builder.dart';
 
 class DownloadedComicDetailPage extends StatelessWidget {
   const DownloadedComicDetailPage({

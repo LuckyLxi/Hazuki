@@ -67,7 +67,7 @@ class SourceRuntimeCoordinator {
     required VoidCallback onSourceReady,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    await _bootstrapGateway.prepareSources();
+    await _bootstrapGateway.loadActiveSourcePreference();
     if (!_bootstrapGateway.hasActiveSource) {
       if (isMounted()) {
         onBootstrapStateChanged(const SourceBootstrapState.idle());
@@ -75,7 +75,7 @@ class SourceRuntimeCoordinator {
       }
       return;
     }
-    final hasLocalSource = await _bootstrapGateway.hasLocalJmSourceFile();
+    final hasLocalSource = await _bootstrapGateway.hasLocalActiveSourceFile();
     if (!isMounted()) {
       return;
     }

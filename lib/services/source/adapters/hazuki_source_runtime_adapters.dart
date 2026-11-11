@@ -80,8 +80,6 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   List<SourceCatalogEntry> get allowedSources =>
       runtime.runtimeRegistry.allowedSources;
   @override
-  Future<void> prepareSources() => runtime.loadActiveSourcePreference();
-  @override
   Future<void> loadActiveSourcePreference() =>
       runtime.loadActiveSourcePreference();
   @override
@@ -122,7 +120,7 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
     SourceTaskOrigin? taskOrigin,
   }) => _dailyCheckIn.perform(taskOrigin: taskOrigin);
   @override
-  Future<bool> hasLocalJmSourceFile() =>
+  Future<bool> hasLocalActiveSourceFile() =>
       _scriptEditing.hasLocalActiveSourceFile();
   @override
   Future<bool> hasLocalSourceFile(String sourceKey) =>

@@ -5,7 +5,8 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/announcements/announcement.dart';
 import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/shared/downloads/downloaded_comic_reader_page_builder.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
@@ -28,8 +29,12 @@ class HomeServices {
     required this.announcementService,
     required this.downloadStatus,
     required this.showAnnouncement,
+    required this.sourceUi,
     this.sourcePlugins,
   });
+
+  /// 插件交互队列由应用层注入，功能层不直接取进程级静态实例。
+  final SourceUiService sourceUi;
 
   final SourceHomeGateway sourceService;
   final SourcePluginGateway? sourcePlugins;
@@ -63,9 +68,6 @@ typedef HomeSearchPageBuilder =
 
 typedef HomeSearchRouteBuilder =
     Route<T> Function<T>({required WidgetBuilder builder});
-
-typedef HomeDownloadedComicReaderPageBuilder =
-    Widget Function(DownloadedMangaComic comic, DownloadedMangaChapter chapter);
 
 typedef HomeReaderPageBuilder =
     Widget Function({
@@ -127,7 +129,7 @@ typedef HomeRankingPageBuilder =
 
 typedef HomeDownloadsPageBuilder =
     Widget Function({
-      required HomeDownloadedComicReaderPageBuilder readerPageBuilder,
+      required DownloadedComicReaderPageBuilder readerPageBuilder,
     });
 
 typedef HomeSettingsPageBuilder =

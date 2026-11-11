@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/source/plugins/source_favorite_menu.dart';
+import 'package:hazuki/services/source/plugins/source_menu.dart';
 
 class FavoriteAppBarActionsState {
   const FavoriteAppBarActionsState({
@@ -21,7 +21,7 @@ class FavoriteAppBarActionsState {
   final String currentSortOrder;
   final List<String> sortOrders;
   final Map<String, dynamic> sortLabels;
-  final List<SourceFavoriteMenuEntry> menu;
+  final List<SourceMenuEntry> menu;
   final String sourceKey;
   final bool showModeToggle;
   final FavoritePageMode currentMode;

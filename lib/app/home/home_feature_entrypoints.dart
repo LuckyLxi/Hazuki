@@ -38,6 +38,7 @@ import 'package:hazuki/services/password_lock_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/search_history_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
@@ -76,6 +77,7 @@ HomeServices buildHazukiHomeServices() {
     announcementService: sl<AnnouncementController>(),
     downloadStatus: _MangaDownloadStatusAdapter(sl<MangaDownloadService>()),
     showAnnouncement: showAnnouncementDialog,
+    sourceUi: SourceUiService.instance,
     taskControl: sl<SourceTaskControlGateway>(),
   );
 }

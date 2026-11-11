@@ -8,14 +8,14 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
-import 'package:hazuki/services/source/plugins/source_favorite_menu.dart';
+import 'package:hazuki/services/source/plugins/source_menu.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_models.dart';
 import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _Gateway extends Mock implements SourcePluginGateway {}
 
-final _menu = SourceFavoriteMenuEntry.parseList([
+final _menu = SourceMenuEntry.parseList([
   {
     'id': 'saved',
     'title': {'zh': '收藏时间', 'en': 'Saved'},
@@ -242,7 +242,7 @@ void main() {
       await _pumpMenu(tester, gateway: gateway, mode: FavoritePageMode.local);
       expect(find.byType(HazukiFrostedMenuButton<String>), findsOneWidget);
       expect(
-        find.byType(HazukiFrostedMenuButton<SourceFavoriteMenuEntry>),
+        find.byType(HazukiFrostedMenuButton<SourceMenuEntry>),
         findsNothing,
       );
       await _pumpMenu(tester, gateway: gateway, logged: false);

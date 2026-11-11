@@ -21,6 +21,7 @@ class HomeProfileFlow {
     required this.profileController,
     required this.sourceService,
     required this.imageService,
+    required this.sourceUi,
     this.imageActions = const ImageActionsService(),
     required this.syncUserProfile,
   });
@@ -31,6 +32,7 @@ class HomeProfileFlow {
   final HomeProfileController profileController;
   final SourceHomeGateway sourceService;
   final SourceImageGateway imageService;
+  final SourceUiService sourceUi;
   final ImageActionsService imageActions;
   final Future<void> Function() syncUserProfile;
 
@@ -92,11 +94,9 @@ class HomeProfileFlow {
     try {
       final service = sourceService;
       final selectedSource = service.activeSourceKey;
-      final methods = service is SourceInteractiveAccountGateway
-          ? await (service as SourceInteractiveAccountGateway).loadLoginMethods(
-              taskOrigin: loginTasks.origin(),
-            )
-          : <SourceLoginMethod>[];
+      final methods = await service.loadLoginMethods(
+        taskOrigin: loginTasks.origin(),
+      );
       if (!isMounted() ||
           !context.mounted ||
           service.activeSourceKey != selectedSource) {
@@ -123,7 +123,7 @@ class HomeProfileFlow {
             password,
             taskOrigin: taskOrigin,
             loginOverride: ({required account, required password}) =>
-                (service as SourceInteractiveAccountGateway).loginInteractive(
+                service.loginInteractive(
                   account: account,
                   password: password,
                   method: method,
@@ -165,7 +165,7 @@ class HomeProfileFlow {
     }
 
     try {
-      await SourceUiService.instance.run(sourceService.logout);
+      await sourceUi.run(sourceService.logout);
     } catch (error) {
       if (isSourceUiCancellation(error) || isSourceTaskCancellation(error)) {
         return;

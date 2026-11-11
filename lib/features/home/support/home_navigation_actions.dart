@@ -8,6 +8,7 @@ import 'package:hazuki/features/home/support/home_feature_contracts.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/downloads/downloaded_comic_reader_page_builder.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
@@ -36,7 +37,7 @@ class HomeNavigationActions {
   final HomeFeatureEntrypoints featureEntrypoints;
   final bool useLegacyRankingSection;
   final ComicDetailPageBuilder comicDetailPageBuilder;
-  final HomeDownloadedComicReaderPageBuilder downloadsReaderPageBuilder;
+  final DownloadedComicReaderPageBuilder downloadsReaderPageBuilder;
 
   Widget buildComicDetailPage(ExploreComic comic, String heroTag) {
     return comicDetailPageBuilder(comic, heroTag);

@@ -2,6 +2,7 @@ import '../models/source_task.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
+import '../account/source_login_interaction.dart';
 import '../models/source_contract_models.dart';
 
 abstract interface class SourceAccountGateway implements Listenable {
@@ -32,7 +33,10 @@ abstract interface class SourceLocalizationGateway {
 }
 
 abstract interface class SourceHomeGateway
-    implements Listenable, SourceAccountGateway {
+    implements
+        Listenable,
+        SourceAccountGateway,
+        SourceInteractiveAccountGateway {
   String? get cachedAvatarUrl;
   String? get sourceRevision;
   bool get supportsLegacyRanking;
@@ -107,13 +111,12 @@ abstract interface class SourceRuntimeGateway implements Listenable {
   SourceRuntimeState get runtimeState;
   List<SourceCatalogEntry> get allowedSources;
 
-  Future<void> prepareSources();
   Future<void> loadActiveSourcePreference();
   Future<void> init({void Function(int received, int total)? onProgress});
   Future<void> ensureInitialized({String? sourceKey});
   Future<void> activateSource(String sourceKey);
   Future<void> prewarmInBackground();
-  Future<bool> hasLocalJmSourceFile();
+  Future<bool> hasLocalActiveSourceFile();
   Future<bool> hasLocalSourceFile(String sourceKey);
   Future<void> downloadSourceFile(
     String sourceKey, {

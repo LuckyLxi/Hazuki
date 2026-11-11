@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 
 import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/features/home/support/home_profile_flow.dart';
@@ -21,7 +22,9 @@ class HomeCoordinator extends ChangeNotifier {
     required SourceImageGateway imageService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
     required AnnouncementController announcementService,
+    required SourceUiService sourceUi,
   }) : _taskControl = taskControl,
+       _sourceUi = sourceUi,
        _sourceService = sourceService,
        _sourceSwitchService = sourceSwitchService,
        _imageService = imageService,
@@ -31,7 +34,10 @@ class HomeCoordinator extends ChangeNotifier {
          sourceService: sourceService,
          taskControl: taskControl,
        ),
-       _shellController = HomeShellController(initialTabIndex: initialTabIndex),
+       _shellController = HomeShellController(
+         initialTabIndex: initialTabIndex,
+         sourceUi: sourceUi,
+       ),
        scaffoldKey = GlobalKey<ScaffoldState>(),
        favoriteActionsBinding = FavoritePageActionsBinding() {
     _lastSourceKey = _sourceService.activeSourceKey;
@@ -46,6 +52,7 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   final SourceTaskControlGateway _taskControl;
+  final SourceUiService _sourceUi;
   final SourceHomeGateway _sourceService;
   final SourceRuntimeGateway _sourceSwitchService;
   final SourceImageGateway _imageService;
@@ -196,6 +203,7 @@ class HomeCoordinator extends ChangeNotifier {
       profileController: _profileController,
       sourceService: _sourceService,
       imageService: _imageService,
+      sourceUi: _sourceUi,
       syncUserProfile: () => syncUserProfile(context),
     );
   }

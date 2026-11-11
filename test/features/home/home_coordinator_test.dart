@@ -7,6 +7,7 @@ import 'package:hazuki/features/home/state/home_coordinator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -95,6 +96,7 @@ void main() {
           imageService: _Images(),
           dailyRecommendationService: recommendations,
           announcementService: _Announcements(),
+          sourceUi: SourceUiService(),
           taskControl: FakeSourceTaskControl(),
         );
         addTearDown(coordinator.dispose);
@@ -180,6 +182,7 @@ void main() {
         imageService: _Images(),
         dailyRecommendationService: recommendations,
         announcementService: _Announcements(),
+        sourceUi: SourceUiService(),
         taskControl: FakeSourceTaskControl(),
       );
       addTearDown(coordinator.dispose);
@@ -238,6 +241,7 @@ void main() {
         imageService: _Images(),
         dailyRecommendationService: recommendations,
         announcementService: _Announcements(),
+        sourceUi: SourceUiService(),
         taskControl: FakeSourceTaskControl(),
       );
       addTearDown(coordinator.dispose);
