@@ -43,7 +43,15 @@ class _Http implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   for (final outcome in ['submit', 'close', 'returnOnClose', 'leave']) {
     test('foreground comment captcha after HTTP: $outcome', () async {
@@ -57,11 +65,12 @@ void main() {
         download: (_) async => throw StateError('offline'),
       );
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
       final filter = CommentFilterService();
-      final ui = SourceUiService.instance;
+      final ui = sourceUiService;
       addTearDown(() async {
         ui.detach();
         assembly.dispose();
@@ -129,6 +138,7 @@ void main() {
       handle.dio.httpClientAdapter = http;
       await assembly.ensureSourceInitialized('comment_ui');
       final controller = CommentsPageController(
+        sourceUiService: sourceUiService,
         sourceService: assembly.gateways.commentsGateway,
         filterService: filter,
         comicId: 'comic',

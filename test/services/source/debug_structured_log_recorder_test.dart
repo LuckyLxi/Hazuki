@@ -1,16 +1,26 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/logging/app_log_event.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late SourceRuntimeHost host;
 
   setUp(() async {
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'jm.js'),
       ],

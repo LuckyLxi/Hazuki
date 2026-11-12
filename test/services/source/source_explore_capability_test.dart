@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,15 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceScriptEngine engine;
@@ -18,6 +27,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'one', name: 'One', fileName: 'one.js'),
       ],
@@ -28,7 +38,10 @@ void main() {
       isLoggedForSource: (_) => false,
     );
     addTearDown(host.dispose);
-    engine = SourceScriptEngine(pluginId: 'one');
+    engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'one',
+    );
     addTearDown(engine.close);
     final handle = host.activeHandle;
     handle.runtime.engine = engine;
@@ -79,7 +92,7 @@ void main() {
         expect(sections.single.comics.single.id, 'healthy');
         expect(sections.single.comics.single.sourceKey, 'one');
         expect(sections.single.maxPage, 2);
-        expect(host.activeHandle.exploreCache.getCachedSections(), sections);
+        expect(host.activeHandle.cache.getExploreSections(), sections);
       },
     );
   }
@@ -108,7 +121,7 @@ void main() {
     await stopped.timeout(const Duration(seconds: 3));
     await receipt.whenSettled.timeout(const Duration(seconds: 3));
 
-    expect(host.activeHandle.exploreCache.getCachedSections(), isNull);
+    expect(host.activeHandle.cache.getExploreSections(), isNull);
     expect(await engine.evaluate('42'), 42);
   });
 }

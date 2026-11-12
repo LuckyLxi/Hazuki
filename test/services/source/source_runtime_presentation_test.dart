@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
@@ -22,12 +23,21 @@ class _Recovery extends Mock implements SourceRuntimeRecoveryOperations {}
 
 class _ComicDetails extends Fake implements SourceComicDetailsCapability {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late HazukiSourceSearchAdapter source;
   setUp(() {
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'custom',
@@ -77,6 +87,7 @@ void main() {
     'page choices and labels share runtime declarations without losing installed fields',
     () async {
       final controller = SearchResultsController(
+        sourceUiService: sourceUiService,
         taskControl: FakeSourceTaskControl(),
         initialOrder: '',
         sourceService: source,
@@ -108,6 +119,7 @@ void main() {
         final newResult = Completer<SearchComicsResult>();
         final requests = <(String, int)>[];
         final controller = SearchResultsController(
+          sourceUiService: sourceUiService,
           taskControl: FakeSourceTaskControl(),
           initialOrder: '',
           sourceService: source,
@@ -169,6 +181,7 @@ void main() {
   test('runtime sort changes preserve an active direct ID lookup', () async {
     final requests = <String>[];
     final controller = SearchResultsController(
+      sourceUiService: sourceUiService,
       taskControl: FakeSourceTaskControl(),
       initialOrder: '',
       sourceService: source,
@@ -217,6 +230,7 @@ void main() {
         final requests = <(String, String)>[];
         final targetSourceKey = sourceKey;
         final controller = AggregateSearchResultsController.withLoader(
+          sourceUiService: sourceUiService,
           taskControl: FakeSourceTaskControl(),
           sourceService: source,
           loader:

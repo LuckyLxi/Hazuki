@@ -257,6 +257,7 @@ class SourceCloudReadingCapability extends ChangeNotifier
       if (pending == null || !pending.available) {
         late final SourceSharedRequest<List<ExploreComic>> created;
         created = SourceSharedRequest<List<ExploreComic>>(
+          sourceUiService: host.sourceUiService,
           pluginId: sourceKey,
           method: 'cloud.history.producer',
           drainOperationOnStop: true,

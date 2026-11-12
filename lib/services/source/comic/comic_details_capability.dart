@@ -23,7 +23,8 @@ class SourceComicDetailsCapability {
   SourceComicDetailsCapability({
     required SourceRuntimeHost runtimeHost,
     required SourceComicDetailsCache cache,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
     required ComicDetailsTextTranslator translateSourceText,
   }) : _runtimeHost = runtimeHost,
        _cache = cache,
@@ -32,7 +33,8 @@ class SourceComicDetailsCapability {
 
   final SourceRuntimeHost _runtimeHost;
   final SourceComicDetailsCache _cache;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
   final SourceComicDetailsParser _parser;
   final SourceComicDetailsRequestTracker _requestTracker =
       SourceComicDetailsRequestTracker();
@@ -124,6 +126,7 @@ class SourceComicDetailsCapability {
     final requestToken = _requestTracker.begin(scopedComicKey);
     late final SourceSharedRequest<ComicDetailsData> request;
     request = SourceSharedRequest<ComicDetailsData>(
+      sourceUiService: _runtimeHost.sourceUiService,
       pluginId: resolvedSourceKey,
       method: 'comic.loadInfo',
       operation: (_) => _loadComicDetailsWithRuntimeRecovery(
@@ -309,10 +312,10 @@ class SourceComicDetailsCapability {
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
     _runtimeHost.checkReaderSession(resolvedSourceKey, taskOrigin);
     var handle = _runtimeHost.handleFor(resolvedSourceKey);
-    final callerScope = SourceUiScope.current;
+    final callerScope = _runtimeHost.sourceUiService.currentScope;
     final caller = callerScope?.controllerOwner;
     final routeOwner =
-        callerScope?.owner ?? SourceUiService.instance.captureOwner?.call();
+        callerScope?.owner ?? _runtimeHost.sourceUiService.captureOwner?.call();
     for (var attempt = 0; attempt < 2; attempt++) {
       final facade = handle.facade;
       try {
@@ -331,7 +334,7 @@ class SourceComicDetailsCapability {
           sensitiveValues: [comicId, epId],
         );
         // Attempt scopes retire independently of the caller's reading scope.
-        final images = await SourceUiService.instance.run(
+        final images = await _runtimeHost.sourceUiService.run(
           run,
           inheritCurrent: false,
           abortOnScopeCancellation: false,
@@ -481,7 +484,7 @@ class SourceComicDetailsCapability {
 
       final result = await _reloginCoordinator.runWithReloginRetry(
         runAction,
-        context: SourceFacadeReloginContext(facade),
+        context: SourceRuntimeReloginContext(operationContext.resource),
         checkActive: operationContext.checkActive,
       );
 

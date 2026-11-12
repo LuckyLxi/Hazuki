@@ -300,6 +300,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   );
   late final ReaderImagePipelineController _imagePipelineController =
       ReaderImagePipelineController(
+        sourceUiService: widget.page.dependencies.sourceUiService,
         runtimeState: _runtimeState,
         pipelineState: _imagePipelineState,
         diagnosticsState: _diagnosticsState,

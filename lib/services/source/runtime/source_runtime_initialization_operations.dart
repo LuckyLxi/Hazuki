@@ -41,10 +41,10 @@ class SourceRuntimeInitializationOperations {
   Future<void> _prewarmInBackground() async {
     if (!_runtimeHost.hasActiveSource) return;
     final handle = _runtimeHost.activeHandle;
-    if (handle.facade.initFuture == null && _isHandleInitialized(handle)) {
+    if (handle.runtime.initFuture == null && _isHandleInitialized(handle)) {
       return;
     }
-    final pending = handle.facade.initFuture;
+    final pending = handle.runtime.initFuture;
     if (pending != null) {
       await _joinInitialization(handle, pending);
       return;
@@ -78,7 +78,7 @@ class SourceRuntimeInitializationOperations {
     required bool prewarm,
   }) async {
     final facade = handle.facade;
-    final inFlight = facade.initFuture;
+    final inFlight = facade.runtime.initFuture;
     if (inFlight != null) {
       await _joinInitialization(handle, inFlight);
       return;
@@ -88,6 +88,7 @@ class SourceRuntimeInitializationOperations {
     // not inherit the first search's cancellation or 25-second budget.
     late final SourceSharedRequest<void> request;
     request = SourceSharedRequest<void>(
+      sourceUiService: handle.sourceUiService,
       pluginId: handle.sourceKey,
       method: 'runtime.initialize',
       operation: (_) => handle.runOperation(
@@ -105,12 +106,12 @@ class SourceRuntimeInitializationOperations {
     );
     _initializations[handle] = request;
     final future = request.subscribe();
-    facade.initFuture = future;
+    facade.runtime.initFuture = future;
     try {
       await future;
     } finally {
-      if (identical(facade.initFuture, future)) {
-        facade.initFuture = null;
+      if (identical(facade.runtime.initFuture, future)) {
+        facade.runtime.initFuture = null;
       }
     }
   }
@@ -119,29 +120,29 @@ class SourceRuntimeInitializationOperations {
     // 崩溃循环锁存后不再按需重建，等待显式手动重试。
     if (handle.runtimeFault case final fault?) throw fault;
     final facade = handle.facade;
-    if (handle.facade.initFuture == null && _isHandleInitialized(handle)) {
+    if (handle.runtime.initFuture == null && _isHandleInitialized(handle)) {
       return;
     }
 
-    final inFlight = facade.initFuture;
+    final inFlight = facade.runtime.initFuture;
     if (inFlight == null) {
       await _initHandle(handle, prewarm: false);
     } else {
       await _joinInitialization(handle, inFlight);
     }
 
-    if (handle.facade.initFuture == null && _isHandleInitialized(handle)) {
+    if (handle.runtime.initFuture == null && _isHandleInitialized(handle)) {
       return;
     }
 
-    final scope = SourceUiScope.current;
+    final scope = handle.sourceUiService.currentScope;
     if (handle.isDisposalRequested) {
       throw const SourceUiCancelled('runtimeDisposed');
     }
     if (scope?.reason != null) {
       throw scope!.failure ?? SourceUiCancelled(scope.reason!);
     }
-    facade.initFuture = null;
+    facade.runtime.initFuture = null;
     await _initHandle(handle, prewarm: false);
 
     if (!_isHandleInitialized(handle)) {
@@ -177,7 +178,7 @@ class SourceRuntimeInitializationOperations {
           prefs.getBool(SourcePrefsKeys.softwareLogCaptureEnabled) ?? false;
       _jsBridgeCookieCapability.configureDioCookieBridge(handle);
       await handle.imageCache.init();
-      await handle.exploreCache.init();
+      await handle.cache.initializeExploreCache();
       _runtimeStateController.setBusy(
         facade,
         busyPhase,

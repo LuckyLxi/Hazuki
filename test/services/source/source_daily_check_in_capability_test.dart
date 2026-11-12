@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/account/source_daily_check_in_capability.dart';
 import 'package:hazuki/services/source/account/source_relogin_coordinator.dart';
@@ -5,7 +6,15 @@ import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   test('normalizes daily check-in dates and data', () {
     expect(
       SourceDailyCheckInCapability.dailyCheckInDateTag(
@@ -37,6 +46,7 @@ void main() {
     () async {
       final capability = SourceDailyCheckInCapability(
         runtimeHost: SourceRuntimeHost(
+          sourceUiService: sourceUiService,
           catalog: const [
             SourceCatalogEntry(
               key: 'copy_manga',

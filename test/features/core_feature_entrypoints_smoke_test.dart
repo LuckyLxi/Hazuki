@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 import '../support/fake_source_task_control.dart';
 import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
@@ -58,6 +59,7 @@ final ReaderCommentsWidgetBuilder _buildReaderComments =
 
 ReaderDependencies _readerDependencies() {
   return ReaderDependencies(
+    sourceUiService: sourceUiService,
     sourceReader: sl<SourceReaderGateway>(),
     sourceSettings: sl<SourceSettingsGateway>(),
     readingProgressService: sl<ReadingProgressService>(),
@@ -67,6 +69,7 @@ ReaderDependencies _readerDependencies() {
 
 ComicDetailDependencies _comicDetailDependencies() {
   return ComicDetailDependencies(
+    sourceUiService: sourceUiService,
     source: sl<SourceComicDetailGateway>(),
     localFavorites: sl<LocalFavoritesRepository>(),
     downloader: sl<MangaDownloadService>(),
@@ -77,7 +80,15 @@ ComicDetailDependencies _comicDetailDependencies() {
   );
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   test('reader entrypoints preserve online defaults and offline arguments', () {
     registerServices();
     final entrypoints = buildHazukiHomeFeatureEntrypoints();

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,7 +7,15 @@ import 'package:hazuki/features/favorite/state/favorite_page_state.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('FavoriteFolderSelectionResult', () {
@@ -141,6 +150,7 @@ void main() {
     test('passes details sourceKey to local folder operations', () async {
       final repository = _RecordingFavoriteFoldersRepository();
       final viewModel = FavoriteFoldersViewModel(
+        sourceUiService: sourceUiService,
         repository: repository,
         details: _comicDetails,
         cloudFavoriteOverride: null,
@@ -174,6 +184,7 @@ void main() {
 
       final repository = _RecordingFavoriteFoldersRepository();
       final viewModel = FavoriteFoldersViewModel(
+        sourceUiService: sourceUiService,
         repository: repository,
         details: _comicDetails,
         cloudFavoriteOverride: null,

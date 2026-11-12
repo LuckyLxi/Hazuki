@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
@@ -22,7 +23,15 @@ ExploreComic _comic(String id) =>
 
 Future<void> _settle() => Future<void>.delayed(Duration.zero);
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _Source source;
   late _Local local;
   late _Preferences preferences;
@@ -123,6 +132,7 @@ void main() {
       ),
     ).thenAnswer((_) async => FavoriteComicsResult.success([_comic('local')]));
     controller = FavoritePageController(
+      sourceUiService: sourceUiService,
       presentationFor: (key) => {
         'refreshCloudFavorites': true,
         'favoriteDefaultOrder': 'mr',

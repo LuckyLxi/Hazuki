@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 import '../../services/source/runtime/source_runtime_assembly.dart';
 import '../../services/source/plugins/source_plugin_manager.dart';
 import '../../services/source/source_capabilities.dart';
+import '../../services/source/interaction/source_ui_service.dart';
 
 /// Registers the source runtime and its focused gateway contracts.
 ///
@@ -10,9 +11,17 @@ import '../../services/source/source_capabilities.dart';
 /// application's global service locator and makes the registration graph
 /// reusable in isolated tests.
 void registerSourceServices(GetIt services) {
+  if (!services.isRegistered<SourceUiService>()) {
+    services.registerLazySingleton<SourceUiService>(
+      services.isRegistered<SourceRuntimeAssembly>()
+          ? () => services<SourceRuntimeAssembly>().sourceUiService
+          : SourceUiService.new,
+      dispose: (service) => service.detach(),
+    );
+  }
   if (!services.isRegistered<SourceRuntimeAssembly>()) {
     services.registerLazySingleton<SourceRuntimeAssembly>(
-      SourceRuntimeAssembly.new,
+      () => SourceRuntimeAssembly(sourceUiService: services<SourceUiService>()),
     );
   }
   if (!services.isRegistered<SourceRuntimeRegistry>()) {

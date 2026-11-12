@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
@@ -16,10 +17,21 @@ import 'package:hazuki/services/source/runtime/source_script_worker.dart';
 import 'package:hazuki/services/source/models/source_script_execution.dart';
 import 'package:quickjs_engine/quickjs_engine.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   SourceScriptEngine engine({int timeout = 5000}) {
-    final result = SourceScriptEngine(timeout: timeout);
+    final result = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      timeout: timeout,
+    );
     addTearDown(result.close);
     return result;
   }
@@ -285,6 +297,7 @@ void main() {
     'admitted operations retain their engine across awaits and source retirement',
     () async {
       final handle = SourceRuntimeHandle(
+        sourceUiService: sourceUiService,
         sourceKey: 'test',
         secureStorage: MemorySourceSecureSessionStorage(),
         ensureInitialized: (_) async {},
@@ -314,6 +327,7 @@ void main() {
     () async {
       SharedPreferences.setMockInitialValues({});
       final handle = SourceRuntimeHandle(
+        sourceUiService: sourceUiService,
         sourceKey: 'test',
         secureStorage: MemorySourceSecureSessionStorage(),
         ensureInitialized: (_) async {},

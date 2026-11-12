@@ -10,7 +10,15 @@ import 'package:hazuki/services/source/runtime/source_shared_request.dart';
 import 'package:hazuki/services/source/runtime/source_task_registry.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceTaskRegistry registry;
   setUp(() {
@@ -141,7 +149,7 @@ void main() {
   test(
     'host cancellation interrupts CPU work and leaves the same engine usable',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final started = Completer<void>();
       engine.setMessageHandler((_) {
@@ -179,7 +187,7 @@ void main() {
   test(
     'a successful task retains resource ownership and drains started writes',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final response = Completer<int>();
       final started = Completer<SourceHostCallContext>();
@@ -231,7 +239,7 @@ void main() {
   test(
     'native shared producers survive cancellation of one business task',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final response = Completer<int>();
       final started = Completer<SourceHostCallContext>();
@@ -292,7 +300,7 @@ void main() {
     final response = Completer<int>();
     final lifetime = SourceTaskCancellation();
     late SourceUiScope scope;
-    final pending = SourceUiService.instance.run(
+    final pending = sourceUiService.run(
       () => registry.run(
         pluginId: 'one',
         method: 'search.load',
@@ -396,6 +404,7 @@ void main() {
       final requests = [
         for (var i = 0; i < 2; i++)
           SourceSharedRequest<int>(
+            sourceUiService: sourceUiService,
             pluginId: 'one',
             method: 'comic.loadInfo',
             onUnavailable: () {},
@@ -408,7 +417,7 @@ void main() {
           ),
       ];
       late SourceUiScope subscriberScope;
-      final pending = SourceUiService.instance.run(
+      final pending = sourceUiService.run(
         () => registry.run(
           pluginId: 'one',
           method: 'search.directId',

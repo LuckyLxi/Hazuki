@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/foundation.dart';
@@ -12,7 +13,15 @@ import '../../support/test_service_locator.dart';
 
 class _Source extends Mock implements SourceSearchGateway {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     await ensureTestServiceLocator();
@@ -20,6 +29,7 @@ void main() {
 
   test('forwards source service changes until disposed', () {
     final controller = SearchResultsController(
+      sourceUiService: sourceUiService,
       taskControl: FakeSourceTaskControl(),
       initialOrder: 'mr',
       sourceService: sl<SourceSearchGateway>(),
@@ -73,6 +83,7 @@ void main() {
       });
       final requests = <String>[];
       final controller = SearchResultsController(
+        sourceUiService: sourceUiService,
         taskControl: FakeSourceTaskControl(),
         initialOrder: 'mr',
         sourceService: source,
@@ -125,6 +136,7 @@ void main() {
       );
       var calls = 0;
       final controller = SearchResultsController(
+        sourceUiService: sourceUiService,
         taskControl: FakeSourceTaskControl(),
         initialOrder: 'mr',
         sourceService: source,

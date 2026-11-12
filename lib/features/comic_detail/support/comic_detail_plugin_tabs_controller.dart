@@ -27,6 +27,7 @@ class ComicDetailPluginTabState {
 /// 管理插件声明的详情页标签页：打开详情时并行预取，各标签页独立失败与重试。
 class ComicDetailPluginTabsController extends ChangeNotifier {
   ComicDetailPluginTabsController({
+    required this.sourceUiService,
     required Future<List<SourceDetailTabBlock>> Function({
       required String comicId,
       required String tabId,
@@ -45,7 +46,8 @@ class ComicDetailPluginTabsController extends ChangeNotifier {
   final String _comicId;
   final List<SourceDetailTab> tabs;
 
-  final _sourceUi = SourceUiOwner();
+  final SourceUiService sourceUiService;
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   final Map<String, ComicDetailPluginTabState> _states = {};
   final Map<String, int> _requestIds = {};
   bool _disposed = false;

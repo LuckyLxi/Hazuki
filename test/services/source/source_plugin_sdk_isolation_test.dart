@@ -1,10 +1,19 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/runtime/source_js_bridge_cookie_capability.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_handle.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
   test(
@@ -12,6 +21,7 @@ void main() {
     () async {
       final storage = MemorySourceSecureSessionStorage();
       SourceRuntimeHandle create(String id) => SourceRuntimeHandle(
+        sourceUiService: sourceUiService,
         sourceKey: id,
         secureStorage: storage,
         ensureInitialized: (_) async {},

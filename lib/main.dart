@@ -144,6 +144,7 @@ class _HazukiAppState extends State<HazukiApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _pluginDialogPresenter = SourcePluginDialogPresenter(
+      sourceUiService: sl<SourceUiService>(),
       _navigatorKey,
       comicDetailPageBuilder: _buildRootComicDetailPage,
       searchPageBuilder: (keyword) => _homeFeatureEntrypoints.buildSearchPage(
@@ -210,9 +211,9 @@ class _HazukiAppState extends State<HazukiApp>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
-      SourceUiService.instance.setForeground(false);
+      sl<SourceUiService>().setForeground(false);
     } else if (state == AppLifecycleState.resumed) {
-      SourceUiService.instance.setForeground(true);
+      sl<SourceUiService>().setForeground(true);
     }
     sl<MangaDownloadService>().handleAppLifecycleState(state);
     unawaited(sl<PasswordLockService>().handleAppLifecycleState(state));
@@ -449,6 +450,7 @@ class _HazukiAppState extends State<HazukiApp>
                     gateway: sl<SourceImageGateway>(),
                     sourceListenable: sl<SourceRuntimeGateway>(),
                     child: SourcePresentationScope(
+                      sourceUiService: sl<SourceUiService>(),
                       registry: sl<SourceRuntimeRegistry>(),
                       sourcePlugins: sl<SourcePluginGateway>(),
                       child: WindowsComicDetailPresentationScope(

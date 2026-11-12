@@ -15,8 +15,10 @@ import 'source_cookie_store.dart';
 import 'source_runtime_kernel.dart';
 import 'source_session_store.dart';
 import '../../logging/app_log_store.dart';
+import '../interaction/source_ui_service.dart';
 
 abstract interface class SourceRuntimeHandleView {
+  SourceUiService get sourceUiService;
   String get sourceKey;
   bool get isDisposed;
   SourceCookieStore get cookieStore;
@@ -108,20 +110,9 @@ class HazukiSourceFacade {
 
   bool get softwareLogCaptureEnabled => appLogStore.captureEnabled;
 
-  DateTime? get lastReloginAt => runtime.lastReloginAt;
-  set lastReloginAt(DateTime? value) => runtime.lastReloginAt = value;
-
-  bool get isRefreshingSource => runtime.isRefreshingSource;
-  set isRefreshingSource(bool value) => runtime.isRefreshingSource = value;
-
   SourceRuntimeState get runtimeState => runtime.runtimeState;
-  set runtimeState(SourceRuntimeState value) => runtime.runtimeState = value;
 
   String get statusText => runtime.statusText;
-  set statusText(String value) => runtime.statusText = value;
-
-  Future<void>? get initFuture => runtime.initFuture;
-  set initFuture(Future<void>? value) => runtime.initFuture = value;
 
   void notifyRuntimeStateChanged() {
     _notifyRuntimeStateChanged(sourceKey);

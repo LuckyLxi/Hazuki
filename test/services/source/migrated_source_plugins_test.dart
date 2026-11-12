@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -18,6 +19,7 @@ Future<SourceRuntimeHandle> _loadPlugin(
   _SiteFixtures fixtures,
 ) async {
   final handle = SourceRuntimeHandle(
+    sourceUiService: sourceUiService,
     sourceKey: id,
     secureStorage: MemorySourceSecureSessionStorage(),
     ensureInitialized: (_) async {},
@@ -28,6 +30,7 @@ Future<SourceRuntimeHandle> _loadPlugin(
   final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
   bridge.configureDioCookieBridge(handle);
   final engine = SourceScriptEngine(
+    sourceUiService: sourceUiService,
     timeout: 5000,
     hostPromiseRejectionHandler: (_) {},
   );
@@ -57,7 +60,15 @@ Future<SourceRuntimeHandle> _loadPlugin(
   return handle;
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
   test(

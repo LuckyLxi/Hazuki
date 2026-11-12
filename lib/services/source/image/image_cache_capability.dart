@@ -201,6 +201,7 @@ class ImageCacheCapability {
         if (request == null || !request.available) {
           late final SourceSharedRequest<Uint8List> created;
           created = SourceSharedRequest<Uint8List>(
+            sourceUiService: _facade.handle.sourceUiService,
             pluginId: resolvedSourceKey,
             method: 'image.bytes',
             drainOperationOnStop: true,

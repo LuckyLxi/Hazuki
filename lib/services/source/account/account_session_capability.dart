@@ -6,6 +6,7 @@ import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
 import 'source_login_operations.dart';
 import 'source_login_interaction.dart';
+import '../runtime/source_runtime_handle.dart';
 
 /// Owns account session state and delegates source-specific login workflows.
 class SourceAccountSessionCapability {
@@ -53,14 +54,14 @@ class SourceAccountSessionCapability {
     taskOrigin: taskOrigin,
   );
 
-  Future<void> loginWithFacade(
-    HazukiSourceFacade facade, {
+  Future<void> loginWithHandle(
+    SourceRuntimeHandle handle, {
     required String account,
     required String password,
     SourceTaskOrigin? taskOrigin,
     bool serviceOwned = false,
-  }) => _loginOperations.loginWithFacade(
-    facade,
+  }) => _loginOperations.loginWithHandle(
+    handle,
     account: account,
     password: password,
     taskOrigin: taskOrigin,

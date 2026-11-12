@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 import 'package:hazuki/features/favorite/support/favorite_list_loader.dart';
@@ -54,7 +55,15 @@ Map<String, dynamic> _presentation(String key) => switch (key.trim()) {
   _ => const {},
 };
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   const policy = FavoriteSourcePolicy(presentationFor: _presentation);
 
   test('cloud refresh follows plugin metadata for arbitrary identities', () {
@@ -237,7 +246,11 @@ void main() {
         ),
       ).thenAnswer((_) async => const FavoriteComicsResult.success([]));
       final loader = FavoriteListLoader(
-        cloud: FavoriteCloudFlow(_Source(), FakeSourceTaskControl()),
+        cloud: FavoriteCloudFlow(
+          sourceUiService: sourceUiService,
+          _Source(),
+          FakeSourceTaskControl(),
+        ),
         local: local,
       );
       await loader.load(

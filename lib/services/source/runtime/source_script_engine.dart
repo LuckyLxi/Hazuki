@@ -16,7 +16,10 @@ import '../interaction/source_ui_service.dart';
 
 /// An asynchronous proxy. All QuickJS objects belong exclusively to its worker.
 class SourceScriptEngine {
+  final SourceUiService sourceUiService;
+
   SourceScriptEngine({
+    required this.sourceUiService,
     int timeout = 5000,
     int memoryLimit = 64 * 1024 * 1024,
     this.pluginId = '',
@@ -411,7 +414,7 @@ class SourceScriptEngine {
         !_hostResources.values.any(
           (e) => e.execution.taskId == execution.taskId,
         )) {
-      SourceUiService.instance.releaseExecution(execution, runtimeId);
+      sourceUiService.releaseExecution(execution, runtimeId);
     }
     _notifyExecutionListeners();
   }
@@ -487,7 +490,7 @@ class SourceScriptEngine {
     // Callback cleanup must still run after its owner has cancelled.
     final scope = inspection || kind == 'release'
         ? null
-        : SourceUiScope.current;
+        : sourceUiService.currentScope;
     final waitingTaskId = execution?.taskId;
     if (waitingTaskId != null) {
       _waitingTaskIds.update(
@@ -566,7 +569,7 @@ class SourceScriptEngine {
     // Retain before dispatch: the caller can finish before the worker starts.
     // Callback commands inherit their original execution inside the worker.
     if (kind != 'callback') {
-      SourceUiService.instance.retainExecution(context, runtimeId);
+      sourceUiService.retainExecution(context, runtimeId);
     }
     _worker!.send({
       'type': kind,
@@ -696,7 +699,7 @@ class SourceScriptEngine {
             'queueElapsedUs': message['queueElapsedUs'],
           },
         );
-        SourceUiService.instance.retainExecution(
+        sourceUiService.retainExecution(
           SourceScriptExecution.fromMap(message['execution'] as Map),
           runtimeId,
         );
@@ -863,13 +866,13 @@ class SourceScriptEngine {
   void _fail(Object error, StackTrace stack) {
     // 故障以独立原因撤销交互，避免被调用方当作正常退役的静默取消。
     if (error is SourceRuntimeFailed) {
-      SourceUiService.instance.cancelRuntime(
+      sourceUiService.cancelRuntime(
         runtimeId,
         reason: 'runtimeFailed',
         error: error,
       );
     } else {
-      SourceUiService.instance.cancelRuntime(runtimeId);
+      sourceUiService.cancelRuntime(runtimeId);
     }
     _closing = true;
     _control?.shutdown();

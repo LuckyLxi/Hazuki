@@ -10,6 +10,8 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../support/source_presentation_fixtures.dart';
+
 class _MockSourceDiscoverGateway extends Mock
     implements SourceDiscoverGateway {}
 
@@ -136,25 +138,28 @@ Widget _buildSubject({
   required TargetPlatform platform,
   List<NavigatorObserver> navigatorObservers = const <NavigatorObserver>[],
 }) {
-  return MaterialApp(
-    theme: ThemeData(platform: platform),
-    navigatorObservers: navigatorObservers,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: DiscoverSectionBlock(
-          section: _section,
-          sectionIndex: 0,
-          layout: layout,
-          loadingMore: false,
-          hasMore: false,
-          onLoadMore: () async {},
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-          comicCoverHeroTagBuilder: (comic, {salt = ''}) => '${comic.id}-$salt',
-          sourceService: _MockSourceDiscoverGateway(),
-          taskControl: FakeSourceTaskControl(),
+  return withTestSourcePresentation(
+    MaterialApp(
+      theme: ThemeData(platform: platform),
+      navigatorObservers: navigatorObservers,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: DiscoverSectionBlock(
+            section: _section,
+            sectionIndex: 0,
+            layout: layout,
+            loadingMore: false,
+            hasMore: false,
+            onLoadMore: () async {},
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            comicCoverHeroTagBuilder: (comic, {salt = ''}) =>
+                '${comic.id}-$salt',
+            sourceService: _MockSourceDiscoverGateway(),
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     ),

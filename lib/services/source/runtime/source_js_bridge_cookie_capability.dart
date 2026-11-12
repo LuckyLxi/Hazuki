@@ -11,7 +11,6 @@ import 'source_cookie_store.dart';
 import 'source_html_bridge.dart';
 import '../plugins/source_plugin_models.dart';
 import '../plugins/source_plugin_localization.dart';
-import '../interaction/source_ui_service.dart';
 import '../interaction/source_dialog_model.dart';
 
 /// Handles the JavaScript host bridge and its cookie operations.
@@ -79,7 +78,7 @@ class SourceJsBridgeCookieCapability {
       }
       if (method == 'ui_browser' || method == 'ui_browser_result') {
         final browserSession = method == 'ui_browser_result'
-            ? SourceUiService.instance.browserSession(
+            ? handle.sourceUiService.browserSession(
                 map['id']?.toString() ?? '',
                 execution,
                 runtimeId,
@@ -88,9 +87,9 @@ class SourceJsBridgeCookieCapability {
         final options = SourceBrowserAuthorizationOptions.parse(
           browserSession?.browserRequest ?? dialogMap(map['options']),
         );
-        return SourceUiService.instance
+        return handle.sourceUiService
             .runBrowserAuthorization(
-              () => SourceUiService.instance.handle(
+              () => handle.sourceUiService.handle(
                 map,
                 execution,
                 runtimeId,
@@ -104,22 +103,17 @@ class SourceJsBridgeCookieCapability {
               interactionScope: browserSession?.scope,
             )
             .then(
-              (value) => _importBrowserResponse(
-                handle,
-                options,
-                value as Map,
-                () {
-                  if (handle.isDisposalRequested) {
-                    throw StateError('plugin_runtime_disposed');
-                  }
-                  handle.loginCancellation?.check();
-                  SourceUiService.instance.checkExecution(execution, runtimeId);
-                },
-                hostContext: hostContext,
-              ),
+              (value) =>
+                  _importBrowserResponse(handle, options, value as Map, () {
+                    if (handle.isDisposalRequested) {
+                      throw StateError('plugin_runtime_disposed');
+                    }
+                    handle.loginCancellation?.check();
+                    handle.sourceUiService.checkExecution(execution, runtimeId);
+                  }, hostContext: hostContext),
             );
       }
-      return SourceUiService.instance.handle(
+      return handle.sourceUiService.handle(
         map,
         execution,
         runtimeId,
@@ -176,7 +170,7 @@ class SourceJsBridgeCookieCapability {
           throw const FormatException('login_invalid_point_count');
         }
         final presented = request['type'] == 'browserAuthorization'
-            ? SourceUiService.instance.runBrowserAuthorization(
+            ? handle.sourceUiService.runBrowserAuthorization(
                 () => present(request, cancellation),
                 execution: execution,
                 runtimeId: runtimeId,
@@ -225,7 +219,7 @@ class SourceJsBridgeCookieCapability {
         break;
       case 'http':
         if (execution != null && runtimeId != null) {
-          SourceUiService.instance.checkExecution(execution, runtimeId);
+          handle.sourceUiService.checkExecution(execution, runtimeId);
         }
         result = handle.facade.httpGateway.sendJsHttpRequest(
           map,
@@ -235,7 +229,7 @@ class SourceJsBridgeCookieCapability {
           checkActive: () {
             handle.loginCancellation?.check();
             if (execution != null && runtimeId != null) {
-              SourceUiService.instance.checkExecution(execution, runtimeId);
+              handle.sourceUiService.checkExecution(execution, runtimeId);
             }
           },
         );

@@ -33,6 +33,7 @@ class CommentsEffect {
 class CommentsPageController extends ChangeNotifier
     implements CommentsSortDelegate {
   CommentsPageController({
+    required this.sourceUiService,
     required SourceTaskControlGateway taskControl,
     required SourceCommentsGateway sourceService,
     required CommentFilterService filterService,
@@ -65,7 +66,8 @@ class CommentsPageController extends ChangeNotifier
   final CommentFilterService _filterService;
   final _effects = StreamController<CommentsEffect>.broadcast(sync: true);
   bool _disposed = false;
-  final _sourceUi = SourceUiOwner();
+  final SourceUiService sourceUiService;
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   final SourceTaskOwner _readTasks;
 
   Stream<CommentsEffect> get effects => _effects.stream;

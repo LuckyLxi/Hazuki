@@ -11,6 +11,7 @@ import 'package:hazuki/shared/favorites/favorite_selection_applier.dart';
 import 'package:hazuki/shared/favorites/favorite_selection_result.dart';
 import 'package:hazuki/shared/favorites/source_favorite_folders_repository.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 Future<void> showHistoryFavoriteDialog(
   BuildContext context,
@@ -62,6 +63,7 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
   );
   final singleFolderOnly = repository.favoriteSingleFolderForSingleComic;
   final viewModel = FavoriteFoldersViewModel(
+    sourceUiService: SourcePresentationScope.uiOf(context),
     repository: repository,
     details: details,
     cloudFavoriteOverride: null,

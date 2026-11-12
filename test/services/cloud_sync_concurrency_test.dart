@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -120,7 +121,15 @@ class _FakeLockedRemoteClient extends CloudSyncRemoteClient {
   }
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
@@ -415,6 +424,7 @@ Future<_TestDevice> _createDevice(
   final favorites = LocalFavoritesService(database: database);
   final groups = DownloadGroupsService(database: database);
   final source = SourceRuntimeAssembly(
+    sourceUiService: sourceUiService,
     initialCatalog: hazukiAllowedSourceCatalog,
   );
   final readHistory = ReadHistoryService(database: database);

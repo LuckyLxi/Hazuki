@@ -48,6 +48,7 @@ import 'source_runtime_state_controller.dart';
 import 'source_secure_session_storage.dart';
 import '../../logging/app_log_store.dart';
 import 'source_settings_operations.dart';
+import '../interaction/source_ui_service.dart';
 
 export '../debug/source_debug_log_store.dart';
 export '../models/source_contract_models.dart';
@@ -67,7 +68,10 @@ const _bundledInitAssetPath = 'assets/init.js';
 /// Feature and application code consume the focused source gateways instead of
 /// depending on this assembly directly.
 class SourceRuntimeAssembly {
+  final SourceUiService sourceUiService;
+
   SourceRuntimeAssembly({
+    required this.sourceUiService,
     SourceSecureSessionStorage? secureSessionStorage,
     // 仅供测试预置目录：跳过插件初始化，脚本存储仍是插件管理器。
     List<SourceCatalogEntry> initialCatalog = const [],
@@ -76,6 +80,7 @@ class SourceRuntimeAssembly {
            secureSessionStorage ?? FlutterSourceSecureSessionStorage() {
     _logStore = AppLogStore(secureStorage: _secureSessionStorage);
     _runtimeHost = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: initialCatalog,
       defaultSourceKey: initialCatalog.firstOrNull?.key ?? '',
       secureSessionStorage: _secureSessionStorage,
@@ -103,11 +108,10 @@ class SourceRuntimeAssembly {
     _accountCapability = SourceAccountSessionCapability(
       runtimeHost: _runtimeHost,
     );
-    _reloginCoordinator = SourceReloginCoordinator(
+    _reloginCoordinator = SourceReloginCoordinator<SourceRuntimeReloginContext>(
       loginWithStoredAccount: (context, {required account, required password}) {
-        final facade = (context as SourceFacadeReloginContext).facade;
-        return _accountCapability.loginWithFacade(
-          facade,
+        return _accountCapability.loginWithHandle(
+          context.handle,
           account: account,
           password: password,
         );
@@ -222,7 +226,8 @@ class SourceRuntimeAssembly {
   late final AppLogStore _logStore;
   late final SourceRuntimeHost _runtimeHost;
   late final SourceAccountSessionCapability _accountCapability;
-  late final SourceReloginCoordinator _reloginCoordinator;
+  late final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
   late final SourceRuntimeCapability _runtimeCapability;
   late final SourceRuntimeView _runtimeView = SourceRuntimeView(
     runtimeHost: _runtimeHost,
@@ -362,6 +367,7 @@ class SourceRuntimeAssembly {
   }
 
   late final SourceRuntimeHandle _applicationHandle = SourceRuntimeHandle(
+    sourceUiService: sourceUiService,
     sourceKey: '__app__',
     secureStorage: _secureSessionStorage,
     ensureInitialized: (_) async {},
@@ -403,6 +409,7 @@ class SourceRuntimeAssembly {
     final handle = _retainedImageHandles.putIfAbsent(
       requested,
       () => SourceRuntimeHandle(
+        sourceUiService: sourceUiService,
         sourceKey: requested,
         secureStorage: _secureSessionStorage,
         ensureInitialized: (_) async =>
@@ -426,11 +433,10 @@ class SourceRuntimeAssembly {
     String sourceKey = '',
   }) => _comicDetailsCache.get(comicId, sourceKey: sourceKey);
 
-  Future<bool> _ensureFavoriteSessionReady({
-    HazukiSourceFacade? targetFacade,
-  }) => _reloginCoordinator.ensureFavoriteSessionReady(
-    SourceFacadeReloginContext(targetFacade ?? _facade),
-  );
+  Future<bool> _ensureFavoriteSessionReady() =>
+      _reloginCoordinator.ensureFavoriteSessionReady(
+        SourceRuntimeReloginContext(_runtimeHost.activeHandle),
+      );
 
   List<ExploreComic> _parseExploreComics(List list, {String sourceKey = ''}) {
     final resolvedSourceKey = sourceKey.trim().isEmpty

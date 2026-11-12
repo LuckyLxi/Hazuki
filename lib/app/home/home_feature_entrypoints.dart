@@ -77,7 +77,7 @@ HomeServices buildHazukiHomeServices() {
     announcementService: sl<AnnouncementController>(),
     downloadStatus: _MangaDownloadStatusAdapter(sl<MangaDownloadService>()),
     showAnnouncement: showAnnouncementDialog,
-    sourceUi: SourceUiService.instance,
+    sourceUi: sl<SourceUiService>(),
     taskControl: sl<SourceTaskControlGateway>(),
   );
 }
@@ -124,6 +124,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     usage: sl<TranslationUsageStore>(),
   );
   final comicDetailDependencies = ComicDetailDependencies(
+    sourceUiService: sl<SourceUiService>(),
     source: sl<SourceComicDetailGateway>(),
     cloudReading: sl<SourceCloudReadingGateway>(),
     localFavorites: sl<LocalFavoritesRepository>(),
@@ -151,6 +152,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     sourceScript: sl<SourceScriptGateway>(),
   );
   final readerDependencies = ReaderDependencies(
+    sourceUiService: sl<SourceUiService>(),
     translation: translationDependencies,
     taskControl: sl<SourceTaskControlGateway>(),
     sourceReader: sl<SourceReaderGateway>(),

@@ -31,6 +31,7 @@ class HomeCoordinator extends ChangeNotifier {
        _dailyRecommendationService = dailyRecommendationService,
        _announcementService = announcementService,
        _profileController = HomeProfileController(
+         sourceUiService: sourceUi,
          sourceService: sourceService,
          taskControl: taskControl,
        ),

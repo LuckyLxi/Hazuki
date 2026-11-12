@@ -10,7 +10,6 @@ import 'source_login_interaction.dart';
 import 'source_login_side_data_operations.dart';
 import 'source_login_storage_transaction.dart';
 import '../interaction/source_ui_scope.dart';
-import '../interaction/source_ui_service.dart';
 
 class SourceInteractiveLoginOperations
     implements SourceInteractiveAccountGateway {
@@ -108,7 +107,7 @@ class SourceInteractiveLoginOperations
     required SourceLoginCancellation cancellation,
   }) async {
     try {
-      await SourceUiService.instance.run(
+      await host.sourceUiService.run(
         () => _loginInteractive(
           context,
           account: account,
@@ -179,6 +178,7 @@ class SourceInteractiveLoginOperations
       final initialStore = original.session.loadSourceStore(key);
       final local = attempt =
           SourceRuntimeHandle(
+              sourceUiService: host.sourceUiService,
               sourceKey: key,
               secureStorage: storage,
               ensureInitialized: (_) async {},
@@ -213,7 +213,7 @@ class SourceInteractiveLoginOperations
             [account, password, method],
           ),
         );
-        SourceUiService.instance.closeRuntimeInteractions(engine.runtimeId);
+        host.sourceUiService.closeRuntimeInteractions(engine.runtimeId);
         cancellation.check();
         await SourceLoginSideDataOperations(
           runtimeHost: host,
@@ -284,7 +284,7 @@ class SourceInteractiveLoginOperations
           ...local.loadingRuntimeIds,
           if (local.runtime.engine != null) local.runtime.engine!.runtimeId,
         }) {
-          SourceUiService.instance.closeRuntimeInteractions(runtimeId);
+          host.sourceUiService.closeRuntimeInteractions(runtimeId);
         }
       }
       if (!successful) cancellation.cancelForCleanup();

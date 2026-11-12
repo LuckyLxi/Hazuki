@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import 'dart:async';
 import '../../support/source_presentation_fixtures.dart';
@@ -160,6 +161,20 @@ class _Plugins extends ChangeNotifier implements SourcePluginGateway {
 }
 
 Widget _app(Widget page, {Locale locale = const Locale('en')}) => MaterialApp(
+  builder: (context, child) => withTestSourcePresentation(
+    child!,
+    sourceUiService: sourceUiService,
+    activeSourceKey: 'fixture',
+    catalog: [
+      for (final plugin in _plugins.installed)
+        SourceCatalogEntry(
+          key: plugin.manifest.id,
+          name: plugin.manifest.name,
+          fileName: plugin.manifest.entry,
+          presentation: plugin.manifest.presentation,
+        ),
+    ],
+  ),
   theme: ThemeData(platform: TargetPlatform.android),
   locale: locale,
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -172,11 +187,20 @@ Future<void> _finishPrompt(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+late SourceUiService sourceUiService;
+late _Plugins _plugins;
+
 void main() {
   late _Plugins plugins;
   setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
+  setUp(() {
     SharedPreferences.setMockInitialValues({});
-    plugins = _Plugins();
+    _plugins = plugins = _Plugins();
   });
   tearDown(() => plugins.dispose());
 

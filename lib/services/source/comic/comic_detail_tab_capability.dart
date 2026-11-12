@@ -11,12 +11,13 @@ import '../runtime/source_runtime_host.dart';
 class SourceComicDetailTabCapability {
   SourceComicDetailTabCapability({
     required SourceRuntimeHost runtimeHost,
-    SourceReloginCoordinator? reloginCoordinator,
+    SourceReloginCoordinator<SourceRuntimeReloginContext>? reloginCoordinator,
   }) : _runtimeHost = runtimeHost,
        _reloginCoordinator = reloginCoordinator;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceReloginCoordinator? _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>?
+  _reloginCoordinator;
 
   String _resolveSourceKey(String sourceKey) => sourceKey.trim().isEmpty
       ? _runtimeHost.activeSourceKey
@@ -31,12 +32,8 @@ class SourceComicDetailTabCapability {
     _runtimeHost,
     _runtimeHost.handleFor(_resolveSourceKey(sourceKey)),
     'comic.loadDetailTab',
-    (operationContext) => _loadDetailTabTask(
-      operationContext,
-      comicId: comicId,
-      tabId: tabId,
-      sourceKey: sourceKey,
-    ),
+    (operationContext) =>
+        _loadDetailTabTask(operationContext, comicId: comicId, tabId: tabId),
     origin: taskOrigin,
     serviceOwned: false,
   );
@@ -45,9 +42,8 @@ class SourceComicDetailTabCapability {
     SourceOperationContext operationContext, {
     required String comicId,
     required String tabId,
-    required String sourceKey,
   }) async {
-    final facade = _runtimeHost.handleFor(_resolveSourceKey(sourceKey)).facade;
+    final facade = operationContext.resource.facade;
     Future<List<SourceDetailTabBlock>>
     load() => facade.handle.runOperation(() async {
       await facade.ensureInitialized();
@@ -69,7 +65,7 @@ class SourceComicDetailTabCapability {
     if (relogin == null) return load();
     return relogin.runWithReloginRetry(
       load,
-      context: SourceFacadeReloginContext(facade),
+      context: SourceRuntimeReloginContext(operationContext.resource),
       checkActive: operationContext.checkActive,
     );
   }

@@ -19,7 +19,10 @@ import '../models/source_task.dart';
 /// this object deliberately keeps selection and handle disposal out of those
 /// capabilities.
 class SourceRuntimeHost extends ChangeNotifier {
+  final SourceUiService sourceUiService;
+
   SourceRuntimeHost({
+    required this.sourceUiService,
     required List<SourceCatalogEntry> catalog,
     required String defaultSourceKey,
     required SourceSecureSessionStorage secureSessionStorage,
@@ -260,7 +263,7 @@ class SourceRuntimeHost extends ChangeNotifier {
   Future<void> activateSource(String sourceKey) async {
     final previous = optionalActiveHandle;
     if (normalize(sourceKey) != activeSourceKey) {
-      SourceUiService.instance.cancelPlugin(activeSourceKey, 'sourceChanged');
+      sourceUiService.cancelPlugin(activeSourceKey, 'sourceChanged');
     }
     await _coordinator.activate(
       sourceKey,
@@ -324,10 +327,7 @@ class SourceRuntimeHost extends ChangeNotifier {
         }
         for (final old in this.catalog) {
           if (!enabled.contains(old.normalizedKey)) {
-            SourceUiService.instance.cancelPlugin(
-              old.normalizedKey,
-              'runtimeDisposed',
-            );
+            sourceUiService.cancelPlugin(old.normalizedKey, 'runtimeDisposed');
           }
         }
 
@@ -365,6 +365,7 @@ class SourceRuntimeHost extends ChangeNotifier {
   }
 
   SourceRuntimeHandle _createHandle(String sourceKey) => SourceRuntimeHandle(
+    sourceUiService: sourceUiService,
     sourceKey: sourceKey,
     secureStorage: _secureSessionStorage,
     ensureInitialized: _ensureSourceInitialized,

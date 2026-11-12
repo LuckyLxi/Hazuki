@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/comic/comic_detail_tab_capability.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
@@ -6,7 +7,15 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceComicDetailTabCapability capability;
@@ -15,6 +24,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'active', name: 'Active', fileName: 'a.js'),
         SourceCatalogEntry(key: 'target', name: 'Target', fileName: 't.js'),
@@ -26,7 +36,10 @@ void main() {
       isLoggedForSource: (_) => false,
     );
     capability = SourceComicDetailTabCapability(runtimeHost: host);
-    target = SourceScriptEngine(hostPromiseRejectionHandler: (_) {});
+    target = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      hostPromiseRejectionHandler: (_) {},
+    );
     host.handleFor('target').runtime.engine = target;
     await target.evaluate('''
       globalThis.calls = [];

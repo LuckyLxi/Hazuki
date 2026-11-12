@@ -46,7 +46,15 @@ Future<void> _until(bool Function() predicate) async {
   expect(predicate(), isTrue);
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceScriptEngine engine;
@@ -61,6 +69,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     initialize = () async {};
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'one',
@@ -79,7 +88,10 @@ void main() {
     addTearDown(host.dispose);
     final handle = host.activeHandle;
     await handle.facade.ensurePrefs();
-    engine = SourceScriptEngine(pluginId: 'one');
+    engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'one',
+    );
     addTearDown(engine.close);
     handle.runtime.engine = engine;
     handle.runtime.sourceMeta = SourceMeta(
@@ -274,7 +286,7 @@ void main() {
     'page disposal revokes UI but lets accepted service HTTP finish',
     () async {
       await install(readHttp, write: writeHttp);
-      final owner = SourceUiOwner();
+      final owner = SourceUiOwner(sourceUiService);
       final pending = owner.run(
         () => comments.sendComment(comicId: 'write', content: 'text'),
       );
@@ -291,7 +303,7 @@ void main() {
 
   test('revoked service UI cannot authorize a later prompt', () async {
     final gate = Completer<void>();
-    final owner = SourceUiOwner();
+    final owner = SourceUiOwner(sourceUiService);
     SourceUiScope? authority;
     final pending = owner.run(
       () => runSourceOperation(host, host.activeHandle, 'fixture.write', (
@@ -390,7 +402,10 @@ void main() {
           pluginVersion: '2',
         ),
       ]);
-      final replacement = SourceScriptEngine(pluginId: 'one');
+      final replacement = SourceScriptEngine(
+        sourceUiService: sourceUiService,
+        pluginId: 'one',
+      );
       addTearDown(replacement.close);
       host.activeHandle.runtime.engine = replacement;
       await stopped;
@@ -500,7 +515,7 @@ void main() {
             attempts++;
             throw StateError('401');
           },
-          context: SourceFacadeReloginContext(handle.facade),
+          context: SourceRuntimeReloginContext(handle),
           checkActive: context.checkActive,
         ),
         origin: origin('page'),
@@ -522,7 +537,7 @@ void main() {
   test(
     'page exit permits the next admitted noninteractive service command',
     () async {
-      final owner = SourceUiOwner();
+      final owner = SourceUiOwner(sourceUiService);
       final gate = Completer<void>();
       final betweenCommands = Completer<void>();
       final pending = owner.run(
@@ -550,7 +565,7 @@ void main() {
   );
   test('plugin disable records its reason before revoking page UI', () async {
     await install(readHttp);
-    final owner = SourceUiOwner();
+    final owner = SourceUiOwner(sourceUiService);
     late Future<ComicCommentsPageResult> serviceRead;
     final pending = owner.run(() {
       serviceRead = comments.loadCommentsPage(

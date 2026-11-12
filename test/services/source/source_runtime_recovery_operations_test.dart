@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -16,7 +17,15 @@ import 'package:hazuki/services/source/runtime/source_script_editing_operations.
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late SourceRuntimeHost host;
@@ -28,6 +37,7 @@ void main() {
     SharedPreferences.setMockInitialValues(const {});
     late SourceRuntimeHost runtimeHost;
     runtimeHost = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'jm.js'),
         SourceCatalogEntry(
@@ -117,11 +127,11 @@ void main() {
       SourceRuntimePhase.ready,
     );
     expect(host.activeHandle.facade.statusText, contains('JMComic'));
-    expect(host.activeHandle.facade.isRefreshingSource, isFalse);
+    expect(host.activeHandle.runtime.isRefreshingSource, isFalse);
   });
 
   test('network recovery ignores a refresh already in progress', () async {
-    host.activeHandle.facade.isRefreshingSource = true;
+    host.activeHandle.runtime.isRefreshingSource = true;
 
     expect(await recovery.refreshSourceOnNetworkRecovery(), isFalse);
     expect(loader.downloadOrLoadSourceKeys, isEmpty);

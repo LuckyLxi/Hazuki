@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'dart:convert';
 
@@ -15,7 +16,15 @@ import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
@@ -25,6 +34,7 @@ void main() {
   test('webdav settings snapshot includes download group metadata', () async {
     final database = HazukiDatabase.memory();
     final source = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       initialCatalog: hazukiAllowedSourceCatalog,
     );
     final groups = DownloadGroupsService(database: database);

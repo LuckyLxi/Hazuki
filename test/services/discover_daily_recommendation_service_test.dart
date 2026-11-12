@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import '../support/fake_source_task_control.dart';
 import 'dart:convert';
@@ -148,7 +149,10 @@ void main() {
     });
 
     test('stops after three consecutive search failures', () async {
-      final source = _SearchCountingSource(throwOnSearch: true);
+      final source = _SearchCountingSource(
+        sourceUiService: sl<SourceUiService>(),
+        throwOnSearch: true,
+      );
       final service = DiscoverDailyRecommendationService(
         source: HazukiSourceDailyRecommendationAdapter(
           runtime: source.testRuntimeView,
@@ -169,7 +173,9 @@ void main() {
     });
 
     test('limits attempts when searches return no comics', () async {
-      final source = _SearchCountingSource();
+      final source = _SearchCountingSource(
+        sourceUiService: sl<SourceUiService>(),
+      );
       final service = DiscoverDailyRecommendationService(
         source: HazukiSourceDailyRecommendationAdapter(
           runtime: source.testRuntimeView,
@@ -190,7 +196,10 @@ void main() {
     });
 
     test('stops retrying when the active source changes', () async {
-      final source = _SearchCountingSource(switchSourceOnFirstSearch: true);
+      final source = _SearchCountingSource(
+        sourceUiService: sl<SourceUiService>(),
+        switchSourceOnFirstSearch: true,
+      );
       final service = DiscoverDailyRecommendationService(
         source: HazukiSourceDailyRecommendationAdapter(
           runtime: source.testRuntimeView,
@@ -314,6 +323,7 @@ void main() {
 
 class _SearchCountingSource extends SourceRuntimeAssembly {
   _SearchCountingSource({
+    required super.sourceUiService,
     this.throwOnSearch = false,
     this.switchSourceOnFirstSearch = false,
   }) : super(secureSessionStorage: MemorySourceSecureSessionStorage());

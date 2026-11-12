@@ -7,11 +7,15 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import '../state/favorite_folder_state.dart' show defaultCloudFavoriteFolder;
 
 class FavoriteCloudFlow {
-  FavoriteCloudFlow(this.sourceService, SourceTaskControlGateway taskControl)
-    : _readTasks = SourceTaskOwner(taskControl);
+  final SourceUiService sourceUiService;
+  FavoriteCloudFlow(
+    this.sourceService,
+    SourceTaskControlGateway taskControl, {
+    required this.sourceUiService,
+  }) : _readTasks = SourceTaskOwner(taskControl);
   final SourceTaskOwner _readTasks;
 
-  final _sourceUi = SourceUiOwner();
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   void dispose() {
     _readTasks.dispose();
     _sourceUi.dispose();

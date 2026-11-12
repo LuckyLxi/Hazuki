@@ -7,7 +7,9 @@ import 'package:hazuki/services/source/source_task_owner.dart';
 
 /// 排行榜页面的状态控制器，负责排行榜选项加载、漫画列表分页与切换逻辑。
 class RankingPageController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   RankingPageController({
+    required this.sourceUiService,
     required SourceCategoryGateway sourceService,
     required SourceTaskControlGateway taskControl,
     required String Function() optionsTimeoutMessage,
@@ -23,7 +25,7 @@ class RankingPageController extends ChangeNotifier {
 
   final SourceCategoryGateway _sourceService;
   final SourceTaskOwner _readTasks;
-  final SourceUiOwner _sourceUi = SourceUiOwner();
+  late final SourceUiOwner _sourceUi = SourceUiOwner(sourceUiService);
   final String Function() _optionsTimeoutMessage;
   final String Function() _pageTimeoutMessage;
   final String Function(String) _loadFailedMessage;

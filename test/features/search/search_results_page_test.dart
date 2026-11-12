@@ -14,6 +14,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/source_catalog_fixtures.dart';
+import '../../support/source_presentation_fixtures.dart';
 
 class _Source extends Mock implements SourceSearchGateway {}
 
@@ -65,26 +66,28 @@ void main() {
             ),
           );
           await tester.pumpWidget(
-            MaterialApp(
-              theme: ThemeData(platform: platform),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: Builder(
-                builder: (context) => Scaffold(
-                  body: TextButton(
-                    onPressed: () => Navigator.of(context).push<void>(
-                      buildComicDetailDestinationRoute(
-                        context,
-                        (_) => SearchPage(
-                          taskControl: FakeSourceTaskControl(),
-                          sourceService: source,
-                          historyService: history,
-                          initialKeyword: 'Action',
-                          comicDetailPageBuilder: (_, _) => const SizedBox(),
+            withTestSourcePresentation(
+              MaterialApp(
+                theme: ThemeData(platform: platform),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: Builder(
+                  builder: (context) => Scaffold(
+                    body: TextButton(
+                      onPressed: () => Navigator.of(context).push<void>(
+                        buildComicDetailDestinationRoute(
+                          context,
+                          (_) => SearchPage(
+                            taskControl: FakeSourceTaskControl(),
+                            sourceService: source,
+                            historyService: history,
+                            initialKeyword: 'Action',
+                            comicDetailPageBuilder: (_, _) => const SizedBox(),
+                          ),
                         ),
                       ),
+                      child: const Text('Action tag'),
                     ),
-                    child: const Text('Action tag'),
                   ),
                 ),
               ),
@@ -137,24 +140,26 @@ void main() {
     when(() => source.supportsDirectComicId).thenReturn(false);
     when(() => source.runtimeState).thenReturn(const SourceRuntimeState.idle());
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) => TextButton(
-            onPressed: () => Navigator.of(context).push<void>(
-              buildComicDetailDestinationRoute(
-                context,
-                (_) => SearchPage(
-                  taskControl: FakeSourceTaskControl(),
-                  sourceService: source,
-                  historyService: history,
-                  initialKeyword: 'Action',
-                  comicDetailPageBuilder: (_, _) => const SizedBox(),
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => Navigator.of(context).push<void>(
+                buildComicDetailDestinationRoute(
+                  context,
+                  (_) => SearchPage(
+                    taskControl: FakeSourceTaskControl(),
+                    sourceService: source,
+                    historyService: history,
+                    initialKeyword: 'Action',
+                    comicDetailPageBuilder: (_, _) => const SizedBox(),
+                  ),
                 ),
               ),
+              child: const Text('Action tag'),
             ),
-            child: const Text('Action tag'),
           ),
         ),
       ),
@@ -213,15 +218,17 @@ void main() {
         ).thenAnswer((_) => response.future);
 
         await tester.pumpWidget(
-          MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: SearchPage(
-              taskControl: FakeSourceTaskControl(),
-              sourceService: source,
-              historyService: history,
-              initialKeyword: '  Action  ',
-              comicDetailPageBuilder: (_, _) => const SizedBox(),
+          withTestSourcePresentation(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: SearchPage(
+                taskControl: FakeSourceTaskControl(),
+                sourceService: source,
+                historyService: history,
+                initialKeyword: '  Action  ',
+                comicDetailPageBuilder: (_, _) => const SizedBox(),
+              ),
             ),
           ),
         );

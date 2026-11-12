@@ -1,3 +1,4 @@
+import '../../support/source_presentation_fixtures.dart';
 import '../../support/fake_source_task_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -300,26 +301,28 @@ Widget _buildDiscoverPage(
   Future<void> Function()? onRequestLogin,
   DiscoverSectionLayout layout = DiscoverSectionLayout.horizontal,
 }) {
-  return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(
-      body: DiscoverPage(
-        discoverSectionLayout: layout,
-        sourceService: sl<SourceDiscoverGateway>(),
-        recommendationSource: sl<SourceRecommendationGateway>(),
-        recommendationService: sl<DiscoverDailyRecommendationService>(),
-        comicDetailPageBuilder: (comic, heroTag) =>
-            Scaffold(body: Center(child: Text('detail:${comic.id}'))),
-        usePinnedSearchInAppBar: true,
-        dailyRecommendationState: DiscoverDailyRecommendationState(
-          enabled: true,
-          displayedRecommendations: recommendations,
+  return withTestSourcePresentation(
+    MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: DiscoverPage(
+          discoverSectionLayout: layout,
+          sourceService: sl<SourceDiscoverGateway>(),
+          recommendationSource: sl<SourceRecommendationGateway>(),
+          recommendationService: sl<DiscoverDailyRecommendationService>(),
+          comicDetailPageBuilder: (comic, heroTag) =>
+              Scaffold(body: Center(child: Text('detail:${comic.id}'))),
+          usePinnedSearchInAppBar: true,
+          dailyRecommendationState: DiscoverDailyRecommendationState(
+            enabled: true,
+            displayedRecommendations: recommendations,
+          ),
+          allowInitialLoad: false,
+          hideLoadingUntilInitialLoadAllowed: true,
+          onRequestLogin: onRequestLogin,
+          taskControl: FakeSourceTaskControl(),
         ),
-        allowInitialLoad: false,
-        hideLoadingUntilInitialLoadAllowed: true,
-        onRequestLogin: onRequestLogin,
-        taskControl: FakeSourceTaskControl(),
       ),
     ),
   );

@@ -23,9 +23,9 @@ Future<T> runSourceOperation<T>(
       ?.pluginVersion;
   final recorder = SourceTaskLogRecorder(host.logStore);
   final routeOwner =
-      SourceUiScope.current?.owner ??
-      SourceUiService.instance.captureOwner?.call();
-  final caller = SourceUiScope.current?.controllerOwner;
+      host.sourceUiService.currentScope?.owner ??
+      host.sourceUiService.captureOwner?.call();
+  final caller = host.sourceUiService.currentScope?.controllerOwner;
   return host.tasks.run<T>(
     pluginId: handle.sourceKey,
     pluginVersion: version,
@@ -73,7 +73,7 @@ Future<T> runSourceOperation<T>(
         } on SourceUiCancelled catch (error) {
           if (error.reason == 'runtimeFailed') {
             // 故障撤销的交互权限仍按运行时故障结算。
-            final failure = SourceUiScope.current?.failure;
+            final failure = host.sourceUiService.currentScope?.failure;
             if (failure is SourceRuntimeFailed) {
               throw failure.forTask(task.taskId);
             }
@@ -93,7 +93,7 @@ Future<T> runSourceOperation<T>(
       });
       if (!serviceOwned) return run();
       Future<T> runService() async {
-        final scope = SourceUiScope.current;
+        final scope = host.sourceUiService.currentScope;
         var waiting = scope?.waiting == true;
         void changed() {
           final reason = scope?.reason;
@@ -123,7 +123,7 @@ Future<T> runSourceOperation<T>(
 
       // Keep the original UI authority while allowing noninteractive admitted
       // work to finish after that authority is revoked.
-      return SourceUiService.instance.run(
+      return host.sourceUiService.run(
         runService,
         abortOnScopeCancellation: false,
         inheritCurrent: false,

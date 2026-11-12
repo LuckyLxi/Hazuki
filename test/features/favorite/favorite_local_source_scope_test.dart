@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
@@ -30,7 +31,15 @@ ComicDetailsData _comic(String sourceKey) => ComicDetailsData(
   subId: '',
 );
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
@@ -74,6 +83,7 @@ void main() {
         sourceChanged = call.positionalArguments.single as VoidCallback;
       });
       final controller = FavoritePageController(
+        sourceUiService: sourceUiService,
         sourceService: source,
         localFavoritesRepository: local,
         localFavoritesPreferences: preferences,

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -11,11 +12,20 @@ import '../../support/source_presentation_fixtures.dart';
 
 class _Settings extends Mock implements SourceSettingsGateway {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   test(
     'declared account buttons enable the standard check-in capability without a source ID flag',
     () {
       final host = SourceRuntimeHost(
+        sourceUiService: sourceUiService,
         catalog: const [
           SourceCatalogEntry(
             key: 'arbitrary',

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -144,7 +145,15 @@ class _TitleBar extends ChangeNotifier implements WindowTitleBarControl {
   Future<void> updateUseSystemTitleBar(bool value) async {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   testWidgets(
     'navigation wins over a pending restore and prefetch follows no-image mode',
     (tester) async {
@@ -185,6 +194,7 @@ void main() {
             sourceKey: 'jm',
             offlineMode: true,
             dependencies: ReaderDependencies(
+              sourceUiService: sourceUiService,
               sourceReader: reader,
               cloudReading: reader,
               readingProgressUploads: reader,
@@ -298,6 +308,7 @@ void main() {
                     images: images,
                     sourceKey: 'jm',
                     dependencies: ReaderDependencies(
+                      sourceUiService: sourceUiService,
                       sourceReader: reader,
                       cloudReading: reader,
                       readingProgressUploads: reader,

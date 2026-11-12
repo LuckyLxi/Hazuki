@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -164,7 +165,15 @@ class _JmFixtures implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceRuntimeHandle handle;
@@ -177,6 +186,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     fixtures = _JmFixtures();
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'jm',
@@ -197,6 +207,7 @@ void main() {
     final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
     bridge.configureDioCookieBridge(handle);
     engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
       timeout: 5000,
       hostPromiseRejectionHandler: (_) {},
     );

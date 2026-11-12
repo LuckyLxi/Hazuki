@@ -10,8 +10,11 @@ import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/plugins/source_menu.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_models.dart';
+import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../support/source_presentation_fixtures.dart';
 
 class _Gateway extends Mock implements SourcePluginGateway {}
 
@@ -49,30 +52,36 @@ Future<void> _pumpMenu(
   final state = FavoritePageData()..mode = mode;
   state.favoriteSortOrder = 'dd';
   await tester.pumpWidget(
-    MaterialApp(
-      locale: const Locale('en'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(
-        body: Align(
-          alignment: Alignment.topRight,
-          child: FavoriteAppBarActions(
-            state: state.buildAppBarActionsState(
-              isLogged: logged,
-              supportFavoriteSortOrder: orders.length > 1,
-              supportFavoriteFolderAdd: false,
-              favoriteSortOrders: orders,
-              favoriteSortLabels: const {'score': 'Score'},
-              favoriteMenu: _menu,
-              sourceKey: sourceKey,
+    withTestSourcePresentation(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topRight,
+            child: FavoriteAppBarActions(
+              state: state.buildAppBarActionsState(
+                isLogged: logged,
+                supportFavoriteSortOrder: orders.length > 1,
+                supportFavoriteFolderAdd: false,
+                favoriteSortOrders: orders,
+                favoriteSortLabels: const {'score': 'Score'},
+                favoriteMenu: _menu,
+                sourceKey: sourceKey,
+              ),
+              sourcePlugins: gateway,
+              onSortSelected: onSort ?? (_) {},
+              onCreateFolderPressed: () {},
+              onModeTogglePressed: () {},
             ),
-            sourcePlugins: gateway,
-            onSortSelected: onSort ?? (_) {},
-            onCreateFolderPressed: () {},
-            onModeTogglePressed: () {},
           ),
         ),
       ),
+      activeSourceKey: sourceKey,
+      catalog: const [
+        SourceCatalogEntry(key: 'custom', name: 'Custom', fileName: 'main.js'),
+      ],
     ),
   );
   await tester.pumpAndSettle();

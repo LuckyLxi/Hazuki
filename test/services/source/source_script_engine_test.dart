@@ -1,12 +1,24 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   SourceScriptEngine createEngine({int timeout = 5000}) {
-    final engine = SourceScriptEngine(timeout: timeout);
+    final engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      timeout: timeout,
+    );
     addTearDown(engine.close);
     return engine;
   }

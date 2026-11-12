@@ -110,7 +110,15 @@ Future<List<int>> _decodeRgba(Uint8List bytes) async {
   return data!.buffer.asUint8List().toList();
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceScriptEngine engine;
@@ -130,6 +138,7 @@ void main() {
     initialize = () async {};
     storage = _Storage();
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'one',
@@ -153,7 +162,10 @@ void main() {
     );
     handle.cache.imageCacheDir = directory;
     addTearDown(() => directory.delete(recursive: true));
-    engine = SourceScriptEngine(pluginId: 'one');
+    engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'one',
+    );
     addTearDown(engine.close);
     handle.runtime.engine = engine;
     engine.operationGuard = handle.runOperation;
@@ -571,7 +583,7 @@ void main() {
     () async {
       final handle = host.activeHandle;
       final session = host.acquireReaderSession('one');
-      final ui = SourceUiOwner();
+      final ui = SourceUiOwner(sourceUiService);
       addTearDown(ui.dispose);
       final pending = ui.run(
         () => handle.imageCache.downloadImageBytes(
@@ -864,7 +876,7 @@ void main() {
       await engine.execute(
         'this.__hazuki_source.comic.loadEp=()=>sendMessage({}).then(()=>({images:["page"]}))',
       );
-      final ui = SourceUiOwner();
+      final ui = SourceUiOwner(sourceUiService);
       addTearDown(ui.dispose);
       final capability = details();
       final pending = ui.run(
@@ -922,7 +934,10 @@ void main() {
       initialize = () async {
         final handle = host.handleFor('one');
         if (handle.runtime.engine == null) {
-          final replacement = SourceScriptEngine(pluginId: 'one');
+          final replacement = SourceScriptEngine(
+            sourceUiService: sourceUiService,
+            pluginId: 'one',
+          );
           addTearDown(replacement.close);
           replacement.operationGuard = handle.runOperation;
           handle.runtime.engine = replacement;
@@ -931,7 +946,7 @@ void main() {
           );
         }
       };
-      final ui = SourceUiOwner();
+      final ui = SourceUiOwner(sourceUiService);
       addTearDown(ui.dispose);
       final pending = ui.run(
         () => details().loadChapterImages(
@@ -980,7 +995,10 @@ void main() {
       initialize = () async {
         final handle = host.handleFor('one');
         if (handle.runtime.engine == null) {
-          final replacement = SourceScriptEngine(pluginId: 'one');
+          final replacement = SourceScriptEngine(
+            sourceUiService: sourceUiService,
+            pluginId: 'one',
+          );
           addTearDown(replacement.close);
           replacement.operationGuard = handle.runOperation;
           handle.runtime.engine = replacement;
@@ -989,7 +1007,7 @@ void main() {
           );
         }
       };
-      final ui = SourceUiOwner();
+      final ui = SourceUiOwner(sourceUiService);
       addTearDown(ui.dispose);
       final pending = ui.run(
         () => details().loadChapterImages(

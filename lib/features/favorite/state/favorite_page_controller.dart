@@ -9,6 +9,7 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorite_sort.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/favorite_comic_tag_loader.dart';
 import '../support/favorite_source_policy.dart';
 import '../support/favorite_list_loader.dart';
@@ -21,7 +22,9 @@ import 'favorite_page_state.dart';
 import '../support/favorite_cloud_flow.dart';
 
 class FavoritePageController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   FavoritePageController({
+    required this.sourceUiService,
     required SourceTaskControlGateway taskControl,
     required SourceFavoriteGateway sourceService,
     SourceReaderGateway? readerService,
@@ -37,7 +40,11 @@ class FavoritePageController extends ChangeNotifier {
        ),
        _selectionStore = FavoriteSelectionStore(localFavoritesPreferences),
        _localFavoritesRepository = localFavoritesRepository,
-       _cloudFlow = FavoriteCloudFlow(sourceService, taskControl),
+       _cloudFlow = FavoriteCloudFlow(
+         sourceService,
+         taskControl,
+         sourceUiService: sourceUiService,
+       ),
        _localFavoritesPreferences = localFavoritesPreferences {
     _lastActiveSourceKey = _activeSourceKey;
     _listLoader = FavoriteListLoader(

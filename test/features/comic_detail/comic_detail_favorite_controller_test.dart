@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
@@ -29,7 +30,15 @@ const _details = ComicDetailsData(
   subId: '',
 );
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   for (final scenario in [
     (
       name: 'user cancellation',
@@ -56,6 +65,7 @@ void main() {
   ]) {
     testWidgets('header action handles ${scenario.name}', (tester) async {
       final controller = ComicDetailFavoriteController(
+        sourceUiService: sourceUiService,
         favoriteFolders: _MockFolders(),
         runComicHeaderAction:
             ({required comicId, required actionId, sourceKey = ''}) {
@@ -141,6 +151,7 @@ void main() {
         return saved.future;
       });
       final controller = ComicDetailFavoriteController(
+        sourceUiService: sourceUiService,
         favoriteFolders: folders,
         runComicHeaderAction:
             ({required comicId, required actionId, sourceKey = ''}) =>

@@ -13,7 +13,8 @@ import 'source_favorites_script_factory.dart';
 class SourceFavoriteComicsLoader {
   const SourceFavoriteComicsLoader({
     required SourceRuntimeHost runtimeHost,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
     required SourceFavoritesResponseParser responseParser,
     SourceFavoritesScriptFactory scriptFactory =
         const SourceFavoritesScriptFactory(),
@@ -23,7 +24,8 @@ class SourceFavoriteComicsLoader {
        _scriptFactory = scriptFactory;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
   final SourceFavoritesResponseParser _responseParser;
   final SourceFavoritesScriptFactory _scriptFactory;
 
@@ -54,7 +56,7 @@ class SourceFavoriteComicsLoader {
     required String folderId,
   }) async {
     final facade = operationContext.resource.facade;
-    final context = SourceFacadeReloginContext(facade);
+    final context = SourceRuntimeReloginContext(operationContext.resource);
     final sessionReady = await _reloginCoordinator.ensureFavoriteSessionReady(
       context,
     );

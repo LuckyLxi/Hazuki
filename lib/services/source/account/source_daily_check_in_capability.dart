@@ -12,12 +12,14 @@ import 'source_relogin_coordinator.dart';
 class SourceDailyCheckInCapability {
   SourceDailyCheckInCapability({
     required SourceRuntimeHost runtimeHost,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
   }) : _runtimeHost = runtimeHost,
        _reloginCoordinator = reloginCoordinator;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
 
   HazukiSourceFacade get _facade => _runtimeHost.activeHandle.facade;
 
@@ -106,7 +108,7 @@ class SourceDailyCheckInCapability {
             ),
           ),
         ),
-        context: SourceFacadeReloginContext(facade),
+        context: SourceRuntimeReloginContext(operationContext.resource),
         checkActive: operationContext.checkActive,
       );
       if (result is! Map) throw StateError('plugin_invalid_check_in_result');

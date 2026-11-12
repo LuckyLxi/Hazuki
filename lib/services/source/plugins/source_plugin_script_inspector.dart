@@ -13,6 +13,7 @@ import 'source_plugin_buttons.dart';
 import 'source_detail_tabs.dart';
 import 'source_search_capabilities.dart';
 import '../account/source_login_interaction.dart';
+import '../interaction/source_ui_service.dart';
 
 /// Reads a plugin's own registration without running init or accessing user data.
 class SourcePluginScriptInspector {
@@ -24,7 +25,9 @@ class SourcePluginScriptInspector {
   Future<SourcePluginManifest> inspect(String script) async {
     final init = await _loadAssetText('assets/init.js');
     final sdk = await _loadAssetText('assets/hazuki_plugin_sdk.js');
+    final sourceUiService = SourceUiService();
     final handle = SourceRuntimeHandle(
+      sourceUiService: sourceUiService,
       sourceKey: '_plugin_inspection',
       secureStorage: MemorySourceSecureSessionStorage(),
       ensureInitialized: (_) async {},
@@ -32,6 +35,7 @@ class SourcePluginScriptInspector {
     );
     final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
     final engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
       pluginId: '_plugin_inspection',
       inspection: true,
       timeout: 5000,

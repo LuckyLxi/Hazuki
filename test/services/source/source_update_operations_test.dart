@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
@@ -6,13 +7,22 @@ import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/source/runtime/source_update_operations.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late SourceRuntimeHost host;
   late _FakePluginManager plugins;
   late SourceUpdateOperations updates;
 
   setUp(() {
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'main.js'),
       ],

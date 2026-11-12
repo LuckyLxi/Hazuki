@@ -8,7 +8,6 @@ import '../debug/source_debug_log_store.dart';
 import '../debug/source_network_log_sink.dart';
 import '../http/source_http_gateway.dart';
 import '../image/image_cache_capability.dart';
-import 'explore_cache_capability.dart';
 import 'line_settings_capability.dart';
 import 'source_cache_store.dart';
 import 'source_cookie_store.dart';
@@ -49,7 +48,11 @@ Dio _createSourceDio() {
 
 class SourceRuntimeHandle
     implements SourceRuntimeResource, SourceRuntimeHandleView {
+  @override
+  final SourceUiService sourceUiService;
+
   SourceRuntimeHandle({
+    required this.sourceUiService,
     required this.sourceKey,
     required SourceSecureSessionStorage secureStorage,
     required Future<void> Function(String sourceKey) ensureInitialized,
@@ -196,9 +199,6 @@ class SourceRuntimeHandle
     tasks: tasks,
     canCache: () => !_disposed && (_canCacheImages?.call(this) ?? true),
   );
-  late final ExploreCacheCapability exploreCache = ExploreCacheCapability(
-    facade,
-  );
   late final DebugLogCapability debugLog = DebugLogCapability(appLogStore);
 
   @override
@@ -327,11 +327,11 @@ class SourceRuntimeHandle
   @override
   void requestDispose() {
     for (final id in loadingRuntimeIds.toList()) {
-      SourceUiService.instance.cancelRuntime(id);
+      sourceUiService.cancelRuntime(id);
     }
     final engine = runtime.engine;
     if (engine != null) {
-      SourceUiService.instance.cancelRuntime(engine.runtimeId);
+      sourceUiService.cancelRuntime(engine.runtimeId);
     }
     if (_disposed || _disposeRequested) {
       return;

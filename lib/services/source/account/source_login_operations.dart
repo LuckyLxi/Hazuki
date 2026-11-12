@@ -26,26 +26,26 @@ class SourceLoginOperations {
     required String account,
     required String password,
     SourceTaskOrigin? taskOrigin,
-  }) => loginWithFacade(
-    facade,
+  }) => loginWithHandle(
+    _runtimeHost.activeHandle,
     account: account,
     password: password,
     taskOrigin: taskOrigin,
   );
 
-  Future<void> loginWithFacade(
-    HazukiSourceFacade facade, {
+  Future<void> loginWithHandle(
+    SourceRuntimeHandle handle, {
     required String account,
     required String password,
     SourceTaskOrigin? taskOrigin,
     bool serviceOwned = false,
   }) async => runSourceOperation(
     _runtimeHost,
-    facade.handle as SourceRuntimeHandle,
+    handle,
     'account.login',
-    (operationContext) => _loginWithFacadeTask(
+    (operationContext) => _loginWithHandleTask(
       operationContext,
-      facade,
+      handle.facade,
       account: account,
       password: password,
     ),
@@ -54,7 +54,7 @@ class SourceLoginOperations {
     serviceOwned: serviceOwned,
   );
 
-  Future<void> _loginWithFacadeTask(
+  Future<void> _loginWithHandleTask(
     SourceOperationContext operationContext,
     HazukiSourceFacade facade, {
     required String account,

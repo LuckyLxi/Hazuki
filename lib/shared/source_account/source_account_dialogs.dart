@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 import 'source_login_interaction_text.dart';
 import 'source_login_interaction_dialog.dart';
 import 'source_login_dialog_controller.dart';
 import 'source_account_dialog_support.dart';
-import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/shared/source_interaction/source_plugin_dialog.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'dart:ui';
@@ -470,7 +470,9 @@ Future<void> showHomeLoginDialog(
                                                     try {
                                                       final profile =
                                                           selectedMethod == null
-                                                          ? await SourceUiService.instance.run(
+                                                          ? await SourcePresentationScope.uiOf(
+                                                              context,
+                                                            ).run(
                                                               () => onLogin(
                                                                 account,
                                                                 password,

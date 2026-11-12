@@ -10,6 +10,8 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../support/source_presentation_fixtures.dart';
+
 class _Source extends Mock implements SourceComicDetailGateway {}
 
 class _LocalFavorites extends Mock implements LocalFavoritesRepository {}
@@ -104,24 +106,26 @@ void main() {
 
   Future<void> open(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: Builder(
-            builder: (context) {
-              strings = AppLocalizations.of(context)!;
-              return TextButton(
-                onPressed: () => showHistoryFavoriteDialog(
-                  context,
-                  _comic,
-                  source: source,
-                  localFavorites: local,
-                ),
-                child: const Text('Open favorites'),
-              );
-            },
+      withTestSourcePresentation(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                strings = AppLocalizations.of(context)!;
+                return TextButton(
+                  onPressed: () => showHistoryFavoriteDialog(
+                    context,
+                    _comic,
+                    source: source,
+                    localFavorites: local,
+                  ),
+                  child: const Text('Open favorites'),
+                );
+              },
+            ),
           ),
         ),
       ),

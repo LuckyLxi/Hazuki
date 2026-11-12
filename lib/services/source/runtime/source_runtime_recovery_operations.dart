@@ -18,7 +18,8 @@ class SourceRuntimeRecoveryOperations {
     required SourceRuntimeLoadClient runtimeLoader,
     required SourceScriptEditingOperations scriptEditing,
     required SourceRuntimeStateController runtimeStateController,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
   }) : _runtimeHost = runtimeHost,
        _diagnostics = diagnostics,
        _plugins = plugins,
@@ -33,7 +34,8 @@ class SourceRuntimeRecoveryOperations {
   final SourceRuntimeLoadClient _runtimeLoader;
   final SourceScriptEditingOperations _scriptEditing;
   final SourceRuntimeStateController _runtimeStateController;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
 
   void requestRuntimeRetry(String trigger) {
     if (!_runtimeHost.hasActiveSource) return;
@@ -66,10 +68,10 @@ class SourceRuntimeRecoveryOperations {
     handle.clearRuntimeFault();
     await handle.runOperation(() async {
       final facade = handle.facade;
-      if (facade.isRefreshingSource) {
+      if (facade.runtime.isRefreshingSource) {
         throw Exception('source_reload_in_progress');
       }
-      facade.isRefreshingSource = true;
+      facade.runtime.isRefreshingSource = true;
       try {
         _runtimeStateController.setBusy(
           facade,
@@ -98,7 +100,7 @@ class SourceRuntimeRecoveryOperations {
         );
         await _reloginIfNeeded(handle);
       } finally {
-        facade.isRefreshingSource = false;
+        facade.runtime.isRefreshingSource = false;
       }
     });
   }
@@ -113,8 +115,8 @@ class SourceRuntimeRecoveryOperations {
 
   Future<bool> _refreshSource(SourceRuntimeHandle handle) async {
     final facade = handle.facade;
-    if (facade.isRefreshingSource) return false;
-    facade.isRefreshingSource = true;
+    if (facade.runtime.isRefreshingSource) return false;
+    facade.runtime.isRefreshingSource = true;
     try {
       _runtimeStateController.setBusy(
         facade,
@@ -144,7 +146,7 @@ class SourceRuntimeRecoveryOperations {
       _runtimeStateController.setFailed(facade, error);
       return false;
     } finally {
-      facade.isRefreshingSource = false;
+      facade.runtime.isRefreshingSource = false;
     }
   }
 
@@ -154,9 +156,9 @@ class SourceRuntimeRecoveryOperations {
     bool clearMetadata = false,
   }) {
     final facade = handle.facade;
-    facade.lastReloginAt = null;
+    facade.runtime.lastReloginAt = null;
     if (clearFavoritesDebugCache) facade.favoritesDebugCache = null;
-    handle.exploreCache.clearMemory();
+    handle.cache.clearExploreSections();
     facade.cache.clearCategoryTagGroupsMemoryCache();
     if (clearMetadata) facade.runtime.sourceMeta = null;
   }
@@ -167,7 +169,7 @@ class SourceRuntimeRecoveryOperations {
       return;
     }
     await _reloginCoordinator.tryReloginFromStoredAccount(
-      SourceFacadeReloginContext(facade),
+      SourceRuntimeReloginContext(handle),
       force: true,
     );
   }

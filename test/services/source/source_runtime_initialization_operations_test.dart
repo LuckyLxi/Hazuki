@@ -16,7 +16,15 @@ import 'package:hazuki/services/source/runtime/source_runtime_state_controller.d
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late SourceRuntimeHost host;
@@ -27,6 +35,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues(const {});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'jm.js'),
       ],
@@ -67,7 +76,23 @@ void main() {
       SourceRuntimePhase.ready,
     );
     expect(host.activeHandle.facade.sourceMeta?.key, 'jm');
-    expect(host.activeHandle.facade.initFuture, isNull);
+    expect(host.activeHandle.runtime.initFuture, isNull);
+  });
+
+  test('state transitions publish matching text with one notification', () {
+    final facade = host.activeHandle.facade;
+    var notifications = 0;
+    host.addListener(() {
+      notifications++;
+      expect(facade.statusText, facade.runtimeState.statusText);
+    });
+    SourceRuntimeStateController().setState(
+      facade: facade,
+      phase: SourceRuntimePhase.ready,
+      statusText: 'ready',
+    );
+    expect(notifications, 1);
+    expect(facade.statusText, 'ready');
   });
 
   test('concurrent initialization requests share one in-flight load', () async {
@@ -91,7 +116,7 @@ void main() {
       final lifetime = SourceTaskCancellation();
       late SourceUiScope firstScope;
       late SourceUiScope secondScope;
-      final first = SourceUiService.instance.run(() {
+      final first = sourceUiService.run(() {
         firstScope = SourceUiScope.current!;
         return host.tasks.run(
           pluginId: 'jm',
@@ -110,7 +135,7 @@ void main() {
       await loader.downloadStarted.future;
       expect(loader.scope, isNot(same(firstScope)));
       expect(firstScope.waiting, isTrue);
-      final second = SourceUiService.instance.run(() {
+      final second = sourceUiService.run(() {
         secondScope = SourceUiScope.current!;
         return initialization.init();
       });
@@ -145,7 +170,7 @@ void main() {
         host.activeHandle.facade.runtimeState.error,
         contains('broken source'),
       );
-      expect(host.activeHandle.facade.initFuture, isNull);
+      expect(host.activeHandle.runtime.initFuture, isNull);
     },
   );
 }

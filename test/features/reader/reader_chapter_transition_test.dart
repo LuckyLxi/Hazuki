@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -25,7 +26,15 @@ import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/test_service_locator.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   setUp(() async {
     SharedPreferences.setMockInitialValues({
       ReaderSettingsStore.windowsShortcutsGuideSeenKey: true,
@@ -490,6 +499,7 @@ ReaderPage _reader({
     ),
   ],
   dependencies: ReaderDependencies(
+    sourceUiService: sourceUiService,
     sourceReader: sourceReader ?? sl<SourceReaderGateway>(),
     readerSessions: readerSessions,
     sourceSettings: sourceSettings ?? sl<SourceSettingsGateway>(),

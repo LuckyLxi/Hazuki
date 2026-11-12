@@ -26,7 +26,8 @@ typedef SourceFavoriteStateUpdater =
 class SourceFavoritesCapability {
   SourceFavoritesCapability({
     required SourceRuntimeHost runtimeHost,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
     required SourceFavoritesComicParser parseExploreComics,
     required SourceFavoriteStateUpdater updateComicDetailsFavoriteState,
     required void Function() notifyCloudFavoritesChanged,
@@ -37,7 +38,8 @@ class SourceFavoritesCapability {
        _notifyCloudFavoritesChanged = notifyCloudFavoritesChanged;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
   final SourceFavoritesResponseParser _responseParser;
   late final SourceFavoriteComicsLoader _comicsLoader =
       SourceFavoriteComicsLoader(
@@ -58,9 +60,6 @@ class SourceFavoritesCapability {
   String _resolveSourceKey(String sourceKey) => sourceKey.trim().isEmpty
       ? _runtimeHost.activeSourceKey
       : _runtimeHost.normalize(sourceKey);
-
-  SourceFacadeReloginContext _reloginContext(HazukiSourceFacade facade) =>
-      SourceFacadeReloginContext(facade);
 
   static String normalizeFolderId(String folderId) =>
       SourceFavoritesResponseParser.normalizeFolderId(folderId);
@@ -195,7 +194,7 @@ class SourceFavoritesCapability {
     final facade = operationContext.resource.facade;
     return await facade.handle.runOperation(() async {
       await facade.ensureInitialized();
-      final context = _reloginContext(facade);
+      final context = SourceRuntimeReloginContext(operationContext.resource);
       final sessionReady = await _reloginCoordinator.ensureFavoriteSessionReady(
         context,
       );
@@ -360,7 +359,7 @@ class SourceFavoritesCapability {
           );
           await operationContext.resolve(facade.js.resolve(result));
         },
-        context: _reloginContext(facade),
+        context: SourceRuntimeReloginContext(operationContext.resource),
         checkActive: operationContext.checkActive,
       );
     });
@@ -414,7 +413,7 @@ class SourceFavoritesCapability {
           );
           await operationContext.resolve(facade.js.resolve(result));
         },
-        context: _reloginContext(facade),
+        context: SourceRuntimeReloginContext(operationContext.resource),
         checkActive: operationContext.checkActive,
       );
     });
@@ -464,7 +463,7 @@ class SourceFavoritesCapability {
           );
           await operationContext.resolve(facade.js.resolve(result));
         },
-        context: _reloginContext(facade),
+        context: SourceRuntimeReloginContext(operationContext.resource),
         checkActive: operationContext.checkActive,
       );
     });
@@ -541,7 +540,7 @@ class SourceFavoritesCapability {
           );
           await operationContext.resolve(facade.js.resolve(result));
         },
-        context: _reloginContext(facade),
+        context: SourceRuntimeReloginContext(operationContext.resource),
         checkActive: operationContext.checkActive,
       );
       if (normalizedComicId.isNotEmpty &&

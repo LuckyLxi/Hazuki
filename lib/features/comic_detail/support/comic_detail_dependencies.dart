@@ -3,12 +3,15 @@ import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 import '../repository/comic_detail_repository.dart';
 
 class ComicDetailDependencies {
+  final SourceUiService sourceUiService;
   final SourceTaskControlGateway taskControl;
   const ComicDetailDependencies({
+    required this.sourceUiService,
     required this.taskControl,
     required this.source,
     this.cloudReading,

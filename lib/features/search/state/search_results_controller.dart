@@ -11,9 +11,11 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class SearchResultsController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   static const Duration _initialSearchRetryDelay = Duration(milliseconds: 450);
 
   SearchResultsController({
+    required this.sourceUiService,
     required String initialOrder,
     required SourceSearchGateway sourceService,
     required this.taskControl,
@@ -35,7 +37,7 @@ class SearchResultsController extends ChangeNotifier {
   final SourceTaskControlGateway taskControl;
   SourceTaskCancellation _requestLifetime = SourceTaskCancellation();
   final String _taskOwnerId = createSourceTaskId();
-  final SourceUiOwner _sourceUi = SourceUiOwner();
+  late final SourceUiOwner _sourceUi = SourceUiOwner(sourceUiService);
   String? _taskGroupId;
 
   void stopPending(SourceTaskStopReason reason) {

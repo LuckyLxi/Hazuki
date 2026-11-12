@@ -15,7 +15,15 @@ import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late MemorySourceSecureSessionStorage storage;
@@ -30,6 +38,7 @@ void main() {
     storage = _Storage();
     http = _Http();
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'sample',
@@ -50,7 +59,7 @@ void main() {
       host: host,
       loadRuntime: (handle) async {
         await handle.session.ensurePrefs();
-        final engine = SourceScriptEngine();
+        final engine = SourceScriptEngine(sourceUiService: sourceUiService);
         handle.runtime.engine = engine;
         final bridge = SourceJsBridgeCookieCapability(
           activeHandle: () => handle,
@@ -94,7 +103,7 @@ void main() {
     test(
       'browser login survives autofill activity suspension: cancelled=$cancelled',
       () async {
-        final ui = SourceUiService.instance;
+        final ui = sourceUiService;
         addTearDown(() => ui.setForeground(true));
         input = 'none';
         script = '''

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -20,7 +21,15 @@ Hazuki.registerSource({id:'website',version:'1.0.0',
 });
 ''';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourcePluginManager manager;
   late SourceRuntimeAssembly assembly;
@@ -35,6 +44,7 @@ void main() {
       legacyDirectories: [],
     );
     assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );

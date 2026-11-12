@@ -15,13 +15,24 @@ import 'package:hazuki/services/source/runtime/source_js_bridge_cookie_capabilit
 SourceScriptExecution execution(String id) =>
     SourceScriptExecution(taskId: id, pluginId: 'fixture', method: 'test.$id');
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
     'exhausting the synchronous host handshake budget is a typed timeout',
     () async {
-      final engine = SourceScriptEngine(timeout: 20);
+      final engine = SourceScriptEngine(
+        sourceUiService: sourceUiService,
+        timeout: 20,
+      );
       addTearDown(engine.close);
       engine.setMessageHandler((_) {
         // Simulate a synchronous service that answers after the worker budget.
@@ -45,7 +56,7 @@ void main() {
   test(
     'cancellation includes commands still waiting for worker ready',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       var completed = false;
       final call = engine.evaluate(
@@ -68,7 +79,7 @@ void main() {
   test(
     'cancel acknowledgements and releases bypass another task spinning microtasks',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final a = engine.evaluate(
         'sendMessage({method:"delay",time:60000})',
@@ -96,7 +107,10 @@ void main() {
   test(
     'a custom Promise reject resolver cannot disable timeout during stop cleanup',
     () async {
-      final engine = SourceScriptEngine(timeout: 40);
+      final engine = SourceScriptEngine(
+        sourceUiService: sourceUiService,
+        timeout: 40,
+      );
       addTearDown(engine.close);
       await expectLater(
         engine.evaluate('''
@@ -114,7 +128,7 @@ void main() {
   );
 
   test('sharing one host resource does not retain its unused sibling', () async {
-    final engine = SourceScriptEngine();
+    final engine = SourceScriptEngine(sourceUiService: sourceUiService);
     addTearDown(engine.close);
     final values = [Completer<int>(), Completer<int>()];
     final contexts = <SourceHostCallContext>[];
@@ -145,7 +159,7 @@ void main() {
   test(
     'a failed job does not end another command with the same task identity',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final b = engine.evaluate(
         'sendMessage({method:"delay",time:100}).then(()=>42)',
@@ -169,7 +183,7 @@ void main() {
   test(
     'deadline stops retain typed identity and repeated cancellation is idempotent',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final call = engine.evaluate(
         'sendMessage({method:"delay",time:60000})',
@@ -199,7 +213,7 @@ void main() {
   test(
     'late subscribers to stopped production fail explicitly without cancelling their own task',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final call = engine.evaluate(
         'globalThis.shared=sendMessage({method:"delay",time:60000});shared',
@@ -227,7 +241,7 @@ void main() {
   test(
     'close waits for an explicitly retained host commit before confirming cleanup',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       final commit = Completer<void>();
       final entered = Completer<void>();
       engine.setOperationMessageHandler((message, context) {
@@ -252,7 +266,7 @@ void main() {
   test(
     'a rejected Promise affects only its own execution and diagnostics omit script contents',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final diagnostic = <Map<String, Object?>>[];
       engine.onDiagnostic = diagnostic.add;
@@ -285,13 +299,17 @@ void main() {
   }) async {
     SharedPreferences.setMockInitialValues({});
     final handle = SourceRuntimeHandle(
+      sourceUiService: sourceUiService,
       sourceKey: 'fixture',
       secureStorage: storage ?? MemorySourceSecureSessionStorage(),
       ensureInitialized: (_) async {},
       notifyRuntimeStateChanged: (_) {},
     );
     await handle.session.ensurePrefs();
-    final engine = SourceScriptEngine(pluginId: 'fixture');
+    final engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'fixture',
+    );
     handle.runtime.engine = engine;
     final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
     engine.setOperationMessageHandler(
@@ -389,7 +407,7 @@ void main() {
   test(
     'the last consumer waits for a retained producer resource to drain',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final host = Completer<int>();
       addTearDown(() {
@@ -428,7 +446,7 @@ void main() {
     () async {
       final storage = MemorySourceSecureSessionStorage();
       final (engine, _) = await httpEngine(storage: storage);
-      final ui = SourceUiService.instance;
+      final ui = sourceUiService;
       ui.setForeground(true);
       addTearDown(ui.detach);
       final shown = Completer<SourceDialogSession>();
@@ -502,7 +520,7 @@ void main() {
   test(
     'shared worker delays survive one cancellation and exclusive long delays settle promptly',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final a = engine.evaluate(
         'globalThis.shared=sendMessage({method:"delay",time:150});shared',
@@ -532,7 +550,7 @@ void main() {
   );
 
   test('a queued command is cancelled before any user side effect', () async {
-    final engine = SourceScriptEngine();
+    final engine = SourceScriptEngine(sourceUiService: sourceUiService);
     addTearDown(engine.close);
     await engine.evaluate('globalThis.effects=0');
     final busy = engine.evaluate(
@@ -552,7 +570,7 @@ void main() {
   test(
     'active computation stops independently and the same runtime remains usable',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       await engine.ready;
       final running = engine.evaluate(
@@ -590,7 +608,7 @@ void main() {
   test(
     'cancelling a shared host producer settles its caller but preserves the consumer',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final host = Completer<int>();
       final called = Completer<SourceHostCallContext>();
@@ -622,7 +640,7 @@ void main() {
   test(
     'exclusive host work signals stop but non-interruptible writes drain before settled',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final write = Completer<void>();
       final started = Completer<SourceHostCallContext>();
@@ -651,7 +669,7 @@ void main() {
   test(
     'returned callbacks retain identity and can be stopped after caller completion',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       final callback =
           await engine.evaluate('()=>42', execution: execution('A'))

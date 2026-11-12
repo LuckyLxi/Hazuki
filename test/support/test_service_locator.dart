@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'source_catalog_fixtures.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
@@ -10,12 +11,17 @@ import 'package:hazuki/services/storage/hazuki_database.dart';
 /// 需要使用 fake 的测试可以在调用此辅助函数后调用 [sl.reset] 并注册自己的实现。
 Future<void> ensureTestServiceLocator() async {
   await sl.reset();
+  sl.registerSingleton<SourceUiService>(
+    SourceUiService(),
+    dispose: (service) => service.detach(),
+  );
   sl.registerLazySingleton<HazukiDatabase>(
     () => HazukiDatabase.memory(),
     dispose: (database) => database.close(),
   );
   sl.registerLazySingleton<SourceRuntimeAssembly>(
     () => SourceRuntimeAssembly(
+      sourceUiService: sl<SourceUiService>(),
       initialCatalog: hazukiAllowedSourceCatalog,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     ),

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/account/source_relogin_coordinator.dart';
@@ -8,7 +9,15 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
@@ -17,7 +26,7 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final host = _createHost();
       addTearDown(host.dispose);
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       host.handleFor('jm').runtime.engine = engine;
       final capability = _createCapability(host);
@@ -77,7 +86,7 @@ globalThis.__hazuki_source.favorites.renameFolder = async () => {
       SharedPreferences.setMockInitialValues({});
       final host = _createHost();
       addTearDown(host.dispose);
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(engine.close);
       host.handleFor('copy_manga').runtime.engine = engine;
       await engine.evaluate('''
@@ -175,6 +184,7 @@ SourceFavoritesCapability _createCapability(
 
 SourceRuntimeHost _createHost() {
   return SourceRuntimeHost(
+    sourceUiService: sourceUiService,
     catalog: const [
       SourceCatalogEntry(key: 'jm', name: 'JM', fileName: 'jm.js'),
       SourceCatalogEntry(

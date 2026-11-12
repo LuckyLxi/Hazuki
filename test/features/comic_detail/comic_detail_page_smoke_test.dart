@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 import '../../support/fake_source_task_control.dart';
 import '../../support/source_presentation_fixtures.dart';
@@ -74,6 +75,7 @@ final ReaderCommentsWidgetBuilder _buildReaderComments =
 
 ReaderDependencies _readerDependencies() {
   return ReaderDependencies(
+    sourceUiService: sourceUiService,
     sourceReader: sl<SourceReaderGateway>(),
     sourceSettings: sl<SourceSettingsGateway>(),
     readingProgressService: sl<ReadingProgressService>(),
@@ -85,6 +87,7 @@ ComicDetailDependencies _comicDetailDependencies({
   MangaDownloadCommands? downloader,
 }) {
   return ComicDetailDependencies(
+    sourceUiService: sourceUiService,
     source: sl<SourceComicDetailGateway>(),
     localFavorites: sl<LocalFavoritesRepository>(),
     downloader: downloader ?? sl<MangaDownloadService>(),
@@ -95,7 +98,15 @@ ComicDetailDependencies _comicDetailDependencies({
   );
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -354,6 +365,7 @@ void main() {
                     offlineMode: true,
                     offlineChapters: offlineChapters,
                     dependencies: ReaderDependencies(
+                      sourceUiService: sourceUiService,
                       sourceReader: sl<SourceReaderGateway>(),
                       sourceSettings: sl<SourceSettingsGateway>(),
                       readingProgressService: progress,

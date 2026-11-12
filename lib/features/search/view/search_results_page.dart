@@ -10,6 +10,7 @@ import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import '../state/aggregate_search_results_controller.dart';
 import '../state/search_focus_coordinator.dart';
@@ -192,6 +193,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _aggregateSearchEnabled = widget.aggregateSearchEnabled ?? false;
     _comicLayout = widget.comicLayout ?? SearchComicLayout.list;
     _resultsController = SearchResultsController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       taskControl: widget.taskControl,
       initialOrder: widget.initialOrder,
       sourceService: widget.sourceService,
@@ -199,6 +201,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       comicDetailsLoader: widget.comicDetailsLoader,
     );
     _aggregateResultsController = AggregateSearchResultsController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       taskControl: widget.taskControl,
       sourceService: _sourceService,
     );

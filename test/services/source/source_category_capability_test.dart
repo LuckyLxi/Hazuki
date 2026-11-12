@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,7 +9,15 @@ import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   test('parses category and explore View More targets', () {
     expect(
@@ -70,6 +79,7 @@ void main() {
       final host = _createHost();
       addTearDown(host.dispose);
       final engine = SourceScriptEngine(
+        sourceUiService: sourceUiService,
         timeout: 5000,
         hostPromiseRejectionHandler: (_) {},
       );
@@ -121,6 +131,7 @@ globalThis.__hazuki_source = {categoryComics: {
 
 SourceRuntimeHost _createHost() {
   return SourceRuntimeHost(
+    sourceUiService: sourceUiService,
     catalog: const [
       SourceCatalogEntry(key: 'jm', name: 'JM', fileName: 'jm.js'),
     ],

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -93,7 +94,15 @@ PreparedChapterImageData _image(double ratio) => PreparedChapterImageData(
   aspectRatio: ratio,
 );
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late ReaderRuntimeState state;
   late ReaderImagePipelineState pipeline;
@@ -113,6 +122,7 @@ void main() {
     addTearDown(tasks.dispose);
     addTearDown(pipeline.dispose);
     controller = ReaderImagePipelineController(
+      sourceUiService: sourceUiService,
       runtimeState: state,
       pipelineState: pipeline,
       diagnosticsState: ReaderDiagnosticsState(),

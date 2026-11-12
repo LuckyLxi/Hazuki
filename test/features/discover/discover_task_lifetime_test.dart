@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -54,7 +55,15 @@ class _Source extends ChangeNotifier implements SourceDiscoverGateway {
   }) async => [];
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late _Source source;
   late FakeSourceTaskControl control;
@@ -72,6 +81,7 @@ void main() {
     source = _Source();
     control = FakeSourceTaskControl();
     controller = DiscoverPageController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       taskControl: control,
     );
@@ -134,6 +144,7 @@ void main() {
   test('disposal releases only the controller owner', () async {
     final anotherControl = FakeSourceTaskControl();
     final another = DiscoverPageController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       taskControl: anotherControl,
     );

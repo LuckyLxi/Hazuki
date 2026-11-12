@@ -16,19 +16,27 @@ Matcher _failedWith(SourceRuntimeFailureKind kind, {String? taskId}) =>
         .having((e) => e.kind, 'kind', kind)
         .having((e) => e.taskId, 'taskId', taskId);
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
     'an internal job failure fails pending and new calls with a typed runtime failure',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(() => _closeQuietly(engine));
       final host = Completer<int>();
       engine.setMessageHandler((_) => host.future);
       await engine.ready;
       late SourceUiScope scope;
-      final pending = SourceUiService.instance.run(() {
+      final pending = sourceUiService.run(() {
         scope = SourceUiScope.current!;
         return engine.evaluate(
           '(async()=>await sendMessage({}))()',
@@ -66,7 +74,7 @@ void main() {
   test(
     'calls racing the worker control shutdown still receive the typed failure',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(() => _closeQuietly(engine));
       await engine.ready;
       engine.debugInjectFault('internalJob');
@@ -86,7 +94,7 @@ void main() {
   );
 
   test('normal close never reports a runtime failure', () async {
-    final engine = SourceScriptEngine();
+    final engine = SourceScriptEngine(sourceUiService: sourceUiService);
     await engine.ready;
     expect(await engine.evaluate('1'), 1);
     var failed = false;
@@ -101,7 +109,7 @@ void main() {
   test(
     'an interrupted computation runs one healthy probe and the runtime stays usable',
     () async {
-      final engine = SourceScriptEngine();
+      final engine = SourceScriptEngine(sourceUiService: sourceUiService);
       addTearDown(() => _closeQuietly(engine));
       final probes = <Map<String, Object?>>[];
       engine.onDiagnostic = (data) {
@@ -131,7 +139,7 @@ void main() {
   );
 
   test('a command cancelled while queued does not run a probe', () async {
-    final engine = SourceScriptEngine();
+    final engine = SourceScriptEngine(sourceUiService: sourceUiService);
     addTearDown(() => _closeQuietly(engine));
     var probes = 0;
     engine.onDiagnostic = (data) {
@@ -157,7 +165,7 @@ void main() {
   });
 
   test('a failed probe turns into a typed runtime failure', () async {
-    final engine = SourceScriptEngine();
+    final engine = SourceScriptEngine(sourceUiService: sourceUiService);
     addTearDown(() => _closeQuietly(engine));
     await engine.ready;
     engine.debugInjectFault('probe');
@@ -176,7 +184,7 @@ void main() {
 
   // 以下两项让 worker 不经正常释放就退出，放在本文件最后，避免影响资源基线。
   test('an uncaught worker error is a workerError failure', () async {
-    final engine = SourceScriptEngine();
+    final engine = SourceScriptEngine(sourceUiService: sourceUiService);
     addTearDown(() => _closeQuietly(engine));
     await engine.ready;
     engine.debugInjectFault('workerError');
@@ -189,7 +197,7 @@ void main() {
   });
 
   test('a worker exit without cleanup is reported as such', () async {
-    final engine = SourceScriptEngine();
+    final engine = SourceScriptEngine(sourceUiService: sourceUiService);
     addTearDown(() => _closeQuietly(engine));
     await engine.ready;
     engine.debugInjectFault('exitWithoutCleanup');

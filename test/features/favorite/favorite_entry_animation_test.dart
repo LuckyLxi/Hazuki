@@ -1,3 +1,4 @@
+import '../../support/source_presentation_fixtures.dart';
 import '../../support/fake_source_task_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -113,22 +114,24 @@ Future<_Source> _pumpPage(
   final appearance = _Appearance(layout);
   addTearDown(appearance.dispose);
   await tester.pumpWidget(
-    MaterialApp(
-      theme: ThemeData(platform: TargetPlatform.android),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: HazukiThemeControllerScope(
-        controller: appearance,
-        child: Scaffold(
-          body: FavoritePage(
-            sourceService: source,
-            localFavoritesRepository: _Local(),
-            localFavoritesPreferences:
-                SharedPreferencesLocalFavoritesPreferencesStore(),
-            imageGateway: _Images(),
-            authVersion: 0,
-            onComicTap: (_, _) async {},
-            taskControl: FakeSourceTaskControl(),
+    withTestSourcePresentation(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.android),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HazukiThemeControllerScope(
+          controller: appearance,
+          child: Scaffold(
+            body: FavoritePage(
+              sourceService: source,
+              localFavoritesRepository: _Local(),
+              localFavoritesPreferences:
+                  SharedPreferencesLocalFavoritesPreferencesStore(),
+              imageGateway: _Images(),
+              authVersion: 0,
+              onComicTap: (_, _) async {},
+              taskControl: FakeSourceTaskControl(),
+            ),
           ),
         ),
       ),

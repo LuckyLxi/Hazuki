@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -25,7 +26,15 @@ Future<void> _until(bool Function() predicate) async {
   expect(predicate(), isTrue);
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceScriptEngine main;
@@ -44,7 +53,10 @@ void main() {
     private.add(handle);
     await beforeLoad?.call(handle);
     handle.loadControl!.checkActive();
-    final engine = SourceScriptEngine(pluginId: 'one');
+    final engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'one',
+    );
     engine.operationGuard = handle.runOperation;
     handle.loadControl!.bindEngine(engine);
     handle.runtime.engine = engine;
@@ -72,6 +84,7 @@ void main() {
     beforeLoad = null;
     privateScript = script;
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'one', name: 'One', fileName: 'one.js'),
         SourceCatalogEntry(key: 'two', name: 'Two', fileName: 'two.js'),
@@ -88,7 +101,10 @@ void main() {
       'login_session',
       'account',
     );
-    main = SourceScriptEngine(pluginId: 'one');
+    main = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'one',
+    );
     main.operationGuard = host.activeHandle.runOperation;
     host.activeHandle.runtime.engine = main;
     await main.execute(script);

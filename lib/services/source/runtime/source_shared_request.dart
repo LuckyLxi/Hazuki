@@ -10,7 +10,10 @@ import 'source_task_registry.dart';
 
 /// A Dart-side shared producer. Subscriptions never own each other's lifetime.
 class SourceSharedRequest<T> {
+  final SourceUiService sourceUiService;
+
   SourceSharedRequest({
+    required this.sourceUiService,
     required this.pluginId,
     required this.method,
     required Future<T> Function(SourceSharedRequest<T>) operation,
@@ -112,13 +115,13 @@ class SourceSharedRequest<T> {
   /// Existing plugin-requested recovery must not reuse a retired UI scope.
   Future<R> withUiScope<R>(Future<R> Function() operation) {
     checkActive();
-    if (SourceUiScope.current?.available == true) return operation();
+    if (sourceUiService.currentScope?.available == true) return operation();
     return SourceUiScope.withoutInteraction(
-      () => SourceUiService.instance.run(
+      () => sourceUiService.run(
         () async {
           final previous = _scope;
           previous?.removeListener(_waitingChanged);
-          _scope = SourceUiScope.current;
+          _scope = sourceUiService.currentScope;
           _scope?.addListener(_waitingChanged);
           _waitingChanged();
           try {
@@ -142,9 +145,9 @@ class SourceSharedRequest<T> {
     _started = true;
     _result.future.ignore();
     SourceUiScope.withoutInteraction(
-      () => SourceUiService.instance.run(
+      () => sourceUiService.run(
         () async {
-          _scope = SourceUiScope.current;
+          _scope = sourceUiService.currentScope;
           _scope?.addListener(_waitingChanged);
           try {
             checkActive();
@@ -185,7 +188,7 @@ class SourceSharedRequest<T> {
     checkActive();
     task?.checkActive();
     final id = Object();
-    final scope = SourceUiScope.current;
+    final scope = sourceUiService.currentScope;
     _subscribers[id] = scope;
     _subscriberTasks[id] = task;
     _metadata[id] = metadata;

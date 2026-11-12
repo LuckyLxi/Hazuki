@@ -9,7 +9,9 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class HomeProfileController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   HomeProfileController({
+    required this.sourceUiService,
     required SourceTaskControlGateway taskControl,
     required SourceHomeGateway sourceService,
     HazukiGeneralPreferencesStore preferences =
@@ -22,7 +24,7 @@ class HomeProfileController extends ChangeNotifier {
   final HazukiGeneralPreferencesStore _preferences;
 
   bool _disposed = false;
-  final _sourceUi = SourceUiOwner();
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   final SourceTaskOwner _readTasks;
   String _username = '';
   String? _avatarUrl;

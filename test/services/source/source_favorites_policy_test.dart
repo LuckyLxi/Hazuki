@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/source_catalog_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/source_meta.dart';
@@ -6,7 +7,15 @@ import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('uninitialized runtimes report no favorite capabilities', () {
@@ -87,6 +96,7 @@ Future<SourceRuntimeHost> _initializedHost(String sourceKey) async {
 
 SourceRuntimeHost _createHost(String defaultSourceKey) {
   return SourceRuntimeHost(
+    sourceUiService: sourceUiService,
     catalog: hazukiAllowedSourceCatalog,
     defaultSourceKey: defaultSourceKey,
     secureSessionStorage: MemorySourceSecureSessionStorage(),

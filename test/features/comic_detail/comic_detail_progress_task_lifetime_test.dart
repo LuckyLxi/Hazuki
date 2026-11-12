@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -6,7 +7,15 @@ import 'package:hazuki/features/comic_detail/support/comic_detail_session_contro
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/models/source_task.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
@@ -14,6 +23,7 @@ void main() {
     () async {
       final repository = _Repository();
       final controller = ComicDetailSessionController(
+        sourceUiService: sourceUiService,
         repository: repository,
         comic: const ExploreComic(
           id: 'comic',

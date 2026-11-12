@@ -1,3 +1,4 @@
+import '../../support/source_presentation_fixtures.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
@@ -61,16 +62,18 @@ void main() {
     TargetPlatform platform = TargetPlatform.android,
   }) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: ThemeData(platform: platform),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: TagCategoryPage(
-          searchPageBuilder: (_) => const SizedBox.shrink(),
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-          categorySource: categorySource,
-          discoverSource: discoverSource,
-          taskControl: FakeSourceTaskControl(),
+      withTestSourcePresentation(
+        MaterialApp(
+          theme: ThemeData(platform: platform),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: TagCategoryPage(
+            searchPageBuilder: (_) => const SizedBox.shrink(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            categorySource: categorySource,
+            discoverSource: discoverSource,
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     );
@@ -101,58 +104,60 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          navigatorKey: navigatorKey,
-          theme: ThemeData(platform: TargetPlatform.windows),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          builder: (context, child) => WindowsComicDetailPresentationScope(
-            panelBuilder:
-                (
-                  comic,
-                  heroTag, {
-                  required shouldAnimatePanelReveal,
-                  required isRestoringPreviousDetail,
-                  required initialTabIndex,
-                  required showHomeAction,
-                  required onBackRequested,
-                  required onHomeRequested,
-                }) => Material(
-                  child: Column(
-                    children: [
-                      Text('Detail ${comic.id}'),
-                      TextButton(
-                        onPressed: onBackRequested,
-                        child: const Text('Close detail'),
-                      ),
-                      Builder(
-                        builder: (context) => TextButton(
-                          onPressed: () => Navigator.of(context).push<void>(
-                            buildComicDetailDestinationRoute(
-                              context,
-                              (_) => DiscoverSectionPage(
-                                taskControl: FakeSourceTaskControl(),
-                                section: const ExploreSection(
-                                  title: 'Adventure',
-                                  comics: [],
-                                  viewMoreUrl: 'category:Adventure',
+        withTestSourcePresentation(
+          MaterialApp(
+            navigatorKey: navigatorKey,
+            theme: ThemeData(platform: TargetPlatform.windows),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => WindowsComicDetailPresentationScope(
+              panelBuilder:
+                  (
+                    comic,
+                    heroTag, {
+                    required shouldAnimatePanelReveal,
+                    required isRestoringPreviousDetail,
+                    required initialTabIndex,
+                    required showHomeAction,
+                    required onBackRequested,
+                    required onHomeRequested,
+                  }) => Material(
+                    child: Column(
+                      children: [
+                        Text('Detail ${comic.id}'),
+                        TextButton(
+                          onPressed: onBackRequested,
+                          child: const Text('Close detail'),
+                        ),
+                        Builder(
+                          builder: (context) => TextButton(
+                            onPressed: () => Navigator.of(context).push<void>(
+                              buildComicDetailDestinationRoute(
+                                context,
+                                (_) => DiscoverSectionPage(
+                                  taskControl: FakeSourceTaskControl(),
+                                  section: const ExploreSection(
+                                    title: 'Adventure',
+                                    comics: [],
+                                    viewMoreUrl: 'category:Adventure',
+                                  ),
+                                  comicDetailPageBuilder: (_, _) =>
+                                      const SizedBox.shrink(),
+                                  sourceService: discoverSource,
                                 ),
-                                comicDetailPageBuilder: (_, _) =>
-                                    const SizedBox.shrink(),
-                                sourceService: discoverSource,
                               ),
                             ),
+                            child: const Text('Special tag'),
                           ),
-                          child: const Text('Special tag'),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-            child: child!,
-          ),
-          home: const WindowsComicDetailHost(
-            child: Scaffold(body: Text('Home')),
+              child: child!,
+            ),
+            home: const WindowsComicDetailHost(
+              child: Scaffold(body: Text('Home')),
+            ),
           ),
         ),
       );
@@ -368,18 +373,20 @@ void main() {
 
     // Loading indicators animate continuously until the first request finishes.
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: DiscoverSectionPage(
-          section: const ExploreSection(
-            title: 'Adventure',
-            comics: [],
-            viewMoreUrl: 'category:Adventure',
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: DiscoverSectionPage(
+            section: const ExploreSection(
+              title: 'Adventure',
+              comics: [],
+              viewMoreUrl: 'category:Adventure',
+            ),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            sourceService: discoverSource,
+            taskControl: FakeSourceTaskControl(),
           ),
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-          sourceService: discoverSource,
-          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -419,15 +426,17 @@ void main() {
         ),
       ).thenAnswer((_) => result.future);
       await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: TagCategoryPage(
-            searchPageBuilder: (_) => const SizedBox.shrink(),
-            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-            categorySource: categorySource,
-            discoverSource: discoverSource,
-            taskControl: FakeSourceTaskControl(),
+        withTestSourcePresentation(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: TagCategoryPage(
+              searchPageBuilder: (_) => const SizedBox.shrink(),
+              comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+              categorySource: categorySource,
+              discoverSource: discoverSource,
+              taskControl: FakeSourceTaskControl(),
+            ),
           ),
         ),
       );
@@ -507,15 +516,17 @@ void main() {
     addTearDown(() => debugOnRebuildDirtyWidget = previousCallback);
 
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: TagCategoryPage(
-          searchPageBuilder: (_) => const SizedBox.shrink(),
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-          categorySource: categorySource,
-          discoverSource: discoverSource,
-          taskControl: FakeSourceTaskControl(),
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: TagCategoryPage(
+            searchPageBuilder: (_) => const SizedBox.shrink(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            categorySource: categorySource,
+            discoverSource: discoverSource,
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     );
@@ -562,15 +573,17 @@ void main() {
           .value;
 
       await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: TagCategoryPage(
-            searchPageBuilder: (_) => const SizedBox.shrink(),
-            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-            categorySource: categorySource,
-            discoverSource: discoverSource,
-            taskControl: FakeSourceTaskControl(),
+        withTestSourcePresentation(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: TagCategoryPage(
+              searchPageBuilder: (_) => const SizedBox.shrink(),
+              comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+              categorySource: categorySource,
+              discoverSource: discoverSource,
+              taskControl: FakeSourceTaskControl(),
+            ),
           ),
         ),
       );

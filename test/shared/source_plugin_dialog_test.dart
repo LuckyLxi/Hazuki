@@ -9,7 +9,15 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/models/source_script_execution.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   testWidgets(
     'point image fits a narrow window, keeps order and clears points on refresh',
     (tester) async {
@@ -23,7 +31,10 @@ void main() {
         ).readAsBytes(),
       ))!;
       final key = GlobalKey<NavigatorState>();
-      final presenter = SourcePluginDialogPresenter(key);
+      final presenter = SourcePluginDialogPresenter(
+        sourceUiService: sourceUiService,
+        key,
+      );
       addTearDown(presenter.dispose);
       await tester.pumpWidget(
         MaterialApp(
@@ -35,7 +46,7 @@ void main() {
           home: const Scaffold(),
         ),
       );
-      final service = SourceUiService.instance;
+      final service = sourceUiService;
       final show = service.presenter!;
       late SourceDialogSession dialog;
       service.presenter = (d) {
@@ -138,7 +149,10 @@ void main() {
     'form preserves input on update, validates and closes only its dialog route',
     (tester) async {
       final key = GlobalKey<NavigatorState>();
-      final presenter = SourcePluginDialogPresenter(key);
+      final presenter = SourcePluginDialogPresenter(
+        sourceUiService: sourceUiService,
+        key,
+      );
       addTearDown(presenter.dispose);
       await tester.pumpWidget(
         MaterialApp(
@@ -150,7 +164,7 @@ void main() {
           home: const Scaffold(body: Text('Home')),
         ),
       );
-      final service = SourceUiService.instance;
+      final service = sourceUiService;
       late SourceDialogSession dialog;
       final show = service.presenter!;
       service.presenter = (value) {
@@ -244,7 +258,10 @@ void main() {
     'a new page does not revoke plugin interaction or get popped on close',
     (tester) async {
       final key = GlobalKey<NavigatorState>();
-      final presenter = SourcePluginDialogPresenter(key);
+      final presenter = SourcePluginDialogPresenter(
+        sourceUiService: sourceUiService,
+        key,
+      );
       addTearDown(presenter.dispose);
       await tester.pumpWidget(
         MaterialApp(
@@ -255,7 +272,7 @@ void main() {
           home: const Scaffold(body: Text('Home')),
         ),
       );
-      final operation = SourceUiService.instance.run(() async {
+      final operation = sourceUiService.run(() async {
         final scope = SourceUiScope.current!..runtimeIds.add('test');
         final execution = SourceScriptExecution(
           taskId: 'test',
@@ -263,7 +280,7 @@ void main() {
           method: 'test',
           uiScopeId: scope.id,
         );
-        final id = await SourceUiService.instance.handle(
+        final id = await sourceUiService.handle(
           {
             'method': 'ui_open',
             'options': {
@@ -280,7 +297,7 @@ void main() {
           'test',
           'Plugin',
         );
-        await SourceUiService.instance.handle(
+        await sourceUiService.handle(
           {'method': 'ui_next_event', 'id': id},
           execution,
           'test',
@@ -297,9 +314,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('New page'), findsOneWidget);
-      final scope = SourceUiService.instance.scopes.single;
+      final scope = sourceUiService.scopes.single;
       expect(scope.available, true);
-      SourceUiService.instance.cancelRuntime('test');
+      sourceUiService.cancelRuntime('test');
       await expectLater(operation, throwsA(isA<SourceUiCancelled>()));
       await tester.pumpAndSettle();
       expect(find.text('New page'), findsOneWidget);

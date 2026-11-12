@@ -100,6 +100,7 @@ class SourceCloudReadingSession {
     if (pending == null || !pending.available) {
       late final SourceSharedRequest<SourceRuntimeHandle> created;
       created = SourceSharedRequest<SourceRuntimeHandle>(
+        sourceUiService: host.sourceUiService,
         pluginId: owner.sourceKey,
         method: 'cloud.initialize',
         drainOperationOnStop: true,
@@ -111,6 +112,7 @@ class SourceCloudReadingSession {
           final storage = SourceLoginStorageTransaction(owner.secureStorage);
           final handle =
               SourceRuntimeHandle(
+                  sourceUiService: host.sourceUiService,
                   sourceKey: owner.sourceKey,
                   secureStorage: storage,
                   tasks: host.tasks,

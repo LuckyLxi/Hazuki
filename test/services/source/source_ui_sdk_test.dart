@@ -12,13 +12,24 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'quick dialogs return values, validate input and propagate cancellation',
     () async {
-      final service = SourceUiService.instance;
-      final engine = SourceScriptEngine(pluginId: 'quick');
+      final service = sourceUiService;
+      final engine = SourceScriptEngine(
+        sourceUiService: sourceUiService,
+        pluginId: 'quick',
+      );
       addTearDown(engine.close);
       addTearDown(service.detach);
       engine.setContextMessageHandler(
@@ -98,11 +109,12 @@ void main() {
         download: (_) async => throw StateError('offline'),
       );
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
       addTearDown(() async {
-        SourceUiService.instance.detach();
+        sourceUiService.detach();
         assembly.dispose();
         await directory.delete(recursive: true);
       });
@@ -130,14 +142,14 @@ void main() {
       final handle = assembly.testing.handleFor('ui_runtime');
       handle.cache.imageCacheDir = directory;
       final titles = <Object>[];
-      SourceUiService.instance.presenter = (dialog) async {
+      sourceUiService.presenter = (dialog) async {
         titles.add(dialog.model.title);
         dialog.markShown();
         dialog.setValue('answer', 'accepted');
         dialog.action('ok');
         await dialog.whenClosed;
       };
-      final result = await SourceUiService.instance.run(
+      final result = await sourceUiService.run(
         () => assembly.gateways.search.searchComics(
           keyword: 'test',
           page: 1,
@@ -188,12 +200,12 @@ void main() {
       final pendingHandle = assembly.testing.handleFor('pending_ui');
       pendingHandle.cache.imageCacheDir = directory;
       final showing = Completer<SourceDialogSession>();
-      SourceUiService.instance.presenter = (dialog) async {
+      sourceUiService.presenter = (dialog) async {
         dialog.markShown();
         showing.complete(dialog);
         await dialog.whenClosed;
       };
-      final pending = SourceUiService.instance.run(
+      final pending = sourceUiService.run(
         () => assembly.ensureSourceInitialized('pending_ui'),
       );
       final cancelled = expectLater(
@@ -215,8 +227,11 @@ void main() {
   test(
     'real QuickJS round-trips form updates and cancellation with task ownership',
     () async {
-      final service = SourceUiService.instance;
-      final engine = SourceScriptEngine(pluginId: 'example');
+      final service = sourceUiService;
+      final engine = SourceScriptEngine(
+        sourceUiService: sourceUiService,
+        pluginId: 'example',
+      );
       addTearDown(engine.close);
       addTearDown(service.detach);
       engine.setContextMessageHandler(

@@ -19,7 +19,15 @@ import 'package:hazuki/services/source/content/source_cloud_reading.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
 import 'package:hazuki/services/source/models/source_task.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'foreground candidate cleanup preserves the original initialization error',
@@ -32,7 +40,7 @@ void main() {
         ),
       );
       await expectLater(
-        SourceUiService.instance.run(
+        sourceUiService.run(
           () => fixture.loader.loadMetadata(
             fixture.host.activeHandle,
             fixture.file,
@@ -144,6 +152,7 @@ void main() {
     final store = _LoaderScriptStore(sourceFile);
     late SourceRuntimeHost host;
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'jm.js'),
       ],
@@ -363,6 +372,7 @@ _createRuntimeFixture() async {
   final file = File('${root.path}/main.js');
   await file.writeAsString(_runtimeScript('1.0.0'));
   final host = SourceRuntimeHost(
+    sourceUiService: sourceUiService,
     catalog: const [
       SourceCatalogEntry(key: 'jm', name: 'Test', fileName: 'main.js'),
     ],

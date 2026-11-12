@@ -1,3 +1,5 @@
+import '../../support/source_presentation_fixtures.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,13 +35,27 @@ class _Preferences extends Mock implements LocalFavoritesPreferencesStore {}
 class _Images extends Mock implements SourceImageGateway {}
 
 Widget _app(Widget child) => MaterialApp(
+  builder: (context, child) => withTestSourcePresentation(
+    child!,
+    sourceUiService: sourceUiService,
+    activeSourceKey: '',
+    catalog: const [],
+  ),
   locale: const Locale('zh'),
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: Scaffold(body: child),
 );
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _Source source;
 
   setUp(() {
@@ -126,6 +142,7 @@ void main() {
     ) async {
       when(() => source.activeSourceKey).thenReturn(sourceKey);
       final controller = HomeProfileController(
+        sourceUiService: sourceUiService,
         sourceService: source,
         taskControl: FakeSourceTaskControl(),
       );

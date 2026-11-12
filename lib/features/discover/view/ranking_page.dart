@@ -2,6 +2,7 @@ import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../models/hazuki_models.dart';
@@ -46,6 +47,7 @@ class _RankingPageState extends State<RankingPage> {
   void initState() {
     super.initState();
     _ranking = RankingPageController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       sourceService: widget.sourceService,
       taskControl: widget.taskControl,
       optionsTimeoutMessage: () =>

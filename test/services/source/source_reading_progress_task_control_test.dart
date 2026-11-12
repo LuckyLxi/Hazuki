@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -20,7 +21,15 @@ Future<void> _until(bool Function() predicate) async {
   expect(predicate(), isTrue);
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceScriptEngine engine;
@@ -39,7 +48,10 @@ void main() {
   };
 
   Future<void> install(SourceRuntimeHandle handle, {String? script}) async {
-    final next = SourceScriptEngine(pluginId: 'one');
+    final next = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'one',
+    );
     engine = next;
     next.operationGuard = handle.runOperation;
     handle.runtime.engine = next;
@@ -67,6 +79,7 @@ void main() {
     logs = AppLogStore(supportDirectory: () async => directory);
     await logs.setCaptureEnabled(true);
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'one',

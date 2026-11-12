@@ -17,8 +17,10 @@ import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class ReaderImagePipelineController {
-  final _sourceUi = SourceUiOwner();
+  final SourceUiService sourceUiService;
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   ReaderImagePipelineController({
+    required this.sourceUiService,
     required ReaderImageContentState runtimeState,
     required ReaderImagePipelineState pipelineState,
     required ReaderDiagnosticsState diagnosticsState,

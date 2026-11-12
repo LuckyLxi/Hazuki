@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:flutter/foundation.dart';
@@ -7,10 +8,19 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/gateways/source_content_gateways.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   test('loads remote comics without a home preview filter', () async {
     final source = _FakeDiscoverGateway();
     final controller = DiscoverSectionPageController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       viewMoreUrl: 'category:Serial updates@0',
       initialComics: [_comic('preview')],
@@ -30,6 +40,7 @@ void main() {
   test('falls back to remote comics when loading sort options fails', () async {
     final source = _FakeDiscoverGateway()..throwOnOptionsLoad = true;
     final controller = DiscoverSectionPageController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       viewMoreUrl: 'category:Serial updates@0',
       initialComics: [_comic('preview')],
@@ -56,6 +67,7 @@ void main() {
         [CategoryRankingOption(value: 'score', label: 'Score')],
       ];
     final controller = DiscoverSectionPageController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       viewMoreUrl: 'category:genre',
       taskControl: FakeSourceTaskControl(),

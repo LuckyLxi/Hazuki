@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -16,7 +17,15 @@ class _Local extends Mock implements LocalFavoritesRepository {}
 
 class _Preferences extends Mock implements LocalFavoritesPreferencesStore {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   setUpAll(() => registerFallbackValue(FavoritePageMode.cloud));
   late _Source source;
   late _Local local;
@@ -112,6 +121,7 @@ void main() {
       return const FavoriteComicsResult.success([]);
     });
     controller = FavoritePageController(
+      sourceUiService: sourceUiService,
       taskControl: FakeSourceTaskControl(),
       sourceService: source,
       localFavoritesRepository: local,

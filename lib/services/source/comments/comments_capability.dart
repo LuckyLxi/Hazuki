@@ -13,12 +13,14 @@ import '../runtime/source_runtime_host.dart';
 class SourceCommentsCapability {
   SourceCommentsCapability({
     required SourceRuntimeHost runtimeHost,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
   }) : _runtimeHost = runtimeHost,
        _reloginCoordinator = reloginCoordinator;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
 
   String _resolveSourceKey(String sourceKey) => sourceKey.trim().isEmpty
       ? _runtimeHost.activeSourceKey
@@ -29,11 +31,10 @@ class SourceCommentsCapability {
 
   Future<T> _runWithReloginRetry<T>(
     SourceOperationContext operationContext,
-    Future<T> Function() action, {
-    required HazukiSourceFacade facade,
-  }) => _reloginCoordinator.runWithReloginRetry(
+    Future<T> Function() action,
+  ) => _reloginCoordinator.runWithReloginRetry(
     action,
-    context: SourceFacadeReloginContext(facade),
+    context: SourceRuntimeReloginContext(operationContext.resource),
     checkActive: operationContext.checkActive,
   );
 
@@ -289,7 +290,7 @@ class SourceCommentsCapability {
         await operationContext.resolve(facade.js.resolve(result));
       }
 
-      await _runWithReloginRetry(operationContext, runSend, facade: facade);
+      await _runWithReloginRetry(operationContext, runSend);
     });
   }
 
@@ -345,7 +346,7 @@ class SourceCommentsCapability {
         await operationContext.resolve(facade.js.resolve(result));
       }
 
-      await _runWithReloginRetry(operationContext, runLike, facade: facade);
+      await _runWithReloginRetry(operationContext, runLike);
     });
   }
 

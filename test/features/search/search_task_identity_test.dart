@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
@@ -75,10 +76,19 @@ SearchComicsResult _result(String id) => SearchComicsResult(
 const _messages = SearchMessages(timeout: 'timeout', failed: _failure);
 String _failure(String message) => message;
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _Source source;
   SearchResultsController single() {
     final controller = SearchResultsController(
+      sourceUiService: sourceUiService,
       taskControl: FakeSourceTaskControl(),
       initialOrder: '',
       sourceService: source,
@@ -89,6 +99,7 @@ void main() {
 
   AggregateSearchResultsController aggregate() {
     final controller = AggregateSearchResultsController(
+      sourceUiService: sourceUiService,
       taskControl: FakeSourceTaskControl(),
       sourceService: source,
     );
@@ -158,6 +169,7 @@ void main() {
       'single ${dispose ? 'disposal' : 'plugin replacement'} invalidates pending results',
       () async {
         final controller = SearchResultsController(
+          sourceUiService: sourceUiService,
           taskControl: FakeSourceTaskControl(),
           initialOrder: '',
           sourceService: source,
@@ -239,6 +251,7 @@ void main() {
       'aggregate ${dispose ? 'disposal' : 'plugin replacement'} rejects late sections',
       () async {
         final controller = AggregateSearchResultsController(
+          sourceUiService: sourceUiService,
           taskControl: FakeSourceTaskControl(),
           sourceService: source,
         );
@@ -434,6 +447,7 @@ void main() {
       (tester) async {
         final control = FakeSourceTaskControl();
         final controller = SearchResultsController(
+          sourceUiService: sourceUiService,
           initialOrder: '',
           sourceService: source,
           taskControl: control,
@@ -464,6 +478,7 @@ void main() {
   test('aggregate retry cancels only its own source branch', () async {
     final control = FakeSourceTaskControl();
     final controller = AggregateSearchResultsController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       taskControl: control,
     );

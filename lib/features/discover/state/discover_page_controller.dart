@@ -10,7 +10,9 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class DiscoverPageController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   DiscoverPageController({
+    required this.sourceUiService,
     required SourceTaskControlGateway taskControl,
     required SourceDiscoverGateway sourceService,
     this.onSourceSwitched,
@@ -35,7 +37,7 @@ class DiscoverPageController extends ChangeNotifier {
   final SourceDiscoverGateway _sourceService;
   final DiscoverPageState _state = DiscoverPageState();
   bool _disposed = false;
-  final _sourceUi = SourceUiOwner();
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   final SourceTaskOwner _readTasks;
   int _sourceGeneration = 0;
   late String? _lastActiveSourceKey;

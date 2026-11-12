@@ -18,11 +18,14 @@ typedef AggregateSearchPageLoader =
     });
 
 class AggregateSearchSectionState {
-  AggregateSearchSectionState({required this.source})
-    : order = normalizeSourceSearchOrder('', source.presentation);
+  final SourceUiService sourceUiService;
+  AggregateSearchSectionState({
+    required this.sourceUiService,
+    required this.source,
+  }) : order = normalizeSourceSearchOrder('', source.presentation);
 
   SourceCatalogEntry source;
-  final SourceUiOwner sourceUi = SourceUiOwner();
+  late final SourceUiOwner sourceUi = SourceUiOwner(sourceUiService);
   String order;
   List<ExploreComic> comics = const [];
   String? errorMessage;
@@ -37,25 +40,38 @@ class AggregateSearchSectionState {
 }
 
 class AggregateSearchResultsController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   AggregateSearchResultsController({
+    required this.sourceUiService,
     required SourceSearchGateway sourceService,
     required this.taskControl,
   }) : _sourceService = sourceService,
        _loader = null,
        sections = sourceService.allowedSources
-           .map((source) => AggregateSearchSectionState(source: source))
+           .map(
+             (source) => AggregateSearchSectionState(
+               sourceUiService: sourceUiService,
+               source: source,
+             ),
+           )
            .toList() {
     _sourceService.addListener(_syncSources);
   }
 
   AggregateSearchResultsController.withLoader({
+    required this.sourceUiService,
     required SourceSearchGateway sourceService,
     required this.taskControl,
     required AggregateSearchPageLoader loader,
   }) : _sourceService = sourceService,
        _loader = loader,
        sections = sourceService.allowedSources
-           .map((source) => AggregateSearchSectionState(source: source))
+           .map(
+             (source) => AggregateSearchSectionState(
+               sourceUiService: sourceUiService,
+               source: source,
+             ),
+           )
            .toList() {
     _sourceService.addListener(_syncSources);
   }
@@ -377,7 +393,12 @@ class AggregateSearchResultsController extends ChangeNotifier {
           previous.sourceUi.dispose();
           previous.requestToken++;
         }
-        updated.add(AggregateSearchSectionState(source: source));
+        updated.add(
+          AggregateSearchSectionState(
+            sourceUiService: sourceUiService,
+            source: source,
+          ),
+        );
       }
     }
     for (final removed in current.values) {

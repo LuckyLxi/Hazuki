@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
@@ -5,7 +6,15 @@ import 'package:hazuki/services/source/runtime/source_runtime_registry.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/widgets/source_comic_tags.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   testWidgets('historical tags remain visible while plugin buttons disappear', (
     tester,
   ) async {
@@ -36,6 +45,7 @@ void main() {
     addTearDown(registry.dispose);
     await tester.pumpWidget(
       SourcePresentationScope(
+        sourceUiService: sourceUiService,
         registry: registry,
         child: MaterialApp(
           home: Builder(

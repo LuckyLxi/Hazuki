@@ -12,7 +12,9 @@ import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class ComicDetailSessionController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   ComicDetailSessionController({
+    required this.sourceUiService,
     SourceTaskControlGateway? taskControl,
     required ComicDetailFeatureFacade repository,
     required ExploreComic comic,
@@ -39,7 +41,7 @@ class ComicDetailSessionController extends ChangeNotifier {
   _applyInitialFavoriteOverrides;
 
   bool _disposed = false;
-  final _sourceUi = SourceUiOwner();
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   final SourceTaskOwner _progressTasks;
   final SourceTaskOwner _progressWatchTasks;
 

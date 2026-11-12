@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,7 +10,15 @@ import 'package:hazuki/services/source/runtime/source_task_registry.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
@@ -25,6 +34,7 @@ void main() {
         legacyDirectories: [],
       );
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: plugins,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );

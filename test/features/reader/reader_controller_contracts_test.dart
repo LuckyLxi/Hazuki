@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -119,7 +120,15 @@ class _ImageState extends Fake implements ReaderImageContentState {
 
 class _Source extends Mock implements SourceReaderGateway {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('settings state and callbacks', () {
@@ -314,6 +323,7 @@ void main() {
         ),
       ).thenAnswer((_) => incoming.future);
       controller = ReaderImagePipelineController(
+        sourceUiService: sourceUiService,
         runtimeState: state,
         pipelineState: pipeline,
         diagnosticsState: ReaderDiagnosticsState(),

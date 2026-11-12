@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
@@ -29,7 +30,15 @@ const _details = ComicDetailsData(
   sourceKey: 'jm',
 );
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late Completer<ComicDetailsData> details;
   late SearchSubmissionCoordinator coordinator;
   late SearchResultsController results;
@@ -57,6 +66,7 @@ void main() {
     events = [];
     lookups = [];
     results = SearchResultsController(
+      sourceUiService: sourceUiService,
       taskControl: FakeSourceTaskControl(),
       initialOrder: 'mr',
       sourceService: source,
@@ -81,6 +91,7 @@ void main() {
           },
     );
     aggregate = AggregateSearchResultsController(
+      sourceUiService: sourceUiService,
       taskControl: FakeSourceTaskControl(),
       sourceService: source,
     );
@@ -218,6 +229,7 @@ void main() {
     () async {
       aggregate.sections.add(
         AggregateSearchSectionState(
+          sourceUiService: sourceUiService,
           source: const SourceCatalogEntry(
             key: 'books',
             name: 'Books',
@@ -250,6 +262,7 @@ void main() {
       for (final key in ['jm', 'books']) {
         aggregate.sections.add(
           AggregateSearchSectionState(
+            sourceUiService: sourceUiService,
             source: SourceCatalogEntry(
               key: key,
               name: key,

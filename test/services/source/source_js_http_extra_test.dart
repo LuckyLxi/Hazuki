@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -24,7 +25,15 @@ class _Http implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHandle handle;
   late _Http http;
@@ -32,6 +41,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     handle = SourceRuntimeHandle(
+      sourceUiService: sourceUiService,
       sourceKey: 'sample',
       secureStorage: MemorySourceSecureSessionStorage(),
       ensureInitialized: (_) async {},

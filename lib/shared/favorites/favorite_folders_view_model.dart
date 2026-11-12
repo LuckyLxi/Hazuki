@@ -11,7 +11,9 @@ import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 import 'favorite_selection_result.dart';
 
 class FavoriteFoldersViewModel extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   FavoriteFoldersViewModel({
+    required this.sourceUiService,
     this.readTaskOrigin,
     required FavoriteFoldersRepository repository,
     required ComicDetailsData details,
@@ -32,7 +34,7 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
   final bool _singleFolderOnly;
 
   bool _disposed = false;
-  final _sourceUi = SourceUiOwner();
+  late final _sourceUi = SourceUiOwner(sourceUiService);
 
   bool _isLoading = true;
   bool _isBusy = false;

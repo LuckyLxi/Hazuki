@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,15 @@ import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import '../../support/test_service_locator.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     await ensureTestServiceLocator();
@@ -17,6 +26,7 @@ void main() {
 
   test('forwards source service changes until disposed', () {
     final controller = DiscoverPageController(
+      sourceUiService: sourceUiService,
       sourceService: sl<SourceDiscoverGateway>(),
       taskControl: FakeSourceTaskControl(),
     );
@@ -50,6 +60,7 @@ void main() {
           failures: [error],
         );
         final controller = DiscoverPageController(
+          sourceUiService: sourceUiService,
           sourceService: source,
           taskControl: FakeSourceTaskControl(),
         );
@@ -70,6 +81,7 @@ void main() {
       failures: [const SourceTaskCancelled('task', SourceTaskStopReason.user)],
     );
     final controller = DiscoverPageController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       taskControl: FakeSourceTaskControl(),
     );
@@ -97,6 +109,7 @@ void main() {
           },
         );
         final controller = DiscoverPageController(
+          sourceUiService: sourceUiService,
           sourceService: source,
           taskControl: FakeSourceTaskControl(),
         );
@@ -141,6 +154,7 @@ void main() {
         },
       );
       final controller = DiscoverPageController(
+        sourceUiService: sourceUiService,
         sourceService: source,
         taskControl: FakeSourceTaskControl(),
       );
@@ -173,6 +187,7 @@ void main() {
         },
       );
       final controller = DiscoverPageController(
+        sourceUiService: sourceUiService,
         sourceService: source,
         taskControl: FakeSourceTaskControl(),
       );

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/features/reader/state/reader_scroll_state.dart';
 import 'package:hazuki/features/reader/support/reader_input_controller.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
@@ -46,7 +47,15 @@ class _Actions extends Mock implements ReaderActionsController {}
 
 class _ProgressReporter extends Mock implements ReaderProgressReporter {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     await ensureTestServiceLocator();
@@ -826,6 +835,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
+                  sourceUiService: sourceUiService,
                   sourceService: sl<SourceReaderGateway>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
@@ -904,6 +914,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
+                  sourceUiService: sourceUiService,
                   sourceService: sl<SourceReaderGateway>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
@@ -977,6 +988,7 @@ void main() {
           home: Builder(
             builder: (context) {
               controller = ReaderImagePipelineController(
+                sourceUiService: sourceUiService,
                 sourceService: sl<SourceReaderGateway>(),
                 runtimeState: runtimeState,
                 pipelineState: pipelineState,
@@ -1032,6 +1044,7 @@ void main() {
           home: Builder(
             builder: (context) {
               controller = ReaderImagePipelineController(
+                sourceUiService: sourceUiService,
                 sourceService: sl<SourceReaderGateway>(),
                 runtimeState: runtimeState,
                 pipelineState: pipelineState,

@@ -4,6 +4,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 import 'source_plugin_action_widgets.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
@@ -51,7 +52,7 @@ class _SourcePluginSettingsContentState
   Map<String, dynamic> _presentation = {};
   List<SourcePluginAction> _actions = [];
   int _loadRevision = 0;
-  final _sourceUi = SourceUiOwner();
+  late final SourceUiOwner _sourceUi;
   @override
   void dispose() {
     _sourceUi.dispose();
@@ -61,6 +62,7 @@ class _SourcePluginSettingsContentState
   @override
   void initState() {
     super.initState();
+    _sourceUi = SourceUiOwner(SourcePresentationScope.uiOf(context));
     unawaited(_load());
   }
 

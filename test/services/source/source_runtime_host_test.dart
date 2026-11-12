@@ -1,10 +1,19 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const catalog = [
@@ -71,6 +80,7 @@ void main() {
 
 SourceRuntimeHost _createHost(List<SourceCatalogEntry> catalog) {
   return SourceRuntimeHost(
+    sourceUiService: sourceUiService,
     catalog: catalog,
     defaultSourceKey: 'jm',
     secureSessionStorage: MemorySourceSecureSessionStorage(),

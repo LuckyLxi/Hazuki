@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
@@ -14,7 +15,15 @@ import 'package:hazuki/services/translation/manga_translation_provider_factory.d
 import 'package:hazuki/services/translation/manga_translation_settings_store.dart';
 import 'package:hazuki/services/translation/translation_response_parser.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   test('registers the service graph in an isolated locator', () async {
     final services = GetIt.asNewInstance();
     addTearDown(services.reset);
@@ -55,6 +64,7 @@ void main() {
   test('keeps composition-root overrides when registering', () async {
     final services = GetIt.asNewInstance();
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       initialCatalog: hazukiAllowedSourceCatalog,
     );
     addTearDown(services.reset);
@@ -63,6 +73,7 @@ void main() {
     registerServices(locator: services);
 
     expect(services<SourceRuntimeAssembly>(), same(assembly));
+    expect(services<SourceUiService>(), same(assembly.sourceUiService));
     expect(services<SourceSearchGateway>(), same(assembly.gateways.search));
     final reader = services<SourceReaderGateway>();
     expect(services<SourceReaderSessionGateway>(), same(reader));

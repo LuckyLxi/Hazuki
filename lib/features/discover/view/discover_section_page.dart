@@ -7,6 +7,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import '../state/discover_section_page_controller.dart';
 import 'discover_section_page_widgets.dart';
@@ -48,6 +49,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage>
   void initState() {
     super.initState();
     _controller = DiscoverSectionPageController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       sourceService: widget.sourceService,
       viewMoreUrl: widget.section.viewMoreUrl,
       initialComics: widget.section.comics,

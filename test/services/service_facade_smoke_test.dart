@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/source_catalog_fixtures.dart';
 
 import 'dart:async';
@@ -31,7 +32,15 @@ class _ConnectionTestClient extends CloudSyncRemoteClient {
       );
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     await ensureTestServiceLocator();
@@ -246,6 +255,7 @@ void main() {
       });
       final secureStorage = MemorySourceSecureSessionStorage();
       final service = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
@@ -301,6 +311,7 @@ void main() {
       final secureStorage = MemorySourceSecureSessionStorage()
         ..failWrites = true;
       final service = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
@@ -346,6 +357,7 @@ void main() {
         },
       );
       final service = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
@@ -372,10 +384,12 @@ void main() {
     });
     final secureStorage = MemorySourceSecureSessionStorage();
     final service = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       initialCatalog: hazukiAllowedSourceCatalog,
       secureSessionStorage: secureStorage,
     );
     final handle = SourceRuntimeHandle(
+      sourceUiService: sourceUiService,
       sourceKey: hazukiDefaultSourceKey,
       secureStorage: secureStorage,
       ensureInitialized: service.testing.initialization.ensureSourceInitialized,
@@ -463,6 +477,7 @@ void main() {
       });
       final secureStorage = MemorySourceSecureSessionStorage();
       final service = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );

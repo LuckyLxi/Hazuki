@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -26,7 +27,15 @@ class _Operations extends Fake
   }
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'installation derives cloud policy from callback declarations and rejects history alone',
@@ -52,6 +61,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'sample',
@@ -66,7 +76,7 @@ void main() {
       isLoggedForSource: (_) => false,
     );
     await host.activeHandle.session.ensurePrefs();
-    engine = SourceScriptEngine();
+    engine = SourceScriptEngine(sourceUiService: sourceUiService);
     host.activeHandle.runtime.engine = engine;
     await engine.evaluate('globalThis.__hazuki_source = {comic:{}}');
     cloud = SourceCloudReadingCapability(host, _Operations());
@@ -244,7 +254,9 @@ void main() {
               activeHandle: () => handle,
             );
             bridge.configureDioCookieBridge(handle);
-            final isolated = SourceScriptEngine();
+            final isolated = SourceScriptEngine(
+              sourceUiService: sourceUiService,
+            );
             handle.runtime.engine = isolated;
             isolated.setMessageHandler(
               (message) => bridge.handleJsMessageForHandle(handle, message),

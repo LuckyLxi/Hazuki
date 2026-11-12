@@ -80,6 +80,7 @@ class SourceLoginSideDataOperations {
         if (request == null || !request.available) {
           late final SourceSharedRequest<String?> created;
           created = SourceSharedRequest<String?>(
+            sourceUiService: _runtimeHost.sourceUiService,
             pluginId: handle.sourceKey,
             method: 'account.profile.producer',
             onUnavailable: () {

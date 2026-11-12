@@ -12,7 +12,15 @@ import 'package:mocktail/mocktail.dart';
 
 class _Source extends Mock implements SourceHomeGateway {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _Source source;
   late HomeProfileController controller;
   late BuildContext context;
@@ -27,6 +35,7 @@ void main() {
     when(() => source.isActiveDailyCheckInSource).thenReturn(false);
     when(source.loadActiveSourcePreference).thenAnswer((_) async {});
     controller = HomeProfileController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       taskControl: FakeSourceTaskControl(),
     );
@@ -58,7 +67,7 @@ void main() {
         requestScope = SourceUiScope.current;
         return pending.future;
       });
-      final owner = SourceUiOwner();
+      final owner = SourceUiOwner(sourceUiService);
       addTearDown(owner.dispose);
       SourceUiScope? buttonScope;
       final operation = owner.run(() {
@@ -100,8 +109,8 @@ void main() {
         final pending = Completer<DailyCheckInResult>();
         final retryPending = Completer<DailyCheckInResult>();
         when(source.performDailyCheckIn).thenAnswer((_) => pending.future);
-        final owner = SourceUiOwner();
-        final retryOwner = SourceUiOwner();
+        final owner = SourceUiOwner(sourceUiService);
+        final retryOwner = SourceUiOwner(sourceUiService);
         addTearDown(owner.dispose);
         addTearDown(retryOwner.dispose);
 

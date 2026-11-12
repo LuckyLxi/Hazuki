@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -68,7 +69,15 @@ class _PendingHttp implements HttpClientAdapter {
       requests[id]!.complete(ResponseBody.fromString('{}', 200));
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceContentOperations content;
@@ -79,6 +88,7 @@ void main() {
 
   setUp(() async {
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'one', name: 'One', fileName: 'one.js'),
       ],
@@ -99,7 +109,10 @@ void main() {
     );
     gateway = _SearchGateway(host, content);
     addTearDown(gateway.dispose);
-    engine = SourceScriptEngine(pluginId: 'one');
+    engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'one',
+    );
     addTearDown(engine.close);
     final handle = host.handleFor('one');
     handle.runtime.engine = engine;
@@ -127,6 +140,7 @@ void main() {
       engine.execute('globalThis.__hazuki_source={search:{load:$load}}');
   SearchResultsController controller() {
     final result = SearchResultsController(
+      sourceUiService: sourceUiService,
       initialOrder: '',
       sourceService: gateway,
       taskControl: host.tasks,
@@ -218,6 +232,7 @@ void main() {
   test('switching from aggregate search cancels its old HTTP branch', () async {
     await install(httpSearch);
     final aggregate = AggregateSearchResultsController(
+      sourceUiService: sourceUiService,
       sourceService: gateway,
       taskControl: host.tasks,
     );

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -10,7 +11,15 @@ import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late SourceRuntimeHost host;
@@ -19,6 +28,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues(const {});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'jm.js'),
       ],
@@ -120,7 +130,7 @@ void main() {
 
   test('plugin isLogged follows passwordless and legacy sessions', () async {
     final handle = host.activeHandle;
-    final engine = SourceScriptEngine();
+    final engine = SourceScriptEngine(sourceUiService: sourceUiService);
     handle.runtime.engine = engine;
     final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
     engine.setMessageHandler(

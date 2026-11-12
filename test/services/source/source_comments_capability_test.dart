@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -10,7 +11,15 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceCommentsCapability comments;
@@ -19,6 +28,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'active',
@@ -51,7 +61,10 @@ void main() {
             (_, {required account, required password}) async {},
       ),
     );
-    target = SourceScriptEngine(hostPromiseRejectionHandler: (_) {});
+    target = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      hostPromiseRejectionHandler: (_) {},
+    );
     host.handleFor('target').runtime.engine = target;
     await target.evaluate('''
       globalThis.calls = [];

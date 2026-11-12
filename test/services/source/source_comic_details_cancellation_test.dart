@@ -27,7 +27,15 @@ class _StatusAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceComicDetailsCapability details;
@@ -58,6 +66,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     initialize = () async {};
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'one', name: 'One', fileName: 'one.js'),
       ],
@@ -78,7 +87,10 @@ void main() {
       ),
       translateSourceText: (text, {sourceKey = ''}) => text,
     );
-    engine = SourceScriptEngine(pluginId: 'one');
+    engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'one',
+    );
     final created = engine;
     // 故障实例的 whenClosed 以故障原因结束，收尾只需确认释放完成。
     addTearDown(() => created.close().catchError((Object _) {}));
@@ -260,7 +272,7 @@ void main() {
       final stopped = expectLater(first, throwsA(isA<SourceTaskCancelled>()));
       final other = details.loadComicDetails('123');
       await waitForCalls(1);
-      final scope = SourceUiService.instance.scopes.singleWhere(
+      final scope = sourceUiService.scopes.singleWhere(
         (scope) => scope.id == contexts.single.execution.uiScopeId,
       );
       scope.cancel('user');
@@ -381,7 +393,10 @@ void main() {
       initialize = () async {
         final next = host.handleFor('one');
         if (next.runtime.engine != null) return;
-        final replacement = SourceScriptEngine(pluginId: 'one');
+        final replacement = SourceScriptEngine(
+          sourceUiService: sourceUiService,
+          pluginId: 'one',
+        );
         addTearDown(replacement.close);
         replacement.operationGuard = next.runOperation;
         await replacement.execute(
@@ -409,7 +424,7 @@ void main() {
         cancellation: lifetime,
       );
       late SourceUiScope firstScope;
-      final first = SourceUiService.instance.run(() {
+      final first = sourceUiService.run(() {
         firstScope = SourceUiScope.current!;
         return details.loadComicDetails('123', taskOrigin: firstOrigin);
       });

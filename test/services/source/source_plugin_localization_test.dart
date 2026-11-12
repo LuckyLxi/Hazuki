@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show Locale;
@@ -26,6 +27,7 @@ const _translation = {
 
 SourceRuntimeHandle _handle() {
   final handle = SourceRuntimeHandle(
+    sourceUiService: sourceUiService,
     sourceKey: 'localized',
     secureStorage: MemorySourceSecureSessionStorage(),
     ensureInitialized: (_) async {},
@@ -39,6 +41,7 @@ Future<SourceScriptEngine> _installRuntime(SourceRuntimeHandle handle) async {
   await handle.session.ensurePrefs();
   final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
   final engine = SourceScriptEngine(
+    sourceUiService: sourceUiService,
     timeout: 5000,
     hostPromiseRejectionHandler: (_) {},
   );
@@ -66,7 +69,15 @@ legacy.translation = ${jsonEncode(_translation)};
   return engine;
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -200,6 +211,7 @@ Hazuki.registerSource({
     'source translations support English and invalidate inactive source caches',
     () async {
       final host = SourceRuntimeHost(
+        sourceUiService: sourceUiService,
         catalog: hazukiAllowedSourceCatalog,
         defaultSourceKey: 'jm',
         secureSessionStorage: MemorySourceSecureSessionStorage(),
@@ -222,13 +234,13 @@ Hazuki.registerSource({
       );
       final inactive = host.handleFor('picacg');
       for (final current in [handle, inactive]) {
-        current.cache.exploreSectionsMemoryCache = [];
+        current.cache.putExploreSections([]);
         current.cache.categoryTagGroupsMemoryCache = [];
       }
       expect(host.existingHandles, hasLength(2));
       localization.clearLocalizedSourceTextCaches();
       for (final current in [handle, inactive]) {
-        expect(current.cache.exploreSectionsMemoryCache, isNull);
+        expect(current.cache.getExploreSections(), isNull);
         expect(current.cache.categoryTagGroupsMemoryCache, isNull);
       }
       expect(host.existingHandles, hasLength(2));

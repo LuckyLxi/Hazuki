@@ -1,3 +1,5 @@
+import '../../support/source_presentation_fixtures.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
@@ -12,7 +14,15 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _Source source;
   late CommentFilterService filter;
   late CommentsPageController controller;
@@ -20,6 +30,7 @@ void main() {
 
   CommentsPageController create({CommentsInteractionState? state}) {
     final next = CommentsPageController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       filterService: filter,
       comicId: 'comic',
@@ -568,6 +579,10 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          builder: (context, child) => withTestSourcePresentation(
+            child!,
+            sourceUiService: sourceUiService,
+          ),
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,

@@ -105,6 +105,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
         ) !=
         null;
     _pluginTabsController = ComicDetailPluginTabsController(
+      sourceUiService: widget.dependencies.sourceUiService,
       loadDetailTab: _repository.loadDetailTab,
       comicId: widget.comic.id,
       tabs: sourceDetailTabs(comicSourceKey, context: context, listen: false),
@@ -150,6 +151,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
 
   void _initializeControllers() {
     _favoriteController = ComicDetailFavoriteController(
+      sourceUiService: widget.dependencies.sourceUiService,
       favoriteFolders: _repository.favoriteFolders,
       runComicHeaderAction: _repository.runComicHeaderAction,
       taskControl: widget.dependencies.taskControl,
@@ -246,6 +248,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       ),
     );
     _sessionController = ComicDetailSessionController(
+      sourceUiService: widget.dependencies.sourceUiService,
       taskControl: widget.dependencies.taskControl,
       repository: _repository,
       comic: widget.comic,

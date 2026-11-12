@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,7 +18,15 @@ import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/test_service_locator.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   setUp(() async {
     SharedPreferences.setMockInitialValues({
       hazukiNoImageModePreferenceKey: true,
@@ -63,6 +72,7 @@ void main() {
               sourceKey: 'picacg',
               offlineMode: offline,
               dependencies: ReaderDependencies(
+                sourceUiService: sourceUiService,
                 sourceReader: sl<SourceReaderGateway>(),
                 sourceSettings: sl<SourceSettingsGateway>(),
                 readingProgressService: sl<ReadingProgressService>(),

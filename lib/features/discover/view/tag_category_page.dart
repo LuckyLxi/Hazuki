@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:ui' show FrameTiming;
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../models/hazuki_models.dart';
@@ -133,7 +134,7 @@ class _TagCategoryGroupRevealState extends State<_TagCategoryGroupReveal>
 
 class _TagCategoryPageState extends State<TagCategoryPage>
     with RouteTransitionSettledMixin {
-  final _sourceUi = SourceUiOwner();
+  late final SourceUiOwner _sourceUi;
   late final _readTasks = SourceTaskOwner(widget.taskControl);
   static const _loadTimeout = Duration(seconds: 25);
 
@@ -158,6 +159,7 @@ class _TagCategoryPageState extends State<TagCategoryPage>
   @override
   void initState() {
     super.initState();
+    _sourceUi = SourceUiOwner(SourcePresentationScope.uiOf(context));
     _sessionStartedAt = DateTime.now();
     _sessionId = _sessionStartedAt.microsecondsSinceEpoch.toString();
     if (_sourceService.softwareLogCaptureEnabled) {

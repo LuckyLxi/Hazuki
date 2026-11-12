@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 import 'package:dio/dio.dart';
@@ -38,7 +39,15 @@ List<int> package({
   );
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   test('declared buttons require callbacks supplied by that plugin', () async {
     SharedPreferences.setMockInitialValues({});
     final inspector = SourcePluginScriptInspector();
@@ -92,6 +101,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
       );
       final storage = MemorySourceSecureSessionStorage();
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: storage,
       );
@@ -156,6 +166,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
             ),
       );
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -406,6 +417,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
 
   test('runtime reads new capabilities independently of plugin identity', () async {
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -502,6 +514,7 @@ class PlainSource extends HazukiSource {
 }
 """;
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -559,6 +572,7 @@ class PlainSource extends HazukiSource {
 
   test('import defers init and its side effects until first use', () async {
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -597,6 +611,7 @@ Hazuki.registerSource({
 
   test('init failure is reported on first use and keeps the package', () async {
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -623,6 +638,7 @@ Hazuki.registerSource({
     'SDK defaults remain live and stored falsy values take precedence',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -658,6 +674,7 @@ Hazuki.registerSource({
     'placed actions run in their own plugin without switching sources',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -737,6 +754,7 @@ Hazuki.registerSource({
 
   test('registered identity stays fixed for SDK storage calls', () async {
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -935,6 +953,7 @@ Hazuki.registerSource({
     () async {
       final secure = MemorySourceSecureSessionStorage();
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: secure,
       );
@@ -966,6 +985,7 @@ Hazuki.registerSource({
     'deleting an inactive plugin through runtime operations preserves its backup',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -995,6 +1015,7 @@ Hazuki.registerSource({
     'invalid native update keeps the previous registration and emits the final catalog',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -1027,6 +1048,7 @@ Hazuki.registerSource({
     );
     await image.writeAsBytes(bytes);
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );

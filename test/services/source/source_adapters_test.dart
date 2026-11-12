@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import '../../support/source_catalog_fixtures.dart';
 import 'dart:async';
@@ -27,7 +28,15 @@ import '../../support/test_service_locator.dart';
 
 class _ComicDetails extends Fake implements SourceComicDetailsCapability {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues(const {}));
@@ -53,6 +62,7 @@ void main() {
     'gateway set shares runtime adapters and forwards view notifications',
     () {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
       );
       addTearDown(assembly.dispose);
@@ -79,6 +89,7 @@ void main() {
     'sync gateway reads the active source through its runtime view',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
       );
       addTearDown(assembly.dispose);

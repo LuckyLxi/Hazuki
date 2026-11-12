@@ -16,6 +16,7 @@ import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import '../state/discover_continue_reading_controller.dart';
 import '../state/discover_page_controller.dart';
@@ -124,6 +125,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
     super.initState();
     widget.announcementService?.addListener(_handleAnnouncementChanged);
     _controller = DiscoverPageController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       sourceService: widget.sourceService,
       // 源切换时后台触发刷新，重新加载当前源的发现页数据
       onSourceSwitched: () {

@@ -18,6 +18,7 @@ import 'package:hazuki/services/source/plugins/source_sort_options.dart'
     show sourceOrderLabel;
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import 'comments_widgets.dart';
 
@@ -112,6 +113,7 @@ class _CommentsPageState extends State<CommentsPage>
     _ownsScrollController = widget.scrollController == null;
     _scrollController = widget.scrollController ?? ScrollController();
     _controller = CommentsPageController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       sourceService: widget.sourceService,
       filterService: widget.filterService,
       state: widget.interactionState,

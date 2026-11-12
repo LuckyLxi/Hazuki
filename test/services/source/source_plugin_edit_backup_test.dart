@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,7 +17,15 @@ search:{load:async()=>({comics:[]})},
 comic:{loadInfo:async()=>({title:'Comic',chapters:{}}),loadEp:async()=>({images:[]})}});
 ''';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory root;
   late SourcePluginManager manager;
@@ -74,6 +83,7 @@ void main() {
     requests.clear();
     manager = createManager();
     assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );

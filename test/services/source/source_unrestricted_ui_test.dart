@@ -29,23 +29,36 @@ class _Http implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
-  final service = SourceUiService.instance;
+  late SourceUiService service;
   late SourceRuntimeHandle handle;
   late SourceScriptEngine engine;
   late _Http http;
 
   setUp(() async {
+    service = sourceUiService;
     SharedPreferences.setMockInitialValues({});
     service.setForeground(true);
     handle = SourceRuntimeHandle(
+      sourceUiService: sourceUiService,
       sourceKey: 'anywhere',
       secureStorage: MemorySourceSecureSessionStorage(),
       ensureInitialized: (_) async {},
       notifyRuntimeStateChanged: (_) {},
     );
-    engine = SourceScriptEngine(pluginId: 'anywhere');
+    engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: 'anywhere',
+    );
     handle.runtime.engine = engine;
     http = _Http();
     handle.dio.httpClientAdapter = http;
@@ -80,7 +93,7 @@ void main() {
           'owner cancellation blocks UI and HTTP: '
           'afterDispatch=$afterDispatch, restart=$restart, browser=$browser',
           () async {
-            final owner = SourceUiOwner();
+            final owner = SourceUiOwner(sourceUiService);
             addTearDown(owner.dispose);
             final shown = <SourceDialogSession>[];
             service.presenter = (dialog) async {

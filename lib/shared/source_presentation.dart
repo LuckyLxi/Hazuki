@@ -4,6 +4,7 @@ import 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
 import 'package:hazuki/services/source/plugins/source_detail_tabs.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_exception.dart';
 import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 export 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
 export 'package:hazuki/services/source/plugins/source_detail_tabs.dart';
@@ -13,10 +14,20 @@ class SourcePresentationScope extends InheritedNotifier<SourceRuntimeRegistry> {
   const SourcePresentationScope({
     super.key,
     required SourceRuntimeRegistry registry,
+    required this.sourceUiService,
     this.sourcePlugins,
     required super.child,
   }) : super(notifier: registry);
+  final SourceUiService sourceUiService;
   final SourcePluginGateway? sourcePlugins;
+
+  static SourceUiService uiOf(BuildContext context) => context
+      .getInheritedWidgetOfExactType<SourcePresentationScope>()!
+      .sourceUiService;
+
+  static SourceUiService? maybeUiOf(BuildContext context) => context
+      .getInheritedWidgetOfExactType<SourcePresentationScope>()
+      ?.sourceUiService;
 
   static SourcePluginGateway? pluginsOf(
     BuildContext context, {
@@ -34,7 +45,8 @@ class SourcePresentationScope extends InheritedNotifier<SourceRuntimeRegistry> {
   @override
   bool updateShouldNotify(covariant SourcePresentationScope oldWidget) =>
       super.updateShouldNotify(oldWidget) ||
-      sourcePlugins != oldWidget.sourcePlugins;
+      sourcePlugins != oldWidget.sourcePlugins ||
+      sourceUiService != oldWidget.sourceUiService;
   static SourceRuntimeRegistry? maybeOf(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<SourcePresentationScope>()
       ?.notifier;

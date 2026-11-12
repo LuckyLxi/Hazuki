@@ -11,7 +11,7 @@ class SourceLocalizationOperations implements SourceLocalizationGateway {
   @override
   void clearLocalizedSourceTextCaches() {
     for (final handle in _runtimeHost.existingHandles) {
-      handle.exploreCache.clearMemory();
+      handle.cache.clearExploreSections();
       handle.facade.cache.clearCategoryTagGroupsMemoryCache();
     }
   }

@@ -23,7 +23,15 @@ import 'package:hazuki/services/source/runtime/source_script_editing_operations.
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
@@ -80,7 +88,7 @@ void main() {
       final engine = handle.runtime.engine!;
       // 页面读取总是携带任务取消信号，因此任务会关联页面交互 scope。
       late Future<Object?> inner;
-      final page = SourceUiService.instance.run(
+      final page = sourceUiService.run(
         () => inner = runSourceOperation<Object?>(
           fixture.host,
           handle,
@@ -339,6 +347,7 @@ class _Fixture {
     }
     late SourceRuntimeInitializationOperations init;
     final host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: [
         for (final key in keys)
           SourceCatalogEntry(key: key, name: key, fileName: '$key.js'),

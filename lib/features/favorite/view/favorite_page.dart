@@ -88,6 +88,7 @@ class FavoritePageState extends State<FavoritePage>
   void initState() {
     super.initState();
     _controller = FavoritePageController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       sourceService: widget.sourceService,
       readerService: widget.readerService,
       presentationFor:

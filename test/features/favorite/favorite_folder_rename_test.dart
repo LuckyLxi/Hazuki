@@ -1,3 +1,4 @@
+import '../../support/source_presentation_fixtures.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
@@ -78,21 +79,23 @@ void main() {
 
   Future<void> pumpPage(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('en'),
-        theme: ThemeData(platform: TargetPlatform.android),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: FavoritePage(
-            sourceService: source,
-            localFavoritesRepository: _Local(),
-            localFavoritesPreferences:
-                SharedPreferencesLocalFavoritesPreferencesStore(),
-            imageGateway: _Images(),
-            authVersion: 0,
-            onComicTap: (_, _) async {},
-            taskControl: FakeSourceTaskControl(),
+      withTestSourcePresentation(
+        MaterialApp(
+          locale: const Locale('en'),
+          theme: ThemeData(platform: TargetPlatform.android),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: FavoritePage(
+              sourceService: source,
+              localFavoritesRepository: _Local(),
+              localFavoritesPreferences:
+                  SharedPreferencesLocalFavoritesPreferencesStore(),
+              imageGateway: _Images(),
+              authVersion: 0,
+              onComicTap: (_, _) async {},
+              taskControl: FakeSourceTaskControl(),
+            ),
           ),
         ),
       ),

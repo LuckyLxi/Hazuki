@@ -45,14 +45,14 @@ class SourceExploreCapability {
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
 
-      final exploreCache = handle.exploreCache;
+      final cache = handle.cache;
       if (!forceRefresh) {
-        final memoryCached = exploreCache.getCachedSections();
+        final memoryCached = cache.getExploreSections();
         if (memoryCached != null) {
           return memoryCached;
         }
       } else {
-        exploreCache.clearMemory();
+        cache.clearExploreSections();
       }
 
       final engine = facade.js.engine;
@@ -120,7 +120,7 @@ Promise.all(
       };
 
       if (operationContext.canCache() && identical(facade.js.engine, engine)) {
-        exploreCache.putSections(sections);
+        cache.putExploreSections(sections);
       }
       return List<ExploreSection>.unmodifiable(sections);
     });

@@ -30,7 +30,9 @@ typedef ComicDetailHeaderActionRunner =
     });
 
 class ComicDetailFavoriteController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   ComicDetailFavoriteController({
+    required this.sourceUiService,
     required SourceTaskControlGateway taskControl,
     required FavoriteFoldersRepository favoriteFolders,
     required ComicDetailHeaderActionRunner runComicHeaderAction,
@@ -41,7 +43,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
   final FavoriteFoldersRepository _favoriteFolders;
   final ComicDetailHeaderActionRunner _runComicHeaderAction;
   bool _disposed = false;
-  final _sourceUi = SourceUiOwner();
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   final SourceTaskOwner _readTasks;
 
   bool _busy = false;
@@ -142,6 +144,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     final singleFolderOnly = folders.favoriteSingleFolderForSingleComic;
     _readTasks.restart();
     final viewModel = FavoriteFoldersViewModel(
+      sourceUiService: sourceUiService,
       readTaskOrigin: _readTasks.origin(),
       repository: folders,
       details: details,

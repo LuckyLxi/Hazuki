@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 Future<SourceScriptEngine> _createEngine() async {
   final handle = SourceRuntimeHandle(
+    sourceUiService: sourceUiService,
     sourceKey: 'convert_source',
     secureStorage: MemorySourceSecureSessionStorage(),
     ensureInitialized: (_) async {},
@@ -17,6 +19,7 @@ Future<SourceScriptEngine> _createEngine() async {
   addTearDown(handle.requestDispose);
   final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
   final engine = SourceScriptEngine(
+    sourceUiService: sourceUiService,
     timeout: 5000,
     hostPromiseRejectionHandler: (_) {},
   );
@@ -31,7 +34,15 @@ Future<SourceScriptEngine> _createEngine() async {
   return engine;
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 

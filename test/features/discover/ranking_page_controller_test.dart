@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -7,7 +8,15 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 
 import '../../support/fake_source_task_control.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _RankingSource source;
   late RankingPageController controller;
   var disposed = false;
@@ -15,6 +24,7 @@ void main() {
   setUp(() {
     source = _RankingSource();
     controller = RankingPageController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       taskControl: FakeSourceTaskControl(),
       optionsTimeoutMessage: () => 'options timed out',

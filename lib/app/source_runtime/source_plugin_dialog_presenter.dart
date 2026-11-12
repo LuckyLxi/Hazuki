@@ -15,17 +15,19 @@ import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 class SourcePluginDialogPresenter extends NavigatorObserver {
   SourcePluginDialogPresenter(
     this.navigatorKey, {
+    required this.sourceUiService,
     this.browserFactory,
     this.comicDetailPageBuilder,
     this.searchPageBuilder,
   }) {
-    final service = SourceUiService.instance;
+    final service = sourceUiService;
     service.presenter = present;
     service.captureOwner = () =>
         _routes.where((r) => !_dialogRoutes.contains(r)).lastOrNull;
     service.isOwnerAvailable = (_) => navigatorKey.currentState != null;
     service.canPresent = (_) => navigatorKey.currentState != null;
   }
+  final SourceUiService sourceUiService;
   final GlobalKey<NavigatorState> navigatorKey;
   final SourceAuthorizationBrowser Function()? browserFactory;
 
@@ -156,7 +158,7 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
   }
 
   void _sync() {
-    final service = SourceUiService.instance;
+    final service = sourceUiService;
     service.schedulePump();
   }
 
@@ -203,5 +205,5 @@ class SourcePluginDialogPresenter extends NavigatorObserver {
     _sync();
   }
 
-  void dispose() => SourceUiService.instance.detach();
+  void dispose() => sourceUiService.detach();
 }

@@ -20,8 +20,7 @@ class SourceRuntimeStateController {
       debugDetail: debugDetail,
       error: error?.toString(),
     );
-    facade.runtimeState = next;
-    facade.statusText = next.statusText;
+    facade.runtime.updateRuntimeState(next);
     facade.notifyRuntimeStateChanged();
   }
 

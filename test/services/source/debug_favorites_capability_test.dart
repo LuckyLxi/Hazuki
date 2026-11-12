@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -11,13 +12,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _Engine extends Mock implements SourceScriptEngine {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHandle handle;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     handle = SourceRuntimeHandle(
+      sourceUiService: sourceUiService,
       sourceKey: 'test',
       secureStorage: MemorySourceSecureSessionStorage(),
       ensureInitialized: (_) async {},

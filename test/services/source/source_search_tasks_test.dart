@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -19,7 +20,15 @@ class _Operations extends Mock
 
 class _Engine extends Mock implements SourceScriptEngine {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceContentOperations content;
@@ -30,7 +39,7 @@ void main() {
     String implementation, {
     String version = '1.0',
   }) async {
-    final engine = SourceScriptEngine();
+    final engine = SourceScriptEngine(sourceUiService: sourceUiService);
     addTearDown(engine.close);
     await engine.evaluate(
       'globalThis.__hazuki_source = {search: {load: $implementation}}',
@@ -61,6 +70,7 @@ void main() {
       () => operations.ensureSourceInitialized(any()),
     ).thenAnswer((_) async {});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'one',

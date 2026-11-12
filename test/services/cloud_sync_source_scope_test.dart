@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'dart:convert';
 
@@ -37,6 +38,7 @@ class _CloudSyncFixture {
   factory _CloudSyncFixture.create() {
     final database = HazukiDatabase.memory();
     final source = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       initialCatalog: hazukiAllowedSourceCatalog,
     );
     final readHistory = ReadHistoryService(database: database);
@@ -98,7 +100,15 @@ class _FakeCloudSyncRemoteClient extends CloudSyncRemoteClient {
   Future<String?> tryGetBackupFile(String fileName) async => files[fileName];
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     _fixture = _CloudSyncFixture.create();

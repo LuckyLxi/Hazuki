@@ -202,7 +202,7 @@ Future<T?> showSourcePluginMenu<T>({
     language: Localizations.localeOf(context).toLanguageTag(),
     selected: selected,
   );
-  final owner = SourceUiOwner();
+  final owner = SourceUiOwner(SourcePresentationScope.uiOf(context));
   var cancelled = false;
   void cancel() {
     cancelled = true;

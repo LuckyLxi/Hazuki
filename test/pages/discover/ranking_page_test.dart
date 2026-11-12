@@ -1,3 +1,4 @@
+import '../../support/source_presentation_fixtures.dart';
 import '../../support/fake_source_task_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,13 +25,15 @@ void main() {
 
   testWidgets('starts initial ranking load after first build', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: RankingPage(
-          sourceService: _FakeRankingSource(),
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-          taskControl: FakeSourceTaskControl(),
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: RankingPage(
+            sourceService: _FakeRankingSource(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     );
@@ -57,13 +60,15 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: RankingPage(
-          sourceService: _FakeRankingSource(),
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-          taskControl: FakeSourceTaskControl(),
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: RankingPage(
+            sourceService: _FakeRankingSource(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     );
@@ -113,13 +118,15 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: RankingPage(
-          sourceService: _FakeRankingSource(),
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-          taskControl: FakeSourceTaskControl(),
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: RankingPage(
+            sourceService: _FakeRankingSource(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     );

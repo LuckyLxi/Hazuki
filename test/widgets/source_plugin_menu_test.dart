@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -36,7 +37,15 @@ class _CommentSort extends ChangeNotifier implements CommentsSortDelegate {
   }
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _Plugins plugins;
   late SourceRuntimeRegistry registry;
   late Map<String, dynamic> presentation;
@@ -96,6 +105,7 @@ void main() {
   Future<void> mount(WidgetTester tester, Widget child) async {
     await tester.pumpWidget(
       SourcePresentationScope(
+        sourceUiService: sourceUiService,
         registry: registry,
         sourcePlugins: plugins,
         child: MaterialApp(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import 'hazuki_frosted_menu.dart';
 import 'source_plugin_menu.dart';
@@ -56,7 +57,15 @@ class _SourcePluginInteractionController<T>
     extends State<SourcePluginInteraction<T>> {
   final _anchorKey = GlobalKey();
   final _dismiss = ValueNotifier(0);
-  final _owner = SourceUiOwner();
+  late final SourceUiOwner? _owner;
+
+  @override
+  void initState() {
+    super.initState();
+    final service = SourcePresentationScope.maybeUiOf(context);
+    _owner = service == null ? null : SourceUiOwner(service);
+  }
+
   SourcePluginGateway? _gateway;
   Object? _scope;
   bool _running = false;
@@ -95,7 +104,7 @@ class _SourcePluginInteractionController<T>
 
   void _cancel() {
     _dismiss.value++;
-    _owner.cancel('ownerGone');
+    _owner?.cancel('ownerGone');
   }
 
   @override
@@ -114,7 +123,7 @@ class _SourcePluginInteractionController<T>
   void dispose() {
     _gateway?.removeListener(_gatewayChanged);
     _cancel();
-    _owner.dispose();
+    _owner?.dispose();
     _dismiss.dispose();
     super.dispose();
   }
@@ -131,7 +140,7 @@ class _SourcePluginInteractionController<T>
       widget.onOpened?.call();
       if (widget.fallback != null && menu?.entries.isNotEmpty != true) {
         setState(() => _actionBusy = true);
-        await _owner.run(() async => await widget.fallback!());
+        await _owner!.run(() async => await widget.fallback!());
       } else {
         final binding = widget.binding;
         final value = binding == null
@@ -167,7 +176,13 @@ class _SourcePluginInteractionController<T>
               );
         if (valid() && value != null) {
           setState(() => _actionBusy = true);
-          await _owner.run(() async => await widget.onSelected(value));
+          final owner = _owner;
+          if (owner == null) {
+            // Standalone host menus do not need a plugin interaction service.
+            await widget.onSelected(value);
+          } else {
+            await owner.run(() async => await widget.onSelected(value));
+          }
         }
       }
     } catch (error) {

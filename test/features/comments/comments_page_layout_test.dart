@@ -1,3 +1,4 @@
+import '../../support/source_presentation_fixtures.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
@@ -69,50 +70,52 @@ void main() {
     await tester.pumpWidget(
       SourceImageGatewayScope(
         gateway: source,
-        child: MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: CommentsSortScope(
-            binding: binding,
-            child: Scaffold(
-              body: NestedScrollView(
-                headerSliverBuilder: (context, _) => [
-                  SliverOverlapAbsorber(
-                    handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                      context,
-                    ),
-                    sliver: SliverPersistentHeader(
-                      pinned: true,
-                      delegate: HazukiTabBarDelegate(
-                        TabBar(
-                          controller: tabs,
-                          isScrollable: true,
-                          tabs: const [
-                            Tab(text: 'Info'),
-                            Tab(text: 'Comments'),
-                            Tab(text: 'Related'),
-                          ],
-                        ),
-                        Colors.white,
-                        detailsReady: true,
-                        shouldAnimateInitialDetailReveal: false,
-                        trailing: ComicDetailCommentsSortAction(
-                          tabController: tabs,
-                          tabIndex: 1,
+        child: withTestSourcePresentation(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: CommentsSortScope(
+              binding: binding,
+              child: Scaffold(
+                body: NestedScrollView(
+                  headerSliverBuilder: (context, _) => [
+                    SliverOverlapAbsorber(
+                      handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                        context,
+                      ),
+                      sliver: SliverPersistentHeader(
+                        pinned: true,
+                        delegate: HazukiTabBarDelegate(
+                          TabBar(
+                            controller: tabs,
+                            isScrollable: true,
+                            tabs: const [
+                              Tab(text: 'Info'),
+                              Tab(text: 'Comments'),
+                              Tab(text: 'Related'),
+                            ],
+                          ),
+                          Colors.white,
+                          detailsReady: true,
+                          shouldAnimateInitialDetailReveal: false,
+                          trailing: ComicDetailCommentsSortAction(
+                            tabController: tabs,
+                            tabIndex: 1,
+                          ),
                         ),
                       ),
                     ),
+                  ],
+                  body: CommentsPage(
+                    sourceService: source,
+                    filterService: filter,
+                    comicId: 'comic',
+                    sourceKey: 'source',
+                    interactionState: state,
+                    isTabView: true,
+                    taskControl: FakeSourceTaskControl(),
                   ),
-                ],
-                body: CommentsPage(
-                  sourceService: source,
-                  filterService: filter,
-                  comicId: 'comic',
-                  sourceKey: 'source',
-                  interactionState: state,
-                  isTabView: true,
-                  taskControl: FakeSourceTaskControl(),
                 ),
               ),
             ),
@@ -177,45 +180,47 @@ void main() {
     await tester.pumpWidget(
       SourceImageGatewayScope(
         gateway: source,
-        child: MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Builder(
-            builder: (context) => Scaffold(
-              body: TextButton(
-                onPressed: () => showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => ReaderCommentsSheet(
-                    comicId: 'comic',
-                    subId: null,
-                    chapterId: 'chapter',
-                    sourceKey: 'source',
-                    interactionState: state,
-                    commentsWidgetBuilder:
-                        ({
-                          required comicId,
-                          required sourceKey,
-                          subId,
-                          chapterId,
-                          scrollController,
-                          onRequestTabFullscreen,
-                          interactionState,
-                        }) => CommentsPage(
-                          sourceService: source,
-                          filterService: filter,
-                          comicId: comicId,
-                          sourceKey: sourceKey,
-                          showAppBar: false,
-                          scrollController: scrollController,
-                          onRequestTabFullscreen: onRequestTabFullscreen,
-                          interactionState: interactionState,
-                          taskControl: FakeSourceTaskControl(),
-                        ),
+        child: withTestSourcePresentation(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: TextButton(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => ReaderCommentsSheet(
+                      comicId: 'comic',
+                      subId: null,
+                      chapterId: 'chapter',
+                      sourceKey: 'source',
+                      interactionState: state,
+                      commentsWidgetBuilder:
+                          ({
+                            required comicId,
+                            required sourceKey,
+                            subId,
+                            chapterId,
+                            scrollController,
+                            onRequestTabFullscreen,
+                            interactionState,
+                          }) => CommentsPage(
+                            sourceService: source,
+                            filterService: filter,
+                            comicId: comicId,
+                            sourceKey: sourceKey,
+                            showAppBar: false,
+                            scrollController: scrollController,
+                            onRequestTabFullscreen: onRequestTabFullscreen,
+                            interactionState: interactionState,
+                            taskControl: FakeSourceTaskControl(),
+                          ),
+                    ),
                   ),
+                  child: const Text('Open'),
                 ),
-                child: const Text('Open'),
               ),
             ),
           ),
@@ -262,55 +267,58 @@ void main() {
     await tester.pumpWidget(
       SourceImageGatewayScope(
         gateway: source,
-        child: MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          theme:
-              theme ??
-              ThemeData(
-                colorScheme: ColorScheme.fromSeed(
-                  seedColor: Colors.deepPurple,
-                  brightness: brightness,
+        child: withTestSourcePresentation(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme:
+                theme ??
+                ThemeData(
+                  colorScheme: ColorScheme.fromSeed(
+                    seedColor: Colors.deepPurple,
+                    brightness: brightness,
+                  ),
                 ),
-              ),
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: TextScaler.linear(textScale)),
-            child: child!,
-          ),
-          home: RepaintBoundary(
-            key: _backgroundBoundaryKey,
-            child: Scaffold(
-              body: Builder(
-                builder: (context) {
-                  final page = CommentsPage(
-                    sourceService: source,
-                    filterService: filter,
-                    comicId: 'comic',
-                    sourceKey: 'source',
-                    showAppBar: showAppBar,
-                    interactionState: state,
-                    isTabView: isTabView,
-                    taskControl: FakeSourceTaskControl(),
-                  );
-                  if (!isTabView) return page;
-                  return NestedScrollView(
-                    headerSliverBuilder: (context, _) => [
-                      SliverOverlapAbsorber(
-                        handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                          context,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(textScale)),
+              child: child!,
+            ),
+            home: RepaintBoundary(
+              key: _backgroundBoundaryKey,
+              child: Scaffold(
+                body: Builder(
+                  builder: (context) {
+                    final page = CommentsPage(
+                      sourceService: source,
+                      filterService: filter,
+                      comicId: 'comic',
+                      sourceKey: 'source',
+                      showAppBar: showAppBar,
+                      interactionState: state,
+                      isTabView: isTabView,
+                      taskControl: FakeSourceTaskControl(),
+                    );
+                    if (!isTabView) return page;
+                    return NestedScrollView(
+                      headerSliverBuilder: (context, _) => [
+                        SliverOverlapAbsorber(
+                          handle:
+                              NestedScrollView.sliverOverlapAbsorberHandleFor(
+                                context,
+                              ),
+                          sliver: const SliverAppBar(
+                            title: Text('Details'),
+                            pinned: true,
+                          ),
                         ),
-                        sliver: const SliverAppBar(
-                          title: Text('Details'),
-                          pinned: true,
-                        ),
-                      ),
-                    ],
-                    body: page,
-                  );
-                },
+                      ],
+                      body: page,
+                    );
+                  },
+                ),
               ),
             ),
           ),

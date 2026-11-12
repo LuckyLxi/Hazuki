@@ -51,8 +51,14 @@ class SourceRuntimeKernel {
 
   String? _metadataJson;
   Future<void>? initFuture;
-  String statusText = 'source_idle';
-  SourceRuntimeState runtimeState = const SourceRuntimeState.idle();
+  SourceRuntimeState _runtimeState = const SourceRuntimeState.idle();
+  SourceRuntimeState get runtimeState => _runtimeState;
+  String get statusText => _runtimeState.statusText;
+
+  void updateRuntimeState(SourceRuntimeState state) {
+    _runtimeState = state;
+  }
+
   SourceMeta? sourceMeta;
   bool isRefreshingSource = false;
   DateTime? lastReloginAt;

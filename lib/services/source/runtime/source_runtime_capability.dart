@@ -19,7 +19,8 @@ class SourceRuntimeCapability {
     required SourcePluginManager scriptStorage,
     required SourceJsBridgeCookieCapability jsBridgeCookieCapability,
     required SourceRuntimeStateController runtimeStateController,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
     required String bundledInitAssetPath,
   }) : _runtimeHost = runtimeHost,
        _scriptStorage = scriptStorage,
@@ -40,7 +41,8 @@ class SourceRuntimeCapability {
   final SourcePluginManager _scriptStorage;
   final SourceJsBridgeCookieCapability _jsBridgeCookieCapability;
   final SourceRuntimeStateController _runtimeStateController;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
   final String _bundledInitAssetPath;
 
   late final SourceScriptEditingOperations scriptEditing =

@@ -37,13 +37,22 @@ class _Browser
   }
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   testWidgets(
     'plugin close waits for WebView exit before showing the next dialog',
     (tester) async {
       final key = GlobalKey<NavigatorState>();
       final browser = _Browser()..ready.complete();
       final presenter = SourcePluginDialogPresenter(
+        sourceUiService: sourceUiService,
         key,
         browserFactory: () => browser,
       );
@@ -57,7 +66,7 @@ void main() {
           home: const Scaffold(body: Text('Home')),
         ),
       );
-      final service = SourceUiService.instance;
+      final service = sourceUiService;
       const task = SourceScriptExecution(
         taskId: 'web-close',
         pluginId: 'test',
@@ -150,6 +159,7 @@ void main() {
           ? 'login_browser_unavailable'
           : 'login_browser_load_failed';
       final presenter = SourcePluginDialogPresenter(
+        sourceUiService: sourceUiService,
         key,
         browserFactory: () {
           if (attempts++ == 0) {
@@ -176,7 +186,7 @@ void main() {
         pluginId: 'test',
         method: 'download',
       );
-      final service = SourceUiService.instance;
+      final service = sourceUiService;
       Future<dynamic> open() => service.runBrowserAuthorization(
         () => service.handle(
           {
@@ -228,6 +238,7 @@ void main() {
         final key = GlobalKey<NavigatorState>();
         final browser = _Browser()..ready.complete();
         final presenter = SourcePluginDialogPresenter(
+          sourceUiService: sourceUiService,
           key,
           browserFactory: () => browser,
         );
@@ -248,7 +259,7 @@ void main() {
           method: 'download',
         );
         final result =
-            SourceUiService.instance.handle(
+            sourceUiService.handle(
                   {
                     'method': 'ui_browser',
                     'options': {
@@ -291,7 +302,7 @@ void main() {
         expect(browser.closed, true);
         expect(find.text(covered ? 'New page' : 'Home'), findsOneWidget);
         expect(tester.takeException(), isNull);
-        SourceUiService.instance.releaseExecution(execution, 'web-runtime');
+        sourceUiService.releaseExecution(execution, 'web-runtime');
       },
     );
   }

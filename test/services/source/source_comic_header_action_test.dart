@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,7 +11,15 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceComicDetailsCache cache;
@@ -19,6 +28,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'arbitrary',
@@ -51,7 +61,10 @@ void main() {
   });
 
   SourceScriptEngine engineFor(String key) {
-    final engine = SourceScriptEngine(hostPromiseRejectionHandler: (_) {});
+    final engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      hostPromiseRejectionHandler: (_) {},
+    );
     host.handleFor(key).runtime.engine = engine;
     return engine;
   }

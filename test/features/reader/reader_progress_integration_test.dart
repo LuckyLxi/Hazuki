@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -69,7 +70,15 @@ class _TitleBar extends ChangeNotifier implements WindowTitleBarControl {
   Future<void> updateUseSystemTitleBar(bool value) async {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   for (final mode in ['right_to_left', 'top_to_bottom']) {
     for (final doublePage in [false, true]) {
       testWidgets(
@@ -121,6 +130,7 @@ void main() {
                 images: images,
                 sourceKey: 'jm',
                 dependencies: ReaderDependencies(
+                  sourceUiService: sourceUiService,
                   sourceReader: _Reader(),
                   readingProgressUploads: uploads,
                   sourceSettings: sl<SourceSettingsGateway>(),

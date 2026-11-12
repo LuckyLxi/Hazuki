@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -26,7 +27,15 @@ FavoriteFoldersResult _result(List<FavoriteFolder> folders) =>
     );
 Future<void> _settle() => Future<void>.delayed(Duration.zero);
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   setUpAll(() => registerFallbackValue(FavoritePageMode.cloud));
   late _Source source;
   late _Local local;
@@ -191,6 +200,7 @@ void main() {
       );
     });
     controller = FavoritePageController(
+      sourceUiService: sourceUiService,
       taskControl: FakeSourceTaskControl(),
       sourceService: source,
       localFavoritesRepository: local,

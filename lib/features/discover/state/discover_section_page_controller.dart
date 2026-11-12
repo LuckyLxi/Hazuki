@@ -8,7 +8,9 @@ import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class DiscoverSectionPageController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   DiscoverSectionPageController({
+    required this.sourceUiService,
     required SourceTaskControlGateway taskControl,
     required SourceDiscoverGateway sourceService,
     String? viewMoreUrl,
@@ -31,7 +33,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
   String Function(String)? _loadFailedMessage;
   final DiscoverSectionPageState _state = DiscoverSectionPageState();
   bool _disposed = false;
-  final _sourceUi = SourceUiOwner();
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   final SourceTaskOwner _readTasks;
   String? _sourceKey;
   String? _sourceRevision;

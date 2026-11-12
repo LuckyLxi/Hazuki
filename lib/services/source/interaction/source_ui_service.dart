@@ -15,7 +15,8 @@ typedef SourceDialogPresenter =
 
 /// A feature controller owns its requests even when their plugin is shared.
 class SourceUiOwner {
-  SourceUiOwner();
+  SourceUiOwner(this._service);
+  final SourceUiService _service;
   Object? _routeOwner;
   final Set<SourceUiScope> _scopes = {};
   final Set<SourceUiScope> _serviceScopes = {};
@@ -30,7 +31,7 @@ class SourceUiOwner {
   Future<T> run<T>(Future<T> Function() operation) async {
     if (_disposed) return Future.error(const SourceUiCancelled('ownerGone'));
     SourceUiScope? entered;
-    final value = await SourceUiService.instance.run(() {
+    final value = await _service.run(() {
       entered = SourceUiScope.current;
       return operation();
     }, owner: this);
@@ -62,7 +63,6 @@ class SourceUiService {
     this.queueTimeout = const Duration(seconds: 60),
     this.interactionTimeout = const Duration(minutes: 5),
   });
-  static final instance = SourceUiService();
   final Duration queueTimeout;
   final Duration interactionTimeout;
   SourceDialogPresenter? presenter;
@@ -81,6 +81,11 @@ class SourceUiService {
   Completer<void>? _foregroundResumed;
   final Map<SourceUiScope, int> _browserAuthorizations = {};
   bool _pumping = false;
+
+  SourceUiScope? get currentScope {
+    final scope = SourceUiScope.current;
+    return scope != null && identical(_scopes[scope.id], scope) ? scope : null;
+  }
 
   Iterable<SourceUiScope> get scopes => List.unmodifiable(_scopes.values);
 
@@ -183,7 +188,7 @@ class SourceUiService {
         interactionScope ??
         (execution != null && runtimeId != null
             ? _scopeFor(execution, runtimeId)
-            : SourceUiScope.current);
+            : currentScope);
     if (scope == null) return operation();
     if (execution != null && runtimeId != null) {
       checkExecution(execution, runtimeId);
@@ -245,7 +250,7 @@ class SourceUiService {
     Object? routeOwner,
     SourceUiOwner? serviceLifetimeOwner,
   }) async {
-    final current = SourceUiScope.current;
+    final current = currentScope;
     if (inheritCurrent &&
         current?.available == true &&
         present == null &&

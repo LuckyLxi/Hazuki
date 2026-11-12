@@ -34,6 +34,7 @@ class SourceLocalRuntimeOperations {
 
       // Keep local access separate so normal content requests still run init.
       final local = SourceRuntimeHandle(
+        sourceUiService: handle.sourceUiService,
         sourceKey: handle.sourceKey,
         secureStorage: handle.secureStorage,
         ensureInitialized: (_) async {},
