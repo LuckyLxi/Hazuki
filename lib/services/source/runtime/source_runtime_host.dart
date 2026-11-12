@@ -28,21 +28,20 @@ class SourceRuntimeHost extends ChangeNotifier {
     required bool Function(String sourceKey) isLoggedForSource,
     AppLogStore? logStore,
     this.onRuntimeState,
-  }) : _catalog = List.unmodifiable(catalog),
-       logStore = logStore ?? AppLogStore(),
+  }) : logStore = logStore ?? AppLogStore(),
        _secureSessionStorage = secureSessionStorage,
        _ensureSourceInitialized = ensureSourceInitialized,
        _currentAccountForSource = currentAccountForSource,
        _isLoggedForSource = isLoggedForSource {
     _coordinator = SourceRuntimeCoordinator<SourceRuntimeHandle>(
-      catalog: _catalog,
+      catalog: catalog,
       defaultSourceKey: defaultSourceKey,
       createHandle: _createHandle,
       onActiveSourceChanged: _notifyChanged,
       retainOnSourceChange: _retainsSource,
     );
     runtimeRegistry = SourceRuntimeRegistry(
-      allowedSources: _catalog,
+      allowedSources: catalog,
       activeSourceKey: () => activeSourceKey,
       definitionFor: definitionFor,
       loadActiveSourcePreference: loadActiveSourcePreference,
@@ -57,7 +56,6 @@ class SourceRuntimeHost extends ChangeNotifier {
     );
   }
 
-  List<SourceCatalogEntry> _catalog;
   final SourceSecureSessionStorage _secureSessionStorage;
   final Future<void> Function(String sourceKey) _ensureSourceInitialized;
   final String? Function(String sourceKey) _currentAccountForSource;
@@ -108,7 +106,7 @@ class SourceRuntimeHost extends ChangeNotifier {
 
   SourceDownloadSession acquireDownloadSession(String sourceKey) {
     if (sourceKey.trim().isNotEmpty &&
-        !_catalog.any((entry) => entry.normalizedKey == sourceKey.trim())) {
+        !catalog.any((entry) => entry.normalizedKey == sourceKey.trim())) {
       throw SourceTaskCancelled(
         createSourceTaskId(),
         SourceTaskStopReason.pluginDisabled,
@@ -202,7 +200,7 @@ class SourceRuntimeHost extends ChangeNotifier {
   late final SourceRuntimeRegistry runtimeRegistry;
   bool _preferenceLoaded = false;
 
-  List<SourceCatalogEntry> get catalog => _catalog;
+  List<SourceCatalogEntry> get catalog => _coordinator.catalog;
   String get activeSourceKey => _coordinator.activeSourceKey;
   bool get hasActiveSource => activeSourceKey.isNotEmpty;
   SourceRuntimeHandle? get optionalActiveHandle =>
@@ -224,7 +222,7 @@ class SourceRuntimeHost extends ChangeNotifier {
   }
 
   SourceRuntimeHandle get activeHandle => _coordinator.activeHandle;
-  Iterable<SourceRuntimeHandle> get existingHandles => _catalog
+  Iterable<SourceRuntimeHandle> get existingHandles => catalog
       .map((source) => _coordinator.existingHandle(source.key))
       .whereType<SourceRuntimeHandle>();
 
@@ -244,7 +242,7 @@ class SourceRuntimeHost extends ChangeNotifier {
       readSavedSourceKey: () async {
         final prefs = await SharedPreferences.getInstance();
         loadedPreferences = prefs;
-        for (final source in _catalog) {
+        for (final source in catalog) {
           final session = handleFor(source.key).session;
           session.prefs = prefs;
           await session.ensurePrefs();
@@ -308,33 +306,23 @@ class SourceRuntimeHost extends ChangeNotifier {
             rethrow;
           }
         }
-        for (final handle in existingHandles.toList()) {
-          final old = _catalog
-              .where((entry) => entry.normalizedKey == handle.sourceKey)
-              .firstOrNull;
-          final next = catalog
-              .where((entry) => entry.normalizedKey == handle.sourceKey)
-              .firstOrNull;
-          if (next == null ||
-              old?.pluginVersion != next.pluginVersion ||
-              old?.pluginDirectory != next.pluginDirectory) {
-            final reason = next == null
-                ? SourceTaskStopReason.pluginDisabled
-                : SourceTaskStopReason.pluginUpdated;
-            final stopped = tasks.retireResource(handle, reason);
-            for (final session in _readerSessions.toList()) {
-              if (session.sourceKey == handle.sourceKey) session.close(reason);
-            }
-            for (final entry in _downloadSessions.entries.toList()) {
-              if (identical(entry.value, handle)) entry.key.close(reason);
-            }
-            for (final entry in _serviceLeases.entries.toList()) {
-              if (identical(entry.value, handle)) entry.key.close(reason);
-            }
-            await stopped;
+        for (final handle in _coordinator.staleHandlesFor(catalog)) {
+          final reason = enabled.contains(handle.sourceKey)
+              ? SourceTaskStopReason.pluginUpdated
+              : SourceTaskStopReason.pluginDisabled;
+          final stopped = tasks.retireResource(handle, reason);
+          for (final session in _readerSessions.toList()) {
+            if (session.sourceKey == handle.sourceKey) session.close(reason);
           }
+          for (final entry in _downloadSessions.entries.toList()) {
+            if (identical(entry.value, handle)) entry.key.close(reason);
+          }
+          for (final entry in _serviceLeases.entries.toList()) {
+            if (identical(entry.value, handle)) entry.key.close(reason);
+          }
+          await stopped;
         }
-        for (final old in _catalog) {
+        for (final old in this.catalog) {
           if (!enabled.contains(old.normalizedKey)) {
             SourceUiService.instance.cancelPlugin(
               old.normalizedKey,
@@ -343,7 +331,6 @@ class SourceRuntimeHost extends ChangeNotifier {
           }
         }
 
-        _catalog = List.unmodifiable(catalog);
         runtimeRegistry.replaceCatalog(catalog, notify: false);
       },
     );
@@ -356,7 +343,6 @@ class SourceRuntimeHost extends ChangeNotifier {
   SourceRuntimeHandle recreateSourceRuntime(
     String sourceKey, {
     SourceRuntimeHandle? expectedHandle,
-    String? completingTaskId,
   }) {
     final replacement = _coordinator.recreate(
       sourceKey,
@@ -407,7 +393,7 @@ class SourceRuntimeHost extends ChangeNotifier {
       lease.close(SourceTaskStopReason.runtimeClosed);
     }
     tasks.dispose();
-    for (final source in _catalog) {
+    for (final source in catalog) {
       _coordinator.remove(source.key);
     }
     runtimeRegistry.dispose();
