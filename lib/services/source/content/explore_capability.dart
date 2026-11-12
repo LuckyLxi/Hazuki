@@ -99,7 +99,7 @@ Promise.all(
           title: section.title ?? "__untitled_section__",
           ...(await section.load(1))
         };
-      } catch (error) { rethrowSourceOperationStop(error);
+      } catch (error) {
         return null;
       }
     })
