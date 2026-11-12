@@ -180,7 +180,10 @@ class _FakePluginManager implements SourcePluginManager {
   var hasRepository = true;
 
   @override
-  Future<bool> redownload(String id) async {
+  Future<bool> redownload(
+    String id, {
+    void Function(int received, int total)? onProgress,
+  }) async {
     redownloadedIds.add(id);
     return hasRepository;
   }

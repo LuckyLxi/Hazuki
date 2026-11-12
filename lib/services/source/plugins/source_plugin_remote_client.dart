@@ -6,15 +6,25 @@ import '../../preferences/software_update_source.dart';
 import 'source_plugin_models.dart';
 import 'source_plugin_repository.dart';
 
+/// 下载进度回调；[total] 未知时为 -1。
+typedef SourcePluginDownloadProgress = void Function(int received, int total);
+
 /// Resolves plugin repositories and fetches their indexes and scripts.
 class SourcePluginRemoteClient {
   SourcePluginRemoteClient({
     Future<List<int>> Function(Uri url)? download,
     required Future<SoftwareUpdateSource> Function() loadUpdateSource,
-  }) : _download = download ?? _downloadBytes,
+  }) : _download = download == null
+           ? _downloadBytes
+           // 注入的下载函数不提供分块信息，进度保持未知。
+           : ((url, {onProgress}) => download(url)),
        _loadUpdateSource = loadUpdateSource;
 
-  final Future<List<int>> Function(Uri url) _download;
+  final Future<List<int>> Function(
+    Uri url, {
+    SourcePluginDownloadProgress? onProgress,
+  })
+  _download;
   final Future<SoftwareUpdateSource> Function() _loadUpdateSource;
 
   /// Resolve a public GitHub repo, a tree/blob URL, or an HTTPS JSON URL.
@@ -73,24 +83,33 @@ class SourcePluginRemoteClient {
       _download(resolveSourcePluginIndexUrl(url, await _loadUpdateSource()));
 
   /// 内置仓库的插件包跟随更新源下载；所选线路失败时回退到索引原始地址。
-  Future<List<int>> downloadPackage(String repository, Uri url) async {
-    if (repository != sourcePluginsRepositoryUrl) return _download(url);
+  Future<List<int>> downloadPackage(
+    String repository,
+    Uri url, {
+    SourcePluginDownloadProgress? onProgress,
+  }) async {
+    if (repository != sourcePluginsRepositoryUrl) {
+      return _download(url, onProgress: onProgress);
+    }
     final routed = resolveSourcePluginPackageUrl(
       url,
       await _loadUpdateSource(),
     );
-    if (routed == url) return _download(url);
+    if (routed == url) return _download(url, onProgress: onProgress);
     try {
-      return await _download(routed);
+      return await _download(routed, onProgress: onProgress);
     } catch (_) {
-      return _download(url);
+      return _download(url, onProgress: onProgress);
     }
   }
 
   /// 网络失败时带上底层原因，避免只显示 `DioException [unknown]: null`。
-  static Future<List<int>> _downloadBytes(Uri url) async {
+  static Future<List<int>> _downloadBytes(
+    Uri url, {
+    SourcePluginDownloadProgress? onProgress,
+  }) async {
     try {
-      return await _downloadBytesOnce(url);
+      return await _downloadBytesOnce(url, onProgress);
     } on DioException catch (error) {
       final status = error.response?.statusCode;
       final cause = error.error ?? error.message;
@@ -105,7 +124,10 @@ class SourcePluginRemoteClient {
     }
   }
 
-  static Future<List<int>> _downloadBytesOnce(Uri url) async {
+  static Future<List<int>> _downloadBytesOnce(
+    Uri url,
+    SourcePluginDownloadProgress? onProgress,
+  ) async {
     final dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 20),
@@ -117,12 +139,16 @@ class SourcePluginRemoteClient {
         url.toString(),
         options: Options(responseType: ResponseType.stream),
       );
+      // 压缩传输时响应头长度与解压后的字节数不一致，此时按未知处理。
+      final encoded = response.headers.value('content-encoding') != null;
+      final total = encoded ? -1 : (response.data!.contentLength);
       final result = <int>[];
       await for (final bytes in response.data!.stream) {
         result.addAll(bytes);
         if (result.length > 8 * 1024 * 1024) {
           throw const SourcePluginException('plugin_download_too_large');
         }
+        onProgress?.call(result.length, total);
       }
       return result;
     } finally {

@@ -408,8 +408,9 @@ class SourcePluginManager extends ChangeNotifier {
 
   Future<void> installFromRepository(
     String repository,
-    SourcePluginIndexEntry entry,
-  ) async {
+    SourcePluginIndexEntry entry, {
+    SourcePluginDownloadProgress? onProgress,
+  }) async {
     await initialize();
     if (_disposed) throw StateError('plugin_manager_disposed');
     if (!_repositories.contains(repository)) {
@@ -422,7 +423,11 @@ class SourcePluginManager extends ChangeNotifier {
     }
     // Downloads are independent; catalog changes and registry writes must
     // still commit one at a time.
-    final bytes = await _remote.downloadPackage(repository, entry.downloadUrl);
+    final bytes = await _remote.downloadPackage(
+      repository,
+      entry.downloadUrl,
+      onProgress: onProgress,
+    );
     await _serialize(() async {
       if (!_repositories.contains(repository)) {
         throw const SourcePluginException('plugin_repository_not_added');
@@ -624,7 +629,10 @@ class SourcePluginManager extends ChangeNotifier {
       (throw SourcePluginException('plugin_not_installed', id));
 
   /// Re-fetch the index even when the installed version is already current.
-  Future<bool> redownload(String id) async {
+  Future<bool> redownload(
+    String id, {
+    SourcePluginDownloadProgress? onProgress,
+  }) async {
     await initialize();
     final repository = _requirePlugin(id).repository;
     if (repository == null) return false;
@@ -635,7 +643,7 @@ class SourcePluginManager extends ChangeNotifier {
     if (entry == null) {
       throw SourcePluginException('plugin_not_found_in_index', id);
     }
-    await installFromRepository(repository, entry);
+    await installFromRepository(repository, entry, onProgress: onProgress);
     return true;
   }
 

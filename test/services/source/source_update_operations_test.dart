@@ -53,6 +53,16 @@ void main() {
     expect(await updates.downloadActiveSource(), isTrue);
     expect(plugins.redownloadedIds, ['jm']);
   });
+
+  test('forwards download progress to the caller', () async {
+    final reported = <(int, int)>[];
+
+    await updates.downloadActiveSource(
+      onProgress: (received, total) => reported.add((received, total)),
+    );
+
+    expect(reported, [(512, 1024), (1024, 1024)]);
+  });
 }
 
 class _FakePluginManager implements SourcePluginManager {
@@ -79,7 +89,12 @@ class _FakePluginManager implements SourcePluginManager {
   );
 
   @override
-  Future<bool> redownload(String id) async {
+  Future<bool> redownload(
+    String id, {
+    void Function(int received, int total)? onProgress,
+  }) async {
+    onProgress?.call(512, 1024);
+    onProgress?.call(1024, 1024);
     redownloadedIds.add(id);
     return true;
   }

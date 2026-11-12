@@ -50,7 +50,10 @@ class SourceRuntimeRecoveryOperations {
     _runtimeHost.handleFor(normalizedSourceKey).clearRuntimeFault();
     // 重装会让旧句柄退役并等待其操作结束，因此不能放在 runOperation 内。
     // 本地导入的插件没有来源仓库，无法重新下载。
-    if (!await _plugins.redownload(normalizedSourceKey)) {
+    if (!await _plugins.redownload(
+      normalizedSourceKey,
+      onProgress: onProgress,
+    )) {
       throw SourcePluginException('plugin_not_installed', normalizedSourceKey);
     }
     await _scriptEditing.setCustomEditedSourceFlag(normalizedSourceKey, false);

@@ -32,6 +32,9 @@ class SourceUpdateOperations {
     void Function(int received, int total)? onProgress,
   }) {
     if (!_runtimeHost.hasActiveSource) return Future.value(false);
-    return _plugins.redownload(_runtimeHost.activeSourceKey);
+    return _plugins.redownload(
+      _runtimeHost.activeSourceKey,
+      onProgress: onProgress,
+    );
   }
 }
