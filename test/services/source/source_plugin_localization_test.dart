@@ -12,7 +12,7 @@ import 'package:hazuki/services/source/runtime/source_localization_operations.da
 import 'package:hazuki/services/source/runtime/source_runtime_handle.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/source_catalog_fixtures.dart';

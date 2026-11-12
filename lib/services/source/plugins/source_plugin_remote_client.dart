@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
-import '../../../shared/preferences/software_update_source.dart';
+import '../../preferences/software_update_source.dart';
 import 'source_plugin_models.dart';
 import 'source_plugin_repository.dart';
 

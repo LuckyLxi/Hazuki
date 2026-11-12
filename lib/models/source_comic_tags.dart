@@ -1,4 +1,4 @@
-import '../models/comic_detail_models.dart';
+import 'comic_detail_models.dart';
 
 List<String> sourceComicDetailTags(
   ComicDetailsData details,

@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/announcement_test_service.dart';
 import 'package:hazuki/services/announcements/announcement_popup_coordinator.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 
 const _cachedPopupManifest = '''
 {

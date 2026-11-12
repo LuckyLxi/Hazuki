@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_exception.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_remote_client.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_repository.dart';
-import 'package:hazuki/shared/preferences/software_update_source.dart';
+import 'package:hazuki/services/preferences/software_update_source.dart';
 
 void main() {
   final builtinPackage = Uri.parse(

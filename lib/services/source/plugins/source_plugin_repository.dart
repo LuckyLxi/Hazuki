@@ -1,4 +1,4 @@
-import '../../../shared/preferences/software_update_source.dart';
+import '../../preferences/software_update_source.dart';
 
 const sourcePluginsRepositoryUrl =
     'https://raw.githubusercontent.com/LuckyLxi/Sources/main/plugins.json';

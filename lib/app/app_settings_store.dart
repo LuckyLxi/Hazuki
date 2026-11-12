@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../shared/preferences/hazuki_preference_keys.dart';
+import '../services/preferences/hazuki_preference_keys.dart';
 import '../shared/appearance/appearance_settings.dart';
 import '../services/display_mode_service.dart';
 

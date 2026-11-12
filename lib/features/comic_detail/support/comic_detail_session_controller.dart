@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:hazuki/shared/source_task_owner.dart';
+import 'package:hazuki/services/source/source_task_owner.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
 import 'package:flutter/foundation.dart';

@@ -14,7 +14,7 @@ void main() {
   test('Drift persistence round-trips source-scoped favorites', () async {
     final database = HazukiDatabase.memory();
     addTearDown(database.close);
-    final persistence = DriftLocalFavoritesPersistence(database);
+    final persistence = LocalFavoritesPersistence(database);
 
     await persistence.replace(
       LocalFavoritesSnapshot(
@@ -50,7 +50,7 @@ void main() {
 
   test('sync codec round-trips snapshots and all tombstone types', () async {
     final sourceDatabase = HazukiDatabase.memory();
-    final sourcePersistence = DriftLocalFavoritesPersistence(sourceDatabase);
+    final sourcePersistence = LocalFavoritesPersistence(sourceDatabase);
     final sourceCodec = LocalFavoritesSyncCodec(sourcePersistence);
 
     await sourcePersistence.replace(
@@ -99,7 +99,7 @@ void main() {
 
     final targetDatabase = HazukiDatabase.memory();
     addTearDown(targetDatabase.close);
-    final targetPersistence = DriftLocalFavoritesPersistence(targetDatabase);
+    final targetPersistence = LocalFavoritesPersistence(targetDatabase);
     final targetCodec = LocalFavoritesSyncCodec(targetPersistence);
     await targetCodec.importJsonStrings(
       foldersRaw: foldersRaw,
@@ -143,7 +143,7 @@ void main() {
     });
     final database = HazukiDatabase.memory();
     addTearDown(database.close);
-    final persistence = DriftLocalFavoritesPersistence(database);
+    final persistence = LocalFavoritesPersistence(database);
     final codec = LocalFavoritesSyncCodec(persistence);
     final migration = LocalFavoritesMigration(syncCodec: codec);
 

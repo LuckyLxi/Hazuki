@@ -6,8 +6,8 @@ import 'package:hazuki/services/announcements/announcement.dart';
 import 'package:hazuki/services/announcements/announcement_manifest_parser.dart';
 import 'package:hazuki/services/announcements/announcement_remote_source.dart';
 import '../support/announcement_test_service.dart';
-import 'package:hazuki/shared/preferences/software_update_source.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/software_update_source.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 
 const _manifest = '''
 {

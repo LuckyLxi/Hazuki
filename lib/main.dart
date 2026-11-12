@@ -34,6 +34,7 @@ import 'package:hazuki/features/home/home.dart'
     show HomeFeatureEntrypoints, HomeServices;
 import 'package:hazuki/features/home/view/home_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'services/chinese_conversion_service.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
@@ -191,6 +192,7 @@ class _HazukiAppState extends State<HazukiApp>
           HazukiLiquidGlass.setEnabled(appearance.liquidGlassEnabled),
       reloadLocale: _reloadLocalePreference,
       refreshHome: _startupCoordinator.refreshHome,
+      chineseConversion: sl<ChineseConversionService>(),
     );
     _appListenable = Listenable.merge([
       _themeController,
@@ -359,6 +361,7 @@ class _HazukiAppState extends State<HazukiApp>
                           children: [
                             HazukiWindowFrame(
                               child: ChineseConversionScope(
+                                service: sl<ChineseConversionService>(),
                                 child: child ?? const SizedBox.shrink(),
                               ),
                             ),

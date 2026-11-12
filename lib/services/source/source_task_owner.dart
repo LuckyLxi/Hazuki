@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import '../services/source/gateways/source_task_control_gateway.dart';
-import '../services/source/models/source_task.dart';
+import 'gateways/source_task_control_gateway.dart';
+import 'models/source_task.dart';
 
 /// An explicit request group; pagination keeps the group until replacement.
 class SourceTaskOwner {

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../shared/preferences/hazuki_preference_keys.dart';
+import '../preferences/hazuki_preference_keys.dart';
 import 'discover_recommendation_models.dart';
 import 'discover_recommendation_config.dart';
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import '../settings_group.dart';
@@ -33,7 +34,7 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
       final mode = await showChineseConversionMenu(
         context: context,
         anchorKey: _anchorKey,
-        selected: hazukiChineseConversion.mode,
+        selected: ChineseConversionScope.read(context).mode,
         onTransitionChanged: (transition) {
           if (mounted) setState(() => _menuTransition = transition);
         },
@@ -47,6 +48,7 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
+    final conversion = ChineseConversionScope.read(context);
     String label(ChineseConversionMode mode) => switch (mode) {
       ChineseConversionMode.off => strings.otherChineseConversionOff,
       ChineseConversionMode.traditional =>
@@ -56,7 +58,7 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
     };
 
     return ListenableBuilder(
-      listenable: hazukiChineseConversion,
+      listenable: conversion,
       builder: (context, _) => ListTile(
         key: const ValueKey('other-chinese-conversion-menu'),
         enabled: widget.enabled,
@@ -73,7 +75,7 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
             onTap: widget.enabled ? _showMenu : null,
             child: HazukiMenuValuePill(
               key: const ValueKey('chinese-conversion-button'),
-              label: label(hazukiChineseConversion.mode),
+              label: label(conversion.mode),
             ),
           ),
         ),

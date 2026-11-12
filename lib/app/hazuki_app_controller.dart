@@ -19,12 +19,14 @@ class HazukiAppController implements CloudSyncRestoreHandler {
     applyAppearanceRuntime,
     required Future<void> Function() reloadLocale,
     required VoidCallback refreshHome,
+    required ChineseConversionService chineseConversion,
   }) : _settingsStore = settingsStore,
        _themeController = themeController,
        _windowsTitleBarController = windowsTitleBarController,
        _applyAppearanceRuntime = applyAppearanceRuntime,
        _reloadLocale = reloadLocale,
-       _refreshHome = refreshHome;
+       _refreshHome = refreshHome,
+       _chineseConversion = chineseConversion;
 
   final HazukiAppSettingsStore _settingsStore;
   final HazukiThemeController _themeController;
@@ -33,6 +35,7 @@ class HazukiAppController implements CloudSyncRestoreHandler {
   _applyAppearanceRuntime;
   final Future<void> Function() _reloadLocale;
   final VoidCallback _refreshHome;
+  final ChineseConversionService _chineseConversion;
 
   @override
   Future<void> applyCloudSyncRestore(CloudSyncRestoreResult result) async {
@@ -42,7 +45,7 @@ class HazukiAppController implements CloudSyncRestoreHandler {
       await _applyAppearanceRuntime(appearance);
       await _reloadLocale();
       await _windowsTitleBarController.reloadFromStore();
-      await hazukiChineseConversion.load();
+      await _chineseConversion.load();
     }
 
     _refreshHome();

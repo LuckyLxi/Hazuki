@@ -5,8 +5,8 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../shared/preferences/hazuki_preference_keys.dart';
-import '../shared/source_comic_tags.dart';
+import 'preferences/hazuki_preference_keys.dart';
+import '../models/source_comic_tags.dart';
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
 import '../models/hazuki_models.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/shared/source_comic_tags.dart';
+import 'package:hazuki/models/source_comic_tags.dart';
 
 void main() {
   test('extracts only plugin-declared tag groups', () {

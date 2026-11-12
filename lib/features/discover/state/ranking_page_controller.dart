@@ -3,7 +3,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/shared/source_task_owner.dart';
+import 'package:hazuki/services/source/source_task_owner.dart';
 
 /// 排行榜页面的状态控制器，负责排行榜选项加载、漫画列表分页与切换逻辑。
 class RankingPageController extends ChangeNotifier {

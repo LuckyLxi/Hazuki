@@ -1,4 +1,4 @@
-import 'package:hazuki/shared/source_task_owner.dart';
+import 'package:hazuki/services/source/source_task_owner.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 // ignore_for_file: use_build_context_synchronously
 

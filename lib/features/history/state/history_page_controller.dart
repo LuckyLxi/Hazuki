@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:hazuki/shared/source_task_owner.dart';
+import 'package:hazuki/services/source/source_task_owner.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
-import 'package:hazuki/shared/source_comic_tags.dart';
+import 'package:hazuki/models/source_comic_tags.dart';
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
 import 'history_page_state.dart';

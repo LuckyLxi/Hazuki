@@ -34,3 +34,10 @@ const hazukiAnnouncementHiddenCardIdsPreferenceKey =
     'announcement_hidden_normal_ids';
 const hazukiReadHistoryMaxCount = 300;
 const hazukiSearchHistoryMaxCount = 50;
+
+// 阅读器设置中由设备决定、云同步始终跳过的键。
+const hazukiReaderReadingModePreferenceKey = 'reader_reading_mode';
+const hazukiReaderDoublePageModePreferenceKey = 'reader_double_page_mode';
+const hazukiReaderFilterEnabledPreferenceKey = 'reader_filter_enabled';
+const hazukiReaderFilterColorPreferenceKey = 'reader_filter_color';
+const hazukiReaderFilterStrengthPreferenceKey = 'reader_filter_strength';

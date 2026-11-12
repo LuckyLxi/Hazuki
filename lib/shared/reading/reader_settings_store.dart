@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/preferences/hazuki_preference_keys.dart';
 import 'reader_filter_color.dart';
 import 'reader_mode.dart';
 
@@ -41,8 +42,9 @@ class ReaderSettingsSnapshot {
 class ReaderSettingsStore {
   const ReaderSettingsStore();
 
-  static const String readingModeKey = 'reader_reading_mode';
-  static const String doublePageModeKey = 'reader_double_page_mode';
+  static const String readingModeKey = hazukiReaderReadingModePreferenceKey;
+  static const String doublePageModeKey =
+      hazukiReaderDoublePageModePreferenceKey;
   static const String tapToTurnPageKey = 'reader_tap_to_turn_page';
   static const String volumeButtonTurnPageKey =
       'reader_volume_button_turn_page';
@@ -50,9 +52,10 @@ class ReaderSettingsStore {
   static const String keepScreenOnKey = 'reader_keep_screen_on';
   static const String customBrightnessKey = 'reader_custom_brightness';
   static const String brightnessValueKey = 'reader_brightness_value';
-  static const String filterEnabledKey = 'reader_filter_enabled';
-  static const String filterColorKey = 'reader_filter_color';
-  static const String filterStrengthKey = 'reader_filter_strength';
+  static const String filterEnabledKey = hazukiReaderFilterEnabledPreferenceKey;
+  static const String filterColorKey = hazukiReaderFilterColorPreferenceKey;
+  static const String filterStrengthKey =
+      hazukiReaderFilterStrengthPreferenceKey;
   static const String pageIndicatorKey = 'reader_page_indicator';
   static const String pinchToZoomKey = 'reader_pinch_to_zoom';
   static const String restorePagePositionKey = 'reader_restore_page_position';

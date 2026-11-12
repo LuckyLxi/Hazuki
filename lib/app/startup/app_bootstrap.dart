@@ -45,7 +45,7 @@ Future<AppBootstrapResult> bootstrapApp() async {
   // native launch screen visible for the slowest task instead of their sum.
   await Future.wait<void>([
     loadHazukiUiFlags(),
-    hazukiChineseConversion.load(),
+    sl<ChineseConversionService>().load(),
     sourcePreferenceFuture,
     sourcePreferenceFuture
         .then((_) => sl<SourceDebugGateway>().loadSoftwareLogCaptureEnabled())

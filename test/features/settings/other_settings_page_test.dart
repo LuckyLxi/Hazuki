@@ -5,7 +5,8 @@ import 'package:hazuki/features/settings/view/other/other_settings_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,6 +19,8 @@ class _MockPlugins extends Mock implements SourcePluginGateway {}
 void main() {
   late _MockSelection selection;
   late _MockDependencies dependencies;
+  // 词典只加载一次，各用例共用同一个转换服务。
+  final chineseConversion = ChineseConversionService();
 
   setUp(() {
     SharedPreferences.setMockInitialValues({
@@ -38,7 +41,10 @@ void main() {
     locale: const Locale('en'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: OtherSettingsPage(dependencies: dependencies),
+    home: ChineseConversionScope(
+      service: chineseConversion,
+      child: OtherSettingsPage(dependencies: dependencies),
+    ),
   );
 
   Finder comicIdSwitch(WidgetTester tester) {
@@ -119,11 +125,9 @@ void main() {
     (tester) async {
       // Prepare assets outside the widget test's fake clock.
       await tester.runAsync(() async {
-        await hazukiChineseConversion.setMode(
-          ChineseConversionMode.traditional,
-        );
-        await hazukiChineseConversion.setMode(ChineseConversionMode.simplified);
-        await hazukiChineseConversion.setMode(ChineseConversionMode.off);
+        await chineseConversion.setMode(ChineseConversionMode.traditional);
+        await chineseConversion.setMode(ChineseConversionMode.simplified);
+        await chineseConversion.setMode(ChineseConversionMode.off);
       });
       await tester.pumpWidget(app());
       await tester.pumpAndSettle();

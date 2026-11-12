@@ -496,6 +496,26 @@ void main() {
     },
   );
 
+  test('services and models do not depend on shared UI helpers', () {
+    final sharedRoot = Directory('lib/shared').absolute.uri.toString();
+    final violations = <String>[];
+    for (final directory in const ['lib/services', 'lib/models']) {
+      for (final file in _dartFilesUnder(directory)) {
+        final dependsOnShared = _dependencyUris(
+          file.readAsStringSync(),
+          file.absolute.uri,
+        ).any((uri) => uri.toString().startsWith(sharedRoot));
+        if (dependsOnShared) violations.add(file.path);
+      }
+    }
+
+    expect(
+      violations,
+      isEmpty,
+      reason: 'Move shared contracts below lib/shared: $violations',
+    );
+  });
+
   test('application and features do not depend on source implementations', () {
     final violations = <String>[];
     for (final directory in const ['lib/app', 'lib/features']) {

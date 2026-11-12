@@ -1,7 +1,7 @@
 import '../models/source_task.dart';
 import 'package:flutter/foundation.dart';
 import '../../../models/source_meta.dart';
-import '../../../shared/preferences/software_update_source.dart';
+import '../../preferences/software_update_source.dart';
 import '../plugins/source_plugin_models.dart';
 
 abstract interface class SourcePluginGateway implements Listenable {

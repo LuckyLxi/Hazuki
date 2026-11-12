@@ -1,4 +1,4 @@
-import 'package:hazuki/shared/source_task_owner.dart';
+import 'package:hazuki/services/source/source_task_owner.dart';
 import 'dart:async';
 import 'dart:ui' show FrameTiming;
 

@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../shared/preferences/hazuki_preference_keys.dart';
+import '../../preferences/hazuki_preference_keys.dart';
 
 /// Matches the app's supported locales, including its English system fallback.
 String sourcePluginLocaleTag(SharedPreferences? prefs) {

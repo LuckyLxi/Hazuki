@@ -1,12 +1,9 @@
 import 'package:flutter/widgets.dart';
 
 import '../l10n/l10n.dart';
+import '../models/default_chapter_title.dart';
 
-const hazukiDefaultChapterTitleToken = '__default_chapter_1__';
-
-bool isHazukiDefaultChapterTitle(String rawTitle) {
-  return rawTitle.trim() == hazukiDefaultChapterTitleToken;
-}
+export '../models/default_chapter_title.dart';
 
 String resolveHazukiChapterTitle(BuildContext context, String rawTitle) {
   final normalized = rawTitle.trim();

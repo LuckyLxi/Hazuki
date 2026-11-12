@@ -8,6 +8,7 @@ import '../../services/announcements/announcement_store.dart';
 import '../../services/cloud_sync/cloud_sync_participant_set.dart';
 import '../../services/cloud_sync_service.dart';
 import '../../services/comment_filter/comment_filter_sync_store.dart';
+import '../../services/chinese_conversion_service.dart';
 import '../../services/comment_filter_service.dart';
 import '../../services/discover_daily_recommendation_service.dart';
 import '../../services/download_groups_service.dart';
@@ -128,7 +129,7 @@ void registerApplicationServices(GetIt services) {
     services.registerLazySingleton<AnnouncementService>(
       () => AnnouncementService(
         remoteSource: HttpAnnouncementRemoteSource(),
-        store: SharedPreferencesAnnouncementStore(),
+        store: AnnouncementStore(),
       ),
       dispose: (service) => service.dispose(),
     );
@@ -149,6 +150,11 @@ void registerApplicationServices(GetIt services) {
       CommentFilterService.new,
     );
   }
+  if (!services.isRegistered<ChineseConversionService>()) {
+    services.registerLazySingleton<ChineseConversionService>(
+      ChineseConversionService.new,
+    );
+  }
   if (!services.isRegistered<CommentFilterSyncStore>()) {
     services.registerLazySingleton<CommentFilterSyncStore>(
       () => services<CommentFilterService>(),
@@ -161,7 +167,7 @@ void registerApplicationServices(GetIt services) {
   }
   if (!services.isRegistered<LocalFavoritesPersistence>()) {
     services.registerLazySingleton<LocalFavoritesPersistence>(
-      () => DriftLocalFavoritesPersistence(services<HazukiDatabase>()),
+      () => LocalFavoritesPersistence(services<HazukiDatabase>()),
     );
   }
   if (!services.isRegistered<LocalFavoritesSyncCodec>()) {

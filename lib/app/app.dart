@@ -1,4 +1,4 @@
-export '../shared/preferences/hazuki_preference_keys.dart';
+export '../services/preferences/hazuki_preference_keys.dart';
 export 'hazuki_app_controller.dart';
 export '../shared/appearance/appearance_settings.dart';
 export '../services/display_mode_service.dart';

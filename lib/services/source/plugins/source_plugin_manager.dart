@@ -8,8 +8,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../shared/preferences/hazuki_preference_keys.dart';
-import '../../../shared/preferences/software_update_source.dart';
+import '../../preferences/hazuki_preference_keys.dart';
+import '../../preferences/software_update_source.dart';
 import '../models/source_contract_models.dart';
 import 'source_plugin_models.dart';
 import 'source_plugin_remote_client.dart';

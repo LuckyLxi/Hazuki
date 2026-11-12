@@ -4,6 +4,8 @@ import '../../support/source_presentation_fixtures.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/services/chinese_conversion_service.dart';
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/features/settings/support/settings_core_dependencies.dart';
 import 'package:hazuki/features/settings/view/advanced/advanced_settings_page.dart';
 import 'package:hazuki/features/settings/view/debug/lab_settings_page.dart';
@@ -671,8 +673,9 @@ void main() {
               sourceService: settings,
               sourcePlugins: plugins,
             ),
-            SourcePluginActionLocation.other => OtherSettingsPage(
-              dependencies: dependencies,
+            SourcePluginActionLocation.other => ChineseConversionScope(
+              service: ChineseConversionService(),
+              child: OtherSettingsPage(dependencies: dependencies),
             ),
             SourcePluginActionLocation.lab => LabSettingsPage(
               sourcePlugins: plugins,

@@ -7,7 +7,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 import 'package:hazuki/shared/comments/comments_sort_delegate.dart';
 import 'package:hazuki/shared/comments/comments_sort_scope.dart';
-import 'package:hazuki/shared/preferences/software_update_source.dart';
+import 'package:hazuki/services/preferences/software_update_source.dart';
 import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';

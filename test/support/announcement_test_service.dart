@@ -8,6 +8,6 @@ AnnouncementService buildTestAnnouncementService({
   DateTime Function()? now,
 }) => AnnouncementService(
   remoteSource: CallbackAnnouncementRemoteSource(loadRemote),
-  store: SharedPreferencesAnnouncementStore(),
+  store: AnnouncementStore(),
   now: now,
 );

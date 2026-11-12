@@ -5,6 +5,7 @@ import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'comment_filter_dialog.dart';
 import 'other_settings_sections.dart';
@@ -56,10 +57,11 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
   }
 
   Future<void> _loadSettings() async {
+    final conversion = ChineseConversionScope.read(context);
     final snapshot = await OtherSettingsActions.loadSettings(
       initialUseSystemTitleBar: widget.initialUseSystemTitleBar,
     );
-    await hazukiChineseConversion.load();
+    await conversion.load();
     if (!mounted) {
       return;
     }
@@ -79,7 +81,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     if (_updatingChineseConversion) return;
     setState(() => _updatingChineseConversion = true);
     try {
-      await hazukiChineseConversion.setMode(mode);
+      await ChineseConversionScope.read(context).setMode(mode);
     } catch (_) {
       if (mounted) {
         await showHazukiPrompt(

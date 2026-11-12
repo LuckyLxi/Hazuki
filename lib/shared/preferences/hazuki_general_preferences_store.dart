@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../ui_flags.dart' show hazukiNoImageModePreferenceKey;
-import 'hazuki_preference_keys.dart';
+import '../../services/preferences/hazuki_preference_keys.dart';
 
 /// 功能页面共用的零散偏好项；UI 层通过它读写，不直接接触 SharedPreferences。
 class HazukiGeneralPreferencesStore {

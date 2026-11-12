@@ -1,5 +1,5 @@
 import '../../../models/hazuki_models.dart';
-import '../../../shared/chapter_title_resolver.dart';
+import '../../../models/default_chapter_title.dart';
 import '../common/source_json_coerce.dart';
 
 typedef ComicDetailsTextTranslator =

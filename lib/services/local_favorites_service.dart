@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/hazuki_models.dart';
-import '../shared/source_comic_tags.dart';
+import '../models/source_comic_tags.dart';
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
 import 'local_favorites/local_favorite_sort.dart';
@@ -26,8 +26,7 @@ class LocalFavoritesService extends ChangeNotifier
     LocalFavoritesMigration? migration,
   }) {
     final resolvedPersistence =
-        persistence ??
-        DriftLocalFavoritesPersistence(database ?? HazukiDatabase());
+        persistence ?? LocalFavoritesPersistence(database ?? HazukiDatabase());
     final resolvedSyncCodec =
         syncCodec ?? LocalFavoritesSyncCodec(resolvedPersistence);
     return LocalFavoritesService._(

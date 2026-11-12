@@ -1,4 +1,4 @@
-import 'package:hazuki/shared/source_task_owner.dart';
+import 'package:hazuki/services/source/source_task_owner.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';

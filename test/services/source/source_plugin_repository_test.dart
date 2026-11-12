@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_repository.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
-import 'package:hazuki/shared/preferences/software_update_source.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/software_update_source.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _indexUrls = {
