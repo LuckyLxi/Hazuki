@@ -158,6 +158,76 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('compact tags and ID follow the animated detail palette', (
+    tester,
+  ) async {
+    final initial = ColorScheme.fromSeed(seedColor: Colors.blue);
+    final cover = ColorScheme.fromSeed(seedColor: Colors.red);
+
+    Future<void> render(ColorScheme scheme) => tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedTheme(
+          data: ThemeData(colorScheme: scheme),
+          child: Scaffold(
+            body: Column(
+              children: [
+                ComicDetailIdRow(
+                  useMobileStyle: true,
+                  id: '123',
+                  onCopy: () {},
+                ),
+                ComicDetailMetaRow(
+                  useMobileStyle: true,
+                  label: 'Tags',
+                  values: const ['Adventure'],
+                  onValuePressed: (_) {},
+                  onValueLongPress: (_) {},
+                ),
+                ComicDetailMetaRow(
+                  useMobileStyle: true,
+                  label: 'Status',
+                  values: const ['Ongoing'],
+                  onValuePressed: null,
+                  onValueLongPress: (_) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    void expectTagColors(ColorScheme scheme) {
+      final fills = tester.widgetList<Ink>(
+        find.descendant(
+          of: find.byWidgetPredicate(
+            (widget) => widget is Chip || widget is ActionChip,
+          ),
+          matching: find.byType(Ink),
+        ),
+      );
+      final fillColor = scheme.primaryContainer.withValues(alpha: 0.22);
+      expect(fills.map((ink) => (ink.decoration! as ShapeDecoration).color), [
+        fillColor,
+        fillColor,
+        fillColor,
+      ]);
+      for (final label in ['ID: 123', 'Adventure', 'Ongoing']) {
+        expect(
+          tester.widget<Text>(find.text(label)).style?.color,
+          scheme.onSurfaceVariant,
+        );
+      }
+    }
+
+    await render(initial);
+    await tester.pumpAndSettle();
+    expectTagColors(initial);
+    await render(cover);
+    await tester.pumpAndSettle();
+    expectTagColors(cover);
+  });
+
   testWidgets('detail authors and tags use category-aware tag callback', (
     tester,
   ) async {

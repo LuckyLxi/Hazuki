@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
+Color _compactMetaChipColor(ColorScheme colors) =>
+    colors.primaryContainer.withValues(alpha: 0.22);
+
 class ComicDetailMetaSection extends StatelessWidget {
   const ComicDetailMetaSection({
     super.key,
@@ -88,7 +91,7 @@ class ComicDetailIdRow extends StatelessWidget {
           child: Chip(
             visualDensity: VisualDensity.compact,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            backgroundColor: colors.primary.withValues(alpha: 0.08),
+            backgroundColor: _compactMetaChipColor(colors),
             side: BorderSide.none,
             labelPadding: const EdgeInsets.symmetric(horizontal: 4),
             padding: EdgeInsets.zero,
@@ -156,6 +159,9 @@ class ComicDetailMetaRow extends StatelessWidget {
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final chipColor = useMobileStyle
+        ? _compactMetaChipColor(cs)
+        : cs.secondaryContainer;
     final valueStyle = theme.textTheme.bodySmall?.copyWith(
       color: useMobileStyle ? cs.onSurfaceVariant : cs.onSecondaryContainer,
       fontWeight: FontWeight.w500,
@@ -169,12 +175,8 @@ class ComicDetailMetaRow extends StatelessWidget {
               child: ActionChip(
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                backgroundColor: useMobileStyle
-                    ? cs.primary.withValues(alpha: 0.08)
-                    : cs.secondaryContainer,
-                disabledColor: useMobileStyle
-                    ? cs.primary.withValues(alpha: 0.08)
-                    : cs.secondaryContainer,
+                backgroundColor: chipColor,
+                disabledColor: chipColor,
                 side: useMobileStyle
                     ? BorderSide.none
                     : BorderSide(
