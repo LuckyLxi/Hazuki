@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/reading/reader_page_builder.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 import '../repository/comic_detail_repository.dart';
@@ -47,7 +48,7 @@ class ComicDetailPage extends StatefulWidget {
   final ExploreComic comic;
   final ComicDetailDependencies dependencies;
   final String heroTag;
-  final ReaderWidgetBuilder readerWidgetBuilder;
+  final ReaderPageBuilder readerWidgetBuilder;
   final ComicDetailSearchPageBuilder searchPageBuilder;
   final CommentsWidgetBuilder commentsWidgetBuilder;
   final ComicDetailCategoryPageBuilder? categoryPageBuilder;

@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 import '../../support/fake_source_task_control.dart';
 import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
@@ -340,6 +341,8 @@ void main() {
                     coverUrl = '',
                     comicTheme,
                     onFavoriteRequested,
+                    offlineMode = false,
+                    offlineChapters = const <ReaderOfflineChapterData>[],
                   }) => ReaderPage(
                     title: title,
                     chapterTitle: chapterTitle,
@@ -349,6 +352,7 @@ void main() {
                     images: const [],
                     sourceKey: sourceKey,
                     offlineMode: true,
+                    offlineChapters: offlineChapters,
                     dependencies: ReaderDependencies(
                       sourceReader: sl<SourceReaderGateway>(),
                       sourceSettings: sl<SourceSettingsGateway>(),
@@ -889,6 +893,8 @@ void main() {
                   coverUrl = '',
                   comicTheme,
                   onFavoriteRequested,
+                  offlineMode = false,
+                  offlineChapters = const <ReaderOfflineChapterData>[],
                 }) => const Scaffold(body: Text('Reader destination')),
             searchPageBuilder: (keyword) =>
                 Scaffold(body: Text('Search destination: $keyword')),
@@ -977,6 +983,8 @@ void main() {
                       coverUrl = '',
                       comicTheme,
                       onFavoriteRequested,
+                      offlineMode = false,
+                      offlineChapters = const <ReaderOfflineChapterData>[],
                     }) => Scaffold(
                       body: Text('Reader: $epId $chapterTitle $chapterIndex'),
                     ),
@@ -1575,6 +1583,8 @@ void main() {
                   coverUrl = '',
                   comicTheme,
                   onFavoriteRequested,
+                  offlineMode = false,
+                  offlineChapters = const <ReaderOfflineChapterData>[],
                 }) => const Scaffold(body: Text('Reader destination')),
             searchPageBuilder: (_) => const SizedBox.shrink(),
             commentsWidgetBuilder: _buildComments,
@@ -1679,6 +1689,8 @@ void main() {
                   coverUrl = '',
                   comicTheme,
                   onFavoriteRequested,
+                  offlineMode = false,
+                  offlineChapters = const <ReaderOfflineChapterData>[],
                 }) => const SizedBox.shrink(),
             searchPageBuilder: (_) => const SizedBox.shrink(),
             commentsWidgetBuilder: _buildComments,
@@ -1763,6 +1775,8 @@ void main() {
                 coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
+                offlineMode = false,
+                offlineChapters = const <ReaderOfflineChapterData>[],
               }) => const SizedBox.shrink(),
           searchPageBuilder: (_) => const SizedBox.shrink(),
           commentsWidgetBuilder: _buildComments,
@@ -1998,6 +2012,8 @@ void main() {
                 coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
+                offlineMode = false,
+                offlineChapters = const <ReaderOfflineChapterData>[],
               }) => ReaderPage(
                 title: title,
                 chapterTitle: chapterTitle,
@@ -2008,6 +2024,10 @@ void main() {
                 dependencies: readerDependencies,
                 sourceKey: sourceKey,
                 coverUrl: coverUrl,
+                comicTheme: comicTheme,
+                onFavoriteRequested: onFavoriteRequested,
+                offlineMode: offlineMode,
+                offlineChapters: offlineChapters,
                 commentsWidgetBuilder: _buildReaderComments,
               ),
           searchPageBuilder: (_) => const SizedBox.shrink(),
@@ -2058,6 +2078,8 @@ void main() {
                 coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
+                offlineMode = false,
+                offlineChapters = const <ReaderOfflineChapterData>[],
               }) => ReaderPage(
                 title: title,
                 chapterTitle: chapterTitle,
@@ -2068,6 +2090,10 @@ void main() {
                 dependencies: readerDependencies,
                 sourceKey: sourceKey,
                 coverUrl: coverUrl,
+                comicTheme: comicTheme,
+                onFavoriteRequested: onFavoriteRequested,
+                offlineMode: offlineMode,
+                offlineChapters: offlineChapters,
                 commentsWidgetBuilder: _buildReaderComments,
               ),
           searchPageBuilder: (_) => const SizedBox.shrink(),
@@ -2503,6 +2529,8 @@ Widget _buildDesktopTestDetail({
           coverUrl = '',
           comicTheme,
           onFavoriteRequested,
+          offlineMode = false,
+          offlineChapters = const <ReaderOfflineChapterData>[],
         }) => const SizedBox.shrink(),
     searchPageBuilder: (_) => const SizedBox.shrink(),
     commentsWidgetBuilder: _buildComments,

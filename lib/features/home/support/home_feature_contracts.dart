@@ -11,7 +11,7 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
-import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
+import 'package:hazuki/shared/reading/reader_page_builder.dart';
 
 abstract class HomeDownloadStatusListenable implements Listenable {
   bool get hasTasks;
@@ -68,22 +68,6 @@ typedef HomeSearchPageBuilder =
 
 typedef HomeSearchRouteBuilder =
     Route<T> Function<T>({required WidgetBuilder builder});
-
-typedef HomeReaderPageBuilder =
-    Widget Function({
-      required String title,
-      required String chapterTitle,
-      required String comicId,
-      required String epId,
-      required int chapterIndex,
-      required List<String> images,
-      required String sourceKey,
-      String coverUrl,
-      ThemeData? comicTheme,
-      Future<void> Function(BuildContext context)? onFavoriteRequested,
-      bool offlineMode,
-      List<ReaderOfflineChapterData> offlineChapters,
-    });
 
 typedef HomeDiscoverTabBuilder =
     Widget Function({
@@ -160,7 +144,7 @@ class HomeFeatureEntrypoints {
   });
 
   final HomeComicDetailPageBuilder buildComicDetailPage;
-  final HomeReaderPageBuilder buildReaderPage;
+  final ReaderPageBuilder buildReaderPage;
   final HomeSearchPageBuilder buildSearchPage;
   final HomeSearchRouteBuilder buildSearchRoute;
   final Future<void> Function()? prepareSearchPage;

@@ -40,17 +40,3 @@ typedef ComicDetailCategoryPageBuilder =
       required String viewMoreUrl,
       required ComicDetailNestedPageBuilder comicDetailPageBuilder,
     });
-
-typedef ReaderWidgetBuilder =
-    Widget Function({
-      required String title,
-      required String chapterTitle,
-      required String comicId,
-      required String epId,
-      required int chapterIndex,
-      required List<String> images,
-      required String sourceKey,
-      String coverUrl,
-      ThemeData? comicTheme,
-      Future<void> Function(BuildContext)? onFavoriteRequested,
-    });

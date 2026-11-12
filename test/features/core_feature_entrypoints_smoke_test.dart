@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 import '../support/fake_source_task_control.dart';
 import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
@@ -77,6 +78,91 @@ ComicDetailDependencies _comicDetailDependencies() {
 }
 
 void main() {
+  test('reader entrypoints preserve online defaults and offline arguments', () {
+    registerServices();
+    final entrypoints = buildHazukiHomeFeatureEntrypoints();
+    final detail =
+        entrypoints.buildComicDetailPage(
+              const ExploreComic(
+                id: 'comic-id',
+                title: 'Comic',
+                subTitle: '',
+                cover: '',
+                sourceKey: 'source',
+              ),
+              'hero',
+            )
+            as ComicDetailPage;
+    final theme = ThemeData.dark();
+    Future<void> favorite(BuildContext context) async {}
+    const chapters = [
+      ReaderOfflineChapterData(
+        epId: 'chapter-id',
+        title: 'Chapter 2',
+        index: 1,
+        images: ['local-image'],
+      ),
+    ];
+
+    for (final build in [
+      entrypoints.buildReaderPage,
+      detail.readerWidgetBuilder,
+    ]) {
+      final online =
+          build(
+                title: 'Comic',
+                chapterTitle: 'Chapter 2',
+                comicId: 'comic-id',
+                epId: 'chapter-id',
+                chapterIndex: 1,
+                images: const ['remote-image'],
+                sourceKey: 'source',
+              )
+              as ReaderPage;
+      expect(online.title, 'Comic');
+      expect(online.chapterTitle, 'Chapter 2');
+      expect(online.comicId, 'comic-id');
+      expect(online.epId, 'chapter-id');
+      expect(online.chapterIndex, 1);
+      expect(online.images, ['remote-image']);
+      expect(online.sourceKey, 'source');
+      expect(online.coverUrl, isEmpty);
+      expect(online.comicTheme, isNull);
+      expect(online.onFavoriteRequested, isNull);
+      expect(online.offlineMode, isFalse);
+      expect(online.offlineChapters, isEmpty);
+
+      final offline =
+          build(
+                title: 'Downloaded comic',
+                chapterTitle: chapters.single.title,
+                comicId: 'offline-comic',
+                epId: chapters.single.epId,
+                chapterIndex: chapters.single.index,
+                images: chapters.single.images,
+                sourceKey: 'offline-source',
+                coverUrl: 'local-cover',
+                comicTheme: theme,
+                onFavoriteRequested: favorite,
+                offlineMode: true,
+                offlineChapters: chapters,
+              )
+              as ReaderPage;
+      expect(offline.title, 'Downloaded comic');
+      expect(offline.chapterTitle, 'Chapter 2');
+      expect(offline.comicId, 'offline-comic');
+      expect(offline.epId, 'chapter-id');
+      expect(offline.chapterIndex, 1);
+      expect(offline.sourceKey, 'offline-source');
+      expect(offline.images, same(chapters.single.images));
+      expect(offline.coverUrl, 'local-cover');
+      expect(offline.comicTheme, same(theme));
+      expect(offline.onFavoriteRequested, same(favorite));
+      expect(offline.offlineMode, isTrue);
+      expect(offline.offlineChapters, same(chapters));
+    }
+  });
+
   test('feature-first entry widgets are constructible from public paths', () {
     registerServices();
     final readerDependencies = _readerDependencies();
@@ -120,6 +206,8 @@ void main() {
             coverUrl = '',
             comicTheme,
             onFavoriteRequested,
+            offlineMode = false,
+            offlineChapters = const <ReaderOfflineChapterData>[],
           }) => ReaderPage(
             title: title,
             chapterTitle: chapterTitle,
@@ -130,6 +218,10 @@ void main() {
             dependencies: readerDependencies,
             sourceKey: sourceKey,
             coverUrl: coverUrl,
+            comicTheme: comicTheme,
+            onFavoriteRequested: onFavoriteRequested,
+            offlineMode: offlineMode,
+            offlineChapters: offlineChapters,
             commentsWidgetBuilder: _buildReaderComments,
           ),
       searchPageBuilder: (_) => const SizedBox.shrink(),
@@ -151,6 +243,8 @@ void main() {
             coverUrl = '',
             comicTheme,
             onFavoriteRequested,
+            offlineMode = false,
+            offlineChapters = const <ReaderOfflineChapterData>[],
           }) => ReaderPage(
             title: title,
             chapterTitle: chapterTitle,
@@ -161,6 +255,10 @@ void main() {
             dependencies: readerDependencies,
             sourceKey: sourceKey,
             coverUrl: coverUrl,
+            comicTheme: comicTheme,
+            onFavoriteRequested: onFavoriteRequested,
+            offlineMode: offlineMode,
+            offlineChapters: offlineChapters,
             commentsWidgetBuilder: _buildReaderComments,
           ),
       searchPageBuilder: (_) => const SizedBox.shrink(),
