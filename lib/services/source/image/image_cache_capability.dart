@@ -1,3 +1,4 @@
+import '../common/source_operation_stop.dart';
 import '../models/source_task.dart';
 import 'dart:io';
 import 'dart:typed_data';
@@ -6,7 +7,6 @@ import '../../../models/hazuki_models.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_task_registry.dart';
 import '../runtime/source_shared_request.dart';
-import '../runtime/source_operation_context.dart';
 import '../debug/source_task_log_recorder.dart';
 import 'image_cache_policy.dart';
 import 'image_disk_cache_store.dart';

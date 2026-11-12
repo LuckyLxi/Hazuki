@@ -13,6 +13,7 @@ import 'package:hazuki/services/source/runtime/source_operation_runner.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
+import 'package:hazuki/services/source/runtime/source_settings_operations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -146,6 +147,45 @@ void main() {
     gate.complete();
     await Future<void>.delayed(Duration.zero);
     expect(await engine.evaluate('typeof executed'), 'undefined');
+  });
+
+  test('line snapshot cancellation preserves the runtime', () async {
+    await engine.execute('''
+      globalThis.__hazuki_source={lines:{snapshot:()=>{
+        sendMessage({entered:true});while(true){}
+      }}};
+    ''');
+    final pending = SourceSettingsOperations(
+      host,
+    ).getLineSettingsSnapshot(taskOrigin: origin('lines-page'));
+    final stopped = expectLater(pending, throwsA(isA<SourceTaskCancelled>()));
+    await entered.future.timeout(const Duration(seconds: 3));
+    final receipt = await host.tasks.cancelOwner(
+      'lines-page',
+      SourceTaskStopReason.user,
+    );
+    await stopped.timeout(const Duration(seconds: 3));
+    await receipt.whenSettled.timeout(const Duration(seconds: 3));
+    expect(await engine.evaluate('42'), 42);
+  });
+
+  test('line refresh commands retain the same service task identity', () async {
+    final identities = <String>[];
+    final methods = <String>[];
+    engine.setOperationMessageHandler((message, context) {
+      identities.add(context.execution.taskId);
+      methods.add(message as String);
+      return null;
+    });
+    await engine.execute('''
+      globalThis.__hazuki_source={
+        refreshApiDomains:()=>sendMessage("api"),
+        refreshImgUrl:()=>sendMessage("image")
+      };
+    ''');
+    await SourceSettingsOperations(host).refreshLines();
+    expect(methods, ['api', 'image']);
+    expect(identities.toSet(), hasLength(1));
   });
 
   test('multiple explicit commands share one service task identity', () async {

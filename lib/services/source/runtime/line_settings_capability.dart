@@ -1,5 +1,12 @@
-import 'source_operation_context.dart';
+import 'source_script_engine.dart';
 import 'source_runtime_facade.dart';
+
+typedef SourceLineScriptEvaluator =
+    Future<dynamic> Function(
+      SourceScriptEngine engine,
+      String code, {
+      String? name,
+    });
 
 class LineSettingsCapability {
   LineSettingsCapability(this._facade);
@@ -7,7 +14,7 @@ class LineSettingsCapability {
   final HazukiSourceFacade _facade;
 
   Future<Map<String, dynamic>> getSnapshot({
-    SourceOperationContext? operationContext,
+    SourceLineScriptEvaluator? evaluateScript,
   }) async {
     return _facade.handle.runOperation(() async {
       final engine = _facade.js.engine;
@@ -17,9 +24,9 @@ class LineSettingsCapability {
       }
 
       Future<dynamic> evaluate(String code, {String? name}) =>
-          operationContext == null
+          evaluateScript == null
           ? engine.evaluate(code, name: name)
-          : operationContext.evaluate(engine, code, name: name);
+          : evaluateScript(engine, code, name: name);
       final result = await _facade.js.resolve(
         evaluate('this.__hazuki_source.lines?.snapshot?.() ?? {}'),
       );
@@ -38,7 +45,7 @@ class LineSettingsCapability {
   Future<void> refresh({
     bool refreshApiDomains = true,
     bool refreshImageHost = true,
-    SourceOperationContext? operationContext,
+    SourceLineScriptEvaluator? evaluateScript,
   }) async {
     return _facade.handle.runOperation(() async {
       final engine = _facade.js.engine;
@@ -47,9 +54,9 @@ class LineSettingsCapability {
       }
 
       Future<dynamic> evaluate(String code, {String? name}) =>
-          operationContext == null
+          evaluateScript == null
           ? engine.evaluate(code, name: name)
-          : operationContext.evaluate(engine, code, name: name);
+          : evaluateScript(engine, code, name: name);
       if (refreshApiDomains) {
         final hasRefreshApi = _facade.js.asBool(
           await evaluate('!!this.__hazuki_source.refreshApiDomains'),

@@ -21,7 +21,8 @@ class SourceSettingsOperations {
       _runtimeHost,
       handle,
       'settings.lines',
-      (context) => handle.lineSettings.getSnapshot(operationContext: context),
+      (context) =>
+          handle.lineSettings.getSnapshot(evaluateScript: context.evaluate),
       origin: taskOrigin,
     );
   }
@@ -152,7 +153,7 @@ class SourceSettingsOperations {
       (context) => handle.lineSettings.refresh(
         refreshApiDomains: refreshApiDomains,
         refreshImageHost: refreshImageHost,
-        operationContext: context,
+        evaluateScript: context.evaluate,
       ),
       origin: taskOrigin,
       serviceOwned: true,

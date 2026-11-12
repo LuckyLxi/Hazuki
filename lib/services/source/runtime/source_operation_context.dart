@@ -3,19 +3,7 @@ import 'source_script_engine.dart';
 import 'source_runtime_handle.dart';
 import 'source_task_registry.dart';
 import '../models/source_task.dart';
-import '../interaction/source_ui_scope.dart';
-import 'source_host_call_context.dart';
-import '../account/source_login_interaction.dart';
 import '../gateways/source_task_control_gateway.dart';
-
-void rethrowSourceOperationStop(Object error) {
-  if (error is SourceTaskCancelled ||
-      (error is SourceScriptStopped && error.reason != 'dependencyStopped') ||
-      error is SourceUiCancelled ||
-      error is SourceLoginCancelled) {
-    throw error;
-  }
-}
 
 /// Explicit identity for all commands and commits in one service operation.
 class SourceOperationContext {
