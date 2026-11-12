@@ -1,4 +1,3 @@
-import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
@@ -79,7 +78,7 @@ class SourceAccountSessionCapability {
 
   Future<void> _logoutTask(SourceOperationContext operationContext) async {
     interactive?.cancelPendingLogin();
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       final engine = facade.js.engine;
       final sourceMeta = facade.sourceMeta;

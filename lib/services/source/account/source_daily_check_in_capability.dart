@@ -1,4 +1,3 @@
-import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
@@ -59,7 +58,7 @@ class SourceDailyCheckInCapability {
     SourceOperationContext operationContext,
   ) async {
     if (!_supports) return false;
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       if (!facade.isLogged) return false;
@@ -95,7 +94,7 @@ class SourceDailyCheckInCapability {
     if (!_supports || !_facade.isLogged) {
       return const DailyCheckInResult.skipped();
     }
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final result = await _reloginCoordinator.runWithReloginRetry(

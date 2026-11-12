@@ -3,7 +3,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/comic_detail/repository/comic_detail_repository.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_favorite_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -12,8 +11,6 @@ import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 import 'package:mocktail/mocktail.dart';
-
-class _MockRepository extends Mock implements ComicDetailFeatureFacade {}
 
 class _MockFolders extends Mock implements FavoriteFoldersRepository {}
 
@@ -58,16 +55,15 @@ void main() {
     (name: 'website failure', error: StateError('vote failed'), silent: false),
   ]) {
     testWidgets('header action handles ${scenario.name}', (tester) async {
-      final repository = _MockRepository();
-      when(
-        () => repository.runComicHeaderAction(
-          comicId: _details.id,
-          actionId: 'rating',
-          sourceKey: '',
-        ),
-      ).thenThrow(scenario.error);
       final controller = ComicDetailFavoriteController(
-        repository: repository,
+        favoriteFolders: _MockFolders(),
+        runComicHeaderAction:
+            ({required comicId, required actionId, sourceKey = ''}) {
+              expect(comicId, _details.id);
+              expect(actionId, 'rating');
+              expect(sourceKey, '');
+              throw scenario.error;
+            },
         taskControl: FakeSourceTaskControl(),
       );
       addTearDown(controller.dispose);
@@ -112,9 +108,7 @@ void main() {
   for (final saveFails in [false, true]) {
     testWidgets('confirmed save starts before dismissal and survives disposal '
         '(saveFails=$saveFails)', (tester) async {
-      final repository = _MockRepository();
       final folders = _MockFolders();
-      when(() => repository.favoriteFolders).thenReturn(folders);
       when(() => folders.favoriteSingleFolderForSingleComic).thenReturn(false);
       when(() => folders.isLogged).thenReturn(false);
       when(
@@ -147,7 +141,10 @@ void main() {
         return saved.future;
       });
       final controller = ComicDetailFavoriteController(
-        repository: repository,
+        favoriteFolders: folders,
+        runComicHeaderAction:
+            ({required comicId, required actionId, sourceKey = ''}) =>
+                throw StateError('Unexpected header action'),
         taskControl: FakeSourceTaskControl(),
       );
       var disposed = false;

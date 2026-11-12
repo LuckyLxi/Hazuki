@@ -1,4 +1,3 @@
-import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
@@ -192,7 +191,7 @@ class SourceFavoritesCapability {
     String sourceKey = '',
   }) async {
     final resolvedSourceKey = _resolveSourceKey(sourceKey);
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return await facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final context = _reloginContext(facade);
@@ -338,7 +337,7 @@ class SourceFavoritesCapability {
     String name, {
     String sourceKey = '',
   }) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       await _reloginCoordinator.runWithReloginRetry(
@@ -392,7 +391,7 @@ class SourceFavoritesCapability {
     String name, {
     String sourceKey = '',
   }) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       await _reloginCoordinator.runWithReloginRetry(
@@ -442,7 +441,7 @@ class SourceFavoritesCapability {
     String folderId, {
     String sourceKey = '',
   }) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       await _reloginCoordinator.runWithReloginRetry(
@@ -504,7 +503,7 @@ class SourceFavoritesCapability {
   }) async {
     final normalizedComicId = comicId.trim();
     final resolvedSourceKey = _resolveSourceKey(sourceKey);
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final originalEngine = facade.js.engine;
@@ -546,10 +545,7 @@ class SourceFavoritesCapability {
       );
       if (normalizedComicId.isNotEmpty &&
           identical(facade.js.engine, originalEngine) &&
-          identical(
-            (operationContext.resource as SourceRuntimeHandle).facade,
-            facade,
-          )) {
+          identical(operationContext.resource.facade, facade)) {
         _updateComicDetailsFavoriteState(
           sourceKey: resolvedSourceKey,
           comicId: normalizedComicId,

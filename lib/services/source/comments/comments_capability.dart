@@ -1,4 +1,3 @@
-import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
@@ -253,7 +252,7 @@ class SourceCommentsCapability {
     required String content,
     String? replyTo,
   }) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
 
@@ -326,7 +325,7 @@ class SourceCommentsCapability {
     required String commentId,
     required bool isLike,
   }) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
 

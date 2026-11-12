@@ -18,6 +18,7 @@ class ReaderSettingsController {
     required ReaderStateUpdate updateState,
     required ReaderLogEvent logEvent,
     required ReaderLogPayloadBuilder logPayload,
+    this.onViewportChanged,
   }) : _runtimeState = runtimeState,
        _settingsStore = settingsStore,
        _syncPositionToImageIndex = syncPositionToImageIndex,
@@ -37,6 +38,7 @@ class ReaderSettingsController {
   final ReaderStateUpdate _updateState;
   final ReaderLogEvent _logEvent;
   final ReaderLogPayloadBuilder _logPayload;
+  final void Function()? onViewportChanged;
 
   Future<void> updateReaderMode(ReaderMode? value) async {
     if (value == null) {
@@ -63,6 +65,7 @@ class ReaderSettingsController {
     if (changed) {
       _resetZoomImmediately(reason: 'reading_mode_changed');
       _syncPositionToImageIndex(targetImageIndex, trigger: 'mode_changed_sync');
+      onViewportChanged?.call();
     }
   }
 
@@ -92,6 +95,7 @@ class ReaderSettingsController {
         targetImageIndex,
         trigger: 'double_page_mode_changed_sync',
       );
+      onViewportChanged?.call();
     }
   }
 
@@ -134,6 +138,7 @@ class ReaderSettingsController {
       content: _logPayload({'setting': 'immersive_mode', 'value': value}),
     );
     await _displaySession.apply();
+    onViewportChanged?.call();
   }
 
   Future<void> toggleKeepScreenOn(bool value) async {
@@ -249,7 +254,11 @@ class ReaderSettingsController {
       content: _logPayload({'setting': 'pinch_to_zoom', 'value': value}),
     );
     if (previousValue != value) {
-      unawaited(_syncPositionAfterPinchToggle(targetImageIndex));
+      unawaited(
+        _syncPositionAfterPinchToggle(targetImageIndex).then((_) {
+          onViewportChanged?.call();
+        }),
+      );
     }
   }
 

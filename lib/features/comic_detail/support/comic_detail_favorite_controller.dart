@@ -17,19 +17,29 @@ import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/shared/favorites/favorite_selection_applier.dart';
 import 'package:hazuki/shared/favorites/favorite_selection_result.dart';
 
-import '../repository/comic_detail_repository.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 
 typedef ComicDetailFavoriteDialogBuilder =
     Widget Function(FavoriteFoldersViewModel viewModel);
 
+typedef ComicDetailHeaderActionRunner =
+    Future<ComicHeaderActionResult> Function({
+      required String comicId,
+      required String actionId,
+      String sourceKey,
+    });
+
 class ComicDetailFavoriteController extends ChangeNotifier {
   ComicDetailFavoriteController({
     required SourceTaskControlGateway taskControl,
-    required ComicDetailFeatureFacade repository,
+    required FavoriteFoldersRepository favoriteFolders,
+    required ComicDetailHeaderActionRunner runComicHeaderAction,
   }) : _readTasks = SourceTaskOwner(taskControl),
-       _repository = repository;
+       _favoriteFolders = favoriteFolders,
+       _runComicHeaderAction = runComicHeaderAction;
 
-  final ComicDetailFeatureFacade _repository;
+  final FavoriteFoldersRepository _favoriteFolders;
+  final ComicDetailHeaderActionRunner _runComicHeaderAction;
   bool _disposed = false;
   final _sourceUi = SourceUiOwner();
   final SourceTaskOwner _readTasks;
@@ -75,7 +85,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     try {
       // 插件可能在回调中弹窗，需要页面级交互作用域。
       final result = await _sourceUi.run(
-        () => _repository.runComicHeaderAction(
+        () => _runComicHeaderAction(
           comicId: details.id,
           actionId: stat.actionId,
           sourceKey: details.sourceKey,
@@ -128,7 +138,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     if (_busy) return;
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final folders = _repository.favoriteFolders;
+    final folders = _favoriteFolders;
     final singleFolderOnly = folders.favoriteSingleFolderForSingleComic;
     _readTasks.restart();
     final viewModel = FavoriteFoldersViewModel(

@@ -10,6 +10,8 @@ import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
+import 'package:hazuki/widgets/reader_settings_content.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -183,6 +185,58 @@ void main() {
           await decode();
           await tester.pump(const Duration(seconds: 5));
           expect(uploads.events.last['page'], greaterThan(1));
+
+          Future<void> changeLayout(
+            void Function(ReaderSettingsContent settings) change,
+          ) async {
+            final scaffold = tester.state<ScaffoldState>(
+              find.byType(Scaffold).last,
+            );
+            scaffold.openEndDrawer();
+            await tester.pumpAndSettle();
+            change(tester.widget(find.byType(ReaderSettingsContent)));
+            await tester.pumpAndSettle();
+            scaffold.closeEndDrawer();
+            await tester.pumpAndSettle();
+            await decode();
+            await tester.pump(const Duration(seconds: 5));
+          }
+
+          void expectMeasuredPages({required bool paged}) {
+            final viewport = tester.getRect(
+              find.byType(paged ? PageView : ListView).first,
+            );
+            final visible = <int>[];
+            for (var i = 0; i < images.length; i++) {
+              final image = find.byWidgetPredicate(
+                (widget) =>
+                    widget is Image &&
+                    widget.key ==
+                        ValueKey(
+                          paged ? 'reader-page-${images[i]}' : images[i],
+                        ),
+              );
+              if (image.evaluate().isEmpty) continue;
+              final rect = tester.getRect(image).intersect(viewport);
+              if (rect.width > 0.5 && rect.height > 0.5) visible.add(i + 1);
+            }
+            expect(visible, isNotEmpty);
+            expect(uploads.events.last['visiblePages'], visible);
+            expect(uploads.events.last['page'], visible.first);
+          }
+
+          await changeLayout(
+            (settings) => settings.onDoublePageModeChanged(!doublePage),
+          );
+          expectMeasuredPages(paged: mode == 'right_to_left');
+          await changeLayout(
+            (settings) => settings.onReaderModeChanged(
+              mode == 'right_to_left'
+                  ? ReaderMode.topToBottom
+                  : ReaderMode.rightToLeft,
+            ),
+          );
+          expectMeasuredPages(paged: mode != 'right_to_left');
           tester.binding.handleAppLifecycleStateChanged(
             AppLifecycleState.inactive,
           );

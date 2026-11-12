@@ -1,4 +1,3 @@
-import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
@@ -53,7 +52,7 @@ class SourceFavoriteComicsLoader {
     required int page,
     required String folderId,
   }) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     final context = SourceFacadeReloginContext(facade);
     final sessionReady = await _reloginCoordinator.ensureFavoriteSessionReady(
       context,

@@ -9,7 +9,6 @@ import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.
 import 'package:hazuki/features/reader/support/reader_progress_reporter.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/support/reader_translation_controller.dart';
-import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
@@ -21,8 +20,6 @@ class _Actions extends Mock implements ReaderActionsController {}
 
 class _Translation extends Mock implements ReaderTranslationController {}
 
-class _Bindings extends Mock implements ReaderViewBindings {}
-
 class _Bridge extends Mock implements ReaderDisplayBridge {}
 
 class _Settings extends Mock implements ReaderSettingsStore {}
@@ -31,6 +28,13 @@ class _Display extends Mock implements ReaderDisplayController {}
 
 class _Progress extends Fake implements ReadingProgressService {
   final saves = <(String, String, String, int, int)>[];
+  Future<Map<String, dynamic>?>? pendingLoad;
+
+  @override
+  Future<Map<String, dynamic>?> load({
+    required String comicId,
+    required String sourceKey,
+  }) => pendingLoad ?? Future.value(null);
 
   @override
   Future<void> save({
@@ -64,7 +68,6 @@ void main() {
   late _Pipeline images;
   late _Actions actions;
   late _Translation translation;
-  late _Bindings bindings;
   late _Settings settings;
   late _Display display;
   late ReaderDisplaySession displaySession;
@@ -72,7 +75,9 @@ void main() {
   late ReaderProgressReporter reporter;
   late List<Object?> reportReasons;
   late List<String> logs;
-  var settingsReady = false;
+  late List<int> restoredTargets;
+  var viewportRequests = 0;
+  var noImages = false;
 
   ReaderSessionController session({
     bool offline = false,
@@ -82,7 +87,12 @@ void main() {
     displayBridge: _Bridge(),
     displaySession: displaySession,
     settingsStore: settings,
-    viewBindings: bindings,
+    syncPositionToImageIndex: (index, {required trigger}) {
+      expect(trigger, 'entry_restore');
+      restoredTargets.add(index);
+    },
+    requestViewportReport: () => viewportRequests++,
+    noImageModeEnabled: () => noImages,
     imagePipeline: images,
     actions: actions,
     translation: translation,
@@ -102,7 +112,6 @@ void main() {
     readingProgressService: progress,
     offlineMode: offline,
     cloudReading: cloudReading,
-    onSettingsReady: () => settingsReady = true,
   );
 
   setUp(() {
@@ -113,9 +122,27 @@ void main() {
     images = _Pipeline();
     actions = _Actions();
     translation = _Translation();
-    bindings = _Bindings();
     settings = _Settings();
+    when(settings.load).thenAnswer((_) async => runtime.settings);
+    when(settings.loadRestorePagePosition).thenAnswer((_) async => true);
+    when(
+      () => settings.saveRestorePagePosition(any()),
+    ).thenAnswer((_) async {});
     display = _Display();
+    when(
+      () => display.apply(
+        immersiveMode: any(named: 'immersiveMode'),
+        keepScreenOn: any(named: 'keepScreenOn'),
+        customBrightness: any(named: 'customBrightness'),
+        brightnessValue: any(named: 'brightnessValue'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => display.syncVolumeButtonPaging(
+        enabled: any(named: 'enabled'),
+        sessionId: 'old-session',
+      ),
+    ).thenAnswer((_) async {});
     displaySession = ReaderDisplaySession(
       controller: display,
       sessionId: 'old-session',
@@ -127,7 +154,9 @@ void main() {
     progress = _Progress();
     reportReasons = [];
     logs = [];
-    settingsReady = false;
+    restoredTargets = [];
+    viewportRequests = 0;
+    noImages = false;
     reporter = ReaderProgressReporter(
       comicId: 'comic',
       chapterId: 'old',
@@ -149,7 +178,6 @@ void main() {
     expect(logs, ['Reader session closed']);
     verify(images.dispose).called(1);
     verify(actions.dispose).called(1);
-    verify(bindings.dispose).called(1);
     verify(translation.dispose).called(1);
     verify(() => display.restore(sessionId: 'old-session')).called(1);
   });
@@ -160,6 +188,10 @@ void main() {
       final pending = Completer<ReaderSettingsSnapshot>();
       when(settings.load).thenAnswer((_) => pending.future);
       final reader = session();
+      reader.initializeEntry(
+        position: {'epId': 'old', 'imagePage': 3},
+        restoreEntry: true,
+      );
       final loading = reader.loadReadingSettings();
       reporter.observe(firstImage: 1, lastImage: 1, totalPages: 3);
 
@@ -167,7 +199,6 @@ void main() {
       expect(reader.isActive, isFalse);
       expect(reader.retireForChapterChange(), isFalse);
       expect(progress.saves, isEmpty);
-      verifyNever(bindings.dispose);
       verifyNever(translation.dispose);
       reporter.observe(firstImage: 2, lastImage: 2, totalPages: 3);
 
@@ -179,7 +210,8 @@ void main() {
       reader.dispose();
       await Future<void>.delayed(Duration.zero);
 
-      expect(settingsReady, isFalse);
+      expect(restoredTargets, isEmpty);
+      expect(viewportRequests, 0);
       expect(logs, ['Reader session closed']);
       expect(reportReasons, ['initial', 'chapter']);
       expect(progress.saves, [('comic', 'bound-source', 'old', 4, 1)]);
@@ -187,7 +219,6 @@ void main() {
         images.retire,
         () => actions.dispose(SourceTaskStopReason.superseded),
         translation.retire,
-        bindings.dispose,
         translation.dispose,
       ]);
       verifyNever(images.dispose);
@@ -195,6 +226,121 @@ void main() {
       verifyZeroInteractions(display);
     },
   );
+
+  for (final order in [
+    ['settings', 'images', 'position'],
+    ['settings', 'position', 'images'],
+    ['images', 'settings', 'position'],
+    ['images', 'position', 'settings'],
+    ['position', 'settings', 'images'],
+    ['position', 'images', 'settings'],
+  ]) {
+    test('entry restores once when ready in order $order', () async {
+      runtime.applyImages([]);
+      final pendingSettings = Completer<ReaderSettingsSnapshot>();
+      final pendingPosition = Completer<Map<String, dynamic>?>();
+      when(settings.load).thenAnswer((_) => pendingSettings.future);
+      progress.pendingLoad = pendingPosition.future;
+      final reader = session(offline: true);
+      addTearDown(reader.dispose);
+      reader.initializeEntry(position: null, restoreEntry: true);
+      final loading = reader.loadReadingSettings();
+      for (var index = 0; index < order.length; index++) {
+        switch (order[index]) {
+          case 'settings':
+            pendingSettings.complete(runtime.settings);
+          case 'images':
+            runtime.applyImages(['first', 'second', 'third']);
+            reader.onImagesChanged();
+          case 'position':
+            pendingPosition.complete({'epId': 'old', 'imagePage': 3});
+        }
+        await Future<void>.delayed(Duration.zero);
+        expect(restoredTargets, index == 2 ? [2] : isEmpty);
+      }
+      await loading;
+      reader.initializeEntry(position: null, restoreEntry: true);
+      reader.onImagesChanged();
+      expect(restoredTargets, [2]);
+      verify(settings.loadRestorePagePosition).called(1);
+    });
+  }
+
+  for (final stop in ['user', 'chapter', 'exit']) {
+    test('$stop prevents a late entry preference from restoring', () async {
+      final preference = Completer<bool>();
+      when(
+        settings.loadRestorePagePosition,
+      ).thenAnswer((_) => preference.future);
+      final reader = session();
+      addTearDown(reader.dispose);
+      reader.initializeEntry(
+        position: {'epId': 'old', 'imagePage': 3},
+        restoreEntry: true,
+      );
+      await reader.loadReadingSettings();
+      switch (stop) {
+        case 'user':
+          reader.cancelEntryRestore();
+        case 'chapter':
+          reader.retireForChapterChange();
+        case 'exit':
+          reader.dispose();
+      }
+      final requests = viewportRequests;
+      preference.complete(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(restoredTargets, isEmpty);
+      expect(viewportRequests, requests);
+    });
+  }
+
+  test('user restore preference wins over a late read', () async {
+    final preference = Completer<bool>();
+    when(settings.loadRestorePagePosition).thenAnswer((_) => preference.future);
+    final reader = session();
+    addTearDown(reader.dispose);
+    reader.initializeEntry(
+      position: {'epId': 'old', 'imagePage': 3},
+      restoreEntry: true,
+    );
+    await reader.loadReadingSettings();
+    reader.setRestorePagePosition(false);
+    preference.complete(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(reader.restorePagePosition, isFalse);
+    expect(restoredTargets, isEmpty);
+    verify(() => settings.saveRestorePagePosition(false)).called(1);
+  });
+
+  test('reports measured range only after restore and while active', () async {
+    final reader = session();
+    addTearDown(reader.dispose);
+    reader.initializeEntry(
+      position: {'epId': 'old', 'imagePage': 3},
+      restoreEntry: true,
+    );
+    reader.observeVisibleRange(firstImage: 0, lastImage: 0);
+    await reader.loadReadingSettings();
+    expect(restoredTargets, [2]);
+    reader.observeVisibleRange(firstImage: 0, lastImage: 0);
+    expect(reportReasons, isEmpty);
+    noImages = true;
+    reader.observeVisibleRange(firstImage: 2, lastImage: 2);
+    expect(reportReasons, isEmpty);
+    noImages = false;
+    reader.observeVisibleRange(firstImage: 2, lastImage: 2);
+    expect(reportReasons, ['initial']);
+    reader.setForeground(false);
+    reader.observeVisibleRange(firstImage: 0, lastImage: 0);
+    reader.setForeground(true);
+    reader.retireForChapterChange();
+    reader.observeVisibleRange(firstImage: 0, lastImage: 0);
+    reader.setForeground(false);
+    reader.dispose();
+    expect(reportReasons, ['initial', 'background', 'chapter']);
+    expect(progress.saves, hasLength(1));
+  });
 
   for (final (label, offline, capability, saves, queries) in [
     ('offline', true, _CloudReading(true), true, false),

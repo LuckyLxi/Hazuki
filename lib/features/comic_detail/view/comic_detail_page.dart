@@ -149,7 +149,8 @@ class _ComicDetailPageState extends State<ComicDetailPage>
 
   void _initializeControllers() {
     _favoriteController = ComicDetailFavoriteController(
-      repository: _repository,
+      favoriteFolders: _repository.favoriteFolders,
+      runComicHeaderAction: _repository.runComicHeaderAction,
       taskControl: widget.dependencies.taskControl,
     );
     _themeController = ComicDetailThemeController(

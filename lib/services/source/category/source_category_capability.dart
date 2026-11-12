@@ -1,4 +1,3 @@
-import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
@@ -56,7 +55,7 @@ class SourceCategoryCapability {
     final resolvedSourceKey = sourceKey.trim().isEmpty
         ? _runtimeHost.activeSourceKey
         : _runtimeHost.normalize(sourceKey);
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final startedAt = DateTime.now();
@@ -242,7 +241,7 @@ class SourceCategoryCapability {
   Future<List<CategoryRankingOption>> _loadRankingOptionsTask(
     SourceOperationContext operationContext,
   ) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final engine = facade.js.engine;
@@ -304,7 +303,7 @@ class SourceCategoryCapability {
     required String rankingOption,
     required int page,
   }) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final engine = facade.js.engine;
@@ -376,7 +375,7 @@ class SourceCategoryCapability {
     SourceOperationContext operationContext, {
     required String viewMoreUrl,
   }) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final engine = facade.js.engine;
@@ -460,7 +459,7 @@ class SourceCategoryCapability {
     String order = '',
     List<String>? orders,
   }) async {
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
       final engine = facade.js.engine;

@@ -8,10 +8,10 @@ import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.
 import 'package:hazuki/features/reader/support/reader_progress_reporter.dart';
 import 'package:hazuki/features/reader/support/reader_translation_controller.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/features/reader/state/reader_entry_restore_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
 
 class ReaderSessionController {
   ReaderSessionController({
@@ -19,7 +19,9 @@ class ReaderSessionController {
     required ReaderDisplayBridge displayBridge,
     required ReaderDisplaySession displaySession,
     required ReaderSettingsStore settingsStore,
-    required ReaderViewBindings viewBindings,
+    required ReaderSyncPositionToImageIndex syncPositionToImageIndex,
+    required void Function() requestViewportReport,
+    required bool Function() noImageModeEnabled,
     required ReaderImagePipelineController imagePipeline,
     required ReaderActionsController actions,
     required ReaderProgressReporter progressReporter,
@@ -37,12 +39,13 @@ class ReaderSessionController {
     required ReadingProgressService readingProgressService,
     bool offlineMode = false,
     SourceCloudReadingGateway? cloudReading,
-    this.onSettingsReady,
   }) : _runtimeState = runtimeState,
        _displayBridge = displayBridge,
        _displaySession = displaySession,
        _settingsStore = settingsStore,
-       _viewBindings = viewBindings,
+       _syncPositionToImageIndex = syncPositionToImageIndex,
+       _requestViewportReport = requestViewportReport,
+       _noImageModeEnabled = noImageModeEnabled,
        _imagePipeline = imagePipeline,
        _actions = actions,
        _progressReporter = progressReporter,
@@ -64,7 +67,9 @@ class ReaderSessionController {
   final ReaderRuntimeState _runtimeState;
   final ReaderDisplayBridge _displayBridge;
   final ReaderSettingsStore _settingsStore;
-  final ReaderViewBindings _viewBindings;
+  final ReaderSyncPositionToImageIndex _syncPositionToImageIndex;
+  final void Function() _requestViewportReport;
+  final bool Function() _noImageModeEnabled;
   final ReaderImagePipelineController _imagePipeline;
   final ReaderActionsController _actions;
   final ReaderProgressReporter _progressReporter;
@@ -85,17 +90,131 @@ class ReaderSessionController {
   final ReaderDisplaySession _displaySession;
   bool _closed = false;
   int? _retiredPageIndex;
-  final void Function()? onSettingsReady;
+  final ReaderEntryRestoreState _entryRestore = ReaderEntryRestoreState();
+  bool _entryInitialized = false;
+  bool _foreground = true;
 
   bool get isActive => !_closed && _retiredPageIndex == null;
+  bool get restorePagePosition => _entryRestore.restorePagePosition ?? false;
+
+  /// The page supplies inherited route data; all asynchronous restore work
+  /// belongs to this chapter and is ignored after it retires.
+  void initializeEntry({
+    required Map<String, dynamic>? position,
+    required bool restoreEntry,
+  }) {
+    if (!isActive || _entryInitialized) return;
+    _entryInitialized = true;
+    unawaited(_loadRestorePreference());
+    _entryRestore.resolvePosition(position);
+    if (_offlineMode && restoreEntry && position == null) {
+      _entryRestore.positionReady = false;
+      unawaited(_loadOfflineEntryPosition());
+    }
+    _maybeRestoreEntry();
+  }
+
+  Future<void> _loadRestorePreference() async {
+    bool enabled;
+    try {
+      enabled = await _settingsStore.loadRestorePagePosition();
+    } catch (_) {
+      enabled = false;
+    }
+    if (!isActive || !_isMounted()) return;
+    // A setting changed by the user wins over a late preference read.
+    _entryRestore.restorePagePosition ??= enabled;
+    _maybeRestoreEntry();
+  }
+
+  Future<void> _loadOfflineEntryPosition() async {
+    Map<String, dynamic>? position;
+    try {
+      position = await _readingProgressService.load(
+        comicId: _comicId,
+        sourceKey: _sourceKey,
+      );
+    } catch (_) {}
+    if (!isActive || !_isMounted()) return;
+    _entryRestore.resolvePosition(position);
+    _maybeRestoreEntry();
+  }
+
+  void setRestorePagePosition(bool value) {
+    _entryRestore.restorePagePosition = value;
+    unawaited(_settingsStore.saveRestorePagePosition(value));
+  }
+
+  void cancelEntryRestore() => _entryRestore.cancel();
+
+  void _maybeRestoreEntry() {
+    if (!isActive || !_isMounted() || _entryRestore.started) return;
+    final target = _entryRestore.takeTarget(
+      epId: _epId,
+      imageCount: _runtimeState.imageCount,
+      spreadSize: _runtimeState.readerSpreadSize,
+    );
+    if (!_entryRestore.started) return;
+    if (target != null) {
+      _syncPositionToImageIndex(target, trigger: 'entry_restore');
+    }
+    _requestViewportReport();
+  }
+
+  void onImagesChanged() {
+    if (!isActive || !_isMounted()) return;
+    _maybeRestoreEntry();
+    _requestViewportReport();
+  }
+
+  void onPageTargetChanged(int index) {
+    if (!isActive) return;
+    cancelEntryRestore();
+    if (_noImageModeEnabled()) return;
+    _imagePipeline.prefetchAround(index);
+    _translation?.updateWindow(index);
+    _imagePipeline.requestPrefetchAhead(index);
+  }
+
+  void updateTranslationWindow() {
+    if (isActive && _isMounted() && !_noImageModeEnabled()) {
+      _translation?.updateWindow(_runtimeState.currentPageIndex);
+    }
+  }
+
+  void handleNoImageModeChanged() {
+    if (!isActive) return;
+    _imagePipeline.handleNoImageModeChanged();
+    _translation?.reset();
+    updateTranslationWindow();
+    _requestViewportReport();
+  }
+
+  void observeVisibleRange({required int firstImage, required int lastImage}) {
+    if (!isActive ||
+        !_isMounted() ||
+        !_foreground ||
+        _offlineMode ||
+        _noImageModeEnabled() ||
+        !_entryRestore.canReportVisibleRange(firstImage, lastImage)) {
+      return;
+    }
+    _progressReporter.observe(
+      firstImage: firstImage,
+      lastImage: lastImage,
+      totalPages: _runtimeState.imageCount,
+    );
+  }
+
+  void setForeground(bool foreground) {
+    if (!isActive) return;
+    if (_foreground && !foreground) _progressReporter.flush('background');
+    _foreground = foreground;
+  }
 
   void initialize() {
     _displayBridge.attach();
-    _viewBindings.attach();
     unawaited(loadReadingSettings());
-    _viewBindings.requestFocusAfterFrame(
-      isMounted: () => isActive && _isMounted(),
-    );
 
     final initialImages = _widgetImages
         .where((entry) => entry.trim().isNotEmpty)
@@ -144,7 +263,6 @@ class ReaderSessionController {
     final exitingReader = _retiredPageIndex == null;
     if (exitingReader) _displaySession.close();
     _displayBridge.detach();
-    _viewBindings.dispose();
     if (exitingReader) {
       _progressReporter.close('exit');
       _imagePipeline.dispose();
@@ -183,7 +301,10 @@ class ReaderSessionController {
       return;
     }
     await _displaySession.syncVolumeButtonPaging();
-    if (isActive) onSettingsReady?.call();
+    if (isActive && _isMounted()) {
+      _entryRestore.settingsReady = true;
+      _maybeRestoreEntry();
+    }
   }
 
   Future<void> _recordReadingProgress({required int lastPageIndex}) async {

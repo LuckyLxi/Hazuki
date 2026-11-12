@@ -1,5 +1,6 @@
 import '../models/source_script_execution.dart';
 import 'source_script_engine.dart';
+import 'source_runtime_handle.dart';
 import 'source_task_registry.dart';
 import '../models/source_task.dart';
 import '../interaction/source_ui_scope.dart';
@@ -21,12 +22,12 @@ class SourceOperationContext {
   SourceOperationContext(
     this.task, {
     required this.canCache,
-    this.resource,
+    required this.resource,
     this.serviceOwned = false,
     this.retainAdmittedWork = false,
   });
   final SourceTask task;
-  final Object? resource;
+  final SourceRuntimeHandle resource;
   final bool serviceOwned;
   final bool retainAdmittedWork;
   final bool Function() canCache;

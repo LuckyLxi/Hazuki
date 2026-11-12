@@ -48,6 +48,7 @@ class ReaderImagePipelineController {
     required SourceReaderGateway sourceService,
     SourceTaskControlGateway? taskControl,
     SourceReaderSession? readerSession,
+    this.onImagesChanged,
   }) : _runtimeState = runtimeState,
        _pipelineState = pipelineState,
        _diagnosticsState = diagnosticsState,
@@ -199,6 +200,7 @@ class ReaderImagePipelineController {
   final ReaderContextGetter _context;
   final ReaderIsMounted _isMounted;
   final ReaderStateUpdate _updateState;
+  final VoidCallback? onImagesChanged;
   final ReaderLogEvent _logEvent;
   final ReaderLogPayloadBuilder _logPayload;
   final ReaderVisiblePageLogger _logVisiblePageChange;
@@ -241,6 +243,7 @@ class ReaderImagePipelineController {
     _zoomController.value = Matrix4.identity();
     _pipelineState.resetForImages(sanitized);
     _runtimeState.applyImages(sanitized);
+    onImagesChanged?.call();
     _logEvent(
       'Reader initial images ready',
       source: 'reader_data',
@@ -288,6 +291,7 @@ class ReaderImagePipelineController {
         _pipelineState.resetForImages(sanitizedImages);
         _runtimeState.applyImages(sanitizedImages);
       });
+      onImagesChanged?.call();
       _diagnosticsState.lastLoggedVisiblePageIndex = -1;
       _logEvent(
         'Reader chapter images loading finished',

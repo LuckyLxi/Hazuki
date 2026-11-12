@@ -2,7 +2,6 @@ import 'package:hazuki/features/reader/state/reader_scroll_state.dart';
 import 'package:hazuki/features/reader/support/reader_input_controller.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/shared/ui_flags.dart';
-import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
 import 'dart:async';
 import 'package:hazuki/app/service_locator.dart';
 import 'dart:ui';
@@ -409,13 +408,7 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       await tester.pumpWidget(const SizedBox.shrink());
       final runtimeState = ReaderRuntimeState();
-      final scrollController = ScrollController();
-      final focusNode = FocusNode();
-      final transformationController = TransformationController();
       addTearDown(runtimeState.dispose);
-      addTearDown(scrollController.dispose);
-      addTearDown(focusNode.dispose);
-      addTearDown(transformationController.dispose);
       final imagePipeline = _ImagePipeline();
       when(
         () => imagePipeline.loadChapterImages(trigger: any(named: 'trigger')),
@@ -429,15 +422,9 @@ void main() {
         readSettings: () => runtimeState.settings,
       );
       final sessionController = ReaderSessionController(
-        viewBindings: ReaderViewBindings(
-          scrollController: scrollController,
-          focusNode: focusNode,
-          zoomController: transformationController,
-          onNoImageModeChanged: () {},
-          onScrollPositionChanged: () {},
-          onZoomChanged: () {},
-          noImageMode: hazukiNoImageModeNotifier,
-        ),
+        syncPositionToImageIndex: (index, {required trigger}) {},
+        requestViewportReport: () {},
+        noImageModeEnabled: () => hazukiNoImageModeNotifier.value,
         runtimeState: runtimeState,
         displayBridge: displayBridge,
         displaySession: displaySession,
@@ -529,13 +516,7 @@ void main() {
       });
 
       final runtimeState = ReaderRuntimeState();
-      final scrollController = ScrollController();
-      final focusNode = FocusNode();
-      final transformationController = TransformationController();
       addTearDown(runtimeState.dispose);
-      addTearDown(scrollController.dispose);
-      addTearDown(focusNode.dispose);
-      addTearDown(transformationController.dispose);
       final displayBridge = ReaderDisplayBridge(
         onVolumeButtonPressed: (_) async {},
       );
@@ -545,15 +526,9 @@ void main() {
         readSettings: () => runtimeState.settings,
       );
       final sessionController = ReaderSessionController(
-        viewBindings: ReaderViewBindings(
-          scrollController: scrollController,
-          focusNode: focusNode,
-          zoomController: transformationController,
-          onNoImageModeChanged: () {},
-          onScrollPositionChanged: () {},
-          onZoomChanged: () {},
-          noImageMode: hazukiNoImageModeNotifier,
-        ),
+        syncPositionToImageIndex: (index, {required trigger}) {},
+        requestViewportReport: () {},
+        noImageModeEnabled: () => hazukiNoImageModeNotifier.value,
         runtimeState: runtimeState,
         displayBridge: displayBridge,
         displaySession: displaySession,

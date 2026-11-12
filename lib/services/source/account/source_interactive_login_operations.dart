@@ -151,7 +151,7 @@ class SourceInteractiveLoginOperations
     required SourceLoginPresenter present,
     required SourceLoginCancellation cancellation,
   }) async {
-    final original = context.resource as SourceRuntimeHandle;
+    final original = context.resource;
     final key = original.sourceKey;
     if (!_running.add(key)) throw StateError('login_already_running');
     _cancellations[key] = cancellation;

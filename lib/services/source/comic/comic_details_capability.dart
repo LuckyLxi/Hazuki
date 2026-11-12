@@ -447,7 +447,7 @@ class SourceComicDetailsCapability {
       throw Exception('comic_id_empty');
     }
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = (operationContext.resource as SourceRuntimeHandle).facade;
+    final facade = operationContext.resource.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
 

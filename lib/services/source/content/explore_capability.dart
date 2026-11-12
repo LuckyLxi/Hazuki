@@ -1,4 +1,3 @@
-import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_operation_context.dart';
 import '../runtime/source_operation_runner.dart';
 import '../models/source_task.dart';
@@ -41,7 +40,7 @@ class SourceExploreCapability {
     bool forceRefresh = false,
   }) async {
     if (!_runtimeHost.hasActiveSource) return const [];
-    final handle = operationContext.resource as SourceRuntimeHandle;
+    final handle = operationContext.resource;
     final facade = handle.facade;
     return facade.handle.runOperation(() async {
       await facade.ensureInitialized();
