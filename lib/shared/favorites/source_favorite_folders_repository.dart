@@ -7,7 +7,7 @@ import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 class SourceFavoriteFoldersRepository implements FavoriteFoldersRepository {
   /// [sourceKey] 为空时在构造时取当前活动源，之后不随活动源切换。
   SourceFavoriteFoldersRepository({
-    required SourceComicDetailGateway source,
+    required SourceFavoriteFoldersGateway source,
     required LocalFavoritesRepository local,
     String sourceKey = '',
   }) : _source = source,
@@ -16,7 +16,7 @@ class SourceFavoriteFoldersRepository implements FavoriteFoldersRepository {
            ? (source.activeSourceKey ?? '')
            : sourceKey.trim();
 
-  final SourceComicDetailGateway _source;
+  final SourceFavoriteFoldersGateway _source;
   final LocalFavoritesRepository _local;
   final String _sourceKey;
 

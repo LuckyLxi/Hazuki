@@ -318,7 +318,6 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
         onImageAspectRatioResolved: _handleImageAspectRatioResolved,
-        onImagesChanged: () => _sessionController.onImagesChanged(),
         sourceService: widget.page.dependencies.sourceReader,
         taskControl: widget.page.dependencies.taskControl,
         readerSession: widget.readerSession,
@@ -803,13 +802,8 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         message: _runtimeState.loadImagesError!,
         retryLabel: l10n(context).commonRetry,
         onRetry: () {
-          setState(() {
-            _runtimeState.markLoadingImages();
-          });
           unawaited(
-            _imagePipelineController.loadChapterImages(
-              trigger: 'retry_after_error',
-            ),
+            _sessionController.loadChapterImages(trigger: 'retry_after_error'),
           );
         },
       );

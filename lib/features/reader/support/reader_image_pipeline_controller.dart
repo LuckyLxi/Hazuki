@@ -50,7 +50,6 @@ class ReaderImagePipelineController {
     required SourceReaderGateway sourceService,
     SourceTaskControlGateway? taskControl,
     SourceReaderSession? readerSession,
-    this.onImagesChanged,
   }) : _runtimeState = runtimeState,
        _pipelineState = pipelineState,
        _diagnosticsState = diagnosticsState,
@@ -202,7 +201,6 @@ class ReaderImagePipelineController {
   final ReaderContextGetter _context;
   final ReaderIsMounted _isMounted;
   final ReaderStateUpdate _updateState;
-  final VoidCallback? onImagesChanged;
   final ReaderLogEvent _logEvent;
   final ReaderLogPayloadBuilder _logPayload;
   final ReaderVisiblePageLogger _logVisiblePageChange;
@@ -245,7 +243,6 @@ class ReaderImagePipelineController {
     _zoomController.value = Matrix4.identity();
     _pipelineState.resetForImages(sanitized);
     _runtimeState.applyImages(sanitized);
-    onImagesChanged?.call();
     _logEvent(
       'Reader initial images ready',
       source: 'reader_data',
@@ -255,14 +252,11 @@ class ReaderImagePipelineController {
       }),
     );
     _logVisiblePageChange(index: 0, trigger: trigger);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      prefetchAround(0);
-      requestPrefetchAhead(0);
-    });
   }
 
-  Future<void> loadChapterImages({String trigger = 'manual'}) async {
-    if (_closed) return;
+  /// Returns whether this request committed images to the active chapter.
+  Future<bool> loadChapterImages({String trigger = 'manual'}) async {
+    if (_closed) return false;
     _sourceUi.restart();
     _chapterTasks.restart();
     final generation = _chapterTasks.generation;
@@ -283,7 +277,7 @@ class ReaderImagePipelineController {
         ),
       );
       if (!_isMounted() || _closed || generation != _chapterTasks.generation) {
-        return;
+        return false;
       }
       _updateState(() {
         _zoomController.value = Matrix4.identity();
@@ -293,7 +287,6 @@ class ReaderImagePipelineController {
         _pipelineState.resetForImages(sanitizedImages);
         _runtimeState.applyImages(sanitizedImages);
       });
-      onImagesChanged?.call();
       _diagnosticsState.lastLoggedVisiblePageIndex = -1;
       _logEvent(
         'Reader chapter images loading finished',
@@ -304,16 +297,13 @@ class ReaderImagePipelineController {
         }),
       );
       _logVisiblePageChange(index: 0, trigger: 'chapter_images_loaded');
-      if (!_noImageModeEnabled()) {
-        prefetchAround(0);
-        requestPrefetchAhead(0);
-      }
+      return true;
     } catch (error) {
       if (_closed ||
           generation != _chapterTasks.generation ||
           isSourceTaskCancellation(error) ||
           error is SourceUiCancelled) {
-        return;
+        return false;
       }
       _logEvent(
         'Reader chapter images loading failed',
@@ -322,11 +312,12 @@ class ReaderImagePipelineController {
         content: _logPayload({'trigger': trigger, 'error': '$error'}),
       );
       if (!_isMounted()) {
-        return;
+        return false;
       }
       _updateState(() {
         _runtimeState.markLoadImagesFailed(_loadImagesErrorBuilder(error));
       });
+      return false;
     }
   }
 

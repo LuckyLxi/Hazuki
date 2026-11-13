@@ -3,6 +3,34 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'image cache and network access do not depend on the aggregate facade',
+    () {
+      for (final name in [
+        'image_cache_capability.dart',
+        'source_image_network_downloader.dart',
+      ]) {
+        final content = File(
+          'lib/services/source/image/$name',
+        ).readAsStringSync();
+        expect(content, isNot(contains('HazukiSourceFacade')), reason: name);
+        expect(
+          content,
+          isNot(contains('source_runtime_handle.dart')),
+          reason: name,
+        );
+      }
+    },
+  );
+
+  test('shared favorite folders depend on their focused source contract', () {
+    final content = File(
+      'lib/shared/favorites/source_favorite_folders_repository.dart',
+    ).readAsStringSync();
+    expect(content, isNot(contains('SourceComicDetailGateway')));
+    expect(content, isNot(contains('SourceFavoriteGateway')));
+  });
+
   test('plugin remote access is separate from local plugin management', () {
     const directory = 'lib/services/source/plugins';
     final manager = File(
@@ -190,6 +218,8 @@ void main() {
     expect(controller, isNot(contains('dart:io')));
     expect(controller, isNot(contains('instantiateImageCodec')));
     expect(controller, isNot(contains('decodeWaiters')));
+    expect(controller, isNot(contains('reader_session_controller.dart')));
+    expect(controller, isNot(contains('onImagesChanged')));
   });
 
   test('download group storage and sync stay behind focused collaborators', () {

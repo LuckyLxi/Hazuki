@@ -421,7 +421,7 @@ void main() {
       final imagePipeline = _ImagePipeline();
       when(
         () => imagePipeline.loadChapterImages(trigger: any(named: 'trigger')),
-      ).thenAnswer((_) async {});
+      ).thenAnswer((_) async => true);
       final displayBridge = ReaderDisplayBridge(
         onVolumeButtonPressed: (_) async {},
       );

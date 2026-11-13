@@ -155,8 +155,8 @@ void main() {
         SourceTaskStopReason.superseded,
       );
       source.chapters.last.$2.complete(['new']);
-      await next;
-      await old;
+      expect(await next, isTrue);
+      expect(await old, isFalse);
       source.chapters.first.$2.complete(['late']);
       await _flush();
       expect(state.images, ['new']);

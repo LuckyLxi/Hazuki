@@ -521,6 +521,24 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   @override
   String? get activeSourceKey => runtime.activeSourceKey;
   @override
+  bool isLoggedForSource(String sourceKey) =>
+      _account.isLoggedForSource(sourceKey);
+  @override
+  bool supportFavoriteFolderLoadForSource(String sourceKey) =>
+      _favorites.supportFavoriteFolderLoadForSource(sourceKey);
+  @override
+  bool supportFavoriteFolderAddForSource(String sourceKey) =>
+      _favorites.supportFavoriteFolderAddForSource(sourceKey);
+  @override
+  bool supportFavoriteFolderDeleteForSource(String sourceKey) =>
+      _favorites.supportFavoriteFolderDeleteForSource(sourceKey);
+  @override
+  bool supportFavoriteToggleForSource(String sourceKey) =>
+      _favorites.supportFavoriteToggleForSource(sourceKey);
+  @override
+  bool favoriteSingleFolderForSingleComicForSource(String sourceKey) =>
+      _favorites.favoriteSingleFolderForSingleComicForSource(sourceKey);
+  @override
   bool get isLogged => _account.isLogged;
   @override
   bool get supportFavoriteFolderDelete =>

@@ -83,7 +83,7 @@ class SourceLoginOperations {
         throw Exception('account_login_not_supported');
       }
 
-      final script = const SourceLoginScriptFactory().generic(
+      final script = buildSourceLoginScript(
         account: account,
         password: password,
       );

@@ -8,6 +8,7 @@ import '../debug/source_debug_log_store.dart';
 import '../debug/source_network_log_sink.dart';
 import '../http/source_http_gateway.dart';
 import '../image/image_cache_capability.dart';
+import '../image/source_image_network_downloader.dart';
 import 'line_settings_capability.dart';
 import 'source_cache_store.dart';
 import 'source_cookie_store.dart';
@@ -186,17 +187,23 @@ class SourceRuntimeHandle
           source: source,
           content: content,
         ),
-    ensureImageCacheDir: () => imageCache.ensureCacheDir(),
-    computeImageCacheSizeBytes: () => imageCache.computeSizeBytes(),
-    enforceImageCachePolicy: ({bool force = false}) =>
-        imageCache.enforcePolicy(force: force),
   );
   late final LineSettingsCapability lineSettings = LineSettingsCapability(
     facade,
   );
   late final ImageCacheCapability imageCache = ImageCacheCapability(
-    facade,
+    handle: this,
+    session: session,
+    cache: cache,
+    appLogStore: appLogStore,
     tasks: tasks,
+    createDownloader: (request) => SourceImageNetworkDownloader.forRuntime(
+      handle: this,
+      ensureInitialized: () => _ensureInitialized(sourceKey),
+      js: js,
+      httpGateway: httpGateway,
+      request: request,
+    ),
     canCache: () => !_disposed && (_canCacheImages?.call(this) ?? true),
   );
   late final DebugLogCapability debugLog = DebugLogCapability(appLogStore);

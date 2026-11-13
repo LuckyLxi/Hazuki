@@ -365,7 +365,7 @@ void main() {
           };
           final pending = controller.loadChapterImages();
           incoming.complete(images);
-          await pending;
+          expect(await pending, isTrue);
           expect(
             state.images,
             images.where((image) => image.trim().isNotEmpty).toList(),
@@ -378,7 +378,7 @@ void main() {
     test('chapter failure is applied through the error transition', () async {
       final pending = controller.loadChapterImages();
       incoming.completeError(StateError('source failure'));
-      await pending;
+      expect(await pending, isFalse);
       expect(state.error, contains('source failure'));
       expect(state.images, ['old']);
       expect(events, ['update', 'error']);
@@ -395,7 +395,7 @@ void main() {
           } else {
             incoming.complete(['late']);
           }
-          await pending;
+          expect(await pending, isFalse);
           expect(state.images, ['old']);
           expect(state.error, isNull);
           expect(events, isEmpty);

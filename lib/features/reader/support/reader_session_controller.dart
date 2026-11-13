@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/scheduler.dart';
+
 import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
@@ -161,10 +163,33 @@ class ReaderSessionController {
     _requestViewportReport();
   }
 
-  void onImagesChanged() {
+  void _onImagesChanged() {
     if (!isActive || !_isMounted()) return;
     _maybeRestoreEntry();
     _requestViewportReport();
+  }
+
+  Future<void> loadChapterImages({String trigger = 'manual'}) async {
+    if (!isActive || !_isMounted()) return;
+    _updateState(_runtimeState.markLoadingImages);
+    final committed = await _imagePipeline.loadChapterImages(trigger: trigger);
+    if (!committed || !isActive || !_isMounted()) return;
+    _onImagesChanged();
+    _prefetchInitialImages();
+  }
+
+  void _prefetchInitialImages() {
+    if (!isActive || !_isMounted() || _noImageModeEnabled()) return;
+    _imagePipeline.prefetchAround(0);
+    _imagePipeline.requestPrefetchAhead(0);
+  }
+
+  void _applyInitialImages(List<String> images, {required String trigger}) {
+    _imagePipeline.applyInitialImages(images, trigger: trigger);
+    _onImagesChanged();
+    SchedulerBinding.instance.addPostFrameCallback(
+      (_) => _prefetchInitialImages(),
+    );
   }
 
   void onPageTargetChanged(int index) {
@@ -228,20 +253,17 @@ class ReaderSessionController {
       }),
     );
     if (initialImages.isNotEmpty) {
-      _imagePipeline.applyInitialImages(
-        initialImages,
-        trigger: 'constructor_images',
-      );
+      _applyInitialImages(initialImages, trigger: 'constructor_images');
       return;
     }
     if (_offlineMode) {
-      _imagePipeline.applyInitialImages(
+      _applyInitialImages(
         const <String>[],
         trigger: 'offline_constructor_images',
       );
       return;
     }
-    unawaited(_imagePipeline.loadChapterImages(trigger: 'initial_load'));
+    unawaited(loadChapterImages(trigger: 'initial_load'));
   }
 
   bool retireForChapterChange() {

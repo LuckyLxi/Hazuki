@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'source_script_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -72,22 +70,13 @@ class HazukiSourceFacade {
     required Future<void> Function(String sourceKey) ensureInitialized,
     required void Function(String sourceKey) notifyRuntimeStateChanged,
     required SourceApplicationLogAppender addApplicationLog,
-    required Future<Directory> Function() ensureImageCacheDir,
-    required Future<int> Function() computeImageCacheSizeBytes,
-    required Future<void> Function({bool force}) enforceImageCachePolicy,
   }) : _ensureInitialized = ensureInitialized,
        _notifyRuntimeStateChanged = notifyRuntimeStateChanged,
-       _addApplicationLog = addApplicationLog,
-       _ensureImageCacheDir = ensureImageCacheDir,
-       _computeImageCacheSizeBytes = computeImageCacheSizeBytes,
-       _enforceImageCachePolicy = enforceImageCachePolicy;
+       _addApplicationLog = addApplicationLog;
 
   final Future<void> Function(String sourceKey) _ensureInitialized;
   final void Function(String sourceKey) _notifyRuntimeStateChanged;
   final SourceApplicationLogAppender _addApplicationLog;
-  final Future<Directory> Function() _ensureImageCacheDir;
-  final Future<int> Function() _computeImageCacheSizeBytes;
-  final Future<void> Function({bool force}) _enforceImageCachePolicy;
   final SourceRuntimeHandleView handle;
   final SourceRuntimeKernel runtime;
   final SourceSessionStore session;
@@ -180,14 +169,6 @@ class HazukiSourceFacade {
 
   Future<void> saveCookieStore(List<SourceCookie> cookies) {
     return session.saveCookieStore(cookies);
-  }
-
-  Future<Directory> ensureImageCacheDir() => _ensureImageCacheDir();
-
-  Future<int> computeImageCacheSizeBytes() => _computeImageCacheSizeBytes();
-
-  Future<void> enforceImageCachePolicy({bool force = false}) {
-    return _enforceImageCachePolicy(force: force);
   }
 
   Uri resolveImageBaseUri(String imageUrl, Uri baseUri) {

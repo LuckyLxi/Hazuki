@@ -178,6 +178,46 @@ void main() {
   });
 
   test(
+    'account changes prevent an in-flight image from entering caches',
+    () async {
+      final handle = host.activeHandle;
+      await handle.session.saveSourceData('one', 'login_session', 'first');
+      final pending = handle.imageCache.downloadImageBytes(
+        'https://fixture.test/account',
+      );
+      await _until(() => http.pending.containsKey('account'));
+      await handle.session.saveSourceData('one', 'login_session', 'second');
+      http.complete('account');
+
+      expect(await pending, [1, 2, 3]);
+      expect(
+        handle.imageCache.peekFromMemory('https://fixture.test/account'),
+        isNull,
+      );
+      expect(await handle.cache.imageCacheDir!.list().toList(), isEmpty);
+    },
+  );
+
+  test('image cache rejects a different source before starting work', () async {
+    final handle = host.activeHandle;
+    await expectLater(
+      handle.imageCache.downloadImageBytes(
+        'https://fixture.test/mismatch',
+        sourceKey: 'two',
+      ),
+      throwsA(
+        isA<Exception>().having(
+          (error) => '$error',
+          'message',
+          contains('source_mismatch:two:one'),
+        ),
+      ),
+    );
+    expect(http.pending, isEmpty);
+    expect(handle.cache.imageDownloadInFlight, isEmpty);
+  });
+
+  test(
     'reader and download leases independently retain an idle source',
     () async {
       final old = host.activeHandle;

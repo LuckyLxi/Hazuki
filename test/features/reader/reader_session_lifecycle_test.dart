@@ -120,6 +120,9 @@ void main() {
       ..setCurrentPageIndex(1);
     addTearDown(runtime.dispose);
     images = _Pipeline();
+    when(
+      () => images.loadChapterImages(trigger: any(named: 'trigger')),
+    ).thenAnswer((_) async => true);
     actions = _Actions();
     translation = _Translation();
     settings = _Settings();
@@ -162,6 +165,153 @@ void main() {
       chapterId: 'old',
       send: (report) async => reportReasons.add(report['reason']),
     );
+  });
+
+  test('successful retry restores entry before prefetching', () async {
+    runtime.applyImages([]);
+    final reader = session();
+    addTearDown(reader.dispose);
+    reader.initializeEntry(
+      position: {'epId': 'old', 'imagePage': 3},
+      restoreEntry: true,
+    );
+    await reader.loadReadingSettings();
+    runtime.markLoadImagesFailed('previous failure');
+    when(
+      () => images.loadChapterImages(trigger: 'retry_after_error'),
+    ).thenAnswer((_) async {
+      expect(runtime.loadingImages, isTrue);
+      expect(runtime.loadImagesError, isNull);
+      runtime.applyImages(['first', 'second', 'third']);
+      return true;
+    });
+    when(() => images.prefetchAround(0)).thenAnswer((_) {
+      expect(restoredTargets, [2]);
+    });
+
+    await reader.loadChapterImages(trigger: 'retry_after_error');
+
+    expect(runtime.loadingImages, isFalse);
+    expect(restoredTargets, [2]);
+    expect(viewportRequests, greaterThan(0));
+    verifyInOrder([
+      () => images.prefetchAround(0),
+      () => images.requestPrefetchAhead(0),
+    ]);
+  });
+
+  test('failed image load does not run completion coordination', () async {
+    final reader = session();
+    addTearDown(reader.dispose);
+    when(() => images.loadChapterImages(trigger: 'manual')).thenAnswer((
+      _,
+    ) async {
+      runtime.markLoadImagesFailed('failed');
+      return false;
+    });
+
+    await reader.loadChapterImages();
+
+    expect(runtime.loadImagesError, 'failed');
+    expect(viewportRequests, 0);
+    expect(restoredTargets, isEmpty);
+    verifyNever(() => images.prefetchAround(any()));
+    verifyNever(() => images.requestPrefetchAhead(any()));
+  });
+
+  test(
+    'superseded completion does not repeat current image coordination',
+    () async {
+      final old = Completer<bool>();
+      final current = Completer<bool>();
+      when(
+        () => images.loadChapterImages(trigger: 'old'),
+      ).thenAnswer((_) => old.future);
+      when(
+        () => images.loadChapterImages(trigger: 'current'),
+      ).thenAnswer((_) => current.future);
+      final reader = session();
+      addTearDown(reader.dispose);
+      final first = reader.loadChapterImages(trigger: 'old');
+      final second = reader.loadChapterImages(trigger: 'current');
+      current.complete(true);
+      await second;
+      final requests = viewportRequests;
+      old.complete(false);
+      await first;
+
+      expect(viewportRequests, requests);
+      verify(() => images.prefetchAround(0)).called(1);
+      verify(() => images.requestPrefetchAhead(0)).called(1);
+    },
+  );
+
+  for (final retire in [false, true]) {
+    test(
+      'late image completion does not coordinate after retire=$retire',
+      () async {
+        final pending = Completer<bool>();
+        when(
+          () => images.loadChapterImages(trigger: 'manual'),
+        ).thenAnswer((_) => pending.future);
+        final reader = session();
+        addTearDown(reader.dispose);
+        final loading = reader.loadChapterImages();
+        if (retire) {
+          reader.retireForChapterChange();
+        } else {
+          reader.dispose();
+        }
+        pending.complete(true);
+        await loading;
+
+        expect(viewportRequests, 0);
+        expect(restoredTargets, isEmpty);
+        verifyNever(() => images.prefetchAround(any()));
+        verifyNever(() => images.requestPrefetchAhead(any()));
+      },
+    );
+
+    testWidgets('initial prefetch ignores frame after retire=$retire', (
+      tester,
+    ) async {
+      final reader = session();
+      addTearDown(reader.dispose);
+      reader.initialize();
+      verifyNever(() => images.prefetchAround(any()));
+      if (retire) {
+        reader.retireForChapterChange();
+      } else {
+        reader.dispose();
+      }
+      tester.binding.scheduleFrame();
+      await tester.pump();
+      verifyNever(() => images.prefetchAround(any()));
+      verifyNever(() => images.requestPrefetchAhead(any()));
+    });
+  }
+
+  testWidgets('initial images defer prefetch until the frame completes', (
+    tester,
+  ) async {
+    final reader = session();
+    addTearDown(reader.dispose);
+    reader.initialize();
+    verifyNever(() => images.prefetchAround(any()));
+    tester.binding.scheduleFrame();
+    await tester.pump();
+    verify(() => images.prefetchAround(0)).called(1);
+    verify(() => images.requestPrefetchAhead(0)).called(1);
+  });
+
+  test('no-image mode skips prefetch after successful load', () async {
+    noImages = true;
+    final reader = session();
+    addTearDown(reader.dispose);
+    await reader.loadChapterImages();
+    expect(viewportRequests, greaterThan(0));
+    verifyNever(() => images.prefetchAround(any()));
+    verifyNever(() => images.requestPrefetchAhead(any()));
   });
 
   test('direct exit stops work and saves and restores once', () async {
@@ -250,8 +400,13 @@ void main() {
           case 'settings':
             pendingSettings.complete(runtime.settings);
           case 'images':
-            runtime.applyImages(['first', 'second', 'third']);
-            reader.onImagesChanged();
+            when(() => images.loadChapterImages(trigger: 'manual')).thenAnswer((
+              _,
+            ) async {
+              runtime.applyImages(['first', 'second', 'third']);
+              return true;
+            });
+            await reader.loadChapterImages();
           case 'position':
             pendingPosition.complete({'epId': 'old', 'imagePage': 3});
         }
@@ -260,7 +415,7 @@ void main() {
       }
       await loading;
       reader.initializeEntry(position: null, restoreEntry: true);
-      reader.onImagesChanged();
+      await reader.loadChapterImages();
       expect(restoredTargets, [2]);
       verify(settings.loadRestorePagePosition).called(1);
     });

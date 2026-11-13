@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
-import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_runtime_facade.dart'
+    show SourceRuntimeHandleView, SourceJsBridge;
+import '../http/source_http_gateway.dart';
 import '../runtime/source_shared_request.dart';
 
 typedef SourceImageLoadConfigResolver =
@@ -35,15 +37,18 @@ class SourceImageNetworkDownloader {
        _resolveCookie = resolveCookie,
        _requestBytes = requestBytes;
 
-  factory SourceImageNetworkDownloader.forFacade(
-    HazukiSourceFacade facade, {
+  factory SourceImageNetworkDownloader.forRuntime({
+    required SourceRuntimeHandleView handle,
+    required Future<void> Function() ensureInitialized,
+    required SourceJsBridge js,
+    required SourceHttpGateway httpGateway,
     SourceSharedRequest<Uint8List>? request,
   }) {
     final cancelToken = CancelToken();
     request?.addStopHandler((reason) => cancelToken.cancel(reason.name));
     Future<void> ready() async {
       request?.checkActive();
-      final initialization = facade.ensureInitialized();
+      final initialization = ensureInitialized();
       if (request == null) {
         await initialization;
       } else {
@@ -56,24 +61,23 @@ class SourceImageNetworkDownloader {
     }
 
     return SourceImageNetworkDownloader(
-      resolveLoadConfig: (url, comicId, epId) =>
-          facade.handle.runOperation(() async {
-            await ready();
-            final engine = facade.js.engine;
-            if (engine == null) return null;
-            request?.bindEngine(engine);
-            final raw = await engine.evaluate(
-              buildImageLoadScript(url, comicId: comicId, epId: epId),
-              name: 'source_on_image_load.js',
-              execution: request?.execution,
-              retainAdmittedWork: request != null,
-            );
-            return facade.js.resolve(raw);
-          }),
-      resolveCookie: facade.httpGateway.buildCookieHeader,
+      resolveLoadConfig: (url, comicId, epId) => handle.runOperation(() async {
+        await ready();
+        final engine = js.engine;
+        if (engine == null) return null;
+        request?.bindEngine(engine);
+        final raw = await engine.evaluate(
+          buildImageLoadScript(url, comicId: comicId, epId: epId),
+          name: 'source_on_image_load.js',
+          execution: request?.execution,
+          retainAdmittedWork: request != null,
+        );
+        return js.resolve(raw);
+      }),
+      resolveCookie: httpGateway.buildCookieHeader,
       requestBytes: (url, headers) async {
         await ready();
-        final response = await facade.httpGateway.getBytes(
+        final response = await httpGateway.getBytes(
           url,
           headers: headers,
           category: 'image_download',

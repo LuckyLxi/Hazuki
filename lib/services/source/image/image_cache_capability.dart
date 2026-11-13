@@ -4,7 +4,10 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../../../models/hazuki_models.dart';
-import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_runtime_facade.dart' show SourceRuntimeHandleView;
+import '../runtime/source_session_store.dart';
+import '../runtime/source_cache_store.dart';
+import '../../logging/app_log_store.dart';
 import '../runtime/source_task_registry.dart';
 import '../runtime/source_shared_request.dart';
 import '../debug/source_task_log_recorder.dart';
@@ -14,25 +17,40 @@ import 'image_download_scheduler.dart';
 import 'source_image_network_downloader.dart';
 
 class ImageCacheCapability {
-  ImageCacheCapability(
-    HazukiSourceFacade facade, {
-    SourceTaskRegistry? tasks,
+  ImageCacheCapability({
+    required SourceRuntimeHandleView handle,
+    required SourceSessionStore session,
+    required SourceCacheStore cache,
+    required AppLogStore appLogStore,
+    required SourceTaskRegistry tasks,
+    required SourceImageNetworkDownloader Function(
+      SourceSharedRequest<Uint8List>,
+    )
+    createDownloader,
     bool Function()? canCache,
-  }) : _tasks = tasks ?? SourceTaskRegistry(),
-       _canCache = canCache ?? (() => !facade.handle.isDisposed),
-       _facade = facade,
+  }) : _handle = handle,
+       _session = session,
+       _cache = cache,
+       _appLogStore = appLogStore,
+       _tasks = tasks,
+       _createDownloader = createDownloader,
+       _canCache = canCache ?? (() => !handle.isDisposed),
        _diskCache = ImageDiskCacheStore(
-         getCachedDirectory: () => facade.cache.imageCacheDir,
-         setCachedDirectory: (directory) =>
-             facade.cache.imageCacheDir = directory,
+         getCachedDirectory: () => cache.imageCacheDir,
+         setCachedDirectory: (directory) => cache.imageCacheDir = directory,
        );
 
+  final SourceRuntimeHandleView _handle;
+  final SourceSessionStore _session;
+  final SourceCacheStore _cache;
+  final AppLogStore _appLogStore;
   final SourceTaskRegistry _tasks;
+  final SourceImageNetworkDownloader Function(SourceSharedRequest<Uint8List>)
+  _createDownloader;
   final bool Function() _canCache;
-  final HazukiSourceFacade _facade;
   final ImageDiskCacheStore _diskCache;
   late final ImageCachePolicy _policy = ImageCachePolicy(
-    getPreferences: () => _facade.session.prefs,
+    getPreferences: () => _session.prefs,
     cleanByAge: _diskCache.cleanByAge,
     trimToOverflow: _diskCache.trimToOverflow,
   );
@@ -44,19 +62,19 @@ class ImageCacheCapability {
   int get maxBytes => _policy.maxBytes;
 
   Future<void> setMaxBytes(int value) async {
-    await _facade.ensurePrefs();
+    await _session.ensurePrefs();
     await _policy.setMaxBytes(value);
   }
 
   String get autoCleanMode => _policy.autoCleanMode;
 
   Future<void> setAutoCleanMode(String mode) async {
-    await _facade.ensurePrefs();
+    await _session.ensurePrefs();
     await _policy.setAutoCleanMode(mode);
   }
 
   Future<Map<String, dynamic>> getStatus() async {
-    await _facade.ensurePrefs();
+    await _session.ensurePrefs();
     final dir = await ensureCacheDir();
     final bytes = await computeSizeBytes();
     return {
@@ -71,7 +89,7 @@ class ImageCacheCapability {
 
   String _resolveSourceKeyForRequest(String sourceKey) {
     final requested = sourceKey.trim();
-    final handleSourceKey = _facade.sourceKey;
+    final handleSourceKey = _handle.sourceKey;
     if (requested.isEmpty) {
       return handleSourceKey;
     }
@@ -86,12 +104,12 @@ class ImageCacheCapability {
       sourceKey: _resolveSourceKeyForRequest(sourceKey),
       comicId: url,
     ).imageCacheKey;
-    return _facade.cache.touchImageBytes(cacheKey);
+    return _cache.touchImageBytes(cacheKey);
   }
 
   void evictFromMemory(Iterable<String> urls, {String sourceKey = ''}) {
     final resolvedSourceKey = _resolveSourceKeyForRequest(sourceKey);
-    _facade.cache.evictImageBytes(
+    _cache.evictImageBytes(
       urls.map(
         (url) => SourceScopedComicId(
           sourceKey: resolvedSourceKey,
@@ -102,7 +120,7 @@ class ImageCacheCapability {
   }
 
   void _putInMemoryCache(String url, Uint8List bytes) {
-    _facade.cache.putImageBytes(url, bytes);
+    _cache.putImageBytes(url, bytes);
   }
 
   // ---------- Download ----------
@@ -155,7 +173,7 @@ class ImageCacheCapability {
     if (session != null && session.sourceKey != resolvedSourceKey) {
       throw StateError('source_reader_session_mismatch');
     }
-    final recorder = SourceTaskLogRecorder(_facade.appLogStore);
+    final recorder = SourceTaskLogRecorder(_appLogStore);
     return _tasks.run(
       pluginId: resolvedSourceKey,
       method: 'image.download',
@@ -168,11 +186,8 @@ class ImageCacheCapability {
         stack,
         sensitiveValues: [url, comicId ?? '', epId ?? ''],
       ),
-      operation: (task) => _facade.handle.runOperation(() async {
-        task.bindResource(
-          _facade.handle,
-          survivesSourceChange: taskOrigin == null,
-        );
+      operation: (task) => _handle.runOperation(() async {
+        task.bindResource(_handle, survivesSourceChange: taskOrigin == null);
         task.checkActive();
         final normalizedUrl = url.trim();
         if (normalizedUrl.isEmpty) throw Exception('image_url_empty');
@@ -180,10 +195,9 @@ class ImageCacheCapability {
           sourceKey: resolvedSourceKey,
           comicId: normalizedUrl,
         ).imageCacheKey;
-        final identity = _facade.session.loginIdentity;
-        bool canCache() =>
-            _canCache() && _facade.session.loginIdentity == identity;
-        final cached = _facade.cache.touchImageBytes(cacheKey);
+        final identity = _session.loginIdentity;
+        bool canCache() => _canCache() && _session.loginIdentity == identity;
+        final cached = _cache.touchImageBytes(cacheKey);
         if (cached != null) return cached;
         if (useDiskCache) {
           final bytes = await task.runCommit(
@@ -196,33 +210,29 @@ class ImageCacheCapability {
           }
         }
         task.checkActive();
-        final map = _facade.cache.imageDownloadInFlight;
+        final map = _cache.imageDownloadInFlight;
         var request = map[cacheKey];
         if (request == null || !request.available) {
           late final SourceSharedRequest<Uint8List> created;
           created = SourceSharedRequest<Uint8List>(
-            sourceUiService: _facade.handle.sourceUiService,
+            sourceUiService: _handle.sourceUiService,
             pluginId: resolvedSourceKey,
             method: 'image.bytes',
             drainOperationOnStop: true,
             onUnavailable: () {
               if (identical(map[cacheKey], created)) map.remove(cacheKey);
             },
-            operation: (_) => _facade.handle.runOperation(() async {
+            operation: (_) => _handle.runOperation(() async {
               final bytes = await _downloadScheduler.schedule(
                 cacheKey,
                 priority: priority,
                 cancellation: created.cancellation,
-                task: () =>
-                    SourceImageNetworkDownloader.forFacade(
-                      _facade,
-                      request: created,
-                    ).download(
-                      normalizedUrl,
-                      comicId: comicId,
-                      epId: epId,
-                      checkActive: created.checkActive,
-                    ),
+                task: () => _createDownloader(created).download(
+                  normalizedUrl,
+                  comicId: comicId,
+                  epId: epId,
+                  checkActive: created.checkActive,
+                ),
               );
               created.checkActive();
               bool wants(bool Function(_ImageCacheIntent) test) => created
@@ -291,7 +301,7 @@ class ImageCacheCapability {
 
   Future<void> clear() async {
     await _diskCache.clear();
-    _facade.cache.imageBytesCache.clear();
+    _cache.imageBytesCache.clear();
   }
 
   Future<void> evictEntries(

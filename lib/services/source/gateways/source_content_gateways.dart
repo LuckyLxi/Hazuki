@@ -123,7 +123,7 @@ abstract interface class SourceCommentsGateway {
   });
 }
 
-abstract interface class SourceComicDetailGateway {
+abstract interface class SourceFavoriteFoldersGateway {
   String? get activeSourceKey;
   bool isLoggedForSource(String sourceKey);
   bool supportFavoriteFolderLoadForSource(String sourceKey);
@@ -131,6 +131,33 @@ abstract interface class SourceComicDetailGateway {
   bool supportFavoriteFolderDeleteForSource(String sourceKey);
   bool supportFavoriteToggleForSource(String sourceKey);
   bool favoriteSingleFolderForSingleComicForSource(String sourceKey);
+  Future<FavoriteFoldersResult> loadFavoriteFolders({
+    String? comicId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<void> addFavoriteFolder(
+    String name, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<void> deleteFavoriteFolder(
+    String folderId, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<void> toggleFavorite({
+    required String comicId,
+    required bool isAdding,
+    String folderId = '0',
+    String? favoriteId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+}
+
+abstract interface class SourceComicDetailGateway
+    implements SourceFavoriteFoldersGateway {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
@@ -173,29 +200,6 @@ abstract interface class SourceComicDetailGateway {
     String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
   });
-  Future<FavoriteFoldersResult> loadFavoriteFolders({
-    String? comicId,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<void> addFavoriteFolder(
-    String name, {
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<void> deleteFavoriteFolder(
-    String folderId, {
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<void> toggleFavorite({
-    required String comicId,
-    required bool isAdding,
-    String folderId = '0',
-    String? favoriteId,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
   Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
     required String actionId,
@@ -204,8 +208,8 @@ abstract interface class SourceComicDetailGateway {
   });
 }
 
-abstract interface class SourceFavoriteGateway implements Listenable {
-  String? get activeSourceKey;
+abstract interface class SourceFavoriteGateway
+    implements Listenable, SourceFavoriteFoldersGateway {
   bool get isLogged;
   bool get supportFavoriteFolderDelete;
   bool get supportFavoriteFolderRename;
@@ -221,32 +225,9 @@ abstract interface class SourceFavoriteGateway implements Listenable {
 
   void requestRuntimeRetry(String trigger);
   Future<void> ensureInitialized();
-  Future<FavoriteFoldersResult> loadFavoriteFolders({
-    String? comicId,
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
   Future<FavoriteComicsResult> loadFavoriteComics({
     required int page,
     required String folderId,
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<void> addFavoriteFolder(
-    String name, {
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<void> deleteFavoriteFolder(
-    String folderId, {
-    String sourceKey = '',
-    SourceTaskOrigin? taskOrigin,
-  });
-  Future<void> toggleFavorite({
-    required String comicId,
-    required bool isAdding,
-    String folderId = '0',
-    String? favoriteId,
-    String sourceKey = '',
     SourceTaskOrigin? taskOrigin,
   });
   Future<void> setFavoriteSortOrder(String order);
