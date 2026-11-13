@@ -163,11 +163,12 @@ void main() {
   ) async {
     final initial = ColorScheme.fromSeed(seedColor: Colors.blue);
     final cover = ColorScheme.fromSeed(seedColor: Colors.red);
+    final appTheme = ThemeData(colorScheme: initial);
 
     Future<void> render(ColorScheme scheme) => tester.pumpWidget(
       MaterialApp(
         home: AnimatedTheme(
-          data: ThemeData(colorScheme: scheme),
+          data: appTheme.copyWith(colorScheme: scheme),
           child: Scaffold(
             body: Column(
               children: [
@@ -197,35 +198,43 @@ void main() {
       ),
     );
 
-    void expectTagColors(ColorScheme scheme) {
-      final fills = tester.widgetList<Ink>(
-        find.descendant(
-          of: find.byWidgetPredicate(
-            (widget) => widget is Chip || widget is ActionChip,
-          ),
-          matching: find.byType(Ink),
-        ),
+    Color tagFill(ColorScheme scheme) {
+      final fills = tester
+          .widgetList<Ink>(
+            find.descendant(
+              of: find.byWidgetPredicate(
+                (widget) => widget is Chip || widget is ActionChip,
+              ),
+              matching: find.byType(Ink),
+            ),
+          )
+          .map((ink) => (ink.decoration! as ShapeDecoration).color!)
+          .toList();
+      expect(fills, hasLength(3));
+      expect(fills.toSet(), hasLength(1));
+      final fill = fills.first;
+      expect(fill.a, 1);
+      expect(
+        fill.computeLuminance(),
+        lessThan(scheme.surface.computeLuminance()),
       );
-      final fillColor = scheme.primaryContainer.withValues(alpha: 0.22);
-      expect(fills.map((ink) => (ink.decoration! as ShapeDecoration).color), [
-        fillColor,
-        fillColor,
-        fillColor,
-      ]);
       for (final label in ['ID: 123', 'Adventure', 'Ongoing']) {
         expect(
           tester.widget<Text>(find.text(label)).style?.color,
           scheme.onSurfaceVariant,
         );
       }
+      return fill;
     }
 
     await render(initial);
     await tester.pumpAndSettle();
-    expectTagColors(initial);
+    final initialFill = tagFill(initial);
+    expect(initialFill.b, greaterThan(initialFill.r));
     await render(cover);
     await tester.pumpAndSettle();
-    expectTagColors(cover);
+    final coverFill = tagFill(cover);
+    expect(coverFill.r, greaterThan(coverFill.b));
   });
 
   testWidgets('detail authors and tags use category-aware tag callback', (

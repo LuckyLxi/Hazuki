@@ -6,7 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 Color _compactMetaChipColor(ColorScheme colors) =>
-    colors.primaryContainer.withValues(alpha: 0.22);
+    colors.brightness == Brightness.light
+    ? Color.alphaBlend(colors.primary.withValues(alpha: 0.14), colors.surface)
+    : colors.primaryContainer.withValues(alpha: 0.22);
 
 class ComicDetailMetaSection extends StatelessWidget {
   const ComicDetailMetaSection({
