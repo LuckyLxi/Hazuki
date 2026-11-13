@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/password_lock/view/password_lock_widgets.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/password_lock_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -43,7 +44,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Stack(
           children: [
@@ -110,7 +111,7 @@ void main() {
     final service = _ManualPasswordLockService();
     Widget buildApp(int generation) => MaterialApp(
       locale: const Locale('zh'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: hazukiLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Stack(
         children: [

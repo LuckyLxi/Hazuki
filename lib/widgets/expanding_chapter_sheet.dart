@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Expands an existing chapter sheet before handing off to the reader.
 class ExpandingChapterSheet extends StatefulWidget {

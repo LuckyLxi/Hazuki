@@ -5,7 +5,7 @@
 import 'dart:async';
 import 'package:hazuki/services/source/source_task_owner.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/widgets/comic_chapters_panel.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';

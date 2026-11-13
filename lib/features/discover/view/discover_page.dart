@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:hazuki/l10n/l10n.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/shared/appearance/appearance_settings.dart';

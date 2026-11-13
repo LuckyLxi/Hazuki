@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 插件可按名称引用的内置图标。插件只写名称，风格与主题由宿主统一；
 /// 未知名称返回 null，旧版应用遇到新图标名时只是不显示图标。

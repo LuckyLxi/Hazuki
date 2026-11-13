@@ -1,5 +1,5 @@
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/widgets/widgets.dart';

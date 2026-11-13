@@ -1,10 +1,11 @@
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/fake_source_task_control.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/discover/view/discover_page.dart';
 import 'package:hazuki/features/discover/view/discover_page_body.dart';
@@ -303,7 +304,7 @@ Widget _buildDiscoverPage(
 }) {
   return withTestSourcePresentation(
     MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: hazukiLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: DiscoverPage(

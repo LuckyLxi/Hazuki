@@ -9,7 +9,7 @@ import 'package:hazuki/features/settings/view/plugins/source_plugins_page.dart';
 import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';

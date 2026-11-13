@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';

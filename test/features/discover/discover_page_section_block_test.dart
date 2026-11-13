@@ -1,11 +1,12 @@
 import '../../support/fake_source_task_control.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/features/discover/view/discover_page_section_block.dart';
 import 'package:hazuki/features/discover/view/discover_section_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
@@ -142,7 +143,7 @@ Widget _buildSubject({
     MaterialApp(
       theme: ThemeData(platform: platform),
       navigatorObservers: navigatorObservers,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: hazukiLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SingleChildScrollView(

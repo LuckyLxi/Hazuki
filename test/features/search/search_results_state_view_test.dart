@@ -1,14 +1,15 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/search/view/search_results_widgets.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 void main() {
   Widget buildView({required bool loading}) {
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: hazukiLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SearchResultsStateView(

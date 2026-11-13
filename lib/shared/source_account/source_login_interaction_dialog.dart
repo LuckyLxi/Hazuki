@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 

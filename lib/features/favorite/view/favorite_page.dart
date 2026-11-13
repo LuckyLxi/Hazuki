@@ -2,7 +2,7 @@ import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/favorites/favorite_page_actions.dart';

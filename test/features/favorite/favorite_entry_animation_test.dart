@@ -1,9 +1,10 @@
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/fake_source_task_control.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
@@ -117,7 +118,7 @@ Future<_Source> _pumpPage(
     withTestSourcePresentation(
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.android),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: HazukiThemeControllerScope(
           controller: appearance,

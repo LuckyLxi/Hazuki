@@ -1,7 +1,7 @@
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hazuki/shared/source_interaction/source_plugin_icons.dart';

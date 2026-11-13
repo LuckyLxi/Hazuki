@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/images/comic_cover_handoff.dart';

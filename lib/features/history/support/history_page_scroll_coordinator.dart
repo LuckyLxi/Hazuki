@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 const double _historyBackToTopThreshold = 520;
 const Duration _historyScrollToTopDuration = Duration(milliseconds: 360);

@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/settings/view/other/comment_filter_dialog.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -31,7 +32,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => Scaffold(
@@ -72,7 +73,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) {
           final mediaQuery = MediaQuery.of(context);
@@ -118,7 +119,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => Scaffold(

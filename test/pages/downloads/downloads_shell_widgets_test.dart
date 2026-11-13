@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 
 void main() {
   testWidgets('batch group button slides in and out with selection mode', (
@@ -11,7 +12,7 @@ void main() {
     late StateSetter update;
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: StatefulBuilder(
@@ -465,7 +466,7 @@ Widget _wrapWithAppBar({
 
 Widget _wrapWithMaterial(Widget child) {
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: hazukiLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: child,
   );

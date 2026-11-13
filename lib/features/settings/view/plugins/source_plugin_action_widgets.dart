@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';

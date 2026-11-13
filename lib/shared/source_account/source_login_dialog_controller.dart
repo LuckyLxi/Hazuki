@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 
 /// Presents login steps inside the existing dialog route.

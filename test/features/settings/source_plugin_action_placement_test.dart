@@ -3,7 +3,7 @@ import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import 'dart:async';
 import '../../support/source_presentation_fixtures.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
@@ -16,6 +16,7 @@ import 'package:hazuki/features/settings/view/plugins/source_plugin_action_widge
 import 'package:hazuki/features/settings/view/plugins/source_plugin_settings_page.dart';
 import 'package:hazuki/features/settings/view/reading_settings_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/source_meta.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -177,7 +178,7 @@ Widget _app(Widget page, {Locale locale = const Locale('en')}) => MaterialApp(
   ),
   theme: ThemeData(platform: TargetPlatform.android),
   locale: locale,
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: hazukiLocalizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: page,
 );

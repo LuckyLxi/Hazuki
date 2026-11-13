@@ -3,7 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_models.dart';

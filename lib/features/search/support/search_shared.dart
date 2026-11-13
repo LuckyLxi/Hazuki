@@ -2,7 +2,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 import 'search_contracts.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 
 export 'search_contracts.dart';

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/shared/comments/comments_sort_scope.dart';
 
 class HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {

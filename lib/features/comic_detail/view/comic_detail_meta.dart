@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 

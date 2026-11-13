@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hazuki/features/home/support/home_sidebar_models.dart';
 import 'package:hazuki/features/home/view/home_drawer_content.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 
 const _profile = HomeSidebarProfileState(
   isLogged: false,
@@ -35,7 +36,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: Drawer(
@@ -68,7 +69,7 @@ void main() {
   testWidgets('drawer menu keeps all configured destinations', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const Scaffold(
           body: Drawer(
@@ -95,7 +96,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const Scaffold(
           body: Drawer(
@@ -127,7 +128,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const Scaffold(
           body: Drawer(
@@ -152,12 +153,21 @@ void main() {
     expect(switcher.switchInCurve, Curves.easeOutBack);
     expect(switcher.switchOutCurve, Curves.easeInCubic);
     expect(find.byIcon(Icons.event_available_outlined), findsOneWidget);
-    final snapshot = tester.widget<SnapshotWidget>(find.byType(SnapshotWidget));
-    expect(snapshot.autoresize, isTrue);
-    expect(
-      find.ancestor(
-        of: find.byType(Hero),
+    final snapshot = tester.widget<SnapshotWidget>(
+      find.descendant(
+        of: find.byType(HomeDrawerContent),
         matching: find.byType(SnapshotWidget),
+      ),
+    );
+    expect(snapshot.autoresize, isTrue);
+    // 路由外层的 FadeForwards 转场快照不计入，只检查抽屉内容内部。
+    expect(
+      find.descendant(
+        of: find.byType(HomeDrawerContent),
+        matching: find.ancestor(
+          of: find.byType(Hero),
+          matching: find.byType(SnapshotWidget),
+        ),
       ),
       findsNothing,
     );

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/widgets/source_runtime_status_card.dart';
 import 'package:hazuki/l10n/app_localizations.dart';

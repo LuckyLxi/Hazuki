@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/support/settings_core_dependencies.dart';
 import 'package:hazuki/features/settings/view/advanced/advanced_settings_page.dart';
@@ -8,6 +8,7 @@ import 'package:hazuki/features/settings/view/network/cloud_sync_page.dart';
 import 'package:hazuki/features/settings/view/plugins/source_plugins_page.dart';
 import 'package:hazuki/features/settings/view/settings_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -70,7 +71,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: Locale(locale),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: SettingsPage(
               appearanceSettings: const AppearanceSettingsData(

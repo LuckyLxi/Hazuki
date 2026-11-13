@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 管理页面级控制器的视图监听订阅与延迟焦点调度。
 class ReaderViewBindings {

@@ -2,7 +2,7 @@ import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';

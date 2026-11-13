@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
 import 'package:hazuki/widgets/hazuki_frosted_menu.dart';

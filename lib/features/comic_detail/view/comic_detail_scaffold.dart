@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';

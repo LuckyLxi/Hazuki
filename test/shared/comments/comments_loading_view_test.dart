@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_view_primitives.dart';
 import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/widgets/hazuki_m3e_loading_indicator.dart';
@@ -14,7 +15,7 @@ void main() {
     late TabController controller;
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: DefaultTabController(
           length: 2,
@@ -67,7 +68,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       const MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: CommentsInitialLoadingView()),
       ),

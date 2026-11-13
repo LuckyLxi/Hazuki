@@ -3,13 +3,14 @@ import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/search/view/search_entry_page.dart';
@@ -65,11 +66,10 @@ void main() {
     expect(editableText.focusNode.hasFocus, isFalse);
     expect(tester.testTextInput.isVisible, isFalse);
 
+    // material_ui 的 FadeForwards 转场会在路由外层包一层快照，
+    // 这里只约束搜索页自身不对内容做快照。
     expect(
-      find.ancestor(
-        of: find.byType(SearchEntryBody),
-        matching: find.byType(SnapshotWidget),
-      ),
+      _snapshotAncestorsWithinPage(find.byType(SearchEntryBody)),
       findsNothing,
     );
     expect(
@@ -80,17 +80,13 @@ void main() {
       findsWidgets,
     );
     expect(
-      find.ancestor(
-        of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
-        matching: find.byType(SnapshotWidget),
+      _snapshotAncestorsWithinPage(
+        find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
       ),
       findsNothing,
     );
     expect(
-      find.ancestor(
-        of: find.byType(FloatingActionButton),
-        matching: find.byType(SnapshotWidget),
-      ),
+      _snapshotAncestorsWithinPage(find.byType(FloatingActionButton)),
       findsNothing,
     );
   });
@@ -105,7 +101,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) {
           final mediaQuery = MediaQuery.of(context);
@@ -145,7 +141,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {
@@ -248,7 +244,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => TextButton(
@@ -291,7 +287,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) => TextButton(
@@ -991,7 +987,7 @@ void main() {
 
 Widget _buildTestApp(Widget home) {
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: hazukiLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     builder: (context, child) => withTestSourcePresentation(child!),
     home: home,
@@ -1044,4 +1040,12 @@ String? _currentExtractedId(WidgetTester tester) {
 
 Widget _comicDetailPageBuilder(ExploreComic comic, String heroTag) {
   return Scaffold(body: Center(child: Text('detail:${comic.id}-$heroTag')));
+}
+
+/// 查找位于 [SearchEntryPage] 内部、包裹 [target] 的快照组件。
+Finder _snapshotAncestorsWithinPage(Finder target) {
+  return find.descendant(
+    of: find.byType(SearchEntryPage),
+    matching: find.ancestor(of: target, matching: find.byType(SnapshotWidget)),
+  );
 }

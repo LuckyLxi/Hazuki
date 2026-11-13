@@ -2,10 +2,11 @@ import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_favorite_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
@@ -80,7 +81,7 @@ void main() {
       late BuildContext pageContext;
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {
@@ -165,7 +166,7 @@ void main() {
       late BuildContext pageContext;
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {

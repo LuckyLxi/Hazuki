@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/view/translation/manga_translation_settings_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/translation/manga_translation_settings_store.dart';
 import 'package:hazuki/services/translation/translation_result_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -100,7 +101,7 @@ void main() {
   }) async {
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: locale,
         home: MangaTranslationSettingsPage(dependencies: dependencies),

@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_expandable_description.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/features/comments/view/comments_widgets.dart';
 import 'package:hazuki/features/downloads/view/downloaded_comic_detail_widgets.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
@@ -24,7 +25,7 @@ void main() {
 
   Widget app(Widget child) => MaterialApp(
     locale: const Locale('en'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: hazukiLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: ChineseConversionScope(
       service: service,

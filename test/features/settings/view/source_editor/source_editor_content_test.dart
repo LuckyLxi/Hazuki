@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/view/source_editor/source_editor_content.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:re_editor/re_editor.dart';
 
 Finder menuItems() => find.byWidgetPredicate(
@@ -17,7 +18,7 @@ Future<void> pumpEditor(
   await tester.pumpWidget(
     MaterialApp(
       locale: const Locale('en'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: hazukiLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Builder(
         builder: (context) => Scaffold(
@@ -172,7 +173,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => Scaffold(

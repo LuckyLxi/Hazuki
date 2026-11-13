@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,6 +10,7 @@ import 'package:hazuki/features/announcements/support/announcement_image_session
 import 'package:hazuki/features/announcements/view/announcement_content.dart';
 import 'package:hazuki/features/discover/view/discover_announcement_card.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/announcements/announcement_service.dart';
 import '../../support/announcement_test_service.dart';
 
@@ -43,7 +44,7 @@ void main() {
 
   Widget app(Widget child) {
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: hazukiLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(body: child),
     );

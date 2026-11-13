@@ -7,8 +7,7 @@ import 'dart:async';
 import 'package:hazuki/app/service_locator.dart';
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -34,6 +33,7 @@ import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
 import 'package:hazuki/widgets/reader_settings_content.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
@@ -653,7 +653,7 @@ void main() {
       ReaderMode? selectedMode;
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: ReaderSettingsContent(

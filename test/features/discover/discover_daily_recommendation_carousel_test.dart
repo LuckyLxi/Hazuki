@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -267,7 +267,16 @@ void main() {
             .widget<PageView>(find.byType(PageView))
             .controller!;
         SnapshotController snapshot() => tester
-            .widget<SnapshotWidget>(find.byType(SnapshotWidget))
+            .widget<SnapshotWidget>(
+              find.descendant(
+                of: find.byType(
+                  routeTransition
+                      ? RouteTransitionSnapshot
+                      : HomeDrawerSnapshot,
+                ),
+                matching: find.byType(SnapshotWidget),
+              ),
+            )
             .controller;
         void moveCarousel() {
           unawaited(

@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:hazuki/shared/reading/reader_entry_position.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/chapter_title_resolver.dart';

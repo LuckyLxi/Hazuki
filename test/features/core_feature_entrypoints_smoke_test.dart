@@ -3,7 +3,7 @@ import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 import '../support/fake_source_task_control.dart';
 import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/app/home/home_feature_entrypoints.dart';

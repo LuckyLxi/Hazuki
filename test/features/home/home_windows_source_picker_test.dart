@@ -1,11 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/home/support/home_sidebar_models.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
 import 'package:hazuki/features/home/view/home_windows_sidebar.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/hazuki_m3e_loading_indicator.dart';
 import 'package:mocktail/mocktail.dart';
@@ -66,7 +67,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: Locale(locale),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(

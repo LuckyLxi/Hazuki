@@ -1,5 +1,5 @@
 import 'package:hazuki/widgets/chapter_group_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/l10n/l10n.dart';

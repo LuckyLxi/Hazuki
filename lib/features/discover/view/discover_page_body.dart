@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/shared/navigation_tags.dart';

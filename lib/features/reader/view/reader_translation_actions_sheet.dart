@@ -1,6 +1,6 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../l10n/l10n.dart';
 import '../../../services/translation/translation_glossary_store.dart';

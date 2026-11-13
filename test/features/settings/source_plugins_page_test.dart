@@ -2,10 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/view/plugins/source_plugins_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_plugin_adapter.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_models.dart';
@@ -97,7 +98,7 @@ void main() {
             await tester.pumpWidget(
               MaterialApp(
                 locale: const Locale('en'),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                localizationsDelegates: hazukiLocalizationsDelegates,
                 supportedLocales: AppLocalizations.supportedLocales,
                 home: SourcePluginsPage(manager: gateway),
               ),
@@ -218,7 +219,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: SourcePluginsPage(manager: gateway),
         ),

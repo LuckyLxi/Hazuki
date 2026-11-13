@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/history/view/history_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -78,7 +79,7 @@ Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
 
 Widget _buildApp() {
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: hazukiLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     initialRoute: '/history',
     routes: {

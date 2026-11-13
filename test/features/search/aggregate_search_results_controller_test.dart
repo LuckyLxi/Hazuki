@@ -6,11 +6,12 @@ import '../../support/source_catalog_fixtures.dart';
 import 'dart:async';
 
 import 'package:hazuki/features/search/support/search_shared.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/search/state/aggregate_search_results_controller.dart';
 import 'package:hazuki/features/search/view/search_aggregate_results.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 
@@ -30,7 +31,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {
@@ -129,7 +130,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: SearchAggregateResultsBody(
@@ -164,7 +165,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {
@@ -219,7 +220,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {
@@ -326,7 +327,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: SearchAggregateSectionPage(
             controller: controller,

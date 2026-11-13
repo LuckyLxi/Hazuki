@@ -1,10 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/view/about_page.dart';
 import 'package:hazuki/features/settings/view/about_page_content.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
 import 'package:mocktail/mocktail.dart';
@@ -21,7 +22,7 @@ Widget _app(
   double textScale = 1,
 }) => MaterialApp(
   locale: locale,
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: hazukiLocalizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   theme: ThemeData(
     colorScheme: ColorScheme.fromSeed(

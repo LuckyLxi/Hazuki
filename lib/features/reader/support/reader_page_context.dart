@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';

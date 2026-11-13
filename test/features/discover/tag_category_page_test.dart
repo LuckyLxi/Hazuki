@@ -2,13 +2,14 @@ import '../../support/source_presentation_fixtures.dart';
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_destination_route.dart';
 import 'package:hazuki/features/discover/view/discover_section_page.dart';
 import 'package:hazuki/features/discover/view/discover_section_page_widgets.dart';
 import 'package:hazuki/features/discover/view/tag_category_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
@@ -65,7 +66,7 @@ void main() {
       withTestSourcePresentation(
         MaterialApp(
           theme: ThemeData(platform: platform),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: TagCategoryPage(
             searchPageBuilder: (_) => const SizedBox.shrink(),
@@ -108,7 +109,7 @@ void main() {
           MaterialApp(
             navigatorKey: navigatorKey,
             theme: ThemeData(platform: TargetPlatform.windows),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             builder: (context, child) => WindowsComicDetailPresentationScope(
               panelBuilder:
@@ -375,7 +376,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: DiscoverSectionPage(
             section: const ExploreSection(
@@ -428,7 +429,7 @@ void main() {
       await tester.pumpWidget(
         withTestSourcePresentation(
           MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: TagCategoryPage(
               searchPageBuilder: (_) => const SizedBox.shrink(),
@@ -518,7 +519,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: TagCategoryPage(
             searchPageBuilder: (_) => const SizedBox.shrink(),
@@ -575,7 +576,7 @@ void main() {
       await tester.pumpWidget(
         withTestSourcePresentation(
           MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: TagCategoryPage(
               searchPageBuilder: (_) => const SizedBox.shrink(),

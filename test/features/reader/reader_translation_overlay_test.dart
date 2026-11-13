@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +8,7 @@ import 'package:hazuki/features/reader/view/reader_translation_actions_sheet.dar
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/translation/manga_translation_settings_store.dart';
 import 'package:hazuki/services/translation/models/translation_models.dart';
 import 'package:mocktail/mocktail.dart';
@@ -166,7 +167,7 @@ void main() {
   );
   Widget app(Widget child) => MaterialApp(
     theme: ThemeData(fontFamily: 'NotoSansSC'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: hazukiLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     locale: const Locale('en'),
     home: Scaffold(body: Center(child: child)),

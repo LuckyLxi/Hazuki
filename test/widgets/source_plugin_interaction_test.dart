@@ -2,12 +2,13 @@ import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_meta.dart';
 import 'package:hazuki/features/home/support/home_sidebar_models.dart';
 import 'package:hazuki/features/home/view/home_drawer_profile_header.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
@@ -106,7 +107,7 @@ void main() {
         sourcePlugins: plugins,
         child: MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(body: Center(child: child)),
         ),

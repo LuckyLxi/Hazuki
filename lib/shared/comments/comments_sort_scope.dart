@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 import 'package:hazuki/shared/comments/comments_sort_delegate.dart';

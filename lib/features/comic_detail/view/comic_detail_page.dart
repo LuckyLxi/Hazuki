@@ -1,7 +1,7 @@
 import 'package:hazuki/shared/source_presentation.dart';
 import 'comic_detail_destination_route.dart';
 import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';

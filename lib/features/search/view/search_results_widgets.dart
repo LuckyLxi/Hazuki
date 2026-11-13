@@ -2,7 +2,7 @@ import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/source_runtime_status_card.dart';

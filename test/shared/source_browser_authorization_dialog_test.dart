@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/app/source_runtime/source_plugin_dialog_presenter.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/models/source_script_execution.dart';
@@ -61,7 +62,7 @@ void main() {
         MaterialApp(
           navigatorKey: key,
           navigatorObservers: [presenter],
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const Scaffold(body: Text('Home')),
         ),
@@ -176,7 +177,7 @@ void main() {
         MaterialApp(
           navigatorKey: key,
           navigatorObservers: [presenter],
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const Scaffold(body: Text('Home')),
         ),
@@ -248,7 +249,7 @@ void main() {
             navigatorKey: key,
             navigatorObservers: [presenter],
             locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const Scaffold(body: Text('Home')),
           ),
@@ -312,7 +313,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (c) {

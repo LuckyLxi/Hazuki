@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/l10n/app_localizations.dart';

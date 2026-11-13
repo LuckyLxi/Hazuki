@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/features/search/view/search_bar_shell.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 
@@ -27,7 +28,7 @@ void main() {
           HazukiLiquidGlass.wrap(
             child: MaterialApp(
               theme: ThemeData(brightness: brightness),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: hazukiLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: Scaffold(
                 body: Center(

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 以胶囊/卡片为起点展开的弹窗路由，路由真正销毁后才返回结果。
 ///

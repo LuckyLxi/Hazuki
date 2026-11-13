@@ -4,14 +4,15 @@ import '../../support/fake_source_task_control.dart';
 import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_cover.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_header.dart';
@@ -134,7 +135,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) => SourceImageGatewayScope(
             gateway: sl<SourceImageGateway>(),
@@ -197,7 +198,7 @@ void main() {
           MaterialApp(
             theme: ThemeData(platform: TargetPlatform.android),
             locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             builder: (context, child) => withTestSourcePresentation(
               child!,
@@ -261,7 +262,7 @@ void main() {
           theme: ThemeData(platform: platform),
           locale: const Locale('en'),
           builder: (context, child) => withTestSourcePresentation(child!),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _buildDesktopTestDetail(
             comic: const ExploreComic(
@@ -326,7 +327,7 @@ void main() {
             builder: (context, child) => withTestSourcePresentation(
               HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
             ),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: ComicDetailPage(
               comic: const ExploreComic(
@@ -481,7 +482,7 @@ void main() {
               builder: (_, value, child) => MaterialApp(
                 locale: value,
                 theme: ThemeData(platform: platform),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                localizationsDelegates: hazukiLocalizationsDelegates,
                 supportedLocales: AppLocalizations.supportedLocales,
                 home: page,
               ),
@@ -557,7 +558,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             theme: ThemeData(platform: platform),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: _buildDesktopTestDetail(
               comic: const ExploreComic(
@@ -615,7 +616,7 @@ void main() {
                   ),
                 ],
               ),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: hazukiLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: _buildDesktopTestDetail(
                 comic: const ExploreComic(
@@ -700,7 +701,7 @@ void main() {
             ),
           ],
         ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -782,7 +783,7 @@ void main() {
           MaterialApp(
             theme: ThemeData(platform: platform),
             builder: (context, child) => withTestSourcePresentation(child!),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: _buildDesktopTestDetail(
               comic: const ExploreComic(
@@ -839,7 +840,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(platform: platform),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _buildDesktopTestDetail(
             comic: const ExploreComic(
@@ -879,7 +880,7 @@ void main() {
           builder: (context, child) => withTestSourcePresentation(
             HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
           ),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ComicDetailPage(
             comic: const ExploreComic(
@@ -969,7 +970,7 @@ void main() {
                   ),
                 ),
               ),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: hazukiLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: ComicDetailPage(
                 comic: const ExploreComic(
@@ -1077,7 +1078,7 @@ void main() {
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.android),
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -1160,7 +1161,7 @@ void main() {
               child: child!,
             ),
           ),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _buildDesktopTestDetail(
             comic: const ExploreComic(
@@ -1209,7 +1210,7 @@ void main() {
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.android),
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -1290,7 +1291,7 @@ void main() {
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.android),
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -1349,7 +1350,7 @@ void main() {
         MaterialApp(
           theme: ThemeData(platform: TargetPlatform.android),
           builder: (context, child) => withTestSourcePresentation(child!),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _buildDesktopTestDetail(
             comic: const ExploreComic(
@@ -1420,7 +1421,7 @@ void main() {
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.android),
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -1482,7 +1483,7 @@ void main() {
                 child: child!,
               ),
             ),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: _buildDesktopTestDetail(
               comic: const ExploreComic(
@@ -1568,7 +1569,7 @@ void main() {
             platform: TargetPlatform.windows,
             brightness: brightness,
           ),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ComicDetailPage(
             comic: const ExploreComic(
@@ -1675,7 +1676,7 @@ void main() {
         MaterialApp(
           builder: (context, child) => withTestSourcePresentation(child!),
           theme: ThemeData(platform: TargetPlatform.windows),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ComicDetailPage(
             comic: const ExploreComic(
@@ -1755,7 +1756,7 @@ void main() {
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
         theme: ThemeData(platform: TargetPlatform.windows),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
           comic: const ExploreComic(
@@ -1827,7 +1828,7 @@ void main() {
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
         theme: ThemeData(platform: TargetPlatform.windows),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -1882,7 +1883,7 @@ void main() {
         MaterialApp(
           builder: (context, child) => withTestSourcePresentation(child!),
           theme: ThemeData(platform: TargetPlatform.windows),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _buildDesktopTestDetail(
             comic: const ExploreComic(
@@ -2006,7 +2007,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
           comic: comic,
@@ -2072,7 +2073,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
           comic: comic,

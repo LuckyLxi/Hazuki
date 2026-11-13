@@ -75,7 +75,7 @@ void main() {
           'VoidCallback',
           '/view/',
           'BuildContext',
-          'package:flutter/material.dart',
+          'package:material_ui/material_ui.dart',
           'favorite_list_loader.dart',
         ]) {
           expect(content, isNot(contains(forbidden)), reason: name);
@@ -102,7 +102,7 @@ void main() {
     for (final forbidden in [
       '/view/',
       'BuildContext',
-      'package:flutter/material.dart',
+      'package:material_ui/material_ui.dart',
       'showDialog',
       'showHazukiPrompt',
       'package:file_selector/',

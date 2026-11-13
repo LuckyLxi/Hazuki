@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
 
 /// 显示设置页的分区标题，可在标题右侧附带图标（如主题扩散动画起点）。

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'hazuki_frosted_menu_core.dart';
 import 'source_plugin_menu.dart';

@@ -2,12 +2,13 @@ import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/services/source/gateways/source_image_gateways.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -40,7 +41,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: Builder(

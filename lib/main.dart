@@ -6,8 +6,7 @@ import 'package:hazuki/services/software_update/software_update_download_service
 import 'dart:async';
 
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'app/app_settings_store.dart';
 import 'app/app_startup_coordinator.dart';
@@ -334,12 +333,7 @@ class _HazukiAppState extends State<HazukiApp>
               debugShowCheckedModeBanner: false,
               onGenerateTitle: (context) => l10n(context).appTitle,
               locale: _locale,
-              localizationsDelegates: const [
-                AppLocalizations.delegate,
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
+              localizationsDelegates: hazukiLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               navigatorObservers: [
                 hazukiPromptNavigatorObserver,
@@ -444,43 +438,48 @@ class _HazukiAppState extends State<HazukiApp>
                     ),
                   ),
                 );
-                return TooltipVisibility(
-                  visible: false,
-                  child: SourceImageGatewayScope(
-                    gateway: sl<SourceImageGateway>(),
-                    sourceListenable: sl<SourceRuntimeGateway>(),
-                    child: SourcePresentationScope(
-                      sourceUiService: sl<SourceUiService>(),
-                      registry: sl<SourceRuntimeRegistry>(),
-                      sourcePlugins: sl<SourcePluginGateway>(),
-                      child: WindowsComicDetailPresentationScope(
-                        panelBuilder:
-                            (
-                              comic,
-                              heroTag, {
-                              required shouldAnimatePanelReveal,
-                              required isRestoringPreviousDetail,
-                              required initialTabIndex,
-                              required showHomeAction,
-                              required onBackRequested,
-                              required onHomeRequested,
-                            }) => _homeFeatureEntrypoints.buildComicDetailPage(
-                              comic,
-                              heroTag,
-                              isDesktopPanel: true,
-                              // Restoring a previous detail rebuilds its widget
-                              // tree, but it must not replay loading-to-content
-                              // animations. New and replacement details still
-                              // keep their normal reveal independently of the
-                              // panel navigation transition.
-                              shouldAnimateInitialRevealOverride:
-                                  isRestoringPreviousDetail ? false : null,
-                              initialTabIndex: initialTabIndex,
-                              showHomeAction: showHomeAction,
-                              onCloseRequested: onBackRequested,
-                              onHomeRequested: onHomeRequested,
-                            ),
-                        child: app,
+                // 部分三方依赖仍基于 flutter/material，桥接把主题与本地化映射给旧组件；
+                // 待依赖迁移到 material_ui 后移除。
+                // ignore: deprecated_member_use
+                return MaterialUiCompatibilityBridge(
+                  child: TooltipVisibility(
+                    visible: false,
+                    child: SourceImageGatewayScope(
+                      gateway: sl<SourceImageGateway>(),
+                      sourceListenable: sl<SourceRuntimeGateway>(),
+                      child: SourcePresentationScope(
+                        sourceUiService: sl<SourceUiService>(),
+                        registry: sl<SourceRuntimeRegistry>(),
+                        sourcePlugins: sl<SourcePluginGateway>(),
+                        child: WindowsComicDetailPresentationScope(
+                          panelBuilder:
+                              (
+                                comic,
+                                heroTag, {
+                                required shouldAnimatePanelReveal,
+                                required isRestoringPreviousDetail,
+                                required initialTabIndex,
+                                required showHomeAction,
+                                required onBackRequested,
+                                required onHomeRequested,
+                              }) => _homeFeatureEntrypoints.buildComicDetailPage(
+                                comic,
+                                heroTag,
+                                isDesktopPanel: true,
+                                // Restoring a previous detail rebuilds its widget
+                                // tree, but it must not replay loading-to-content
+                                // animations. New and replacement details still
+                                // keep their normal reveal independently of the
+                                // panel navigation transition.
+                                shouldAnimateInitialRevealOverride:
+                                    isRestoringPreviousDetail ? false : null,
+                                initialTabIndex: initialTabIndex,
+                                showHomeAction: showHomeAction,
+                                onCloseRequested: onBackRequested,
+                                onHomeRequested: onHomeRequested,
+                              ),
+                          child: app,
+                        ),
                       ),
                     ),
                   ),

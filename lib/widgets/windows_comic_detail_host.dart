@@ -2,7 +2,7 @@ import 'windows_comic_detail_transition.dart';
 import 'windows_comic_detail_presentation_scope.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../shared/windows/windows_comic_detail.dart';
 

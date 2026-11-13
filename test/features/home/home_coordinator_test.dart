@@ -1,10 +1,11 @@
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/home/state/home_coordinator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
@@ -103,7 +104,7 @@ void main() {
         late BuildContext context;
         await tester.pumpWidget(
           MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Builder(
               builder: (value) {
@@ -188,7 +189,7 @@ void main() {
       addTearDown(coordinator.dispose);
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _RuntimeScope(
             notifier: runtime,
@@ -248,7 +249,7 @@ void main() {
       late BuildContext context;
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (value) {

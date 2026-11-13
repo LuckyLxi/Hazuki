@@ -3,13 +3,14 @@ import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comments/view/comments_page.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_panels.dart';
 import 'package:hazuki/features/reader/view/reader_comments_sheet.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -73,7 +74,7 @@ void main() {
         child: withTestSourcePresentation(
           MaterialApp(
             locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: CommentsSortScope(
               binding: binding,
@@ -183,7 +184,7 @@ void main() {
         child: withTestSourcePresentation(
           MaterialApp(
             locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Builder(
               builder: (context) => Scaffold(
@@ -270,7 +271,7 @@ void main() {
         child: withTestSourcePresentation(
           MaterialApp(
             locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             theme:
                 theme ??

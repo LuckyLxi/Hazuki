@@ -1,7 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';

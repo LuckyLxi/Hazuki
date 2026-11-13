@@ -4,13 +4,14 @@ import 'dart:io';
 
 import 'package:hazuki/shared/reading/reader_entry_position.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -179,7 +180,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) => withTestSourcePresentation(
             HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
@@ -285,7 +286,7 @@ void main() {
             await tester.pumpWidget(
               MaterialApp(
                 locale: const Locale('en'),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                localizationsDelegates: hazukiLocalizationsDelegates,
                 supportedLocales: AppLocalizations.supportedLocales,
                 builder: (context, child) => withTestSourcePresentation(
                   HazukiWindowsTitleBarScope(

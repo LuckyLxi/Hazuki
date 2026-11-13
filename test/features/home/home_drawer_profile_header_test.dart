@@ -3,13 +3,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/home/support/home_sidebar_models.dart';
 import 'package:hazuki/features/home/view/home_drawer_content.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/gateways/source_image_gateways.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -35,7 +36,7 @@ Widget _wrap(_Images images, HomeSidebarProfileState profile) =>
       gateway: images,
       child: MaterialApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: SizedBox(
@@ -50,8 +51,14 @@ Widget _wrap(_Images images, HomeSidebarProfileState profile) =>
       ),
     );
 
-SnapshotController _snapshot(WidgetTester tester) =>
-    tester.widget<SnapshotWidget>(find.byType(SnapshotWidget)).controller;
+SnapshotController _snapshot(WidgetTester tester) => tester
+    .widget<SnapshotWidget>(
+      find.descendant(
+        of: find.byType(HomeDrawerContent),
+        matching: find.byType(SnapshotWidget),
+      ),
+    )
+    .controller;
 
 void _expectRevealing(WidgetTester tester) {
   expect(_snapshot(tester).allowSnapshotting, isFalse);

@@ -209,6 +209,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.0.0"
+  cupertino_ui:
+    dependency: "direct main"
+    description:
+      name: cupertino_ui
+      sha256: "369e39a1c5c030a6212589c3da1809920b1c2cfade7b02aade7695bfa4b88c3a"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.1.6"
   dart_style:
     dependency: transitive
     description:
@@ -672,6 +680,14 @@ packages:
       relative: true
     source: path
     version: "1.13.0"
+  listen:
+    dependency: transitive
+    description:
+      name: listen
+      sha256: "47501a08016a43fcad79252439d723f50f14f88fa7bfd8a177e0a417e5c9e1f2"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.0.1"
   loading_indicator_m3e:
     dependency: "direct main"
     description:
@@ -720,6 +736,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.0.0"
+  material_ui:
+    dependency: "direct main"
+    description:
+      name: material_ui
+      sha256: "474c135fd46b56ff1d35ca982155e8863d28fbc6464d1192acf4ee53a738680e"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.11.0"
   meta:
     dependency: transitive
     description:
@@ -1164,10 +1188,10 @@ packages:
     dependency: transitive
     description:
       name: test_api
-      sha256: "2a122cbe059f8b610d3a5415f42e255b6c17b1f21eee1d960f31080237fb4f11"
+      sha256: "0a10344e901e5b2e63819567951cb6a06673ed6b84f40462188ff5a0c41f371f"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "0.7.12"
+    version: "0.7.14"
   typed_data:
     dependency: transitive
     description:

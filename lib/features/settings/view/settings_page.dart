@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:hazuki/l10n/app_localizations.dart';

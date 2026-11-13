@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/favorite/view/favorite_comic_tile.dart';
 import 'package:hazuki/features/favorite/view/favorite_page_content.dart';
 import 'package:hazuki/features/favorite/view/favorite_view_support.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
@@ -43,7 +44,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: const Locale('zh'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: SingleChildScrollView(

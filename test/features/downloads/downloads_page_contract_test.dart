@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/view/downloads_ongoing_tab.dart';
 import 'package:hazuki/features/downloads/view/downloads_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/download_groups/download_groups_repository.dart';
 import 'package:hazuki/services/manga_download/manga_download_library.dart';
 import 'package:mocktail/mocktail.dart';
@@ -42,7 +43,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: DownloadsPage(
           downloadService: downloads,

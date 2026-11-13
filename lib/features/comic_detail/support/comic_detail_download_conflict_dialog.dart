@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/downloads/download_conflict_dialog.dart';
 import 'package:hazuki/shared/downloads/chapter_download_flow.dart';

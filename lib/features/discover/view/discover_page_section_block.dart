@@ -1,6 +1,6 @@
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/shared/source_presentation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';

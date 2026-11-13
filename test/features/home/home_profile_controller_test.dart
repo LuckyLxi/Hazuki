@@ -1,10 +1,11 @@
 import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/interaction/source_ui_service.dart';
@@ -45,7 +46,7 @@ void main() {
   Future<void> mount(WidgetTester tester) => tester.pumpWidget(
     MaterialApp(
       locale: const Locale('zh'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: hazukiLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Builder(
         builder: (value) {

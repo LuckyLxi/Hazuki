@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/shared/liquid_glass_support.dart';

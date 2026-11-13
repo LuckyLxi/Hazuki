@@ -1,7 +1,7 @@
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/widgets/widgets.dart';

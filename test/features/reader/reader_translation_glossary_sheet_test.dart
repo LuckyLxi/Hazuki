@@ -1,11 +1,12 @@
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/reader/support/reader_translation_controller.dart';
 import 'package:hazuki/features/reader/view/reader_translation_actions_sheet.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/translation/detection/translation_detector_model_store.dart';
 import 'package:hazuki/services/translation/manga_translation_service.dart';
 import 'package:hazuki/services/translation/manga_translation_settings_store.dart';
@@ -91,7 +92,7 @@ void main() {
   Future<void> pump(WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: const Locale('en'),
         home: Scaffold(
