@@ -12,6 +12,8 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - third_party/pub_overrides/**
+    # gen-l10n 生成文件仍引用 flutter_localizations 的旧代理，应用已改用 lib/l10n/l10n.dart 中的代理集合
+    - lib/l10n/app_localizations*.dart
     - build/**
     - android/**
     - ios/**
