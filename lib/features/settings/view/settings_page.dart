@@ -1,19 +1,23 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
-import 'package:hazuki/shared/window/window_title_bar_control.dart';
+import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'about_page.dart';
+import 'advanced/advanced_settings_page.dart';
 import 'appearance/appearance_settings_page.dart';
 import 'cache_settings_page.dart';
+import 'debug/lab_settings_page.dart';
+import 'network/cloud_sync_page.dart';
 import 'other/other_settings_page.dart';
 import 'reading_settings_page.dart';
 import 'plugins/source_plugins_page.dart';
 import 'security/privacy_settings_page.dart';
 import 'settings_group.dart';
+import 'translation/manga_translation_settings_page.dart';
 import '../support/settings_core_dependencies.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -23,9 +27,6 @@ class SettingsPage extends StatefulWidget {
     required this.onAppearanceChanged,
     required this.locale,
     required this.onLocaleChanged,
-    required this.cloudSyncPageBuilder,
-    required this.labSettingsPageBuilder,
-    required this.advancedSettingsPageBuilder,
     required this.coreDependencies,
   });
 
@@ -33,9 +34,6 @@ class SettingsPage extends StatefulWidget {
   final AppearanceSettingsApplyCallback onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
-  final WidgetBuilder cloudSyncPageBuilder;
-  final WidgetBuilder labSettingsPageBuilder;
-  final WidgetBuilder advancedSettingsPageBuilder;
   final SettingsCoreDependencies coreDependencies;
 
   @override
@@ -86,9 +84,14 @@ class _SettingsPageState extends State<SettingsPage> {
     await widget.onLocaleChanged(locale);
   }
 
+  void _open(WidgetBuilder builder) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: builder));
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
+    final dependencies = widget.coreDependencies;
     return WindowsComicDetailHost(
       child: Scaffold(
         appBar: hazukiFrostedAppBar(
@@ -99,161 +102,237 @@ class _SettingsPageState extends State<SettingsPage> {
           maxWidth: 960,
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: ListView(
+            padding: const EdgeInsets.only(top: 4, bottom: 24),
             children: [
-              ListTile(
-                leading: Icon(Icons.cached_outlined),
-                title: Text(strings.settingsCacheTitle),
-                subtitle: Text(strings.settingsCacheSubtitle),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => CacheSettingsPage(
-                        sourceService: widget.coreDependencies.sourceSettings,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.palette_outlined),
-                title: Text(strings.settingsDisplayTitle),
-                subtitle: Text(strings.settingsDisplaySubtitle),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AppearanceSettingsPage(
+              _SettingsSection(
+                title: strings.settingsSectionAppearanceReading,
+                entries: [
+                  _SettingsEntryTile(
+                    icon: Icons.palette_outlined,
+                    title: strings.settingsDisplayTitle,
+                    subtitle: strings.settingsDisplaySubtitle,
+                    onTap: () => _open(
+                      (_) => AppearanceSettingsPage(
                         appearanceSettings: _appearanceSettings,
                         onAppearanceChanged: _handleAppearanceChanged,
                         locale: _locale,
                         onLocaleChanged: _handleLocaleChanged,
-                        debugGateway: widget.coreDependencies.sourceDebug,
+                        debugGateway: dependencies.sourceDebug,
                       ),
                     ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.auto_stories_outlined),
-                title: Text(strings.settingsReadingTitle),
-                subtitle: Text(strings.settingsReadingSubtitle),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ReadingSettingsPage(
-                        sourceService: widget.coreDependencies.sourceSettings,
-                        sourcePlugins: widget.coreDependencies.sourcePlugins,
+                  ),
+                  _SettingsEntryTile(
+                    icon: Icons.auto_stories_outlined,
+                    title: strings.settingsReadingTitle,
+                    subtitle: strings.settingsReadingSubtitle,
+                    onTap: () => _open(
+                      (_) => ReadingSettingsPage(
+                        sourceService: dependencies.sourceSettings,
+                        sourcePlugins: dependencies.sourcePlugins,
                       ),
                     ),
-                  );
-                },
-              ),
-              if (!Platform.isWindows)
-                ListTile(
-                  leading: Icon(Icons.security_outlined),
-                  title: Text(strings.settingsPrivacyTitle),
-                  subtitle: Text(strings.settingsPrivacySubtitle),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => PrivacySettingsPage(
-                          passwordLockService:
-                              widget.coreDependencies.passwordLock,
+                  ),
+                  if (dependencies.translation case final translation?)
+                    _SettingsEntryTile(
+                      icon: Icons.translate_rounded,
+                      title: strings.translationSettingsTitle,
+                      subtitle: strings.translationSettingsSubtitle,
+                      onTap: () => _open(
+                        (_) => MangaTranslationSettingsPage(
+                          dependencies: translation,
                         ),
                       ),
-                    );
-                  },
-                ),
-              if (widget.coreDependencies.sourcePlugins case final plugins?)
-                ListTile(
-                  leading: const Icon(Icons.extension_outlined),
-                  title: Text(strings.settingsPluginsTitle),
-                  subtitle: Text(strings.settingsPluginsSubtitle),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => SourcePluginsPage(manager: plugins),
-                      ),
-                    );
-                  },
-                ),
-              ListTile(
-                leading: Icon(Icons.cloud_sync_outlined),
-                title: Text(strings.settingsCloudSyncTitle),
-                subtitle: Text(strings.settingsCloudSyncSubtitle),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: widget.cloudSyncPageBuilder,
                     ),
-                  );
-                },
+                ],
               ),
-              ListTile(
-                leading: Icon(Icons.widgets_outlined),
-                title: Text(strings.settingsOtherTitle),
-                subtitle: Text(strings.settingsOtherSubtitle),
-                onTap: () {
-                  final titleBarController = HazukiWindowsTitleBarScope.of(
-                    context,
-                  );
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => OtherSettingsPage(
-                        dependencies: widget.coreDependencies,
-                        initialUseSystemTitleBar:
-                            titleBarController.useSystemTitleBar,
-                        onUseSystemTitleBarChanged:
-                            titleBarController.updateUseSystemTitleBar,
+              _SettingsSection(
+                title: strings.settingsSectionContentData,
+                entries: [
+                  _SettingsEntryTile(
+                    icon: Icons.extension_outlined,
+                    title: strings.settingsPluginsTitle,
+                    subtitle: strings.settingsPluginsSubtitle,
+                    onTap: () => _open(
+                      (_) => SourcePluginsPage(
+                        manager: dependencies.sourcePlugins,
                       ),
                     ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.science_outlined),
-                title: Text(strings.settingsLabTitle),
-                subtitle: Text(strings.settingsLabSubtitle),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: widget.labSettingsPageBuilder,
+                  ),
+                  _SettingsEntryTile(
+                    icon: Icons.cloud_sync_outlined,
+                    title: strings.settingsCloudSyncTitle,
+                    subtitle: strings.settingsCloudSyncSubtitle,
+                    onTap: () => _open(
+                      (_) => CloudSyncPage(service: dependencies.cloudSync),
                     ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.settings_applications_outlined),
-                title: Text(strings.settingsAdvancedTitle),
-                subtitle: Text(strings.settingsAdvancedSubtitle),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: widget.advancedSettingsPageBuilder,
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.info_outline),
-                title: Text(strings.settingsAboutTitle),
-                subtitle: const Text('Hazuki'),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AboutPage(
-                        softwareUpdateDialog:
-                            widget.coreDependencies.softwareUpdateDialog,
-                        softwareUpdateService:
-                            widget.coreDependencies.softwareUpdate,
+                  ),
+                  _SettingsEntryTile(
+                    icon: Icons.cached_outlined,
+                    title: strings.settingsCacheTitle,
+                    subtitle: strings.settingsCacheSubtitle,
+                    onTap: () => _open(
+                      (_) => CacheSettingsPage(
+                        sourceService: dependencies.sourceSettings,
                       ),
                     ),
-                  );
-                },
+                  ),
+                ],
+              ),
+              _SettingsSection(
+                title: strings.settingsSectionSystem,
+                entries: [
+                  if (!Platform.isWindows)
+                    _SettingsEntryTile(
+                      icon: Icons.security_outlined,
+                      title: strings.settingsPrivacyTitle,
+                      subtitle: strings.settingsPrivacySubtitle,
+                      onTap: () => _open(
+                        (_) => PrivacySettingsPage(
+                          passwordLockService: dependencies.passwordLock,
+                        ),
+                      ),
+                    ),
+                  _SettingsEntryTile(
+                    icon: Icons.widgets_outlined,
+                    title: strings.settingsOtherTitle,
+                    subtitle: strings.settingsOtherSubtitle,
+                    onTap: () {
+                      final titleBarController = HazukiWindowsTitleBarScope.of(
+                        context,
+                      );
+                      _open(
+                        (_) => OtherSettingsPage(
+                          dependencies: dependencies,
+                          initialUseSystemTitleBar:
+                              titleBarController.useSystemTitleBar,
+                          onUseSystemTitleBarChanged:
+                              titleBarController.updateUseSystemTitleBar,
+                        ),
+                      );
+                    },
+                  ),
+                  _SettingsEntryTile(
+                    icon: Icons.science_outlined,
+                    title: strings.settingsLabTitle,
+                    subtitle: strings.settingsLabSubtitle,
+                    onTap: () => _open(
+                      (_) => LabSettingsPage(
+                        sourcePlugins: dependencies.sourcePlugins,
+                      ),
+                    ),
+                  ),
+                  _SettingsEntryTile(
+                    icon: Icons.settings_applications_outlined,
+                    title: strings.settingsAdvancedTitle,
+                    subtitle: strings.settingsAdvancedSubtitle,
+                    onTap: () => _open(
+                      (_) => AdvancedSettingsPage(
+                        sourceService: dependencies.sourceScript,
+                        debugGateway: dependencies.sourceDebug,
+                        sourcePlugins: dependencies.sourcePlugins,
+                        softwareUpdateService: dependencies.softwareUpdate,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              _SettingsSection(
+                title: strings.settingsAboutTitle,
+                entries: [
+                  _SettingsEntryTile(
+                    icon: Icons.info_outline,
+                    title: strings.settingsAboutTitle,
+                    subtitle: 'Hazuki',
+                    onTap: () => _open(
+                      (_) => AboutPage(
+                        softwareUpdateDialog: dependencies.softwareUpdateDialog,
+                        softwareUpdateService: dependencies.softwareUpdate,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 设置主页的一个分区：主题色标题 + 圆角卡片，条目之间插入缩进分隔线。
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({required this.title, required this.entries});
+
+  final String title;
+  final List<Widget> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final divider = Divider(
+      height: 1,
+      indent: 72,
+      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 16, 28, 0),
+          child: Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        SettingsGroup(
+          children: [
+            for (var i = 0; i < entries.length; i++) ...[
+              if (i > 0) divider,
+              entries[i],
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 设置主页入口条目：圆形色块图标 + 标题副标题 + 右侧箭头。
+class _SettingsEntryTile extends StatelessWidget {
+  const _SettingsEntryTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListTile(
+      minTileHeight: 72,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: colorScheme.secondaryContainer,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 22, color: colorScheme.onSecondaryContainer),
+      ),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
     );
   }
 }

@@ -1,4 +1,4 @@
-import '../../shared/preferences/hazuki_preference_keys.dart';
+import '../preferences/hazuki_preference_keys.dart';
 
 const commentFilterSyncPreferenceKeys = <String>{
   hazukiCommentFilterKeywordsKey,

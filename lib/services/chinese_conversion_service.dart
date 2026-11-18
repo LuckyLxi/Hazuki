@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 
 enum ChineseConversionMode {
   off,
@@ -12,8 +12,6 @@ enum ChineseConversionMode {
   static ChineseConversionMode decode(String? value) =>
       values.firstWhere((mode) => mode.name == value, orElse: () => off);
 }
-
-final hazukiChineseConversion = ChineseConversionService();
 
 /// Converts display text only. Source models and persisted content stay intact.
 class ChineseConversionService extends ChangeNotifier {

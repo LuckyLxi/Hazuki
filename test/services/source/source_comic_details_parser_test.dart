@@ -88,22 +88,33 @@ void main() {
             },
             {
               'text': {'zh': '12点赞', 'en': '12 likes'},
-              'action': 'like',
+              'icon': 'like',
+              'action': 'plugin',
+              'id': 'like',
             },
             {'text': 'Weekly', 'action': 'none'},
+            // 旧版插件的 like 动作按普通文字兼容。
+            {'text': 'Legacy', 'action': 'like'},
+            {'text': 'Site', 'action': 'link', 'url': 'https://example.com'},
+            {'text': 'Copy me', 'action': 'copy', 'value': 'raw'},
           ],
         },
         fallbackComicId: 'id',
         sourceKey: 'custom',
       );
-      expect(details.headerStats, hasLength(3));
+      expect(details.headerStats, hasLength(6));
       expect(details.headerStats.first.text, 'custom:Rating 9.8');
       expect(details.headerStats.first.action, ComicHeaderStatAction.none);
       expect(details.headerStats[1].text, {'zh': '12点赞', 'en': '12 likes'});
-      expect(details.headerStats[1].action, ComicHeaderStatAction.like);
-      expect(details.headerStats.last.text, 'custom:Weekly');
+      expect(details.headerStats[1].action, ComicHeaderStatAction.plugin);
+      expect(details.headerStats[1].actionId, 'like');
+      expect(details.headerStats[1].icon, 'like');
+      expect(details.headerStats[2].text, 'custom:Weekly');
+      expect(details.headerStats[3].action, ComicHeaderStatAction.none);
+      expect(details.headerStats[4].url, 'https://example.com');
+      expect(details.headerStats[5].value, 'raw');
       expect(
-        details.copyWith(isLiked: true).headerStats,
+        details.copyWith(isFavorite: true).headerStats,
         same(details.headerStats),
       );
       expect(() => details.headerStats.clear(), throwsUnsupportedError);
@@ -146,6 +157,15 @@ void main() {
       [
         {'text': 'Short', 'action': 'unknown'},
       ],
+      [
+        {'text': 'No id', 'action': 'plugin'},
+      ],
+      [
+        {'text': 'Bad url', 'action': 'link', 'url': 'javascript:alert(1)'},
+      ],
+      [
+        {'text': 'Bad icon', 'icon': 'Not An Icon'},
+      ],
     ]) {
       expect(
         () => parser.parse(
@@ -153,6 +173,63 @@ void main() {
           fallbackComicId: 'id',
           sourceKey: 'custom',
         ),
+        throwsFormatException,
+      );
+    }
+  });
+
+  test('header badges keep at most three and validate tones', () {
+    final details = parser.parse(
+      map: {
+        'headerBadges': [
+          {'text': '连载中'},
+          {'text': ' '},
+          {'text': 'Paid', 'tone': 'warning'},
+          {'text': 'VIP', 'tone': 'primary'},
+          {'text': 'Dropped', 'tone': 'error'},
+        ],
+      },
+      fallbackComicId: 'id',
+      sourceKey: 'custom',
+    );
+    expect(details.headerBadges.map((b) => b.text), [
+      'custom:连载中',
+      'custom:Paid',
+      'custom:VIP',
+    ]);
+    expect(details.headerBadges[1].tone, ComicHeaderBadgeTone.warning);
+    expect(
+      () => parser.parse(
+        map: {
+          'headerBadges': [
+            {'text': 'x', 'tone': 'loud'},
+          ],
+        },
+        fallbackComicId: 'id',
+        sourceKey: 'custom',
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('header action results distinguish missing and empty fields', () {
+    final empty = parser.parseHeaderActionResult(null, sourceKey: 'custom');
+    expect(empty.headerStats, isNull);
+    expect(empty.reload, isFalse);
+    final result = parser.parseHeaderActionResult({
+      'headerStats': <Object>[],
+      'reload': true,
+    }, sourceKey: 'custom');
+    expect(result.headerStats, isEmpty);
+    expect(result.headerBadges, isNull);
+    expect(result.reload, isTrue);
+    for (final invalid in [
+      'bad',
+      {'reload': 'yes'},
+      {'headerStats': 'bad'},
+    ]) {
+      expect(
+        () => parser.parseHeaderActionResult(invalid, sourceKey: 'custom'),
         throwsFormatException,
       );
     }
@@ -202,7 +279,7 @@ void main() {
       details.copyWith(isFavorite: true).infoFields,
       same(details.infoFields),
     );
-    expect(details.copyWith(isLiked: true).viewsCount, '42');
+    expect(details.copyWith(isFavorite: false).viewsCount, '42');
     expect(() => details.infoFields.clear(), throwsUnsupportedError);
     expect(
       () => details.infoFields.first.values.clear(),
@@ -287,7 +364,6 @@ void main() {
         'maxPage': 18,
         'subId': 'sub-id',
         'isFavorite': 1,
-        'isLiked': 'true',
         '__chapterEntries': [
           [' ep-1 ', ' Chapter 1 '],
           ['', 'Ignored'],
@@ -318,7 +394,6 @@ void main() {
     expect(details.pageCount, '18');
     expect(details.likesCount, '12');
     expect(details.isFavorite, isTrue);
-    expect(details.isLiked, isTrue);
     expect(details.chapters, {'ep-1': 'Chapter 1'});
     expect(details.updateTime, '2026-08-17');
     expect(details.tags, {

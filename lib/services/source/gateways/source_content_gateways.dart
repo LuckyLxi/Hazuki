@@ -1,27 +1,32 @@
 import '../plugins/source_search_capabilities.dart';
 import '../plugins/source_sort_options.dart';
+import '../plugins/source_detail_tabs.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../models/source_contract_models.dart';
+import '../models/source_task.dart';
 
 abstract interface class SourceSearchGateway implements Listenable {
   String? get activeSourceKey;
   bool get supportsDirectComicId;
   DirectComicIdRules? directComicIdRulesForSource(String sourceKey);
-  SourceRuntimeState get sourceRuntimeState;
+  SourceRuntimeState get runtimeState;
   List<SourceCatalogEntry> get allowedSources;
 
-  void logRuntimeRetryRequested(String source);
+  void requestRuntimeRetry(String trigger);
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
     String order = '',
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
 }
 
@@ -30,18 +35,23 @@ abstract interface class SourceDiscoverGateway implements Listenable {
   String? get sourceRevision;
   String? get activeSourceKey;
   bool get isLogged;
-  SourceRuntimeState get sourceRuntimeState;
+  SourceRuntimeState get runtimeState;
 
-  void logRuntimeRetryRequested(String source);
-  Future<List<ExploreSection>> loadExploreSections({bool forceRefresh = false});
+  void requestRuntimeRetry(String trigger);
+  Future<List<ExploreSection>> loadExploreSections({
+    bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  });
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
     String order = '',
     List<String>? orders,
+    SourceTaskOrigin? taskOrigin,
   });
 }
 
@@ -50,11 +60,15 @@ abstract interface class SourceCategoryGateway {
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
-  Future<List<CategoryRankingOption>> loadCategoryRankingOptions();
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
+    SourceTaskOrigin? taskOrigin,
+  });
   Future<CategoryComicsResult> loadCategoryRankingComics({
     required String rankingOption,
     required int page,
+    SourceTaskOrigin? taskOrigin,
   });
   void addApplicationLog({
     required String level,
@@ -82,6 +96,7 @@ abstract interface class SourceCommentsGateway {
     int pageSize = 16,
     String? replyTo,
     String order = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<void> sendComment({
     required String comicId,
@@ -90,6 +105,7 @@ abstract interface class SourceCommentsGateway {
     String sourceKey = '',
     required String content,
     String? replyTo,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<void> likeComment({
     required String comicId,
@@ -97,6 +113,7 @@ abstract interface class SourceCommentsGateway {
     String sourceKey = '',
     required String commentId,
     required bool isLike,
+    SourceTaskOrigin? taskOrigin,
   });
   void addApplicationLog({
     required String level,
@@ -106,23 +123,51 @@ abstract interface class SourceCommentsGateway {
   });
 }
 
-abstract interface class SourceComicDetailGateway {
+abstract interface class SourceFavoriteFoldersGateway {
   String? get activeSourceKey;
   bool isLoggedForSource(String sourceKey);
   bool supportFavoriteFolderLoadForSource(String sourceKey);
   bool supportFavoriteFolderAddForSource(String sourceKey);
   bool supportFavoriteFolderDeleteForSource(String sourceKey);
   bool supportFavoriteToggleForSource(String sourceKey);
-  bool supportComicLikeForSource(String sourceKey);
   bool favoriteSingleFolderForSingleComicForSource(String sourceKey);
+  Future<FavoriteFoldersResult> loadFavoriteFolders({
+    String? comicId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<void> addFavoriteFolder(
+    String name, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<void> deleteFavoriteFolder(
+    String folderId, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<void> toggleFavorite({
+    required String comicId,
+    required bool isAdding,
+    String folderId = '0',
+    String? favoriteId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+}
+
+abstract interface class SourceComicDetailGateway
+    implements SourceFavoriteFoldersGateway {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<Uint8List> downloadImageBytes(
     String url, {
@@ -132,11 +177,19 @@ abstract interface class SourceComicDetailGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<List<SourceDetailTabBlock>> loadDetailTab({
+    required String comicId,
+    required String tabId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<void> prefetchComicImages({
     required String comicId,
@@ -145,31 +198,21 @@ abstract interface class SourceComicDetailGateway {
     required int count,
     required int memoryCount,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
-  Future<FavoriteFoldersResult> loadFavoriteFolders({
-    String? comicId,
-    String sourceKey = '',
-  });
-  Future<void> addFavoriteFolder(String name, {String sourceKey = ''});
-  Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''});
-  Future<void> toggleFavorite({
+  Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
-    required bool isAdding,
-    String folderId = '0',
-    String? favoriteId,
+    required String actionId,
     String sourceKey = '',
-  });
-  Future<void> toggleComicLike({
-    required String comicId,
-    required bool isLike,
-    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
 }
 
-abstract interface class SourceFavoriteGateway implements Listenable {
-  String? get activeSourceKey;
+abstract interface class SourceFavoriteGateway
+    implements Listenable, SourceFavoriteFoldersGateway {
   bool get isLogged;
   bool get supportFavoriteFolderDelete;
+  bool get supportFavoriteFolderRename;
   bool get supportFavoriteFolderAdd;
   bool get supportFavoriteFolderLoad;
   bool get supportFavoriteSortOrder;
@@ -178,39 +221,35 @@ abstract interface class SourceFavoriteGateway implements Listenable {
   String get favoriteSortOrder;
   List<String> get favoriteSortOrders;
   Stream<void> get cloudFavoritesChangedStream;
-  SourceRuntimeState get sourceRuntimeState;
+  SourceRuntimeState get runtimeState;
 
-  void logRuntimeRetryRequested(String source);
+  void requestRuntimeRetry(String trigger);
   Future<void> ensureInitialized();
-  Future<FavoriteFoldersResult> loadFavoriteFolders({
-    String? comicId,
-    String sourceKey = '',
-  });
   Future<FavoriteComicsResult> loadFavoriteComics({
     required int page,
     required String folderId,
-  });
-  Future<void> addFavoriteFolder(String name, {String sourceKey = ''});
-  Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''});
-  Future<void> toggleFavorite({
-    required String comicId,
-    required bool isAdding,
-    String folderId = '0',
-    String? favoriteId,
-    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<void> setFavoriteSortOrder(String order);
+  Future<void> renameFavoriteFolder(
+    String folderId,
+    String name, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  });
 }
 
 abstract interface class SourceReaderGateway {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<PreparedChapterImageData> prepareChapterImageData(
     String imageUrl, {
@@ -219,6 +258,7 @@ abstract interface class SourceReaderGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   Future<Uint8List> downloadImageBytes(
     String url, {
@@ -228,6 +268,7 @@ abstract interface class SourceReaderGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
   bool isLocalImagePath(String value);
   String normalizeLocalImagePath(String value);
@@ -247,10 +288,41 @@ abstract interface class SourceReaderGateway {
   });
 }
 
-/// Optional reader extension; old gateway implementations remain valid.
+/// Provides a source lease for an online reader visit.
+abstract interface class SourceReaderSessionGateway {
+  SourceReaderSession acquireReaderSession(String sourceKey);
+}
+
+/// Provides a source lease for a download run.
+abstract interface class SourceDownloadSessionGateway {
+  SourceDownloadSession acquireDownloadSession(String sourceKey);
+}
+
+/// Optional progress upload capability for the reader.
 abstract interface class SourceReadingProgressGateway {
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {
     required String sourceKey,
+    SourceTaskOrigin? taskOrigin,
   });
 }
+
+/// Optional capability. No cloud position ever enters the local progress DB or
+/// the WebDAV participant. This account-scoped cache is for display only.
+abstract interface class SourceCloudReadingGateway {
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<Map<String, dynamic>?> loadCloudReadingProgress(
+    String sourceKey,
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<List<ExploreComic>> refreshCloudReadingHistory(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  });
+}
+
+abstract interface class SourceCloudReadingEvents implements Listenable {}

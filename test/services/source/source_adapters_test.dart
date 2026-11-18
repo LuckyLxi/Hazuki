@@ -1,3 +1,5 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/comic/comic_details_capability.dart';
 import '../../support/source_catalog_fixtures.dart';
 import 'dart:async';
 
@@ -5,22 +7,36 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/source/account/source_account_operations.dart';
+import 'package:hazuki/services/source/account/account_session_capability.dart';
+import 'package:hazuki/services/source/account/source_daily_check_in_capability.dart';
+import 'package:hazuki/services/source/debug/debug_favorites_capability.dart';
 import 'package:hazuki/services/source/content/source_content_operations.dart';
-import 'package:hazuki/services/source/favorites/source_favorites_operations.dart';
+import 'package:hazuki/services/source/favorites/source_favorites_capability.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_recovery_operations.dart';
+import 'package:hazuki/services/source/runtime/source_script_editing_operations.dart';
+import 'package:hazuki/services/source/runtime/source_update_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_view.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_image_adapters.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_runtime_adapters.dart';
-import 'package:hazuki/services/source/adapters/hazuki_source_sync_adapter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/test_service_locator.dart';
 
+class _ComicDetails extends Fake implements SourceComicDetailsCapability {}
+
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues(const {}));
@@ -34,10 +50,10 @@ void main() {
     expect(sl<SourceFavoriteGateway>(), isA<HazukiSourceFavoriteAdapter>());
     expect(sl<SourceReaderGateway>(), isA<HazukiSourceReaderAdapter>());
     expect(sl<SourceSettingsGateway>(), isA<HazukiSourceSettingsAdapter>());
-    expect(sl<SourceAccountGateway>(), isA<HazukiSourceAccountAdapter>());
-    expect(sl<SourceDebugGateway>(), isA<HazukiSourceDebugAdapter>());
+    expect(sl<SourceAccountGateway>(), isA<HazukiSourceRuntimeAdapter>());
+    expect(sl<SourceDebugGateway>(), isA<HazukiSourceImageAdapter>());
     expect(sl<SourceImageGateway>(), isA<HazukiSourceImageAdapter>());
-    expect(sl<SourceSyncGateway>(), isA<HazukiSourceSyncAdapter>());
+    expect(sl<SourceScriptGateway>(), isA<HazukiSourceRuntimeAdapter>());
     expect(sl<SourceRuntimeGateway>(), isA<HazukiSourceRuntimeAdapter>());
     expect(sl<SourceCommentsGateway>(), isA<HazukiSourceCommentsAdapter>());
   });
@@ -46,6 +62,7 @@ void main() {
     'gateway set shares runtime adapters and forwards view notifications',
     () {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
       );
       addTearDown(assembly.dispose);
@@ -56,11 +73,15 @@ void main() {
       assembly.testing.notifyRuntimeView();
 
       expect(notifications, 1);
-      expect(identical(gateways.runtimeGateway, gateways.selection), isTrue);
-      expect(
-        identical(gateways.runtimeGateway, gateways.switchGateway),
-        isTrue,
-      );
+      for (final gateway in <Object>[
+        gateways.accountGateway,
+        gateways.home,
+        gateways.script,
+      ]) {
+        expect(identical(gateways.runtimeGateway, gateway), isTrue);
+      }
+      expect(identical(gateways.imageGateway, gateways.debugGateway), isTrue);
+      expect(identical(gateways.imageGateway, gateways.recommendation), isTrue);
     },
   );
 
@@ -68,14 +89,15 @@ void main() {
     'sync gateway reads the active source through its runtime view',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
       );
       addTearDown(assembly.dispose);
 
-      expect(assembly.gateways.sync.activeSourceKey, 'jm');
+      expect(assembly.gateways.script.activeSourceKey, 'jm');
       await assembly.runtimeRegistry.activateSource('copy_manga');
 
-      expect(assembly.gateways.sync.activeSourceKey, 'copy_manga');
+      expect(assembly.gateways.script.activeSourceKey, 'copy_manga');
     },
   );
 
@@ -87,22 +109,27 @@ void main() {
       final content = _FakeContentOperations();
       final adapter = HazukiSourceSearchAdapter(
         runtime: runtime,
+        recovery: _FakeRecoveryOperations(),
         content: content,
+        comicDetails: _ComicDetails(),
       );
       var notifications = 0;
       void onChanged() => notifications++;
       adapter.addListener(onChanged);
 
       runtime.runtimeRegistry.notifyChanged();
+      final origin = SourceTaskOrigin.standalone();
       await adapter.searchComics(
         keyword: 'hazuki',
         page: 2,
         order: 'vd',
         sourceKey: 'picacg',
+        taskOrigin: origin,
       );
 
       expect(notifications, 1);
       expect(content.searchCalls, [('hazuki', 2, 'vd', 'picacg')]);
+      expect(content.searchOrigins.single, same(origin));
 
       adapter.removeListener(onChanged);
       runtime.runtimeRegistry.notifyChanged();
@@ -111,53 +138,78 @@ void main() {
   );
 
   test(
-    'favorite and sync adapters forward streams and runtime operations',
+    'favorite and runtime adapters forward streams and runtime operations',
     () async {
       final runtime = _FakeRuntimeView();
-      final runtimeOperations = _FakeRuntimeOperations();
-      final favorites = _FakeFavoritesOperations();
+      final initialization = _FakeInitializationOperations();
+      final scriptEditing = _FakeScriptEditingOperations();
+      final recovery = _FakeRecoveryOperations();
+      final favorites = _FakeFavoritesCapability();
+      final account = _FakeAccountCapability();
+      final changes = StreamController<void>.broadcast();
+      addTearDown(changes.close);
       final favorite = HazukiSourceFavoriteAdapter(
         runtime: runtime,
-        account: _FakeAccountOperations(),
+        recovery: recovery,
+        account: account,
         favorites: favorites,
-        runtimeOperations: runtimeOperations,
+        cloudFavoritesChangedStream: changes.stream,
+        initialization: initialization,
       );
       final received = <void>[];
       final subscription = favorite.cloudFavoritesChangedStream.listen(
         received.add,
       );
-      final sync = HazukiSourceSyncAdapter(
+      final SourceScriptGateway sync = HazukiSourceRuntimeAdapter(
         runtime: runtime,
-        runtimeOperations: runtimeOperations,
+        initialization: initialization,
+        scriptEditing: scriptEditing,
+        updates: _FakeUpdateOperations(),
+        recovery: recovery,
+        account: account,
+        dailyCheckIn: _FakeDailyCheckIn(),
+        favoritesDebug: _FakeFavoritesDebug(),
       );
 
-      favorites.emitChanged();
+      changes.add(null);
       await Future<void>.delayed(Duration.zero);
       await sync.writeLocalActiveSource('edited source');
       await sync.reloadFromLocalSourceFiles();
+      expect(favorite.supportFavoriteFolderRename, isTrue);
+      await favorite.renameFavoriteFolder(
+        'shelf',
+        'Renamed',
+        sourceKey: 'picacg',
+      );
 
       expect(received, hasLength(1));
-      expect(runtimeOperations.writtenSource, 'edited source');
-      expect(runtimeOperations.reloadCalls, 1);
+      expect(scriptEditing.writtenSource, 'edited source');
+      expect(recovery.reloadCalls, 1);
+      expect(favorites.renameCalls, [('shelf', 'Renamed', 'picacg')]);
       await subscription.cancel();
-      await favorites.dispose();
     },
   );
 
-  test(
-    'bootstrap adapter forwards initialization callback and source key',
-    () async {
-      final operations = _FakeRuntimeOperations();
-      final adapter = HazukiSourceBootstrapAdapter(operations);
-      void onProgress(int _, int _) {}
+  test('runtime adapter forwards bootstrap callback and source key', () async {
+    final operations = _FakeInitializationOperations();
+    final SourceRuntimeGateway adapter = HazukiSourceRuntimeAdapter(
+      runtime: _FakeRuntimeView(),
+      initialization: operations,
+      scriptEditing: _FakeScriptEditingOperations(),
+      updates: _FakeUpdateOperations(),
+      recovery: _FakeRecoveryOperations(),
+      account: _FakeAccountCapability(),
+      dailyCheckIn: _FakeDailyCheckIn(),
+      favoritesDebug: _FakeFavoritesDebug(),
+    );
+    void onProgress(int _, int _) {}
 
-      await adapter.init(onProgress: onProgress);
-      await adapter.ensureInitialized(sourceKey: 'copy_manga');
+    await adapter.init(onProgress: onProgress);
+    await adapter.ensureInitialized(sourceKey: 'copy_manga');
 
-      expect(operations.initProgress, same(onProgress));
-      expect(operations.ensureSourceKeys, ['copy_manga']);
-    },
-  );
+    expect(operations.initProgress, same(onProgress));
+    expect(operations.ensureSourceKeys, ['copy_manga']);
+  });
 }
 
 class _FakeRuntimeView extends ChangeNotifier implements SourceRuntimeView {
@@ -192,6 +244,7 @@ class _FakeRuntimeRegistry extends ChangeNotifier
 
 class _FakeContentOperations implements SourceContentOperations {
   final searchCalls = <(String, int, String, String)>[];
+  final searchOrigins = <SourceTaskOrigin?>[];
 
   @override
   Future<SearchComicsResult> searchComics({
@@ -199,8 +252,10 @@ class _FakeContentOperations implements SourceContentOperations {
     required int page,
     String order = 'mr',
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     searchCalls.add((keyword, page, order, sourceKey));
+    searchOrigins.add(taskOrigin);
     return const SearchComicsResult(comics: [], maxPage: 0);
   }
 
@@ -208,20 +263,27 @@ class _FakeContentOperations implements SourceContentOperations {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _FakeFavoritesOperations implements SourceFavoritesOperations {
-  final _changes = StreamController<void>.broadcast();
-
-  void emitChanged() => _changes.add(null);
-  Future<void> dispose() => _changes.close();
+class _FakeFavoritesCapability implements SourceFavoritesCapability {
+  final renameCalls = <(String, String, String)>[];
 
   @override
-  Stream<void> get changedStream => _changes.stream;
+  bool get supportFavoriteFolderRename => true;
+
+  @override
+  Future<void> renameFavoriteFolder(
+    String folderId,
+    String name, {
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) async {
+    renameCalls.add((folderId, name, sourceKey));
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _FakeAccountOperations implements SourceAccountOperations {
+class _FakeAccountCapability implements SourceAccountSessionCapability {
   @override
   bool get isLogged => false;
 
@@ -229,11 +291,15 @@ class _FakeAccountOperations implements SourceAccountOperations {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _FakeRuntimeOperations implements SourceRuntimeOperations {
+class _FakeDailyCheckIn extends Fake implements SourceDailyCheckInCapability {}
+
+class _FakeFavoritesDebug extends Fake
+    implements SourceFavoritesDebugCapability {}
+
+class _FakeInitializationOperations
+    implements SourceRuntimeInitializationOperations {
   void Function(int received, int total)? initProgress;
   final ensureSourceKeys = <String?>[];
-  String? writtenSource;
-  var reloadCalls = 0;
 
   @override
   Future<void> init({
@@ -249,15 +315,34 @@ class _FakeRuntimeOperations implements SourceRuntimeOperations {
   }
 
   @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeScriptEditingOperations implements SourceScriptEditingOperations {
+  String? writtenSource;
+
+  @override
   Future<void> writeLocalActiveSource(String content) async {
     writtenSource = content;
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeRecoveryOperations implements SourceRuntimeRecoveryOperations {
+  var reloadCalls = 0;
 
   @override
   Future<void> reloadFromLocalSourceFiles() async {
     reloadCalls++;
   }
 
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeUpdateOperations implements SourceUpdateOperations {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

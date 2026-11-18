@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/source_task_owner.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
@@ -5,12 +6,18 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
 import 'discover_page_state.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class DiscoverPageController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   DiscoverPageController({
+    required this.sourceUiService,
+    required SourceTaskControlGateway taskControl,
     required SourceDiscoverGateway sourceService,
     this.onSourceSwitched,
-  }) : _sourceService = sourceService {
+  }) : _readTasks = SourceTaskOwner(taskControl),
+       _sourceService = sourceService {
     _lastActiveSourceKey = _sourceService.activeSourceKey;
     _lastSourceRevision = _sourceService.sourceRevision;
     _sourceService.addListener(_onSourceChanged);
@@ -19,10 +26,19 @@ class DiscoverPageController extends ChangeNotifier {
   static const _discoverLoadTimeout = Duration(seconds: 20);
   static const _initialVisibleSectionCount = 1;
   static const _sectionRevealBatchSize = 1;
+  static const _lifecycleStopRetryLimit = 2;
+  static const _lifecycleStopReasons = {
+    SourceTaskStopReason.sourceChanged,
+    SourceTaskStopReason.pluginUpdated,
+    SourceTaskStopReason.pluginDisabled,
+    SourceTaskStopReason.runtimeClosed,
+  };
 
   final SourceDiscoverGateway _sourceService;
   final DiscoverPageState _state = DiscoverPageState();
   bool _disposed = false;
+  late final _sourceUi = SourceUiOwner(sourceUiService);
+  final SourceTaskOwner _readTasks;
   int _sourceGeneration = 0;
   late String? _lastActiveSourceKey;
   String? _lastSourceRevision;
@@ -30,16 +46,20 @@ class DiscoverPageController extends ChangeNotifier {
   /// 源切换时的回调，由外层 View 绑定以触发刷新
   final VoidCallback? onSourceSwitched;
 
-  SourceRuntimeState get sourceRuntimeState =>
-      _sourceService.sourceRuntimeState;
+  SourceRuntimeState get sourceRuntimeState => _sourceService.runtimeState;
 
   void _onSourceChanged() {
     final activeKey = _sourceService.activeSourceKey;
+    if (activeKey != _lastActiveSourceKey) _sourceUi.cancel('sourceChanged');
     if (activeKey != _lastActiveSourceKey ||
         _lastSourceRevision != _sourceService.sourceRevision) {
       // 源发生了实际切换，通知 View 执行刷新
+      final reason = activeKey != _lastActiveSourceKey
+          ? SourceTaskStopReason.sourceChanged
+          : SourceTaskStopReason.pluginUpdated;
       _lastActiveSourceKey = activeKey;
       _lastSourceRevision = _sourceService.sourceRevision;
+      _readTasks.restart(reason);
       _sourceGeneration++;
       _state.sectionRevealGeneration++;
       _state.sections = const [];
@@ -65,6 +85,8 @@ class DiscoverPageController extends ChangeNotifier {
     required String timeoutMessage,
     required String Function(String) loadFailedMessage,
   }) async {
+    _readTasks.restart();
+    _sourceUi.restart();
     if (showLoginRequired) {
       _state.sections = const [];
       _state.errorMessage = null;
@@ -75,20 +97,28 @@ class DiscoverPageController extends ChangeNotifier {
     }
 
     final sourceGeneration = _sourceGeneration;
+    final requestGeneration = _readTasks.generation;
     List<ExploreSection>? loadedSections;
     String? error;
     try {
-      loadedSections = await _sourceService.loadExploreSections().timeout(
-        _discoverLoadTimeout,
-        onTimeout: () => throw Exception('discover_load_timeout'),
+      loadedSections = await _loadSections(
+        sourceGeneration: sourceGeneration,
+        requestGeneration: requestGeneration,
       );
     } catch (e) {
-      error = e.toString().contains('discover_load_timeout')
+      error = (isSourceUiCancellation(e) || isSourceTaskCancellation(e))
+          ? null
+          : (e is SourceTaskTimedOut ||
+                e.toString().contains('discover_load_timeout'))
           ? timeoutMessage
           : loadFailedMessage('$e');
     }
 
-    if (_disposed || sourceGeneration != _sourceGeneration) return;
+    if (_disposed ||
+        sourceGeneration != _sourceGeneration ||
+        requestGeneration != _readTasks.generation) {
+      return;
+    }
 
     _state.sectionRevealGeneration++;
     final generation = _state.sectionRevealGeneration;
@@ -119,6 +149,8 @@ class DiscoverPageController extends ChangeNotifier {
     required String Function(String) loadFailedMessage,
   }) async {
     if (_state.refreshing) return;
+    _readTasks.restart();
+    _sourceUi.restart();
     if (showLoginRequired) {
       _state.sections = const [];
       _state.errorMessage = null;
@@ -128,30 +160,37 @@ class DiscoverPageController extends ChangeNotifier {
       _notify();
       return;
     }
-    if (_sourceService.sourceRuntimeState.canRetry) {
-      _sourceService.logRuntimeRetryRequested('discover_page');
+    if (_sourceService.runtimeState.canRetry) {
+      _sourceService.requestRuntimeRetry('discover_page');
     }
 
     _state.refreshing = true;
     _notify();
 
     final sourceGeneration = _sourceGeneration;
+    final requestGeneration = _readTasks.generation;
     List<ExploreSection>? refreshedSections;
     String? error;
     try {
-      refreshedSections = await _sourceService
-          .loadExploreSections(forceRefresh: true)
-          .timeout(
-            _discoverLoadTimeout,
-            onTimeout: () => throw Exception('discover_load_timeout'),
-          );
+      refreshedSections = await _loadSections(
+        forceRefresh: true,
+        sourceGeneration: sourceGeneration,
+        requestGeneration: requestGeneration,
+      );
     } catch (e) {
-      error = e.toString().contains('discover_load_timeout')
+      error = (isSourceUiCancellation(e) || isSourceTaskCancellation(e))
+          ? null
+          : (e is SourceTaskTimedOut ||
+                e.toString().contains('discover_load_timeout'))
           ? timeoutMessage
           : loadFailedMessage('$e');
     }
 
-    if (_disposed || sourceGeneration != _sourceGeneration) return;
+    if (_disposed ||
+        sourceGeneration != _sourceGeneration ||
+        requestGeneration != _readTasks.generation) {
+      return;
+    }
 
     final revealProgressively = _state.sections.isEmpty;
     _state.sectionRevealGeneration++;
@@ -174,6 +213,50 @@ class DiscoverPageController extends ChangeNotifier {
         _state.visibleSectionCount < refreshedSections.length) {
       _scheduleRemainingSectionReveal(generation);
     }
+  }
+
+  /// 源切换、插件更新或运行时重建会从外部中止进行中的请求，而本页的
+  /// 换代通知可能晚于取消到达；此时直接重发，避免把空结果误显示为无内容。
+  Future<List<ExploreSection>> _loadSections({
+    bool forceRefresh = false,
+    required int sourceGeneration,
+    required int requestGeneration,
+  }) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await _sourceUi.run(
+          () => SourceUiScope.timeout(
+            _sourceService.loadExploreSections(
+              forceRefresh: forceRefresh,
+              taskOrigin: _readTasks.origin(),
+            ),
+            _discoverLoadTimeout,
+            onTimeout: () => throw Exception('discover_load_timeout'),
+          ),
+        );
+      } catch (e) {
+        final superseded =
+            _disposed ||
+            sourceGeneration != _sourceGeneration ||
+            requestGeneration != _readTasks.generation;
+        if (superseded ||
+            attempt >= _lifecycleStopRetryLimit ||
+            !_isStoppedBySourceLifecycle(e)) {
+          rethrow;
+        }
+      }
+    }
+  }
+
+  static bool _isStoppedBySourceLifecycle(Object error) {
+    if (error is SourceTaskTimedOut) return false;
+    if (error is SourceTaskCancelled) {
+      return _lifecycleStopReasons.contains(error.reason);
+    }
+    if (!isSourceUiCancellation(error)) return false;
+    final text = error.toString();
+    return text.contains('plugin_ui_cancelled:sourceChanged') ||
+        text.contains('plugin_ui_cancelled:runtimeDisposed');
   }
 
   void _scheduleRemainingSectionReveal(int generation) {
@@ -215,15 +298,20 @@ class DiscoverPageController extends ChangeNotifier {
     _notify();
 
     final sourceGeneration = _sourceGeneration;
+    final requestGeneration = _readTasks.generation;
     try {
       while (true) {
         final nextPage = currentPage + 1;
-        final result = await _sourceService.loadCategoryComicsByViewMore(
-          viewMoreUrl: viewMoreUrl,
-          page: nextPage,
+        final result = await _sourceUi.run(
+          () => _sourceService.loadCategoryComicsByViewMore(
+            viewMoreUrl: viewMoreUrl,
+            page: nextPage,
+            taskOrigin: _readTasks.origin(),
+          ),
         );
         if (_disposed ||
             sourceGeneration != _sourceGeneration ||
+            requestGeneration != _readTasks.generation ||
             index >= _state.sections.length) {
           return;
         }
@@ -290,6 +378,8 @@ class DiscoverPageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _readTasks.dispose();
+    _sourceUi.dispose();
     _disposed = true;
     _sourceService.removeListener(_onSourceChanged);
     super.dispose();

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
@@ -19,7 +19,6 @@ class ReaderSettingsContent extends StatelessWidget {
     required this.tapToTurnPage,
     required this.volumeButtonTurnPage,
     required this.pinchToZoom,
-    required this.longPressToSave,
     required this.immersiveMode,
     required this.keepScreenOn,
     required this.pageIndicator,
@@ -34,7 +33,6 @@ class ReaderSettingsContent extends StatelessWidget {
     required this.onTapToTurnPageChanged,
     required this.onVolumeButtonTurnPageChanged,
     required this.onPinchToZoomChanged,
-    required this.onLongPressToSaveChanged,
     required this.onImmersiveModeChanged,
     required this.onKeepScreenOnChanged,
     required this.onPageIndicatorChanged,
@@ -49,6 +47,8 @@ class ReaderSettingsContent extends StatelessWidget {
     this.onShowWindowsShortcuts,
     this.onClose,
     this.pageFooter,
+    this.restorePagePosition = false,
+    this.onRestorePagePositionChanged,
   });
 
   final ReaderSettingsSurface surface;
@@ -57,7 +57,6 @@ class ReaderSettingsContent extends StatelessWidget {
   final bool tapToTurnPage;
   final bool volumeButtonTurnPage;
   final bool pinchToZoom;
-  final bool longPressToSave;
   final bool immersiveMode;
   final bool keepScreenOn;
   final bool pageIndicator;
@@ -72,7 +71,6 @@ class ReaderSettingsContent extends StatelessWidget {
   final ValueChanged<bool>? onTapToTurnPageChanged;
   final ValueChanged<bool> onVolumeButtonTurnPageChanged;
   final ValueChanged<bool> onPinchToZoomChanged;
-  final ValueChanged<bool> onLongPressToSaveChanged;
   final ValueChanged<bool> onImmersiveModeChanged;
   final ValueChanged<bool> onKeepScreenOnChanged;
   final ValueChanged<bool> onPageIndicatorChanged;
@@ -87,6 +85,10 @@ class ReaderSettingsContent extends StatelessWidget {
   final VoidCallback? onShowWindowsShortcuts;
   final VoidCallback? onClose;
   final Widget? pageFooter;
+  final bool restorePagePosition;
+
+  /// 为空时不显示该开关。
+  final ValueChanged<bool>? onRestorePagePositionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -134,13 +136,16 @@ class ReaderSettingsContent extends StatelessWidget {
               value: pinchToZoom,
               onChanged: onPinchToZoomChanged,
             ),
-            SwitchListTile(
-              secondary: const Icon(Icons.save_alt_outlined),
-              title: Text(l10n(context).readingLongPressSaveTitle),
-              subtitle: Text(l10n(context).readingLongPressSaveSubtitle),
-              value: longPressToSave,
-              onChanged: onLongPressToSaveChanged,
-            ),
+            if (onRestorePagePositionChanged != null)
+              SwitchListTile(
+                secondary: const Icon(Icons.bookmark_outline),
+                title: Text(l10n(context).readingRestorePagePositionTitle),
+                subtitle: Text(
+                  l10n(context).readingRestorePagePositionSubtitle,
+                ),
+                value: restorePagePosition,
+                onChanged: onRestorePagePositionChanged,
+              ),
           ],
         ),
         _PageSettingsGroup(
@@ -275,14 +280,18 @@ class ReaderSettingsContent extends StatelessWidget {
                 value: pinchToZoom,
                 onChanged: onPinchToZoomChanged,
               ),
-              const Divider(height: 1),
-              SwitchListTile(
-                secondary: const Icon(Icons.save_alt_outlined),
-                title: Text(l10n(context).readingLongPressSaveTitle),
-                subtitle: Text(l10n(context).readingLongPressSaveSubtitle),
-                value: longPressToSave,
-                onChanged: onLongPressToSaveChanged,
-              ),
+              if (onRestorePagePositionChanged != null) ...[
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.bookmark_outline),
+                  title: Text(l10n(context).readingRestorePagePositionTitle),
+                  subtitle: Text(
+                    l10n(context).readingRestorePagePositionSubtitle,
+                  ),
+                  value: restorePagePosition,
+                  onChanged: onRestorePagePositionChanged,
+                ),
+              ],
             ],
           ),
           _DrawerSettingsGroup(
@@ -560,28 +569,26 @@ class ReaderSettingsContent extends StatelessWidget {
   Widget _buildSourceImageQualityField() {
     return Builder(
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          child: InputDecorator(
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              labelText: sourceImageQuality.title,
-              isDense: true,
-            ),
-            child: HazukiFrostedDropdown<String>(
-              selected: sourceImageQuality.value,
-              tooltip: sourceImageQuality.title,
-              options: sourceImageQuality.options.entries
-                  .map(
-                    (entry) => HazukiFrostedMenuOption<String>(
-                      value: entry.key,
-                      label: entry.value,
-                    ),
-                  )
-                  .toList(),
-              onSelected: onSourceImageQualityChanged,
-            ),
+        return HazukiMenuSettingTile<String>(
+          leading: const Icon(Icons.high_quality_outlined),
+          title: sourceImageQuality.title,
+          subtitle: l10n(context).readingSourceImageQualitySubtitle,
+          pluginMenu: SourcePluginMenuBinding(
+            menuId: 'reader.imageQuality',
+            sourceKey: sourceImageQuality.sourceKey.isEmpty
+                ? null
+                : sourceImageQuality.sourceKey,
           ),
+          selected: sourceImageQuality.value,
+          options: sourceImageQuality.options.entries
+              .map(
+                (entry) => HazukiFrostedMenuOption<String>(
+                  value: entry.key,
+                  label: entry.value,
+                ),
+              )
+              .toList(),
+          onSelected: onSourceImageQualityChanged,
         );
       },
     );

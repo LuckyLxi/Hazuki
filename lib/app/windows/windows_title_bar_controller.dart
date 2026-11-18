@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:window_manager/window_manager.dart';
 
-import '../../shared/window/window_title_bar_control.dart';
-export '../../shared/window/window_title_bar_control.dart';
+import '../../shared/windows/window_title_bar_control.dart';
+export '../../shared/windows/window_title_bar_control.dart';
 
 import '../app_settings_store.dart';
 

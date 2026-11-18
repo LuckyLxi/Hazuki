@@ -41,3 +41,10 @@ The upstream `device_info_plus` Windows integration test assumes the registry's
 current Windows host these are `26100.ge_release.240331-1435` and `26300`, so
 that assertion fails. Both the test and Windows implementation are unchanged
 from 13.1.0; this is a pre-existing host-dependent test limitation.
+
+`onnxruntime_v2` 1.23.2+2 is kept as a pure Dart FFI package: the native
+plugin packaging is removed and the shared library is loaded from the path
+given to `setOnnxRuntimeLibraryPath`. Hazuki downloads ONNX Runtime on demand
+from the translation settings (1.23.2 on Android, its QNN build plus the QNN
+runtime on supported Snapdragon SoCs, the 1.23.0 DirectML build on Windows), so
+no runtime is bundled into the app.

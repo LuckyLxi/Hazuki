@@ -1,10 +1,13 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 import 'source_plugin_action_widgets.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class SourcePluginSettingsPage extends StatelessWidget {
   const SourcePluginSettingsPage({
@@ -46,12 +49,20 @@ class _SourcePluginSettingsContentState
     extends State<SourcePluginSettingsContent> {
   Map<String, dynamic> _settings = {};
   Map<String, dynamic> _translation = {};
+  Map<String, dynamic> _presentation = {};
   List<SourcePluginAction> _actions = [];
-  String? _error;
   int _loadRevision = 0;
+  late final SourceUiOwner _sourceUi;
+  @override
+  void dispose() {
+    _sourceUi.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _sourceUi = SourceUiOwner(SourcePresentationScope.uiOf(context));
     unawaited(_load());
   }
 
@@ -59,10 +70,11 @@ class _SourcePluginSettingsContentState
   void didUpdateWidget(covariant SourcePluginSettingsContent oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.id != widget.id || oldWidget.gateway != widget.gateway) {
+      _sourceUi.restart();
       _settings = {};
       _translation = {};
+      _presentation = {};
       _actions = [];
-      _error = null;
       unawaited(_load());
     }
   }
@@ -83,22 +95,28 @@ class _SourcePluginSettingsContentState
         setState(() {
           _settings = settings;
           _translation = meta?.translation ?? {};
+          _presentation = meta?.presentation ?? {};
           _actions = actions;
         });
       }
     } catch (error) {
       if (mounted && revision == _loadRevision) {
-        setState(() => _error = error.toString());
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
       }
     }
   }
 
   Future<void> _set(String key, dynamic value) async {
     try {
-      await widget.gateway.saveSetting(widget.id, key, value);
+      await _sourceUi.run(
+        () => widget.gateway.saveSetting(widget.id, key, value),
+      );
       if (mounted) setState(() {});
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (isSourceUiCancellation(error)) return;
+      if (mounted) {
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+      }
     }
   }
 
@@ -106,7 +124,6 @@ class _SourcePluginSettingsContentState
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(24),
     children: [
-      if (_error != null) SelectableText(_error!),
       for (final entry in _settings.entries)
         if (entry.value is Map && _showsSetting(entry.value as Map))
           _control(entry.key, Map<String, dynamic>.from(entry.value as Map)),
@@ -164,6 +181,15 @@ class _SourcePluginSettingsContentState
       return ListTile(
         title: Text(title),
         trailing: HazukiFrostedDropdown<String>(
+          pluginMenu: SourcePluginMenuBinding(
+            menuId: 'plugin.settings.$key',
+            sourceKey: widget.id,
+            gateway: widget.gateway,
+            entries: SourceMenuEntry.forLocation(
+              _presentation,
+              'plugin.settings.$key',
+            ),
+          ),
           selected: selected,
           options: options,
           tooltip: title,

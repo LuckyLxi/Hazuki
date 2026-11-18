@@ -1,5 +1,8 @@
 import '../account/source_relogin_coordinator.dart';
 import '../models/source_contract_models.dart';
+import '../plugins/source_plugin_exception.dart';
+import '../plugins/source_plugin_manager.dart';
+import 'source_runtime_diagnostics_operations.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_host.dart';
 import 'source_runtime_loader.dart';
@@ -10,58 +13,65 @@ import 'source_script_editing_operations.dart';
 class SourceRuntimeRecoveryOperations {
   SourceRuntimeRecoveryOperations({
     required SourceRuntimeHost runtimeHost,
+    required SourceRuntimeDiagnosticsOperations diagnostics,
+    required SourcePluginManager plugins,
     required SourceRuntimeLoadClient runtimeLoader,
     required SourceScriptEditingOperations scriptEditing,
     required SourceRuntimeStateController runtimeStateController,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
   }) : _runtimeHost = runtimeHost,
+       _diagnostics = diagnostics,
+       _plugins = plugins,
        _runtimeLoader = runtimeLoader,
        _scriptEditing = scriptEditing,
        _runtimeStateController = runtimeStateController,
        _reloginCoordinator = reloginCoordinator;
 
   final SourceRuntimeHost _runtimeHost;
+  final SourceRuntimeDiagnosticsOperations _diagnostics;
+  final SourcePluginManager _plugins;
   final SourceRuntimeLoadClient _runtimeLoader;
   final SourceScriptEditingOperations _scriptEditing;
   final SourceRuntimeStateController _runtimeStateController;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
+
+  void requestRuntimeRetry(String trigger) {
+    if (!_runtimeHost.hasActiveSource) return;
+    _runtimeHost.activeHandle.clearRuntimeFault();
+    _diagnostics.logRuntimeRetryRequested(trigger);
+  }
 
   Future<void> downloadSourceFile(
     String sourceKey, {
     void Function(int received, int total)? onProgress,
   }) async {
     final normalizedSourceKey = _runtimeHost.normalize(sourceKey);
-    final handle = _runtimeHost.handleFor(normalizedSourceKey);
-    await handle.runOperation(() async {
-      final facade = handle.facade;
-      _clearRuntimeCaches(handle, clearMetadata: false);
-      final result = await _runtimeLoader.download(
-        handle,
-        onProgress: onProgress,
-      );
-      await _scriptEditing.setCustomEditedSourceFlag(
-        handle.sourceKey,
-        false,
-        targetFacade: facade,
-      );
-      facade.lastSourceVersionDebugInfo = {
-        'checkedAt': DateTime.now().toIso8601String(),
-        'resolvedFrom': 'manual_source_download',
-        'sourceKey': handle.sourceKey,
-        'outcome': result.message,
-      };
-    });
+    // 手动重新下载脚本是显式恢复入口，解除故障锁存。
+    _runtimeHost.handleFor(normalizedSourceKey).clearRuntimeFault();
+    // 重装会让旧句柄退役并等待其操作结束，因此不能放在 runOperation 内。
+    // 本地导入的插件没有来源仓库，无法重新下载。
+    if (!await _plugins.redownload(
+      normalizedSourceKey,
+      onProgress: onProgress,
+    )) {
+      throw SourcePluginException('plugin_not_installed', normalizedSourceKey);
+    }
+    await _scriptEditing.setCustomEditedSourceFlag(normalizedSourceKey, false);
     await _runtimeHost.activateSource(normalizedSourceKey);
   }
 
   Future<void> reloadFromLocalSourceFiles() async {
     final handle = _runtimeHost.activeHandle;
+    // 手动重新加载是显式恢复入口，解除故障锁存。
+    handle.clearRuntimeFault();
     await handle.runOperation(() async {
       final facade = handle.facade;
-      if (facade.isRefreshingSource) {
+      if (facade.runtime.isRefreshingSource) {
         throw Exception('source_reload_in_progress');
       }
-      facade.isRefreshingSource = true;
+      facade.runtime.isRefreshingSource = true;
       try {
         _runtimeStateController.setBusy(
           facade,
@@ -90,7 +100,7 @@ class SourceRuntimeRecoveryOperations {
         );
         await _reloginIfNeeded(handle);
       } finally {
-        facade.isRefreshingSource = false;
+        facade.runtime.isRefreshingSource = false;
       }
     });
   }
@@ -98,13 +108,15 @@ class SourceRuntimeRecoveryOperations {
   Future<bool> refreshSourceOnNetworkRecovery() {
     if (!_runtimeHost.hasActiveSource) return Future.value(false);
     final handle = _runtimeHost.activeHandle;
+    // 网络恢复是自动入口，不能绕过崩溃循环锁存。
+    if (handle.runtimeFault != null) return Future.value(false);
     return handle.runOperation(() => _refreshSource(handle));
   }
 
   Future<bool> _refreshSource(SourceRuntimeHandle handle) async {
     final facade = handle.facade;
-    if (facade.isRefreshingSource) return false;
-    facade.isRefreshingSource = true;
+    if (facade.runtime.isRefreshingSource) return false;
+    facade.runtime.isRefreshingSource = true;
     try {
       _runtimeStateController.setBusy(
         facade,
@@ -134,7 +146,7 @@ class SourceRuntimeRecoveryOperations {
       _runtimeStateController.setFailed(facade, error);
       return false;
     } finally {
-      facade.isRefreshingSource = false;
+      facade.runtime.isRefreshingSource = false;
     }
   }
 
@@ -144,9 +156,9 @@ class SourceRuntimeRecoveryOperations {
     bool clearMetadata = false,
   }) {
     final facade = handle.facade;
-    facade.lastReloginAt = null;
+    facade.runtime.lastReloginAt = null;
     if (clearFavoritesDebugCache) facade.favoritesDebugCache = null;
-    handle.exploreCache.clearMemory();
+    handle.cache.clearExploreSections();
     facade.cache.clearCategoryTagGroupsMemoryCache();
     if (clearMetadata) facade.runtime.sourceMeta = null;
   }
@@ -157,7 +169,7 @@ class SourceRuntimeRecoveryOperations {
       return;
     }
     await _reloginCoordinator.tryReloginFromStoredAccount(
-      SourceFacadeReloginContext(facade),
+      SourceRuntimeReloginContext(handle),
       force: true,
     );
   }

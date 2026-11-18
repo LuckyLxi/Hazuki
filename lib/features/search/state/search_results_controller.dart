@@ -6,13 +6,19 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 
 import '../support/search_contracts.dart';
+import '../support/search_task_lifetime.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class SearchResultsController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   static const Duration _initialSearchRetryDelay = Duration(milliseconds: 450);
 
   SearchResultsController({
+    required this.sourceUiService,
     required String initialOrder,
     required SourceSearchGateway sourceService,
+    required this.taskControl,
     SearchPageLoader? searchPageLoader,
     SearchComicDetailsLoader? comicDetailsLoader,
   }) : _searchPageLoader = searchPageLoader,
@@ -21,12 +27,32 @@ class SearchResultsController extends ChangeNotifier {
        _searchOrder = initialOrder.trim() {
     _searchOrder = _normalizeSearchOrder(_searchOrder);
     _lastSourceEpoch = _sourceEpoch;
+    _lastSourceKey = _sourceService.activeSourceKey;
     _sourceService.addListener(_onSourceChanged);
   }
 
   final SearchPageLoader? _searchPageLoader;
   final SearchComicDetailsLoader? _comicDetailsLoader;
   final SourceSearchGateway _sourceService;
+  final SourceTaskControlGateway taskControl;
+  SourceTaskCancellation _requestLifetime = SourceTaskCancellation();
+  final String _taskOwnerId = createSourceTaskId();
+  late final SourceUiOwner _sourceUi = SourceUiOwner(sourceUiService);
+  String? _taskGroupId;
+
+  void stopPending(SourceTaskStopReason reason) {
+    _searchRequestToken++;
+    _requestLifetime.cancel(reason);
+    _sourceUi.cancel(
+      reason == SourceTaskStopReason.ownerDisposed ? 'ownerGone' : reason.name,
+    );
+    _searchLoading = false;
+    _searchLoadingMore = false;
+    taskControl
+        .cancelOwner(_taskOwnerId, reason)
+        .then<void>((receipt) => receipt.whenSettled.ignore())
+        .ignore();
+  }
 
   String _searchKeyword = '';
   SearchMessages? _lastSearchMessages;
@@ -41,6 +67,7 @@ class SearchResultsController extends ChangeNotifier {
   String _searchOrder;
   bool _disposed = false;
   late String _lastSourceEpoch;
+  String? _lastSourceKey;
   String get _sourceEpoch {
     final id = _sourceService.activeSourceKey;
     final source = _sourceService.allowedSources
@@ -59,12 +86,11 @@ class SearchResultsController extends ChangeNotifier {
   int? get searchMaxPage => _searchMaxPage;
   String get searchOrder => _searchOrder;
 
-  SourceRuntimeState get sourceRuntimeState =>
-      _sourceService.sourceRuntimeState;
+  SourceRuntimeState get sourceRuntimeState => _sourceService.runtimeState;
   bool get canRetry => sourceRuntimeState.canRetry;
 
-  void logRuntimeRetryRequested(String source) =>
-      _sourceService.logRuntimeRetryRequested(source);
+  void requestRuntimeRetry(String trigger) =>
+      _sourceService.requestRuntimeRetry(trigger);
 
   String _normalizeSearchOrder(String order) => normalizeSourceSearchOrder(
     order,
@@ -78,6 +104,17 @@ class SearchResultsController extends ChangeNotifier {
   void _onSourceChanged() {
     final sourceChanged = _sourceEpoch != _lastSourceEpoch;
     if (sourceChanged) {
+      final oldSourceRemoved = !_sourceService.allowedSources.any(
+        (source) => source.key == _lastSourceKey,
+      );
+      stopPending(
+        oldSourceRemoved
+            ? SourceTaskStopReason.pluginDisabled
+            : _lastSourceKey == _sourceService.activeSourceKey
+            ? SourceTaskStopReason.pluginUpdated
+            : SourceTaskStopReason.sourceChanged,
+      );
+      _lastSourceKey = _sourceService.activeSourceKey;
       _lastSourceEpoch = _sourceEpoch;
       _lastSearchMessages = null;
       _searchRequestToken++;
@@ -99,6 +136,8 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   void clearSearchData() {
+    stopPending(SourceTaskStopReason.superseded);
+    _sourceUi.restart();
     _searchRequestToken++;
     _searchKeyword = '';
     _lastSearchMessages = null;
@@ -122,6 +161,10 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   int prepareDirectIdLookup(String keyword) {
+    stopPending(SourceTaskStopReason.superseded);
+    _requestLifetime = SourceTaskCancellation();
+    _taskGroupId = createSourceTaskId();
+    _sourceUi.restart();
     final requestToken = ++_searchRequestToken;
     _lastSearchMessages = null;
     _searchKeyword = keyword;
@@ -142,16 +185,33 @@ class SearchResultsController extends ChangeNotifier {
     String comicId, {
     String sourceKey = '',
   }) {
-    final overrideLoader = _comicDetailsLoader;
-    if (overrideLoader != null) {
-      return overrideLoader(
-        comicId,
-        sourceKey: sourceKey,
-      ).timeout(searchLoadTimeout);
-    }
-    return _sourceService
-        .loadComicDetails(comicId, sourceKey: sourceKey)
-        .timeout(searchLoadTimeout);
+    final lifetime = _requestLifetime;
+    final token = _searchRequestToken;
+    final origin = SourceTaskOrigin(
+      ownerId: _taskOwnerId,
+      groupId: _taskGroupId ??= createSourceTaskId(),
+      requestSequence: token,
+      cancellation: lifetime,
+      resultDisposition: () => _disposed
+          ? SourceTaskResultDisposition.disposed
+          : lifetime.reason == SourceTaskStopReason.deadlineExceeded
+          ? SourceTaskResultDisposition.timedOut
+          : isCurrentRequest(token)
+          ? SourceTaskResultDisposition.current
+          : SourceTaskResultDisposition.superseded,
+    );
+    return _sourceUi.run(
+      () => runSearchOperation(
+        () =>
+            _comicDetailsLoader?.call(comicId, sourceKey: sourceKey) ??
+            _sourceService.loadComicDetails(
+              comicId,
+              sourceKey: sourceKey,
+              taskOrigin: origin,
+            ),
+        lifetime,
+      ),
+    );
   }
 
   void finishDirectIdLookup(int token) {
@@ -167,20 +227,41 @@ class SearchResultsController extends ChangeNotifier {
     required String keyword,
     required int page,
     required String order,
+    required String groupId,
+    required int requestToken,
   }) {
     final overrideLoader = _searchPageLoader;
     if (overrideLoader != null) {
-      return overrideLoader(keyword: keyword, page: page, order: order);
+      return runSearchOperation(
+        () => overrideLoader(keyword: keyword, page: page, order: order),
+        _requestLifetime,
+      );
     }
-    final timeoutMessage = messages.timeout;
-    return _sourceService
-        .searchComics(keyword: keyword, page: page, order: order)
-        .timeout(
-          searchLoadTimeout,
-          onTimeout: () {
-            throw Exception(timeoutMessage);
-          },
-        );
+    final lifetime = _requestLifetime;
+    final taskOrigin = SourceTaskOrigin(
+      ownerId: _taskOwnerId,
+      groupId: groupId,
+      requestSequence: requestToken,
+      cancellation: lifetime,
+      resultDisposition: () {
+        if (_disposed) return SourceTaskResultDisposition.disposed;
+        if (lifetime.reason == SourceTaskStopReason.deadlineExceeded) {
+          return SourceTaskResultDisposition.timedOut;
+        }
+        return isCurrentRequest(requestToken)
+            ? SourceTaskResultDisposition.current
+            : SourceTaskResultDisposition.superseded;
+      },
+    );
+    return runSearchOperation(
+      () => _sourceService.searchComics(
+        keyword: keyword,
+        page: page,
+        order: order,
+        taskOrigin: taskOrigin,
+      ),
+      lifetime,
+    );
   }
 
   bool _shouldRetryInitialSearch({
@@ -198,13 +279,57 @@ class SearchResultsController extends ChangeNotifier {
     bool append = false,
     bool silentRefresh = false,
   }) async {
+    if (keyword.trim().isEmpty || _disposed) return;
+    if (!append) {
+      stopPending(SourceTaskStopReason.superseded);
+    } else {
+      _requestLifetime.cancel(SourceTaskStopReason.superseded);
+    }
+    _requestLifetime = SourceTaskCancellation();
+    _sourceUi.restart();
+    final nextRequestToken = _searchRequestToken + 1;
+    Future<void> work() => _search(
+      messages,
+      keyword: keyword,
+      page: page,
+      append: append,
+      silentRefresh: silentRefresh,
+    );
+    try {
+      if (silentRefresh) {
+        await SourceUiScope.withoutInteraction(work);
+      } else {
+        await _sourceUi.run(work);
+      }
+    } catch (error) {
+      if (!_disposed && isCurrentRequest(nextRequestToken)) {
+        _searchLoading = false;
+        _searchLoadingMore = false;
+        _searchErrorMessage = isSilentSearchStop(error)
+            ? null
+            : searchFailureMessage(error, messages);
+        _notify();
+      }
+    }
+  }
+
+  Future<void> _search(
+    SearchMessages messages, {
+    required String keyword,
+    required int page,
+    bool append = false,
+    bool silentRefresh = false,
+  }) async {
     final normalized = keyword.trim();
     if (normalized.isEmpty) {
       return;
     }
 
     final requestToken = ++_searchRequestToken;
+    final lifetime = _requestLifetime;
     final isLoadMore = append;
+    if (!append || _taskGroupId == null) _taskGroupId = createSourceTaskId();
+    final groupId = _taskGroupId!;
 
     _searchKeyword = normalized;
     _lastSearchMessages = messages;
@@ -243,21 +368,32 @@ class SearchResultsController extends ChangeNotifier {
             keyword: normalized,
             page: page,
             order: _searchOrder,
+            groupId: groupId,
+            requestToken: requestToken,
           );
           final hasRemainingAttempt = attempt + 1 < maxAttempts;
-          if (result.comics.isNotEmpty || !hasRemainingAttempt) {
+          if (result.comics.isNotEmpty ||
+              !hasRemainingAttempt ||
+              _sourceUi.wasCancelled) {
             break;
           }
-          await Future<void>.delayed(_initialSearchRetryDelay);
+          await waitForSearchRetry(_initialSearchRetryDelay, lifetime);
           if (!isCurrentRequest(requestToken)) {
             return;
           }
         } catch (error) {
+          // 运行时故障不自动重试：重试会把已接纳的搜索重放到重建后的实例。
+          if (isSilentSearchStop(error) ||
+              error is SourceRuntimeFailed ||
+              _sourceUi.wasCancelled ||
+              lifetime.reason != null) {
+            rethrow;
+          }
           final hasRemainingAttempt = attempt + 1 < maxAttempts;
           if (!hasRemainingAttempt) {
             rethrow;
           }
-          await Future<void>.delayed(_initialSearchRetryDelay);
+          await waitForSearchRetry(_initialSearchRetryDelay, lifetime);
           if (!isCurrentRequest(requestToken)) {
             return;
           }
@@ -294,7 +430,9 @@ class SearchResultsController extends ChangeNotifier {
       if (!isCurrentRequest(requestToken)) {
         return;
       }
-      _searchErrorMessage = messages.failed('$e');
+      _searchErrorMessage = isSilentSearchStop(e)
+          ? null
+          : searchFailureMessage(e, messages);
     } finally {
       if (isCurrentRequest(requestToken)) {
         if (isLoadMore) {
@@ -337,6 +475,8 @@ class SearchResultsController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    stopPending(SourceTaskStopReason.ownerDisposed);
+    _sourceUi.dispose();
     _searchRequestToken++;
     _sourceService.removeListener(_onSourceChanged);
     super.dispose();

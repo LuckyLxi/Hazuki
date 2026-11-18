@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
@@ -12,6 +12,7 @@ import 'discover_page_sections.dart';
 
 class DiscoverPageBody extends StatelessWidget {
   const DiscoverPageBody({
+    required this.taskControl,
     super.key,
     required this.controller,
     required this.scrollController,
@@ -27,6 +28,7 @@ class DiscoverPageBody extends StatelessWidget {
     required this.sourceService,
   });
 
+  final SourceTaskControlGateway taskControl;
   final DiscoverPageController controller;
   final ScrollController scrollController;
   final int headerItemCount;
@@ -53,7 +55,6 @@ class DiscoverPageBody extends StatelessWidget {
 
         return HazukiPullToRefresh(
           onRefresh: onRefresh,
-          edgeOffset: 56,
           child: ListView.builder(
             controller: scrollController,
             physics: const AlwaysScrollableScrollPhysics(
@@ -93,6 +94,7 @@ class DiscoverPageBody extends StatelessWidget {
                 comicDetailPageBuilder: comicDetailPageBuilder,
                 comicCoverHeroTagBuilder: comicCoverHeroTagBuilder,
                 sourceService: sourceService,
+                taskControl: taskControl,
               );
             },
           ),

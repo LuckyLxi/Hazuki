@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:hazuki/services/source/source_task_owner.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
@@ -11,9 +13,14 @@ import 'package:hazuki/features/reader/state/reader_image_content_state.dart';
 
 import 'reader_image_loader.dart';
 import 'reader_image_prefetch_scheduler.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class ReaderImagePipelineController {
+  final SourceUiService sourceUiService;
+  late final _sourceUi = SourceUiOwner(sourceUiService);
   ReaderImagePipelineController({
+    required this.sourceUiService,
     required ReaderImageContentState runtimeState,
     required ReaderImagePipelineState pipelineState,
     required ReaderDiagnosticsState diagnosticsState,
@@ -41,6 +48,8 @@ class ReaderImagePipelineController {
     })?
     onImageAspectRatioResolved,
     required SourceReaderGateway sourceService,
+    SourceTaskControlGateway? taskControl,
+    SourceReaderSession? readerSession,
   }) : _runtimeState = runtimeState,
        _pipelineState = pipelineState,
        _diagnosticsState = diagnosticsState,
@@ -57,12 +66,15 @@ class ReaderImagePipelineController {
        _sourceKey = sourceKey,
        _loadImagesErrorBuilder = loadImagesErrorBuilder,
        _sourceService = sourceService,
+       _taskControl = taskControl,
+       _readerSession = readerSession,
        _evictImageBytesFromMemory =
            evictImageBytesFromMemory ?? sourceService.evictImageBytesFromMemory,
        _evictImageCacheEntries =
            evictImageCacheEntries ?? sourceService.evictImageCacheEntries,
        _precacheImageCallback = precacheImageCallback,
        _onImageAspectRatioResolved = onImageAspectRatioResolved {
+    _chapterTasks = SourceTaskOwner(taskControl, readerSession: readerSession);
     _imageLoader = ReaderImageLoader(
       state: pipelineState,
       source: sourceService,
@@ -84,10 +96,13 @@ class ReaderImagePipelineController {
         spreadSize: _runtimeState.readerSpreadSize,
       ),
       getImageProvider: getImageProvider,
+      onWindowChanged: _trimImageTasks,
       isLocalImagePath: sourceService.isLocalImagePath,
       downloadImageBytes: (url) async {
+        final owner = _byteTasks.putIfAbsent(url, _newImageOwner);
         await sourceService.downloadImageBytes(
           url,
+          taskOrigin: _origin(owner),
           comicId: comicId,
           epId: epId,
           sourceKey: sourceKey,
@@ -99,12 +114,57 @@ class ReaderImagePipelineController {
     );
   }
 
+  final SourceTaskControlGateway? _taskControl;
+  final SourceReaderSession? _readerSession;
+  late final SourceTaskOwner _chapterTasks;
+  final Map<String, SourceTaskOwner> _imageTasks = {};
+  final Map<String, SourceTaskOwner> _byteTasks = {};
+  bool _closed = false;
+  SourceTaskOwner _newImageOwner() => SourceTaskOwner(
+    _taskControl,
+    readerSession: _readerSession,
+    ownerId: _chapterTasks.ownerId,
+  );
+  SourceTaskOrigin? _origin(SourceTaskOwner owner) =>
+      _taskControl == null && _readerSession == null ? null : owner.origin();
+
+  void _trimImageTasks(Set<String> providers, Set<String> bytes) {
+    void trim(Map<String, SourceTaskOwner> tasks, Set<String> keep) {
+      for (final url in tasks.keys.toList()) {
+        if (!keep.contains(url)) tasks.remove(url)!.restart();
+      }
+    }
+
+    trim(_imageTasks, providers);
+    trim(_byteTasks, bytes);
+  }
+
+  void _stopImages([
+    SourceTaskStopReason reason = SourceTaskStopReason.superseded,
+  ]) {
+    for (final owner in [..._imageTasks.values, ..._byteTasks.values]) {
+      owner.restart(reason);
+    }
+    _imageTasks.clear();
+    _byteTasks.clear();
+  }
+
   late final ReaderImageLoader _imageLoader;
   late final ReaderImagePrefetchScheduler _prefetchScheduler;
 
-  void prefetchAround(int index) => _prefetchScheduler.prefetchAround(index);
-  void requestPrefetchAhead(int index) =>
-      _prefetchScheduler.requestPrefetchAhead(index);
+  void prefetchAround(int index) {
+    if (_closed) return;
+    SourceUiScope.withoutInteractionSync(
+      () => _prefetchScheduler.prefetchAround(index),
+    );
+  }
+
+  void requestPrefetchAhead(int index) {
+    if (_closed) return;
+    SourceUiScope.withoutInteractionSync(
+      () => _prefetchScheduler.requestPrefetchAhead(index),
+    );
+  }
 
   void _logDecodedAspectRatio(String url, double aspectRatio) {
     final index = _pipelineState.imageIndexMap[url];
@@ -169,6 +229,13 @@ class ReaderImagePipelineController {
 
   ImageProvider? cachedProviderFor(String url) => providerCache[url];
 
+  Future<Uint8List?> resolveImageBytes(String url) async {
+    final provider = await getImageProvider(url);
+    if (provider is MemoryImage) return provider.bytes;
+    if (provider is FileImage) return provider.file.readAsBytes();
+    return null;
+  }
+
   bool isRetrying(String url) => retryingImageUrls.contains(url);
 
   void applyInitialImages(List<String> images, {required String trigger}) {
@@ -185,26 +252,32 @@ class ReaderImagePipelineController {
       }),
     );
     _logVisiblePageChange(index: 0, trigger: trigger);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      prefetchAround(0);
-      requestPrefetchAhead(0);
-    });
   }
 
-  Future<void> loadChapterImages({String trigger = 'manual'}) async {
+  /// Returns whether this request committed images to the active chapter.
+  Future<bool> loadChapterImages({String trigger = 'manual'}) async {
+    if (_closed) return false;
+    _sourceUi.restart();
+    _chapterTasks.restart();
+    final generation = _chapterTasks.generation;
+    _stopImages();
+    _pipelineState.invalidatePending();
     _logEvent(
       'Reader chapter images loading started',
       source: 'reader_data',
       content: _logPayload({'trigger': trigger}),
     );
     try {
-      final images = await _sourceService.loadChapterImages(
-        comicId: _comicId,
-        epId: _epId,
-        sourceKey: _sourceKey,
+      final images = await _sourceUi.run(
+        () => _sourceService.loadChapterImages(
+          comicId: _comicId,
+          epId: _epId,
+          sourceKey: _sourceKey,
+          taskOrigin: _origin(_chapterTasks),
+        ),
       );
-      if (!_isMounted()) {
-        return;
+      if (!_isMounted() || _closed || generation != _chapterTasks.generation) {
+        return false;
       }
       _updateState(() {
         _zoomController.value = Matrix4.identity();
@@ -224,11 +297,14 @@ class ReaderImagePipelineController {
         }),
       );
       _logVisiblePageChange(index: 0, trigger: 'chapter_images_loaded');
-      if (!_noImageModeEnabled()) {
-        prefetchAround(0);
-        requestPrefetchAhead(0);
-      }
+      return true;
     } catch (error) {
+      if (_closed ||
+          generation != _chapterTasks.generation ||
+          isSourceTaskCancellation(error) ||
+          error is SourceUiCancelled) {
+        return false;
+      }
       _logEvent(
         'Reader chapter images loading failed',
         level: 'error',
@@ -236,15 +312,19 @@ class ReaderImagePipelineController {
         content: _logPayload({'trigger': trigger, 'error': '$error'}),
       );
       if (!_isMounted()) {
-        return;
+        return false;
       }
       _updateState(() {
         _runtimeState.markLoadImagesFailed(_loadImagesErrorBuilder(error));
       });
+      return false;
     }
   }
 
   void handleNoImageModeChanged() {
+    if (_closed) return;
+    _stopImages();
+    _pipelineState.queuedPrefetchAheadIndex = null;
     _pipelineState.clearProviderCaches();
     _logEvent(
       'Reader no-image mode changed',
@@ -268,6 +348,11 @@ class ReaderImagePipelineController {
     required bool useDiskCache,
     bool priority = false,
   }) {
+    if (_closed) {
+      return Future.error(
+        SourceTaskCancelled(url, SourceTaskStopReason.ownerDisposed),
+      );
+    }
     final existing = providerFutureCache[url];
     if (existing != null &&
         (!priority || _pipelineState.priorityProviderRequests.contains(url))) {
@@ -277,11 +362,24 @@ class ReaderImagePipelineController {
     if (priority) {
       _pipelineState.priorityProviderRequests.add(url);
     }
+    final generation = _pipelineState.generation;
+    final owner = _imageTasks.putIfAbsent(url, _newImageOwner);
+    final origin = _origin(owner);
     late final Future<ImageProvider> created;
+    bool current() =>
+        !_closed &&
+        generation == _pipelineState.generation &&
+        identical(providerFutureCache[url], created) &&
+        origin?.cancellation?.reason == null;
     created = _imageLoader
-        .load(url, useDiskCache: useDiskCache, priority: priority)
+        .load(
+          url,
+          useDiskCache: useDiskCache,
+          priority: priority,
+          taskOrigin: origin,
+        )
         .then((provider) async {
-          if (_pipelineState.disposed) return provider;
+          if (!current()) return provider;
           if (_isMounted()) {
             try {
               final precacheImageCallback = _precacheImageCallback;
@@ -292,7 +390,7 @@ class ReaderImagePipelineController {
               }
             } catch (_) {}
           }
-          if (_pipelineState.disposed) return provider;
+          if (!current()) return provider;
           providerCache[url] = provider;
           if (_isMounted()) {
             _updateState(() {});
@@ -313,6 +411,7 @@ class ReaderImagePipelineController {
   }
 
   Future<void> retryImage(String url) async {
+    if (_closed || _pipelineState.disposed) return;
     final normalized = url.trim();
     if (normalized.isEmpty || retryingImageUrls.contains(normalized)) {
       return;
@@ -323,16 +422,21 @@ class ReaderImagePipelineController {
       source: 'reader_data',
       content: _logPayload({'imageUrl': normalized, 'useDiskCache': false}),
     );
+    _imageTasks.remove(normalized)?.restart();
+    _byteTasks.remove(normalized)?.restart();
     _updateState(() {
       retryingImageUrls.add(normalized);
       providerCache.remove(normalized);
       providerFutureCache.remove(normalized);
     });
+    final generation = _pipelineState.generation;
     _evictImageBytesFromMemory([normalized]);
-    await _evictImageCacheEntries([normalized]);
 
     try {
+      await _evictImageCacheEntries([normalized]);
+      if (_closed || generation != _pipelineState.generation) return;
       await _getImageProvider(normalized, useDiskCache: false, priority: true);
+      if (_closed || generation != _pipelineState.generation) return;
       _logEvent(
         'Reader image retry finished',
         source: 'reader_data',
@@ -343,6 +447,11 @@ class ReaderImagePipelineController {
         }),
       );
     } catch (error) {
+      if (_closed ||
+          generation != _pipelineState.generation ||
+          isSourceTaskCancellation(error)) {
+        return;
+      }
       _logEvent(
         'Reader image retry failed',
         level: 'error',
@@ -355,7 +464,10 @@ class ReaderImagePipelineController {
       );
       // Keep the error state visible so the user can retry again.
     } finally {
-      if (!_pipelineState.disposed && _isMounted()) {
+      if (!_pipelineState.disposed &&
+          !_closed &&
+          generation == _pipelineState.generation &&
+          _isMounted()) {
         _updateState(() {
           retryingImageUrls.remove(normalized);
         });
@@ -435,8 +547,18 @@ class ReaderImagePipelineController {
         .toDouble();
   }
 
+  void retire([SourceTaskStopReason reason = SourceTaskStopReason.superseded]) {
+    if (_closed) return;
+    _closed = true;
+    _pipelineState.invalidatePending();
+    _pipelineState.queuedPrefetchAheadIndex = null;
+    _stopImages(reason);
+    _chapterTasks.dispose(reason);
+    _sourceUi.dispose();
+  }
+
   void dispose() {
-    _pipelineState.dispose();
+    retire(SourceTaskStopReason.ownerDisposed);
   }
 
   void _notifyImageAspectRatioResolved(String url) {

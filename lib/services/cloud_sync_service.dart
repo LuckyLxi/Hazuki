@@ -7,7 +7,6 @@ import 'cloud_sync/cloud_sync_config_store.dart';
 import 'cloud_sync/cloud_sync_models.dart';
 import 'cloud_sync/cloud_sync_participant_set.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
-import 'cloud_sync/cloud_sync_restore_applier.dart';
 import 'cloud_sync/cloud_sync_snapshot_codec.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
@@ -42,18 +41,11 @@ class CloudSyncService {
   late final CloudSyncSnapshotCodec _snapshotCodec = CloudSyncSnapshotCodec(
     participants: _participants,
   );
-  late final CloudSyncRestoreApplier _restoreApplier = CloudSyncRestoreApplier(
-    participants: _participants,
-  );
-  late final CloudSyncFacade facade = CloudSyncFacade._(
-    configStore: _configStore,
-    snapshotCodec: _snapshotCodec,
-    restoreApplier: _restoreApplier,
-    remoteClientFactory: (config) => _remoteClientFactory(config, _configStore),
-  );
-
   bool _autoSyncRunning = false;
   Future<void> _uploadQueue = Future<void>.value();
+
+  CloudSyncRemoteClient _remoteClient(CloudSyncConfig config) =>
+      _remoteClientFactory(config, _configStore);
 
   Future<CloudSyncConfig> loadConfig() => _configStore.loadConfig();
 
@@ -91,7 +83,7 @@ class CloudSyncService {
         checkedAt: DateTime.now(),
       );
     }
-    return facade.remoteClient(config).testConnection();
+    return _remoteClient(config).testConnection();
   }
 
   Future<void> uploadBackup({
@@ -121,7 +113,7 @@ class CloudSyncService {
     final lastSyncedRemoteTs = await _configStore.loadLastSyncedRemoteTs(
       config,
     );
-    final client = facade.remoteClient(config);
+    final client = _remoteClient(config);
     await client.ensureRootDir();
     await client.ensureBackupDirs();
 
@@ -290,7 +282,7 @@ class CloudSyncService {
       throw Exception('cloud_sync_config_incomplete');
     }
 
-    final client = facade.remoteClient(config);
+    final client = _remoteClient(config);
     final settingsText = await client.getBackupFile(
       CloudSyncConfigStore.settingsFileName,
     );
@@ -298,11 +290,12 @@ class CloudSyncService {
     final searchHistoryText = await client.getBackupFile(
       CloudSyncConfigStore.searchHistoryFileName,
     );
-    final settingsResult = await _restoreApplier.applySettingsJson(
+    final settingsResult = await _participants.settings.restoreSnapshot(
       settingsText,
     );
-    await _restoreApplier.applyReadingSnapshot(readingText);
-    await _restoreApplier.applySearchHistoryJsonl(searchHistoryText);
+    await _participants.commentFilter.reloadAfterExternalChange();
+    await _participants.reading.restoreSnapshot(readingText);
+    await _participants.searchHistory.restoreSnapshot(searchHistoryText);
 
     return CloudSyncRestoreResult(
       restoredSettings: true,
@@ -311,25 +304,5 @@ class CloudSyncService {
       appliedPlatformFilteredKeys: settingsResult.appliedPlatformFilteredKeys,
       skippedKeys: settingsResult.skippedKeys,
     );
-  }
-}
-
-class CloudSyncFacade {
-  CloudSyncFacade._({
-    required this.configStore,
-    required this.snapshotCodec,
-    required this.restoreApplier,
-    required CloudSyncRemoteClient Function(CloudSyncConfig config)
-    remoteClientFactory,
-  }) : _remoteClientFactory = remoteClientFactory;
-
-  final CloudSyncConfigStore configStore;
-  final CloudSyncSnapshotCodec snapshotCodec;
-  final CloudSyncRestoreApplier restoreApplier;
-  final CloudSyncRemoteClient Function(CloudSyncConfig config)
-  _remoteClientFactory;
-
-  CloudSyncRemoteClient remoteClient(CloudSyncConfig config) {
-    return _remoteClientFactory(config);
   }
 }

@@ -1,11 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/view/reader_control_motion.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
+import 'package:hazuki/features/reader/view/reader_page_indicator_overlay.dart';
+import 'package:hazuki/features/reader/view/reader_top_controls.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 
 class ReaderOverlayHost extends StatelessWidget {
@@ -25,6 +28,9 @@ class ReaderOverlayHost extends StatelessWidget {
     this.onPreviousChapter,
     this.onFavorite,
     this.onComments,
+    this.onTranslation,
+    this.onTranslationLongPress,
+    this.translationSelected = false,
     this.onNextChapter,
     required this.onResetZoom,
   });
@@ -43,6 +49,9 @@ class ReaderOverlayHost extends StatelessWidget {
   final VoidCallback? onPreviousChapter;
   final VoidCallback? onFavorite;
   final VoidCallback? onComments;
+  final VoidCallback? onTranslation;
+  final VoidCallback? onTranslationLongPress;
+  final bool translationSelected;
   final VoidCallback? onNextChapter;
   final VoidCallback onResetZoom;
 
@@ -61,11 +70,10 @@ class ReaderOverlayHost extends StatelessWidget {
                 : const Offset(0, -1),
             duration: const Duration(milliseconds: 360),
             curve: Curves.easeOutBack,
-            child: buildReaderTopControls(
-              context: context,
-              runtimeState: runtimeState,
+            child: ReaderTopControls(
               readerTheme: readerTheme,
               title: title,
+              settingsTooltip: l10n(context).readingSettingsTitle,
               onBackPressed: onBackPressed,
               onOpenSettingsDrawer: onOpenSettingsDrawer,
             ),
@@ -83,10 +91,11 @@ class ReaderOverlayHost extends StatelessWidget {
                 : Offset.zero,
             duration: const Duration(milliseconds: 360),
             curve: Curves.easeOutBack,
-            child: buildReaderPageIndicator(
-              runtimeState: runtimeState,
+            child: ReaderPageIndicatorOverlay(
               readerTheme: readerTheme,
+              pageIndexNotifier: runtimeState.pageIndexNotifier,
               chapterIndex: chapterIndex,
+              imageCount: runtimeState.readerSpreadCount,
             ),
           ),
         ),
@@ -112,14 +121,17 @@ class ReaderOverlayHost extends StatelessWidget {
           onPreviousChapter: onPreviousChapter,
           onFavorite: onFavorite,
           onComments: onComments,
+          onTranslation: onTranslation,
+          onTranslationLongPress: onTranslationLongPress,
+          translationSelected: translationSelected,
           onNextChapter: onNextChapter,
           onResetZoom: onResetZoom,
         ),
       ),
     ];
     // Sliding controls must not repaint the comic or the surrounding scaffold.
-    // Keep the glass live: repaint boundaries retain display lists, rather than
-    // taking a background snapshot that would become stale on page changes.
+    // Windows shares a repaint-driven content texture between the glass
+    // controls; page changes update it without repainting the comic for slides.
     final content = RepaintBoundary(child: child);
     final controls = Positioned.fill(
       child: RepaintBoundary(child: Stack(children: overlays)),
@@ -132,6 +144,7 @@ class ReaderOverlayHost extends StatelessWidget {
     return GlassScaffold(
       backgroundColor: readerTheme.colorScheme.surface,
       enableBackgroundSampling: false,
+      enableBackdropRefraction: true,
       resizeToAvoidBottomInset: false,
       edgeFade: false,
       body: content,

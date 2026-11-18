@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -9,12 +10,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/content/source_cloud_reading.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_initialization_operations.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hazuki/services/source/models/source_task.dart';
 
-class _Operations extends Fake implements SourceRuntimeOperations {
+class _Operations extends Fake
+    implements SourceRuntimeInitializationOperations {
   Future<void>? delay;
   int initializationCalls = 0;
   @override
@@ -24,7 +27,15 @@ class _Operations extends Fake implements SourceRuntimeOperations {
   }
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'installation derives cloud policy from callback declarations and rejects history alone',
@@ -50,12 +61,12 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'sample',
           name: 'Sample',
           fileName: 'sample.js',
-          directUrls: [],
         ),
       ],
       defaultSourceKey: 'sample',
@@ -65,9 +76,9 @@ void main() {
       isLoggedForSource: (_) => false,
     );
     await host.activeHandle.session.ensurePrefs();
-    engine = SourceScriptEngine();
+    engine = SourceScriptEngine(sourceUiService: sourceUiService);
     host.activeHandle.runtime.engine = engine;
-    engine.evaluate('globalThis.__hazuki_source = {comic:{}}');
+    await engine.evaluate('globalThis.__hazuki_source = {comic:{}}');
     cloud = SourceCloudReadingCapability(host, _Operations());
   });
   tearDown(() {
@@ -90,11 +101,11 @@ void main() {
         host.activeHandle.runtime.engine = null;
         engine.close();
       } else if (declaration == 'uploadOnly') {
-        engine.evaluate(
+        await engine.evaluate(
           'globalThis.__hazuki_source.comic.onReadingProgress=()=>{}',
         );
       } else if (declaration == 'progressOnly') {
-        engine.evaluate(
+        await engine.evaluate(
           'globalThis.__hazuki_source.comic.loadReadingProgress=()=>null',
         );
       }
@@ -110,7 +121,7 @@ void main() {
   test('logged-out cloud history skips network initialization', () async {
     cloud.dispose();
     final operations = _Operations();
-    engine.evaluate('''
+    await engine.evaluate('''
       globalThis.__hazuki_source.comic = {
         loadReadingProgress: () => { throw Error('login required'); },
         loadReadingHistory: () => { throw Error('login required'); }
@@ -125,11 +136,11 @@ void main() {
   test(
     'upload-only declaration preserves legacy mode; reader requires login',
     () async {
-      engine.evaluate(
+      await engine.evaluate(
         'globalThis.__hazuki_source.comic.onReadingProgress = () => {}',
       );
       expect(await cloud.usesCloudReading('sample'), isFalse);
-      engine.evaluate(
+      await engine.evaluate(
         'globalThis.__hazuki_source.comic.loadReadingProgress = () => null',
       );
       expect(await cloud.usesCloudReading('sample'), isTrue);
@@ -139,7 +150,7 @@ void main() {
       );
       await login('account-one');
       expect(await cloud.loadCloudReadingProgress('sample', 'c'), isNull);
-      engine.evaluate(
+      await engine.evaluate(
         'globalThis.__hazuki_source.comic.loadReadingProgress = () => { throw Error("offline") }',
       );
       await expectLater(
@@ -156,11 +167,14 @@ void main() {
       final waiting = Completer<void>();
       final operations = _Operations()..delay = waiting.future;
       cloud = SourceCloudReadingCapability(host, operations);
-      engine.evaluate(
+      await engine.evaluate(
         'globalThis.__hazuki_source.comic.loadReadingProgress=()=>null',
       );
       final pending = cloud.usesCloudReading('sample');
-      final assertion = expectLater(pending, throwsStateError);
+      final assertion = expectLater(
+        pending,
+        throwsA(isA<SourceTaskCancelled>()),
+      );
       await host.replaceCatalog(const []);
       waiting.complete();
       await assertion;
@@ -170,7 +184,7 @@ void main() {
   test(
     'imports every page, deduplicates and clears cache on account change',
     () async {
-      engine.evaluate('''
+      await engine.evaluate('''
       globalThis.calls=[];
       globalThis.__hazuki_source.comic={
         loadReadingProgress:()=>null,
@@ -182,8 +196,8 @@ void main() {
       await login('first');
       final history = await cloud.refreshCloudReadingHistory('sample');
       expect(history.map((c) => c.id), ['1', '2']);
-      expect(engine.evaluate('JSON.stringify(calls)'), '[1,2,3,4]');
-      engine.evaluate(
+      expect(await engine.evaluate('JSON.stringify(calls)'), '[1,2,3,4]');
+      await engine.evaluate(
         'globalThis.__hazuki_source.comic.loadReadingHistory=()=>{throw Error("offline")}',
       );
       expect((await cloud.refreshCloudReadingHistory('sample')).length, 2);
@@ -194,12 +208,12 @@ void main() {
   test('late progress from a replaced account is rejected', () async {
     final delayed = Completer<Object?>();
     engine.setMessageHandler((_) => delayed.future);
-    engine.evaluate(
+    await engine.evaluate(
       'globalThis.__hazuki_source.comic.loadReadingProgress=()=>sendMessage({method:"wait"})',
     );
     await login('first');
     final pending = cloud.loadCloudReadingProgress('sample', 'c');
-    final assertion = expectLater(pending, throwsStateError);
+    final assertion = expectLater(pending, throwsA(isA<SourceTaskCancelled>()));
     await Future<void>.delayed(Duration.zero);
     await login('second');
     delayed.complete({'chapterId': 'old', 'page': 30});
@@ -227,7 +241,7 @@ void main() {
       () async {
         cloud.dispose();
         final http = _PendingHttp();
-        engine.evaluate(
+        await engine.evaluate(
           'globalThis.__hazuki_source.comic.loadReadingProgress=()=>null',
         );
         cloud = SourceCloudReadingCapability(
@@ -240,16 +254,18 @@ void main() {
               activeHandle: () => handle,
             );
             bridge.configureDioCookieBridge(handle);
-            final isolated = SourceScriptEngine();
+            final isolated = SourceScriptEngine(
+              sourceUiService: sourceUiService,
+            );
             handle.runtime.engine = isolated;
             isolated.setMessageHandler(
               (message) => bridge.handleJsMessageForHandle(handle, message),
             );
-            isolated.evaluate(File('assets/init.js').readAsStringSync());
-            isolated.evaluate(
+            await isolated.evaluate(File('assets/init.js').readAsStringSync());
+            await isolated.evaluate(
               File('assets/hazuki_plugin_sdk.js').readAsStringSync(),
             );
-            isolated.evaluate(
+            await isolated.evaluate(
               '''Hazuki.registerSource({id:'sample',search:{load:()=>({comics:[]})},comic:{
         loadInfo:()=>({title:'Test'}),loadEp:()=>({images:[]}),
         loadReadingProgress:async()=>{
@@ -261,7 +277,10 @@ void main() {
         );
         await login('first');
         final pending = cloud.loadCloudReadingProgress('sample', 'c');
-        final assertion = expectLater(pending, throwsStateError);
+        final assertion = expectLater(
+          pending,
+          throwsA(isA<SourceTaskCancelled>()),
+        );
         await http.started.future;
         if (logout) {
           await SourceAccountSessionCapability(runtimeHost: host).logout();

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/preferences/hazuki_preference_keys.dart';
 import 'reader_filter_color.dart';
 import 'reader_mode.dart';
 
@@ -21,7 +22,6 @@ class ReaderSettingsSnapshot {
     required this.filterStrength,
     required this.pageIndicator,
     required this.pinchToZoom,
-    required this.longPressToSave,
   });
 
   final ReaderMode readerMode;
@@ -37,14 +37,14 @@ class ReaderSettingsSnapshot {
   final double filterStrength;
   final bool pageIndicator;
   final bool pinchToZoom;
-  final bool longPressToSave;
 }
 
 class ReaderSettingsStore {
   const ReaderSettingsStore();
 
-  static const String readingModeKey = 'reader_reading_mode';
-  static const String doublePageModeKey = 'reader_double_page_mode';
+  static const String readingModeKey = hazukiReaderReadingModePreferenceKey;
+  static const String doublePageModeKey =
+      hazukiReaderDoublePageModePreferenceKey;
   static const String tapToTurnPageKey = 'reader_tap_to_turn_page';
   static const String volumeButtonTurnPageKey =
       'reader_volume_button_turn_page';
@@ -52,12 +52,13 @@ class ReaderSettingsStore {
   static const String keepScreenOnKey = 'reader_keep_screen_on';
   static const String customBrightnessKey = 'reader_custom_brightness';
   static const String brightnessValueKey = 'reader_brightness_value';
-  static const String filterEnabledKey = 'reader_filter_enabled';
-  static const String filterColorKey = 'reader_filter_color';
-  static const String filterStrengthKey = 'reader_filter_strength';
+  static const String filterEnabledKey = hazukiReaderFilterEnabledPreferenceKey;
+  static const String filterColorKey = hazukiReaderFilterColorPreferenceKey;
+  static const String filterStrengthKey =
+      hazukiReaderFilterStrengthPreferenceKey;
   static const String pageIndicatorKey = 'reader_page_indicator';
   static const String pinchToZoomKey = 'reader_pinch_to_zoom';
-  static const String longPressToSaveKey = 'reader_long_press_save';
+  static const String restorePagePositionKey = 'reader_restore_page_position';
   static const String windowsShortcutsGuideSeenKey =
       'reader_windows_shortcuts_guide_seen';
 
@@ -74,7 +75,7 @@ class ReaderSettingsStore {
   static const double defaultFilterStrength = 0.3;
   static const bool defaultPageIndicator = false;
   static const bool defaultPinchToZoom = false;
-  static const bool defaultLongPressToSave = false;
+  static const bool defaultRestorePagePosition = false;
 
   Future<ReaderSettingsSnapshot> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -98,8 +99,6 @@ class ReaderSettingsStore {
       ),
       pageIndicator: prefs.getBool(pageIndicatorKey) ?? defaultPageIndicator,
       pinchToZoom: prefs.getBool(pinchToZoomKey) ?? defaultPinchToZoom,
-      longPressToSave:
-          prefs.getBool(longPressToSaveKey) ?? defaultLongPressToSave,
     );
   }
 
@@ -155,8 +154,14 @@ class ReaderSettingsStore {
     return _saveBool(pinchToZoomKey, value);
   }
 
-  Future<void> saveLongPressToSave(bool value) {
-    return _saveBool(longPressToSaveKey, value);
+  /// 仅在进入阅读器时读取一次，不放入快照，避免影响阅读器内设置抽屉。
+  Future<bool> loadRestorePagePosition() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(restorePagePositionKey) ?? defaultRestorePagePosition;
+  }
+
+  Future<void> saveRestorePagePosition(bool value) {
+    return _saveBool(restorePagePositionKey, value);
   }
 
   Future<bool> hasSeenWindowsShortcutsGuide() async {

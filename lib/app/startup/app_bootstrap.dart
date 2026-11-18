@@ -4,7 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'package:hazuki/app/app_settings_store.dart';
-import 'package:hazuki/app/appearance_settings.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
@@ -45,7 +45,7 @@ Future<AppBootstrapResult> bootstrapApp() async {
   // native launch screen visible for the slowest task instead of their sum.
   await Future.wait<void>([
     loadHazukiUiFlags(),
-    hazukiChineseConversion.load(),
+    sl<ChineseConversionService>().load(),
     sourcePreferenceFuture,
     sourcePreferenceFuture
         .then((_) => sl<SourceDebugGateway>().loadSoftwareLogCaptureEnabled())

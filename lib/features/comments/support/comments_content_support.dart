@@ -1,5 +1,5 @@
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -87,6 +87,13 @@ List<InlineSpan> buildCommentContentSpans(
 }
 
 String commentPreviewText(String content) {
+  return commentLayoutText(
+    content,
+  ).replaceAll('\n', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+/// 保留换行的纯文本，用于测量评论实际渲染行数（图片以 alt 文本近似）。
+String commentLayoutText(String content) {
   if (content.isEmpty) {
     return '';
   }
@@ -115,11 +122,7 @@ String commentPreviewText(String content) {
     buffer.write(normalizeCommentText(content.substring(start)));
   }
 
-  return buffer
-      .toString()
-      .replaceAll('\n', ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
+  return buffer.toString();
 }
 
 String commentFilterText(String content) => commentPreviewText(content);
@@ -203,7 +206,7 @@ InlineSpan _buildCommentImageSpan({
   required TextStyle? style,
 }) {
   if (hazukiNoImageModeNotifier.value) {
-    return TextSpan(text: alt.isEmpty ? '[鐞涖劍鍎廬' : alt, style: style);
+    return TextSpan(text: alt.isEmpty ? '[表情]' : alt, style: style);
   }
 
   final baseFontSize =
@@ -213,7 +216,7 @@ InlineSpan _buildCommentImageSpan({
     fontSize: baseFontSize * 0.85,
     height: 1,
   );
-  final fallbackText = alt.isEmpty ? '[鐞涖劍鍎廬' : alt;
+  final fallbackText = alt.isEmpty ? '[表情]' : alt;
 
   Widget buildFallback() {
     return SizedBox(

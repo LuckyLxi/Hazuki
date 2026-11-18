@@ -2,18 +2,19 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/reader/support/reader_image_actions_service.dart';
+import 'package:hazuki/services/media/image_actions_service.dart';
 import 'package:hazuki/features/reader/support/reader_save_image_controller.dart';
 import 'package:hazuki/features/reader/view/reader_image_actions_sheet.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _Source extends Mock implements SourceReaderGateway {}
 
-class _ImageActions extends Mock implements ReaderImageActionsService {}
+class _ImageActions extends Mock implements ImageActionsService {}
 
 void main() {
   const url = 'https://example.com/page.jpg';
@@ -32,7 +33,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         theme: ThemeData(
           brightness: brightness,
@@ -105,6 +106,7 @@ void main() {
       expect(find.text('分享'), findsNothing);
       expect(find.text('复制图片'), findsOneWidget);
       expect(find.text('保存图片'), findsOneWidget);
+      expect(find.text('重新翻译图片'), findsNothing);
       expect(find.byType(Divider), findsOneWidget);
 
       await tester.tap(
@@ -122,11 +124,16 @@ void main() {
     }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
   }
 
-  for (final action in ReaderImageAction.values) {
+  for (final action in [
+    ReaderImageAction.share,
+    ReaderImageAction.copy,
+    ReaderImageAction.save,
+  ]) {
     final label = switch (action) {
       ReaderImageAction.share => '分享',
       ReaderImageAction.copy => '复制图片',
       ReaderImageAction.save => '保存图片',
+      ReaderImageAction.retranslate => '重新翻译图片',
     };
     testWidgets(
       '$label uses processed image bytes and the resulting extension',
@@ -156,12 +163,41 @@ void main() {
           case ReaderImageAction.save:
             verify(() => media.saveImage(bytes, 'png', 'page.png')).called(1);
             expect(find.text('已保存'), findsOneWidget);
+          case ReaderImageAction.retranslate:
+            fail('Retranslation should not prepare image bytes');
         }
         verifyNoMoreInteractions(media);
         await finish(tester);
       },
     );
   }
+
+  testWidgets('retranslation runs only the selected image callback', (
+    tester,
+  ) async {
+    await pumpReader(tester);
+    String? selected;
+    final pending = controller.showSaveImageDialog(
+      url,
+      onRetranslate: () => selected = url,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('重新翻译图片'), findsOneWidget);
+    await tester.tap(find.text('重新翻译图片'));
+    await tester.pumpAndSettle();
+    await pending;
+    expect(selected, url);
+    verifyNever(
+      () => source.prepareChapterImageData(
+        url,
+        comicId: 'comic',
+        epId: 'chapter',
+        sourceKey: 'source',
+      ),
+    );
+    verifyZeroInteractions(media);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final brightness in Brightness.values) {
     testWidgets(

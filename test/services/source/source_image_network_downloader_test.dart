@@ -1,7 +1,23 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/services/source/account/source_login_interaction.dart';
 import 'package:hazuki/services/source/image/source_image_network_downloader.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/models/source_script_execution.dart';
+import 'package:hazuki/services/source/models/source_task.dart';
+import 'package:hazuki/services/source/runtime/source_host_call_context.dart';
+
+SourceScriptStopped _scriptStopped(String reason) => SourceScriptStopped(
+  execution: const SourceScriptExecution(
+    taskId: 'image-task',
+    pluginId: 'source',
+    method: 'image.load',
+  ),
+  runtimeId: 'runtime',
+  nativeToken: 1,
+  reason: reason,
+);
 
 void main() {
   test('merges source headers and cookies into the byte request', () async {
@@ -104,6 +120,55 @@ void main() {
 
       expect(await downloader.download('url'), [9]);
       expect(requestedHeaders, {'cookie': 'runtime=cookie'});
+    },
+  );
+
+  for (final entry in <String, Object>{
+    'task cancellation': const SourceTaskCancelled(
+      'image-task',
+      SourceTaskStopReason.user,
+    ),
+    'UI cancellation': const SourceUiCancelled('ownerGone'),
+    'login cancellation': const SourceLoginCancelled(),
+    'script stop': _scriptStopped('cancelled'),
+  }.entries) {
+    test('propagates ${entry.key} without sending a byte request', () async {
+      var requests = 0;
+      final downloader = SourceImageNetworkDownloader(
+        resolveLoadConfig: (_, _, _) => Future.error(entry.value),
+        resolveCookie: (_) => null,
+        requestBytes: (_, _) async {
+          requests++;
+          return const SourceImageBytesResponse(statusCode: 200, data: [1]);
+        },
+      );
+
+      await expectLater(
+        downloader.download('https://image.test/1.jpg'),
+        throwsA(same(entry.value)),
+      );
+      expect(requests, 0);
+    });
+  }
+
+  test(
+    'falls back to the original request when a hook dependency stops',
+    () async {
+      var requests = 0;
+      final downloader = SourceImageNetworkDownloader(
+        resolveLoadConfig: (_, _, _) =>
+            Future.error(_scriptStopped('dependencyStopped')),
+        resolveCookie: (_) => 'runtime=cookie',
+        requestBytes: (url, headers) async {
+          requests++;
+          expect(url, 'https://image.test/1.jpg');
+          expect(headers, {'cookie': 'runtime=cookie'});
+          return const SourceImageBytesResponse(statusCode: 200, data: [9]);
+        },
+      );
+
+      expect(await downloader.download('https://image.test/1.jpg'), [9]);
+      expect(requests, 1);
     },
   );
 

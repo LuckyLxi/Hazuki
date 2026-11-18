@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,7 +9,15 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late SourceRuntimeHost host;
@@ -16,13 +25,9 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues(const {});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
-        SourceCatalogEntry(
-          key: 'jm',
-          name: 'JMComic',
-          fileName: 'jm.js',
-          directUrls: [],
-        ),
+        SourceCatalogEntry(key: 'jm', name: 'JMComic', fileName: 'jm.js'),
       ],
       defaultSourceKey: 'jm',
       secureSessionStorage: MemorySourceSecureSessionStorage(),
@@ -94,8 +99,10 @@ void main() {
 
   test('profile refresh failure falls back to persisted avatar', () async {
     final facade = host.activeHandle.facade;
-    facade.runtime.engine = SourceScriptEngine()
-      ..evaluate('''
+    facade.runtime.engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+    );
+    await facade.runtime.engine!.evaluate('''
         this.__hazuki_source = {account: {loadProfile() {
           throw new Error('offline');
         }}};
@@ -111,12 +118,12 @@ void main() {
     final refresh = Completer<dynamic>();
     var calls = 0;
     final facade = host.activeHandle.facade;
-    facade.runtime.engine = SourceScriptEngine()
+    facade.runtime.engine = SourceScriptEngine(sourceUiService: sourceUiService)
       ..setMessageHandler((_) {
         calls++;
         return refresh.future;
-      })
-      ..evaluate('''
+      });
+    await facade.runtime.engine!.evaluate('''
         this.__hazuki_source = {account: {loadProfile: () => sendMessage({})}};
       ''');
     final sideData = SourceLoginSideDataOperations(runtimeHost: host);
@@ -132,9 +139,9 @@ void main() {
   test('timed-out profile uses cache and ignores the late result', () async {
     final refresh = Completer<dynamic>();
     final facade = host.activeHandle.facade;
-    facade.runtime.engine = SourceScriptEngine()
-      ..setMessageHandler((_) => refresh.future)
-      ..evaluate('''
+    facade.runtime.engine = SourceScriptEngine(sourceUiService: sourceUiService)
+      ..setMessageHandler((_) => refresh.future);
+    await facade.runtime.engine!.evaluate('''
         this.__hazuki_source = {account: {loadProfile: () => sendMessage({})}};
       ''');
     await facade.saveSourceData('jm', 'avatar_url', 'https://example/cached');
@@ -156,12 +163,13 @@ void main() {
       final requested = Completer<void>();
       final facade = host.activeHandle.facade;
       await facade.saveSourceData('jm', 'login_session', 'session');
-      facade.runtime.engine = SourceScriptEngine()
-        ..setMessageHandler((_) {
-          requested.complete();
-          return refresh.future;
-        })
-        ..evaluate('''
+      facade.runtime.engine =
+          SourceScriptEngine(sourceUiService: sourceUiService)
+            ..setMessageHandler((_) {
+              requested.complete();
+              return refresh.future;
+            });
+      await facade.runtime.engine!.evaluate('''
         this.__hazuki_source = {account: {loadProfile: () => sendMessage({})}};
       ''');
       final sideData = SourceLoginSideDataOperations(runtimeHost: host);

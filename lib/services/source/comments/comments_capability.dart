@@ -1,3 +1,6 @@
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:convert';
 
 import '../../../models/hazuki_models.dart';
@@ -10,12 +13,14 @@ import '../runtime/source_runtime_host.dart';
 class SourceCommentsCapability {
   SourceCommentsCapability({
     required SourceRuntimeHost runtimeHost,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
   }) : _runtimeHost = runtimeHost,
        _reloginCoordinator = reloginCoordinator;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
 
   String _resolveSourceKey(String sourceKey) => sourceKey.trim().isEmpty
       ? _runtimeHost.activeSourceKey
@@ -25,11 +30,12 @@ class SourceCommentsCapability {
       _runtimeHost.handleFor(_resolveSourceKey(sourceKey)).facade;
 
   Future<T> _runWithReloginRetry<T>(
-    Future<T> Function() action, {
-    required HazukiSourceFacade facade,
-  }) => _reloginCoordinator.runWithReloginRetry(
+    SourceOperationContext operationContext,
+    Future<T> Function() action,
+  ) => _reloginCoordinator.runWithReloginRetry(
     action,
-    context: SourceFacadeReloginContext(facade),
+    context: SourceRuntimeReloginContext(operationContext.resource),
+    checkActive: operationContext.checkActive,
   );
 
   Future<ComicCommentsPageResult> loadCommentsPage({
@@ -41,52 +47,85 @@ class SourceCommentsCapability {
     int pageSize = 16,
     String? replyTo,
     String order = '',
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.handleFor(_resolveSourceKey(sourceKey)),
+    'comments.load',
+    (operationContext) => _loadCommentsPageTask(
+      operationContext,
+      comicId: comicId,
+      subId: subId,
+      chapterId: chapterId,
+      sourceKey: sourceKey,
+      page: page,
+      pageSize: pageSize,
+      replyTo: replyTo,
+      order: order,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<ComicCommentsPageResult> _loadCommentsPageTask(
+    SourceOperationContext operationContext, {
+    required String comicId,
+    String? subId,
+    String? chapterId,
+    String sourceKey = '',
+    int page = 1,
+    int pageSize = 16,
+    String? replyTo,
+    String order = '',
   }) async {
     final resolvedSourceKey = _resolveSourceKey(sourceKey);
     final facade = _facadeFor(resolvedSourceKey);
-    await facade.ensureInitialized();
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final subIdArg = subId == null ? 'null' : jsonEncode(subId);
-    final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
-    final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
-    final orderArg = jsonEncode(
-      commentSortOptionsForSource(resolvedSourceKey).normalize(order),
-    );
-    final hasChapterComments =
-        chapterId?.isNotEmpty == true &&
-        facade.js.asBool(
-          facade.js.evaluate(
-            '!!this.__hazuki_source.comic?.loadChapterComments',
-          ),
-        );
-    final dynamic result = engine.evaluate(
-      hasChapterComments
-          ? 'this.__hazuki_source.comic.loadChapterComments(${jsonEncode(comicId)}, $chapterIdArg, $page, $replyToArg, $orderArg)'
-          : 'this.__hazuki_source.comic.loadComments(${jsonEncode(comicId)}, $subIdArg, $page, $replyToArg, $orderArg)',
-      name: 'source_comments.js',
-    );
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! Map) {
-      return const ComicCommentsPageResult(comments: [], maxPage: null);
-    }
-
-    final resultMap = Map<String, dynamic>.from(resolved);
-    final commentsRaw = resultMap['comments'];
-    if (commentsRaw is! List) {
-      return ComicCommentsPageResult(
-        comments: const [],
-        maxPage: jsAsInt(resultMap['maxPage']),
+      final subIdArg = subId == null ? 'null' : jsonEncode(subId);
+      final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
+      final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
+      final orderArg = jsonEncode(
+        commentSortOptionsForSource(resolvedSourceKey).normalize(order),
       );
-    }
+      final hasChapterComments =
+          chapterId?.isNotEmpty == true &&
+          facade.js.asBool(
+            await operationContext.evaluate(
+              engine,
+              '!!this.__hazuki_source.comic?.loadChapterComments',
+            ),
+          );
+      final dynamic result = await operationContext.evaluate(
+        engine,
+        hasChapterComments
+            ? 'this.__hazuki_source.comic.loadChapterComments(${jsonEncode(comicId)}, $chapterIdArg, $page, $replyToArg, $orderArg)'
+            : 'this.__hazuki_source.comic.loadComments(${jsonEncode(comicId)}, $subIdArg, $page, $replyToArg, $orderArg)',
+        name: 'source_comments.js',
+      );
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
+      if (resolved is! Map) {
+        return const ComicCommentsPageResult(comments: [], maxPage: null);
+      }
 
-    final all = commentsRaw.whereType<Map>().map((e) {
-      final map = Map<String, dynamic>.from(e);
-      return ComicCommentData(
+      final resultMap = Map<String, dynamic>.from(resolved);
+      final commentsRaw = resultMap['comments'];
+      if (commentsRaw is! List) {
+        return ComicCommentsPageResult(
+          comments: const [],
+          maxPage: jsAsInt(resultMap['maxPage']),
+        );
+      }
+
+      ComicCommentData parseComment(Map map) => ComicCommentData(
         avatar: map['avatar']?.toString() ?? '',
         userName: map['userName']?.toString() ?? '',
         time: map['time']?.toString() ?? '',
@@ -96,17 +135,26 @@ class SourceCommentsCapability {
         isLiked: map['isLiked'] is bool ? map['isLiked'] as bool : null,
         score: jsAsInt(map['score']),
         voteStatus: jsAsInt(map['voteStatus']),
+        canUnlike: map['canUnlike'] != false,
       );
-    }).toList();
+      final all = commentsRaw.whereType<Map>().map((map) {
+        final quotes = map['quotedComments'];
+        return parseComment(map).copyWith(
+          quotedComments: quotes is List
+              ? quotes.whereType<Map>().map(parseComment).toList()
+              : const [],
+        );
+      }).toList();
 
-    final comments = (pageSize <= 0 || all.length <= pageSize)
-        ? all
-        : all.sublist(0, pageSize);
+      final comments = (pageSize <= 0 || all.length <= pageSize)
+          ? all
+          : all.sublist(0, pageSize);
 
-    return ComicCommentsPageResult(
-      comments: comments,
-      maxPage: jsAsInt(resultMap['maxPage']),
-    );
+      return ComicCommentsPageResult(
+        comments: comments,
+        maxPage: jsAsInt(resultMap['maxPage']),
+      );
+    });
   }
 
   Future<List<ComicCommentData>> loadComments({
@@ -118,8 +166,39 @@ class SourceCommentsCapability {
     int pageSize = 16,
     String? replyTo,
     String order = '',
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.handleFor(_resolveSourceKey(sourceKey)),
+    'comments.list',
+    (operationContext) => _loadCommentsTask(
+      operationContext,
+      comicId: comicId,
+      subId: subId,
+      chapterId: chapterId,
+      sourceKey: sourceKey,
+      page: page,
+      pageSize: pageSize,
+      replyTo: replyTo,
+      order: order,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<List<ComicCommentData>> _loadCommentsTask(
+    SourceOperationContext operationContext, {
+    required String comicId,
+    String? subId,
+    String? chapterId,
+    String sourceKey = '',
+    int page = 1,
+    int pageSize = 16,
+    String? replyTo,
+    String order = '',
   }) async {
-    final result = await loadCommentsPage(
+    final result = await _loadCommentsPageTask(
+      operationContext,
       comicId: comicId,
       subId: subId,
       chapterId: chapterId,
@@ -146,42 +225,73 @@ class SourceCommentsCapability {
     String sourceKey = '',
     required String content,
     String? replyTo,
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.handleFor(_resolveSourceKey(sourceKey)),
+    'comments.send',
+    (operationContext) => _sendCommentTask(
+      operationContext,
+      comicId: comicId,
+      subId: subId,
+      chapterId: chapterId,
+      sourceKey: sourceKey,
+      content: content,
+      replyTo: replyTo,
+    ),
+    origin: taskOrigin,
+    serviceOwned: true,
+    sensitiveValues: [content, comicId],
+  );
+
+  Future<void> _sendCommentTask(
+    SourceOperationContext operationContext, {
+    required String comicId,
+    String? subId,
+    String? chapterId,
+    String sourceKey = '',
+    required String content,
+    String? replyTo,
   }) async {
-    final facade = _facadeFor(sourceKey);
-    await facade.ensureInitialized();
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final text = content.trim();
-    if (text.isEmpty) {
-      throw Exception('comment_content_empty');
-    }
+      final text = content.trim();
+      if (text.isEmpty) {
+        throw Exception('comment_content_empty');
+      }
 
-    final subIdArg = subId == null ? 'null' : jsonEncode(subId);
-    final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
-    final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
+      final subIdArg = subId == null ? 'null' : jsonEncode(subId);
+      final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
+      final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
 
-    Future<void> runSend() async {
-      final hasChapterComments =
-          chapterId?.isNotEmpty == true &&
-          facade.js.asBool(
-            facade.js.evaluate(
-              '!!this.__hazuki_source.comic?.sendChapterComment',
-            ),
-          );
-      final dynamic result = engine.evaluate(
-        hasChapterComments
-            ? 'this.__hazuki_source.comic.sendChapterComment(${jsonEncode(comicId)}, $chapterIdArg, ${jsonEncode(text)}, $replyToArg)'
-            : 'this.__hazuki_source.comic.sendComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(text)}, $replyToArg)',
-        name: 'source_send_comment.js',
-      );
-      await facade.js.resolve(result);
-    }
+      Future<void> runSend() async {
+        final hasChapterComments =
+            chapterId?.isNotEmpty == true &&
+            facade.js.asBool(
+              await operationContext.evaluate(
+                engine,
+                '!!this.__hazuki_source.comic?.sendChapterComment',
+              ),
+            );
+        final dynamic result = await operationContext.evaluate(
+          engine,
+          hasChapterComments
+              ? 'this.__hazuki_source.comic.sendChapterComment(${jsonEncode(comicId)}, $chapterIdArg, ${jsonEncode(text)}, $replyToArg)'
+              : 'this.__hazuki_source.comic.sendComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(text)}, $replyToArg)',
+          name: 'source_send_comment.js',
+        );
+        await operationContext.resolve(facade.js.resolve(result));
+      }
 
-    await _runWithReloginRetry(runSend, facade: facade);
+      await _runWithReloginRetry(operationContext, runSend);
+    });
   }
 
   Future<void> likeComment({
@@ -190,26 +300,54 @@ class SourceCommentsCapability {
     String sourceKey = '',
     required String commentId,
     required bool isLike,
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.handleFor(_resolveSourceKey(sourceKey)),
+    'comments.like',
+    (operationContext) => _likeCommentTask(
+      operationContext,
+      comicId: comicId,
+      subId: subId,
+      sourceKey: sourceKey,
+      commentId: commentId,
+      isLike: isLike,
+    ),
+    origin: taskOrigin,
+    serviceOwned: true,
+    sensitiveValues: [comicId, commentId],
+  );
+
+  Future<void> _likeCommentTask(
+    SourceOperationContext operationContext, {
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    required String commentId,
+    required bool isLike,
   }) async {
-    final facade = _facadeFor(sourceKey);
-    await facade.ensureInitialized();
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final subIdArg = subId == null ? 'null' : jsonEncode(subId);
+      final subIdArg = subId == null ? 'null' : jsonEncode(subId);
 
-    Future<void> runLike() async {
-      final dynamic result = engine.evaluate(
-        'this.__hazuki_source.comic.likeComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(commentId)}, $isLike)',
-        name: 'source_like_comment.js',
-      );
-      await facade.js.resolve(result);
-    }
+      Future<void> runLike() async {
+        final dynamic result = await operationContext.evaluate(
+          engine,
+          'this.__hazuki_source.comic.likeComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(commentId)}, $isLike)',
+          name: 'source_like_comment.js',
+        );
+        await operationContext.resolve(facade.js.resolve(result));
+      }
 
-    await _runWithReloginRetry(runLike, facade: facade);
+      await _runWithReloginRetry(operationContext, runLike);
+    });
   }
 
   bool supportCommentSendForSource(String sourceKey) {
@@ -219,7 +357,7 @@ class SourceCommentsCapability {
       return false;
     }
     return facade.js.asBool(
-      facade.js.evaluate('!!this.__hazuki_source.comic?.sendComment'),
+      facade.js.cachedValue('!!this.__hazuki_source.comic?.sendComment'),
     );
   }
 
@@ -230,7 +368,7 @@ class SourceCommentsCapability {
       return false;
     }
     return facade.js.asBool(
-      facade.js.evaluate('!!this.__hazuki_source.comic?.likeComment'),
+      facade.js.cachedValue('!!this.__hazuki_source.comic?.likeComment'),
     );
   }
 
@@ -242,7 +380,7 @@ class SourceCommentsCapability {
       return false;
     }
     return facade.js.asBool(
-      facade.js.evaluate(
+      facade.js.cachedValue(
         '!!this.__hazuki_source.comic?.loadComments && this.__hazuki_source.presentation?.commentReplies == true',
       ),
     );

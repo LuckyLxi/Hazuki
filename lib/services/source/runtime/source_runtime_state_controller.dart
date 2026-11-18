@@ -20,8 +20,7 @@ class SourceRuntimeStateController {
       debugDetail: debugDetail,
       error: error?.toString(),
     );
-    facade.runtimeState = next;
-    facade.statusText = next.statusText;
+    facade.runtime.updateRuntimeState(next);
     facade.notifyRuntimeStateChanged();
   }
 
@@ -65,7 +64,7 @@ class SourceRuntimeStateController {
       error: error,
     );
     facade.addApplicationLog(
-      level: 'warning',
+      level: 'error',
       title: 'Source runtime failed',
       source: 'source_runtime',
       content: facade.runtimeState.toDebugMap(),

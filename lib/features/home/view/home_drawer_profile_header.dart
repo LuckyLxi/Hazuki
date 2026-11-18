@@ -1,8 +1,9 @@
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/features/home/support/home_sidebar_models.dart';
+import 'package:hazuki/features/home/view/home_drawer_snapshot.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
 import 'package:hazuki/features/home/view/home_source_switch_pill_button.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -134,9 +135,19 @@ class HomeDrawerProfileHeader extends StatelessWidget {
                       !profile.profileLoading &&
                       !profile.autoCheckInEnabled) ...[
                     const SizedBox(height: 16),
-                    _HomeDrawerCheckInButton(
-                      profile: profile,
-                      onPressed: actions.onCheckInPressed,
+                    SourcePluginButtonInteraction(
+                      id: 'checkIn',
+                      sourceKey: activeSourceKey,
+                      title: l10n(context).homeCheckInAction,
+                      enabled:
+                          actions.onCheckInPressed != null &&
+                          !profile.checkInBusy &&
+                          !profile.checkedInToday,
+                      onInvoke: () => actions.onCheckInPressed?.call(),
+                      builder: (context, activate) => _HomeDrawerCheckInButton(
+                        profile: profile,
+                        onPressed: activate,
+                      ),
                     ),
                   ],
                 ],
@@ -249,6 +260,7 @@ class _HomeDrawerProfileBackgroundState
       }
       _snapshotController.clear();
       _snapshotController.allowSnapshotting = true;
+      const HomeDrawerRepaintNotification().dispatch(context);
     });
   }
 
@@ -261,6 +273,13 @@ class _HomeDrawerProfileBackgroundState
     final outlineColor = widget.isDark
         ? Colors.white.withValues(alpha: 0.09)
         : Colors.white.withValues(alpha: 0.42);
+    // 随抽屉滑入时已缓存的背景直接显示，抽屉转场期间会被截取为静态缓存，
+    // 淡入既播放不出来，也会在转场结束时突然出现。
+    // Hero 测量期间路由先离屏构建一帧，此时其动画恒为完成态，需一并视为滑入中。
+    final route = ModalRoute.of(context);
+    final arrivingWithRoute =
+        route != null &&
+        (route.offstage || route.animation?.isCompleted == false);
 
     return SnapshotWidget(
       controller: _snapshotController,
@@ -293,7 +312,7 @@ class _HomeDrawerProfileBackgroundState
                           fit: BoxFit.cover,
                           ignoreNoImageMode: true,
                           animateOnLoad: true,
-                          animateOnCacheHit: true,
+                          animateOnCacheHit: !arrivingWithRoute,
                           waitForFirstFrame: true,
                           onRevealComplete: _handleRevealComplete,
                           onStateChanged: _handleImageStateChanged,

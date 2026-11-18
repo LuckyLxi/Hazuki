@@ -18,11 +18,7 @@ void main() {
         favoriteSortOrders: cloudOrders,
       );
       expect(actions.showSort, isTrue);
-      expect(actions.sortOrders, [
-        'savedNewest',
-        'savedOldest',
-        'updatedNewest',
-      ]);
+      expect(actions.sortOrders, ['savedNewest', 'savedOldest', 'readNewest']);
     }
   });
 
@@ -33,10 +29,11 @@ void main() {
         'mr': 'savedNewest',
         'dd': 'savedNewest',
         'da': 'savedOldest',
-        'mp': 'updatedNewest',
-        '-datetime_updated': 'updatedNewest',
+        'mp': 'readNewest',
+        '-datetime_updated': 'readNewest',
         '-datetime_modifier': 'savedNewest',
-        '-datetime_browse': 'savedNewest',
+        '-datetime_browse': 'readNewest',
+        'updatedNewest': 'readNewest',
         '': 'savedNewest',
         'unknown': 'savedNewest',
       }.entries) {
@@ -44,13 +41,18 @@ void main() {
       }
       final presentation = {
         'localFavoriteOrders': {
-          'custom': 'updatedNewest',
+          'custom': 'savedOldest',
+          'retired': 'updatedNewest',
           'savedOldest': 'savedNewest',
         },
       };
       expect(
         normalizeLocalFavoriteSort('custom', presentation: presentation),
-        'updatedNewest',
+        'savedOldest',
+      );
+      expect(
+        normalizeLocalFavoriteSort('retired', presentation: presentation),
+        'readNewest',
       );
       for (final order in localFavoriteSortOrders) {
         expect(

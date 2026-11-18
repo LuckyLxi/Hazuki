@@ -1,3 +1,5 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../../support/fake_source_task_control.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -19,7 +21,15 @@ Hazuki.registerSource({id:'website',version:'1.0.0',
 });
 ''';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourcePluginManager manager;
   late SourceRuntimeAssembly assembly;
@@ -34,6 +44,7 @@ void main() {
       legacyDirectories: [],
     );
     assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -75,6 +86,7 @@ void main() {
         final service = DiscoverDailyRecommendationService(
           source: gateway,
           cacheStore: cacheStore,
+          taskControl: FakeSourceTaskControl(),
         );
         addTearDown(service.dispose);
         final state = await service.ensurePrepared(enabled: true);
@@ -110,6 +122,7 @@ void main() {
         final restored = DiscoverDailyRecommendationService(
           source: gateway,
           cacheStore: cacheStore,
+          taskControl: FakeSourceTaskControl(),
         );
         addTearDown(restored.dispose);
         final cached = await restored.ensurePrepared(enabled: true);
@@ -125,7 +138,7 @@ void main() {
           );
         }
         expect(
-          assembly.testing
+          await assembly.testing
               .handleFor('website')
               .runtime
               .engine!
@@ -137,14 +150,17 @@ void main() {
           prefs.getString('discover_daily_recommendation_cache_website'),
           isNull,
         );
-        final nextSession = DiscoverDailyRecommendationService(source: gateway);
+        final nextSession = DiscoverDailyRecommendationService(
+          source: gateway,
+          taskControl: FakeSourceTaskControl(),
+        );
         addTearDown(nextSession.dispose);
         expect(
           (await nextSession.ensurePrepared(enabled: true)).recommendations,
           hasLength(count),
         );
         expect(
-          assembly.testing
+          await assembly.testing
               .handleFor('website')
               .runtime
               .engine!
@@ -164,6 +180,7 @@ void main() {
     await assembly.runtimeRegistry.ensureInitialized(sourceKey: 'website');
     final service = DiscoverDailyRecommendationService(
       source: assembly.gateways.dailyRecommendation,
+      taskControl: FakeSourceTaskControl(),
     );
     addTearDown(service.dispose);
     final entry = (await service.ensurePrepared(

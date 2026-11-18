@@ -1,10 +1,11 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/view/other/chinese_conversion_menu.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
 
 void main() {
@@ -18,7 +19,7 @@ void main() {
         key: captureKey,
         child: MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) => Scaffold(
@@ -50,9 +51,8 @@ void main() {
     await tester.pumpAndSettle();
 
     Future<void> expectBlurredFrame() async {
-      final rect = tester.getRect(
-        find.byKey(const ValueKey('chinese-conversion-menu-surface')),
-      );
+      // 菜单从入口按钮形变展开，动画途中外框始终覆盖按钮所在区域。
+      final rect = tester.getRect(find.byKey(anchorKey));
       final contrast = await tester.runAsync(() async {
         final boundary =
             captureKey.currentContext!.findRenderObject()
@@ -99,7 +99,7 @@ void main() {
     (const Size(740, 360), Brightness.dark, 2.0),
   ]) {
     testWidgets(
-      'menu opens above a bottom button and fits $size at scale $scale',
+      'menu overlaps a bottom button and fits $size at scale $scale',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -111,7 +111,7 @@ void main() {
           MaterialApp(
             theme: ThemeData(brightness: brightness),
             locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(
@@ -152,11 +152,12 @@ void main() {
           const ValueKey('chinese-conversion-menu-surface'),
         );
         final menuRect = tester.getRect(surface);
-        expect(menuRect.bottom, closeTo(buttonRect.top - 8, 0.1));
+        expect(menuRect.overlaps(buttonRect), isTrue);
         expect(menuRect.right, closeTo(buttonRect.right, 0.1));
         expect(menuRect.left, greaterThanOrEqualTo(12));
         expect(menuRect.top, greaterThanOrEqualTo(12));
         expect(menuRect.right, lessThanOrEqualTo(size.width - 12));
+        expect(menuRect.bottom, lessThanOrEqualTo(size.height - 12));
         final choice = find.byKey(
           const ValueKey('chinese-conversion-choice-simplified'),
         );
@@ -165,13 +166,16 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 80));
         expect(surface, findsOneWidget);
+        // 收起时菜单文字先淡出，外框随后缩回按钮。
         expect(
           tester
               .widget<Opacity>(
-                find.byKey(const ValueKey('chinese-conversion-menu-opacity')),
+                find.byKey(
+                  const ValueKey('chinese-conversion-menu-items-fade'),
+                ),
               )
               .opacity,
-          inExclusiveRange(0, 1),
+          lessThan(1),
         );
         await tester.pumpAndSettle();
         expect(surface, findsNothing);
@@ -188,7 +192,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => Scaffold(
@@ -215,7 +219,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     final opacity = find.byKey(
-      const ValueKey('chinese-conversion-menu-opacity'),
+      const ValueKey('chinese-conversion-menu-items-fade'),
     );
     final before = tester.widget<Opacity>(opacity).opacity;
     await tester.tapAt(const Offset(10, 500));

@@ -1,9 +1,52 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:hazuki/services/source/image/image_download_scheduler.dart';
 
 void main() {
+  test('cancel queued and granted work without leaking permits', () async {
+    final scheduler = ImageDownloadScheduler(maxConcurrent: 1);
+    final gate = Completer<void>();
+    final active = scheduler.schedule(
+      'active',
+      priority: false,
+      task: () => gate.future,
+    );
+    final queued = SourceTaskCancellation();
+    var ran = false;
+    final pending = scheduler.schedule(
+      'queued',
+      priority: false,
+      cancellation: queued,
+      task: () async {
+        ran = true;
+      },
+    );
+    final failed = expectLater(pending, throwsA(isA<SourceTaskCancelled>()));
+    queued.cancel(SourceTaskStopReason.ownerDisposed);
+    await failed;
+    final granted = SourceTaskCancellation();
+    final next = scheduler.schedule(
+      'granted',
+      priority: false,
+      cancellation: granted,
+      task: () async {
+        ran = true;
+      },
+    );
+    final nextFailed = expectLater(next, throwsA(isA<SourceTaskCancelled>()));
+    gate.complete();
+    scheduleMicrotask(() => granted.cancel(SourceTaskStopReason.superseded));
+    await active;
+    await nextFailed;
+    expect(ran, isFalse);
+    expect(
+      await scheduler.schedule('last', priority: false, task: () async => 42),
+      42,
+    );
+  });
+
   test('starts no more than the configured number of tasks', () async {
     final scheduler = ImageDownloadScheduler(maxConcurrent: 2);
     final started = <String>[];

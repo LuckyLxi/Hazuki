@@ -1,10 +1,12 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/account/source_browser_authorization.dart';
 import 'package:hazuki/services/source/account/source_external_authorization.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
@@ -26,7 +28,7 @@ void main() {
           addTearDown(tester.view.reset);
           final image = (await tester.runAsync(
             () => File(
-              'assets/images/downloaded_cover_placeholder.png',
+              'assets/images/downloaded_cover_placeholder.webp',
             ).readAsBytes(),
           ))!;
           final host = await _mount(tester, locale: locale);
@@ -114,7 +116,7 @@ void main() {
       addTearDown(tester.view.reset);
       final image = (await tester.runAsync(
         () => File(
-          'assets/images/downloaded_cover_placeholder.png',
+          'assets/images/downloaded_cover_placeholder.webp',
         ).readAsBytes(),
       ))!;
       final host = await _mount(tester);
@@ -195,7 +197,7 @@ void main() {
   ) async {
     final image = (await tester.runAsync(
       () =>
-          File('assets/images/downloaded_cover_placeholder.png').readAsBytes(),
+          File('assets/images/downloaded_cover_placeholder.webp').readAsBytes(),
     ))!;
     final host = await _mount(tester);
     final token = SourceLoginCancellation();
@@ -472,7 +474,7 @@ Future<({BuildContext context, _Observer observer})> _mount(
       gateway: const _Images(),
       child: MaterialApp(
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         navigatorObservers: [observer],
         home: Builder(
@@ -547,5 +549,6 @@ class _Images implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async => throw StateError('Unexpected image request');
 }

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -32,7 +33,15 @@ Hazuki.registerSource({
 });
 ''';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
   late SourcePluginManager manager;
@@ -53,6 +62,7 @@ void main() {
       download: (_) async => throw StateError('unexpected plugin download'),
     );
     assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -81,7 +91,7 @@ void main() {
       expect(handle.runtime.initFuture, isNull);
       expect(handle.facade.runtimeState.phase, SourceRuntimePhase.idle);
 
-      handle.cache.exploreSectionsMemoryCache = [];
+      handle.cache.putExploreSections([]);
       await gateway.saveSetting('offline_settings', 'option', false);
       await gateway.saveSetting('offline_settings', 'host', 'offline.example');
 
@@ -98,7 +108,7 @@ void main() {
         handle.facade.loadSourceData('offline_settings', 'initStarted'),
         isNull,
       );
-      expect(handle.cache.exploreSectionsMemoryCache, isNull);
+      expect(handle.cache.getExploreSections(), isNull);
       expect(handle.runtime.engine, isNull);
 
       final adapter = _StalledOfflineAdapter();

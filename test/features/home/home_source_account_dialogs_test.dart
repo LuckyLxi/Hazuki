@@ -1,12 +1,14 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/gateways/source_image_gateways.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/source_account/source_account_dialogs.dart';
@@ -23,7 +25,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => Scaffold(
@@ -216,7 +218,7 @@ Future<void> _pumpProfileHost(WidgetTester tester) {
       gateway: const _EmptyImageGateway(),
       child: HazukiLiquidGlass.wrap(
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) => Scaffold(
@@ -271,6 +273,7 @@ class _EmptyImageGateway implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) {
     throw StateError('No image download expected in this test.');
   }

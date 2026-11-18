@@ -42,6 +42,8 @@
         <!-- 修复设备（如一加、OPPO及部分系统白名单限制）上的Flutter锁定60帧的问题 -->
         <meta-data android:name="flutterView.preserve_surface_geometry" android:value="true" />
         <meta-data android:name="com.oneplus.screen.refresh_rate" android:value="true" />
+        <!-- 骁龙 NPU 翻译检测通过厂商库 libcdsprpc.so 与 NPU 通信；Android 12 起须声明才能加载，非高通设备没有此库。 -->
+        <uses-native-library android:name="libcdsprpc.so" android:required="false" />
         <service
             android:name=".DownloadForegroundService"
             android:foregroundServiceType="dataSync"

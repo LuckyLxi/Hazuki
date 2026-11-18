@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -10,15 +11,24 @@ import 'package:hazuki/services/source/runtime/source_secure_session_storage.dar
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceCommentsCapability comments;
   late SourceScriptEngine target;
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'active',
@@ -51,9 +61,12 @@ void main() {
             (_, {required account, required password}) async {},
       ),
     );
-    target = SourceScriptEngine(hostPromiseRejectionHandler: (_) {});
+    target = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      hostPromiseRejectionHandler: (_) {},
+    );
     host.handleFor('target').runtime.engine = target;
-    target.evaluate('''
+    await target.evaluate('''
       globalThis.calls = [];
       globalThis.__hazuki_source = {comic: {
         loadComments: async (...args) => {
@@ -68,6 +81,36 @@ void main() {
     ''');
     addTearDown(host.dispose);
   });
+
+  test(
+    'quoted floors retain IDs, actions and one-way likes without recursive nesting',
+    () async {
+      await target.evaluate(
+        '''globalThis.__hazuki_source.comic.loadComments = async () => ({
+      comments: [{id:'3', content:'Latest', quotedComments:[
+        {id:'1',userName:'First',content:'Original',score:7,isLiked:true,canUnlike:false,
+         quotedComments:[{id:'ignored',content:'nested'}]},
+        {id:'2',content:'Second'}
+      ]}], maxPage:1
+    });''',
+      );
+      final result = await comments.loadCommentsPage(
+        comicId: 'comic',
+        sourceKey: 'target',
+      );
+      final main = result.comments.single;
+      expect(main.content, 'Latest');
+      expect(main.canUnlike, isTrue);
+      expect(main.quotedComments.map((quote) => quote.id), ['1', '2']);
+      final quote = main.quotedComments.first;
+      expect(quote.userName, 'First');
+      expect(quote.score, 7);
+      expect(quote.isLiked, isTrue);
+      expect(quote.canUnlike, isFalse);
+      expect(quote.quotedComments, isEmpty);
+      expect(main.copyWith(score: 1).quotedComments, same(main.quotedComments));
+    },
+  );
 
   test(
     'passes normalized order after replyTo for comic and chapter requests',
@@ -90,10 +133,13 @@ void main() {
         replyTo: 'reply',
         order: 'missing',
       );
-      expect(jsonDecode(target.evaluate('JSON.stringify(calls)') as String), [
-        ['comic', 'comic"id', 'sub', 2, 'parent', 'new'],
-        ['chapter', 'comic', 'chapter', 3, 'reply', 'hot'],
-      ]);
+      expect(
+        jsonDecode(await target.evaluate('JSON.stringify(calls)') as String),
+        [
+          ['comic', 'comic"id', 'sub', 2, 'parent', 'new'],
+          ['chapter', 'comic', 'chapter', 3, 'reply', 'hot'],
+        ],
+      );
       expect(host.activeSourceKey, 'active');
       expect(comments.commentSortOptionsForSource('').orders, isEmpty);
     },
@@ -140,10 +186,13 @@ void main() {
         sourceKey: 'target',
         order: 'new',
       );
-      expect(jsonDecode(target.evaluate('JSON.stringify(calls)') as String), [
-        ['comic', 'comic', null, 1, null, ''],
-      ]);
-      target.evaluate('''
+      expect(
+        jsonDecode(await target.evaluate('JSON.stringify(calls)') as String),
+        [
+          ['comic', 'comic', null, 1, null, ''],
+        ],
+      );
+      await target.evaluate('''
       this.__hazuki_source.comic.loadComments = async (id, subId, page, replyTo) =>
         ({comments: [{content: [id, subId, page, replyTo].join('|')}], maxPage: 1});
     ''');

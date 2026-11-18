@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/source_task_owner.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -6,7 +7,10 @@ import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
+import 'package:hazuki/shared/comments/comments_sort_delegate.dart';
 
 enum CommentsEffectType {
   initialLoadStarted,
@@ -26,8 +30,11 @@ class CommentsEffect {
   final Object? error;
 }
 
-class CommentsPageController extends ChangeNotifier {
+class CommentsPageController extends ChangeNotifier
+    implements CommentsSortDelegate {
   CommentsPageController({
+    required this.sourceUiService,
+    required SourceTaskControlGateway taskControl,
     required SourceCommentsGateway sourceService,
     required CommentFilterService filterService,
     required this.comicId,
@@ -37,7 +44,8 @@ class CommentsPageController extends ChangeNotifier {
     this.logSource = 'comments',
     this.logContext = const {},
     CommentsInteractionState? state,
-  }) : _sourceService = sourceService,
+  }) : _readTasks = SourceTaskOwner(taskControl),
+       _sourceService = sourceService,
        _filterService = filterService,
        state = state ?? CommentsInteractionState() {
     _filterService.addListener(_onFilterChanged);
@@ -49,6 +57,7 @@ class CommentsPageController extends ChangeNotifier {
   final String comicId;
   final String? subId;
   final String? chapterId;
+  @override
   final String sourceKey;
   final String logSource;
   final Map<String, Object?> logContext;
@@ -57,11 +66,18 @@ class CommentsPageController extends ChangeNotifier {
   final CommentFilterService _filterService;
   final _effects = StreamController<CommentsEffect>.broadcast(sync: true);
   bool _disposed = false;
+  final SourceUiService sourceUiService;
+  late final _sourceUi = SourceUiOwner(sourceUiService);
+  final SourceTaskOwner _readTasks;
 
   Stream<CommentsEffect> get effects => _effects.stream;
 
+  @override
   SourceCommentSortOptions get sortOptions =>
       _sourceService.commentSortOptionsForSource(sourceKey);
+
+  @override
+  String get selectedOrder => state.order;
 
   bool get isLogged => sourceKey.trim().isEmpty
       ? _sourceService.isLogged
@@ -88,8 +104,9 @@ class CommentsPageController extends ChangeNotifier {
   }
 
   Future<ComicCommentsPageResult> _loadPage(int page, {String? replyTo}) {
-    return _sourceService
-        .loadCommentsPage(
+    return _sourceUi.run(
+      () => SourceUiScope.timeout(
+        _sourceService.loadCommentsPage(
           comicId: comicId,
           subId: subId,
           chapterId: chapterId,
@@ -98,8 +115,11 @@ class CommentsPageController extends ChangeNotifier {
           pageSize: pageSize,
           replyTo: replyTo,
           order: state.order,
-        )
-        .timeout(loadTimeout);
+          taskOrigin: _readTasks.origin(),
+        ),
+        loadTimeout,
+      ),
+    );
   }
 
   bool _isCurrent(int epoch) => !_disposed && state.loadEpoch == epoch;
@@ -116,6 +136,8 @@ class CommentsPageController extends ChangeNotifier {
 
   Future<void> loadInitial() async {
     if (_disposed) return;
+    _readTasks.restart();
+    _sourceUi.restart();
     _refreshCapabilities();
     final epoch = ++state.loadEpoch;
     _emit(CommentsEffectType.initialLoadStarted);
@@ -155,6 +177,9 @@ class CommentsPageController extends ChangeNotifier {
       );
     } catch (error) {
       if (!_isCurrent(epoch)) return;
+      if ((isSourceUiCancellation(error) || isSourceTaskCancellation(error))) {
+        return;
+      }
       _update(() => state.loadError = error);
       _logEvent(
         'Comments load failed',
@@ -228,6 +253,7 @@ class CommentsPageController extends ChangeNotifier {
     }
   }
 
+  @override
   Future<void> setOrder(String order) async {
     if (_disposed ||
         !sortOptions.orders.containsKey(order) ||
@@ -263,7 +289,12 @@ class CommentsPageController extends ChangeNotifier {
 
   Future<void> toggleCommentLike(ComicCommentData comment) async {
     final id = comment.id;
-    if (_disposed || id == null || state.likingCommentIds.contains(id)) return;
+    if (_disposed ||
+        id == null ||
+        state.likingCommentIds.contains(id) ||
+        (comment.isLiked == true && !comment.canUnlike)) {
+      return;
+    }
     final epoch = state.loadEpoch;
     final nextLiked = !(comment.isLiked ?? false);
     _update(() {
@@ -280,19 +311,31 @@ class CommentsPageController extends ChangeNotifier {
       });
     });
     try {
-      await _sourceService.likeComment(
-        comicId: comicId,
-        subId: subId,
-        sourceKey: sourceKey,
-        commentId: id,
-        isLike: nextLiked,
+      await _sourceUi.run(
+        () => _sourceService.likeComment(
+          comicId: comicId,
+          subId: subId,
+          sourceKey: sourceKey,
+          commentId: id,
+          isLike: nextLiked,
+        ),
       );
       _emit(nextLiked ? CommentsEffectType.liked : CommentsEffectType.unliked);
     } catch (error) {
       if (_isCurrent(epoch)) {
-        _update(() => _updateCommentById(id, (_) => comment));
+        _update(
+          () => _updateCommentById(
+            id,
+            (current) =>
+                identical(current.quotedComments, comment.quotedComments)
+                ? comment
+                : comment.copyWith(quotedComments: current.quotedComments),
+          ),
+        );
       }
-      _emit(CommentsEffectType.likeFailed, error: error);
+      if (!(isSourceUiCancellation(error) || isSourceTaskCancellation(error))) {
+        _emit(CommentsEffectType.likeFailed, error: error);
+      }
     } finally {
       _update(() => state.likingCommentIds.remove(id));
     }
@@ -302,9 +345,13 @@ class CommentsPageController extends ChangeNotifier {
     String id,
     ComicCommentData Function(ComicCommentData) update,
   ) {
-    List<ComicCommentData> replace(List<ComicCommentData> comments) => comments
-        .map((comment) => comment.id == id ? update(comment) : comment)
-        .toList();
+    List<ComicCommentData> replace(List<ComicCommentData> comments) =>
+        comments.map((comment) {
+          final next = comment.id == id ? update(comment) : comment;
+          return next.quotedComments.isEmpty
+              ? next
+              : next.copyWith(quotedComments: replace(next.quotedComments));
+        }).toList();
     state.comments = replace(state.comments);
     for (final entry in state.replyComments.entries) {
       state.replyComments[entry.key] = replace(entry.value);
@@ -348,6 +395,13 @@ class CommentsPageController extends ChangeNotifier {
           result.maxPage,
         );
       });
+    } catch (error) {
+      if (!_isCurrent(epoch) ||
+          isSourceUiCancellation(error) ||
+          isSourceTaskCancellation(error)) {
+        return;
+      }
+      rethrow;
     } finally {
       if (_isCurrent(epoch)) {
         _update(() => state.loadingReplyIds.remove(id));
@@ -376,20 +430,24 @@ class CommentsPageController extends ChangeNotifier {
     final replyTo = state.replyToComment?.id;
     _update(() => state.sendingComment = true);
     try {
-      await _sourceService.sendComment(
-        comicId: comicId,
-        subId: subId,
-        chapterId: chapterId,
-        sourceKey: sourceKey,
-        content: text,
-        replyTo: replyTo,
+      await _sourceUi.run(
+        () => _sourceService.sendComment(
+          comicId: comicId,
+          subId: subId,
+          chapterId: chapterId,
+          sourceKey: sourceKey,
+          content: text,
+          replyTo: replyTo,
+        ),
       );
       if (_disposed) return;
       _update(() => state.replyToComment = null);
       _emit(CommentsEffectType.sendSucceeded);
       await loadInitial();
     } catch (error) {
-      _emit(CommentsEffectType.sendFailed, error: error);
+      if (!(isSourceUiCancellation(error) || isSourceTaskCancellation(error))) {
+        _emit(CommentsEffectType.sendFailed, error: error);
+      }
     } finally {
       _update(() => state.sendingComment = false);
     }
@@ -503,6 +561,8 @@ class CommentsPageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _readTasks.dispose();
+    _sourceUi.dispose();
     _disposed = true;
     _filterService.removeListener(_onFilterChanged);
     // Keep cached content for the next surface, but release this surface's work.

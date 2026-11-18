@@ -62,6 +62,8 @@ class DebugLogCapability {
     Object? requestData,
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
+    Map<String, Object?>? taskContext,
+    bool cancelled = false,
   }) => _network.append(
     method: method,
     url: url,
@@ -74,5 +76,7 @@ class DebugLogCapability {
     requestData: requestData,
     responseHeaders: responseHeaders,
     responseBody: responseBody,
+    taskContext: taskContext,
+    cancelled: cancelled,
   );
 }

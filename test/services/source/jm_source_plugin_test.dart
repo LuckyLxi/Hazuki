@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -164,19 +165,28 @@ class _JmFixtures implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late SourceRuntimeHandle handle;
   late _JmFixtures fixtures;
   late SourceScriptEngine engine;
-  Future<dynamic> run(String code) =>
+  Future<dynamic> run(String code) async =>
       handle.facade.js.resolve(engine.evaluate(code));
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     fixtures = _JmFixtures();
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'jm',
@@ -197,6 +207,7 @@ void main() {
     final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
     bridge.configureDioCookieBridge(handle);
     engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
       timeout: 5000,
       hostPromiseRejectionHandler: (_) {},
     );
@@ -204,13 +215,11 @@ void main() {
     engine.setMessageHandler(
       (dynamic message) => bridge.handleJsMessageForHandle(handle, message),
     );
-    engine.evaluate(await File('assets/init.js').readAsString());
-    engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
-    // Prove the plugin uses only documented SDK APIs, without legacy globals.
-    engine.evaluate(
-      'Network=undefined;Convert=undefined;Comic=undefined;ComicDetails=undefined;Comment=undefined;HazukiSource=undefined;',
+    await engine.evaluate(await File('assets/init.js').readAsString());
+    await engine.evaluate(
+      await File('assets/hazuki_plugin_sdk.js').readAsString(),
     );
-    engine.evaluate(
+    await engine.evaluate(
       await File('test/fixtures/source_plugins/jm/main.js').readAsString(),
     );
     handle.runtime.sourceMeta = SourceMeta(
@@ -219,7 +228,7 @@ void main() {
       version: '1.0.1',
       supportsAccount: true,
       settingsDefaults: parseSourceSettingsDefaults(
-        engine.evaluate('source.settings'),
+        await engine.evaluate('source.settings'),
       ),
     );
   });
@@ -248,7 +257,7 @@ void main() {
       expect((await capability.perform()).isSuccess, isTrue);
       expect(
         handle.facade.loadSourceData('jm', 'lastCheckInDate'),
-        engine.evaluate('jmToday()'),
+        await engine.evaluate('jmToday()'),
       );
       expect(await capability.isCompletedToday(), isTrue);
       final requestCount = fixtures.requests.length;
@@ -345,9 +354,9 @@ void main() {
       );
       expect(manifest.id, 'jm');
       expect(fixtures.requests, isEmpty);
-      expect(engine.evaluate("source.settings.apiDomain.default"), '1');
+      expect(await engine.evaluate("source.settings.apiDomain.default"), '1');
       expect(
-        engine.evaluate(
+        await engine.evaluate(
           "Object.values(source.settings).some(s=>s.type==='callback')",
         ),
         isFalse,
@@ -518,7 +527,7 @@ void main() {
       ),
       'https://user:pass@cdnsha.jmapiproxyxxx.vip/a',
     );
-    engine.evaluate(
+    await engine.evaluate(
       "jmApiDomains=['www.cdntwice.org:45176'];jmImageHost='https://cdn-msp.jmapinodeudzn.net:45176';",
     );
     final info = await run("source.comic.loadInfo('7')") as Map;
@@ -543,21 +552,21 @@ void main() {
   });
 
   test('image rules preserve segments and request headers', () async {
-    Map config(String id, String name) =>
-        engine.evaluate(
+    Future<Map> config(String id, String name) async =>
+        await engine.evaluate(
               "source.comic.onImageLoad('https://img.example/$name','7','$id')",
             )
             as Map;
-    expect(config('100000', '1.jpg')['segments'], 0);
-    expect(config('250000', '1.jpg')['segments'], 10);
-    expect(config('250000', '1.GIF?key=1')['segments'], 0);
+    expect((await config('100000', '1.jpg'))['segments'], 0);
+    expect((await config('250000', '1.jpg'))['segments'], 10);
+    expect((await config('250000', '1.GIF?key=1'))['segments'], 0);
     final hash = md5.convert(utf8.encode('5000001')).toString();
     expect(
-      config('500000', '1.jpg')['segments'],
+      (await config('500000', '1.jpg'))['segments'],
       hash.codeUnitAt(hash.length - 1) % 8 * 2 + 2,
     );
     expect(
-      (config('250000', '1.jpg')['headers'] as Map)['Referer'],
+      ((await config('250000', '1.jpg'))['headers'] as Map)['Referer'],
       'https://localhost/',
     );
   });

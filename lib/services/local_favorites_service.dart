@@ -3,9 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/hazuki_models.dart';
-import '../shared/source_comic_tags.dart';
+import '../models/source_comic_tags.dart';
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
+import 'local_favorites/local_favorite_sort.dart';
 import 'local_favorites/local_favorites_contracts.dart';
 import 'local_favorites/local_favorites_migration.dart';
 import 'local_favorites/local_favorites_models.dart';
@@ -25,8 +26,7 @@ class LocalFavoritesService extends ChangeNotifier
     LocalFavoritesMigration? migration,
   }) {
     final resolvedPersistence =
-        persistence ??
-        DriftLocalFavoritesPersistence(database ?? HazukiDatabase());
+        persistence ?? LocalFavoritesPersistence(database ?? HazukiDatabase());
     final resolvedSyncCodec =
         syncCodec ?? LocalFavoritesSyncCodec(resolvedPersistence);
     return LocalFavoritesService._(
@@ -171,10 +171,21 @@ class LocalFavoritesService extends ChangeNotifier
         )
         .toList();
 
+    final lastReadAtMs = normalizedSortOrder == 'readNewest'
+        ? await _persistence.loadLastReadAtMs()
+        : const <String, int>{};
+    int readAtMs(LocalFavoriteComicRecord entry) =>
+        lastReadAtMs[SourceScopedComicId(
+          sourceKey: _effectiveStoredSourceKey(entry.sourceKey),
+          comicId: entry.comicId,
+        ).storageKey] ??
+        0;
+
     filteredEntries.sort((a, b) {
-      if (normalizedSortOrder == 'updatedNewest') {
-        final updateCompare = b.updateTime.compareTo(a.updateTime);
-        if (updateCompare != 0) return updateCompare;
+      // 未读过的条目阅读时间为 0，自然排在已读之后。
+      if (normalizedSortOrder == 'readNewest') {
+        final readCompare = readAtMs(b).compareTo(readAtMs(a));
+        if (readCompare != 0) return readCompare;
       }
       final aMs = a.folderSavedAtMs[normalizedFolderId] ?? 0;
       final bMs = b.folderSavedAtMs[normalizedFolderId] ?? 0;
@@ -198,16 +209,7 @@ class LocalFavoritesService extends ChangeNotifier
     return FavoriteComicsResult.success(comics, maxPage: maxPage);
   }
 
-  String _normalizeSortOrder(String order) {
-    final normalized = order.trim();
-    return const [
-          'savedNewest',
-          'savedOldest',
-          'updatedNewest',
-        ].contains(normalized)
-        ? normalized
-        : 'savedNewest';
-  }
+  String _normalizeSortOrder(String order) => normalizeLocalFavoriteSort(order);
 
   @override
   Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) {

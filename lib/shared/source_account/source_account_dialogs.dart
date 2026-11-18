@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 import 'source_login_interaction_text.dart';
 import 'source_login_interaction_dialog.dart';
 import 'source_login_dialog_controller.dart';
+import 'source_account_dialog_support.dart';
+import 'package:hazuki/shared/source_interaction/source_plugin_dialog.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -13,93 +17,8 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
-Future<T?> showHomeAnimatedDialog<T>(
-  BuildContext context, {
-  required Widget child,
-  bool barrierDismissible = true,
-  bool useGlassTransition = false,
-}) {
-  final clearGlass = useGlassTransition && HazukiLiquidGlass.isAvailable;
-  return showGeneralDialog<T>(
-    context: context,
-    barrierDismissible: barrierDismissible,
-    barrierLabel: l10n(context).dialogBarrierLabel,
-    barrierColor: clearGlass
-        ? Colors.black.withValues(alpha: 0.18)
-        : Colors.black45,
-    transitionDuration: const Duration(milliseconds: 260),
-    pageBuilder: (buildContext, animation, secondaryAnimation) {
-      return SafeArea(
-        child: Center(
-          child: Material(type: MaterialType.transparency, child: child),
-        ),
-      );
-    },
-    transitionBuilder:
-        (buildContext, animation, secondaryAnimation, dialogChild) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          );
-          final progress = curved.value;
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // Backdrop filters must read the page directly, without an
-              // ancestor opacity layer isolating them during the transition.
-              IgnorePointer(
-                child: ClipRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(
-                      sigmaX: (clearGlass ? 1.2 : 8) * progress,
-                      sigmaY: (clearGlass ? 1.2 : 8) * progress,
-                    ),
-                    child: const SizedBox.expand(),
-                  ),
-                ),
-              ),
-              ScaleTransition(
-                scale: Tween<double>(begin: 0.94, end: 1).animate(curved),
-                child: useGlassTransition
-                    ? _HomeDialogGlassProgress(
-                        progress: progress,
-                        child: dialogChild,
-                      )
-                    : FadeTransition(opacity: curved, child: dialogChild),
-              ),
-            ],
-          );
-        },
-  );
-}
-
-class _HomeDialogGlassProgress extends InheritedWidget {
-  const _HomeDialogGlassProgress({
-    required this.progress,
-    required super.child,
-  });
-
-  final double progress;
-
-  static double of(BuildContext context) =>
-      context
-          .dependOnInheritedWidgetOfExactType<_HomeDialogGlassProgress>()
-          ?.progress ??
-      1;
-
-  @override
-  bool updateShouldNotify(_HomeDialogGlassProgress oldWidget) =>
-      progress != oldWidget.progress;
-}
-
-Color homeDialogBackgroundColor(BuildContext context) {
-  final colorScheme = Theme.of(context).colorScheme;
-  final brightness = ThemeData.estimateBrightnessForColor(colorScheme.surface);
-  return brightness == Brightness.dark
-      ? colorScheme.surfaceContainerLow
-      : colorScheme.surfaceContainerHigh;
-}
+export 'source_account_dialog_support.dart'
+    show showHomeAnimatedDialog, homeDialogBackgroundColor;
 
 Future<bool> showHomeLogoutConfirmDialog(BuildContext context) async {
   final strings = l10n(context);
@@ -397,6 +316,10 @@ Future<void> showHomeLoginDialog(
                                         IgnorePointer(
                                           ignoring: loading,
                                           child: HazukiFrostedDropdown<String>(
+                                            pluginMenu:
+                                                const SourcePluginMenuBinding(
+                                                  menuId: 'account.loginMethod',
+                                                ),
                                             selected: selectedMethod!.id,
                                             options: [
                                               for (final method in loginMethods)
@@ -547,9 +470,47 @@ Future<void> showHomeLoginDialog(
                                                     try {
                                                       final profile =
                                                           selectedMethod == null
-                                                          ? await onLogin(
-                                                              account,
-                                                              password,
+                                                          ? await SourcePresentationScope.uiOf(
+                                                              context,
+                                                            ).run(
+                                                              () => onLogin(
+                                                                account,
+                                                                password,
+                                                              ),
+                                                              present: (dialog) async {
+                                                                final cancellation =
+                                                                    SourceLoginCancellation();
+                                                                try {
+                                                                  await interactions.present((
+                                                                    finish,
+                                                                  ) {
+                                                                    unawaited(
+                                                                      dialog
+                                                                          .whenClosed
+                                                                          .then(
+                                                                            (
+                                                                              _,
+                                                                            ) => finish(
+                                                                              true,
+                                                                            ),
+                                                                          ),
+                                                                    );
+                                                                    return SourcePluginDialog(
+                                                                      dialog:
+                                                                          dialog,
+                                                                      embedded:
+                                                                          true,
+                                                                      onUserClose:
+                                                                          cancellation
+                                                                              .cancel,
+                                                                    );
+                                                                  }, cancellation);
+                                                                } finally {
+                                                                  dialog.close(
+                                                                    'user',
+                                                                  );
+                                                                }
+                                                              },
                                                             )
                                                           : await onLoginMethod!(
                                                               selectedMethod!
@@ -601,7 +562,10 @@ Future<void> showHomeLoginDialog(
                                                             dialogContext,
                                                           );
                                                       if (error
-                                                          is SourceLoginCancelled) {
+                                                              is SourceLoginCancelled ||
+                                                          isSourceUiCancellation(
+                                                            error,
+                                                          )) {
                                                         if (route?.isActive ==
                                                             true) {
                                                           if (route!
@@ -709,7 +673,7 @@ class _HomeProfileGlassCard extends StatelessWidget {
   }
 
   Widget _buildCard(BuildContext context) {
-    final progress = _HomeDialogGlassProgress.of(context);
+    final progress = HomeDialogGlassProgress.of(context);
     final content = HomeProfileCardContent(
       avatarUrl: avatarUrl,
       username: username,

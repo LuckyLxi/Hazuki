@@ -8,6 +8,7 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 extension ListFirstWhere<T> on Iterable<T> {
@@ -75,6 +76,7 @@ class JSChannelType {
   static const MODULE = 1;
   static const PROMISE_TRACK = 2;
   static const FREE_OBJECT = 3;
+  static const TASK_REFERENCE = 4;
 }
 
 class JSProp {
@@ -214,6 +216,7 @@ _jsNewRuntime = _qjsLib
     .asFunction();
 
 class _RuntimeOpaque {
+  bool taskControlEnabled = false;
   final _JSChannel _channel;
   List<JSRef> _ref = [];
   final ReceivePort _port;
@@ -221,6 +224,7 @@ class _RuntimeOpaque {
   _RuntimeOpaque(this._channel, this._port);
 
   int? get dartObjectClassId => _dartObjectClassId;
+  void notifyJobs() => _port.sendPort.send(#call);
 
   void addRef(JSRef ref) => _ref.add(ref);
 
@@ -238,7 +242,8 @@ Pointer<JSValue> channelDispacher(
   int type,
   Pointer<JSValue> argv,
 ) {
-  final rt = type == JSChannelType.FREE_OBJECT
+  final rt =
+      type == JSChannelType.FREE_OBJECT || type == JSChannelType.TASK_REFERENCE
       ? ctx.cast<JSRuntime>()
       : jsGetRuntime(ctx);
   return runtimeOpaques[rt]!._channel(ctx, type, argv);
@@ -367,8 +372,9 @@ Pointer<JSValue> jsEval(
   Pointer<JSContext> ctx,
   String input,
   String filename,
-  int evalFlags,
-) {
+  int evalFlags, {
+  bool notifyJobs = true,
+}) {
   final utf8input = input.toNativeUtf8();
   final utf8filename = filename.toNativeUtf8();
   final val = _jsEval(
@@ -380,7 +386,7 @@ Pointer<JSValue> jsEval(
   );
   malloc.free(utf8input);
   malloc.free(utf8filename);
-  runtimeOpaques[jsGetRuntime(ctx)]?._port.sendPort.send(#eval);
+  if (notifyJobs) runtimeOpaques[jsGetRuntime(ctx)]?._port.sendPort.send(#eval);
   return val;
 }
 
@@ -851,3 +857,238 @@ jsFree = _qjsLib
       NativeFunction<Void Function(Pointer<JSContext>, Pointer<JSPropertyEnum>)>
     >('jsFree')
     .asFunction();
+
+final jsGetTaskContext = _qjsLib
+    .lookupFunction<
+      Uint64 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsGetTaskContext');
+final jsSetTaskContext = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Uint64),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsSetTaskContext');
+final jsRetainTaskContext = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Uint64),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsRetainTaskContext');
+final jsReleaseTaskContext = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Uint64),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsReleaseTaskContext');
+final jsRemainingExecutionMilliseconds = _qjsLib
+    .lookupFunction<
+      Int64 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsRemainingExecutionMilliseconds');
+
+/// A thread-safe byte mailbox. It never accesses a QuickJS runtime.
+class QuickJsHostReply {
+  static final _createForWork = _qjsLib
+      .lookupFunction<
+        Uint64 Function(Uint64, Uint64, Uint64),
+        int Function(int, int, int)
+      >('jsHostReplyCreateForWork');
+  static int createForWork(int controlId, int task, int work) =>
+      _createForWork(controlId, task, work);
+  static final _create = _qjsLib
+      .lookupFunction<Uint64 Function(), int Function()>('jsHostReplyCreate');
+  static final _complete = _qjsLib
+      .lookupFunction<
+        Int32 Function(Uint64, Pointer<Uint8>, IntPtr),
+        int Function(int, Pointer<Uint8>, int)
+      >('jsHostReplyComplete');
+  static final _close = _qjsLib
+      .lookupFunction<Void Function(Uint64), void Function(int)>(
+        'jsHostReplyClose',
+      );
+  static final _active = _qjsLib
+      .lookupFunction<Int32 Function(Uint64), int Function(int)>(
+        'jsHostReplyActive',
+      );
+  static final _count = _qjsLib
+      .lookupFunction<IntPtr Function(), int Function()>('jsHostReplyCount');
+  static final _wait = _qjsLib
+      .lookupFunction<
+        IntPtr Function(Uint64, Int64, Pointer<Pointer<Uint8>>),
+        int Function(int, int, Pointer<Pointer<Uint8>>)
+      >('jsHostReplyWait');
+  static final _free = _qjsLib
+      .lookupFunction<
+        Void Function(Pointer<Void>),
+        void Function(Pointer<Void>)
+      >('jsHostReplyFree');
+
+  static int create() => _create();
+  static bool active(int id) => _active(id) != 0;
+  static int get count => _count();
+  static void close(int id) => _close(id);
+
+  static bool complete(int id, Uint8List bytes) {
+    final buffer = malloc<Uint8>(bytes.length);
+    try {
+      buffer.asTypedList(bytes.length).setAll(0, bytes);
+      return _complete(id, buffer, bytes.length) != 0;
+    } finally {
+      malloc.free(buffer);
+    }
+  }
+
+  /// Only call on a worker isolate; the FFI call must remain non-leaf.
+  static Uint8List wait(int id, int milliseconds) {
+    final output = calloc<Pointer<Uint8>>();
+    try {
+      final size = _wait(id, milliseconds, output);
+      if (size < 0) {
+        if (size == -4 || size == -5) throw QuickJsMailboxStopped(size == -5);
+        if (size == -2) throw QuickJsMailboxTimeout();
+        throw StateError('host_bridge_closed');
+      }
+      return Uint8List.fromList(output.value.asTypedList(size));
+    } finally {
+      if (output.value != nullptr) _free(output.value.cast());
+      calloc.free(output);
+    }
+  }
+}
+
+/// Keeps the legacy StateError contract while exposing the native wait status.
+class QuickJsMailboxTimeout extends StateError {
+  QuickJsMailboxTimeout() : super('host_bridge_timeout');
+}
+
+class QuickJsMailboxStopped implements Exception {
+  const QuickJsMailboxStopped(this.timedOut);
+  final bool timedOut;
+}
+
+final jsTaskStopRetained = _qjsLib
+    .lookupFunction<
+      Int32 Function(Uint64, Uint64, Int32),
+      int Function(int, int, int)
+    >('jsTaskStopRetained');
+final jsCreateWorkContext = _qjsLib
+    .lookupFunction<
+      Uint64 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsCreateWorkContext');
+final jsWorkState = _qjsLib
+    .lookupFunction<Int32 Function(Uint64, Uint64), int Function(int, int)>(
+      'jsWorkState',
+    );
+final jsWorkClaimStop = _qjsLib
+    .lookupFunction<Int32 Function(Uint64, Uint64), int Function(int, int)>(
+      'jsWorkClaimStop',
+    );
+final jsTaskShutdown = _qjsLib
+    .lookupFunction<Void Function(Uint64), void Function(int)>(
+      'jsTaskShutdown',
+    );
+final jsNewStoppedError = _qjsLib
+    .lookupFunction<
+      Pointer<JSValue> Function(Pointer<JSContext>, Uint64, Int32),
+      Pointer<JSValue> Function(Pointer<JSContext>, int, int)
+    >('jsNewStoppedError');
+
+final jsEnableTaskControl = _qjsLib
+    .lookupFunction<
+      Uint64 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsEnableTaskControl');
+final jsObserveHostPromise = _qjsLib
+    .lookupFunction<
+      Int32 Function(
+        Pointer<JSContext>,
+        Pointer<JSValue>,
+        Pointer<JSValue>,
+        Pointer<JSValue>,
+      ),
+      int Function(
+        Pointer<JSContext>,
+        Pointer<JSValue>,
+        Pointer<JSValue>,
+        Pointer<JSValue>,
+      )
+    >('jsObserveHostPromise');
+final jsSettleHostFuture = _qjsLib
+    .lookupFunction<
+      Pointer<JSValue> Function(
+        Pointer<JSContext>,
+        Pointer<JSValue>,
+        Pointer<JSValue>,
+      ),
+      Pointer<JSValue> Function(
+        Pointer<JSContext>,
+        Pointer<JSValue>,
+        Pointer<JSValue>,
+      )
+    >('jsSettleHostFuture');
+final jsTaskRegister = _qjsLib
+    .lookupFunction<Uint64 Function(Uint64), int Function(int)>(
+      'jsTaskRegister',
+    );
+final jsTaskStop = _qjsLib
+    .lookupFunction<
+      Int32 Function(Uint64, Uint64, Int32),
+      int Function(int, int, int)
+    >('jsTaskStop');
+final jsTaskComplete = _qjsLib
+    .lookupFunction<Int32 Function(Uint64, Uint64), int Function(int, int)>(
+      'jsTaskComplete',
+    );
+final jsTaskCount = _qjsLib
+    .lookupFunction<Uint64 Function(Uint64, Int32), int Function(int, int)>(
+      'jsTaskCount',
+    );
+final jsGetWorkContext = _qjsLib
+    .lookupFunction<
+      Uint64 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsGetWorkContext');
+final jsSetWorkContext = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Uint64),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsSetWorkContext');
+final jsRetainWorkContext = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Uint64),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsRetainWorkContext');
+final jsReleaseWorkContext = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Uint64),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsReleaseWorkContext');
+final jsSetHostObserver = _qjsLib
+    .lookupFunction<
+      Void Function(Pointer<JSRuntime>, Int32),
+      void Function(Pointer<JSRuntime>, int)
+    >('jsSetHostObserver');
+final jsLastJobTask = _qjsLib
+    .lookupFunction<
+      Uint64 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsLastJobTask');
+final jsLastJobStopReason = _qjsLib
+    .lookupFunction<
+      Int32 Function(Pointer<JSRuntime>),
+      int Function(Pointer<JSRuntime>)
+    >('jsLastJobStopReason');
+final jsStopErrorReason = _qjsLib
+    .lookupFunction<
+      Int32 Function(Pointer<JSValue>),
+      int Function(Pointer<JSValue>)
+    >('jsStopErrorReason');
+final jsStopErrorTask = _qjsLib
+    .lookupFunction<
+      Uint64 Function(Pointer<JSValue>),
+      int Function(Pointer<JSValue>)
+    >('jsStopErrorTask');
+final jsSweepStoppedPromises = _qjsLib
+    .lookupFunction<
+      Int32 Function(Pointer<JSContext>),
+      int Function(Pointer<JSContext>)
+    >('jsSweepStoppedPromises');

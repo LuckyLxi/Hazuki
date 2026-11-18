@@ -3,40 +3,111 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('favorite workflows depend on narrow state and injected callbacks', () {
-    for (final name in [
-      'favorite_folder_coordinator.dart',
-      'favorite_sort_flow.dart',
-    ]) {
-      final content = File(
-        'lib/features/favorite/support/$name',
-      ).readAsStringSync();
-      for (final forbidden in [
-        'favorite_page_controller.dart',
-        'FavoritePageController',
-        'favorite_page_state.dart',
-        'FavoritePageData',
-        '/view/',
-        'BuildContext',
-        'package:flutter/material.dart',
-        'favorite_list_loader.dart',
+  test(
+    'image cache and network access do not depend on the aggregate facade',
+    () {
+      for (final name in [
+        'image_cache_capability.dart',
+        'source_image_network_downloader.dart',
       ]) {
-        expect(content, isNot(contains(forbidden)), reason: name);
+        final content = File(
+          'lib/services/source/image/$name',
+        ).readAsStringSync();
+        expect(content, isNot(contains('HazukiSourceFacade')), reason: name);
+        expect(
+          content,
+          isNot(contains('source_runtime_handle.dart')),
+          reason: name,
+        );
       }
-    }
-    for (final name in [
-      'favorite_folder_state.dart',
-      'favorite_sort_state.dart',
+    },
+  );
+
+  test('shared favorite folders depend on their focused source contract', () {
+    final content = File(
+      'lib/shared/favorites/source_favorite_folders_repository.dart',
+    ).readAsStringSync();
+    expect(content, isNot(contains('SourceComicDetailGateway')));
+    expect(content, isNot(contains('SourceFavoriteGateway')));
+  });
+
+  test('plugin remote access is separate from local plugin management', () {
+    const directory = 'lib/services/source/plugins';
+    final manager = File(
+      '$directory/source_plugin_manager.dart',
+    ).readAsStringSync();
+    expect(manager, isNot(contains('package:dio/')));
+
+    final client = File(
+      '$directory/source_plugin_remote_client.dart',
+    ).readAsStringSync();
+    for (final dependency in [
+      'source_plugin_manager.dart',
+      'dart:io',
+      'package:path_provider/',
+      'package:shared_preferences/',
+      'package:flutter/',
+      '/storage/',
+      '/features/',
+      '/widgets/',
     ]) {
-      final content = File(
-        'lib/features/favorite/state/$name',
-      ).readAsStringSync();
-      expect(
-        content,
-        isNot(contains('favorite_page_state.dart')),
-        reason: name,
-      );
-      expect(content, isNot(contains('/support/')), reason: name);
+      expect(client, isNot(contains(dependency)), reason: dependency);
+    }
+  });
+
+  test(
+    'favorite folder requests do not own page state or call back into the page',
+    () {
+      for (final name in ['favorite_folder_coordinator.dart']) {
+        final content = File(
+          'lib/features/favorite/support/$name',
+        ).readAsStringSync();
+        for (final forbidden in [
+          'favorite_page_controller.dart',
+          'FavoritePageController',
+          'favorite_page_state.dart',
+          'FavoritePageData',
+          'favorite_folder_state.dart',
+          'FavoriteFolderState',
+          'favorite_selection_store.dart',
+          'selectFolder',
+          'notifyListeners',
+          'VoidCallback',
+          '/view/',
+          'BuildContext',
+          'package:material_ui/material_ui.dart',
+          'favorite_list_loader.dart',
+        ]) {
+          expect(content, isNot(contains(forbidden)), reason: name);
+        }
+      }
+      for (final name in ['favorite_folder_state.dart']) {
+        final content = File(
+          'lib/features/favorite/state/$name',
+        ).readAsStringSync();
+        expect(
+          content,
+          isNot(contains('favorite_page_state.dart')),
+          reason: name,
+        );
+        expect(content, isNot(contains('/support/')), reason: name);
+      }
+    },
+  );
+
+  test('plugin operation state does not depend on views or dialogs', () {
+    final content = File(
+      'lib/features/settings/state/source_plugins_controller.dart',
+    ).readAsStringSync();
+    for (final forbidden in [
+      '/view/',
+      'BuildContext',
+      'package:material_ui/material_ui.dart',
+      'showDialog',
+      'showHazukiPrompt',
+      'package:file_selector/',
+    ]) {
+      expect(content, isNot(contains(forbidden)), reason: forbidden);
     }
   });
 
@@ -147,6 +218,8 @@ void main() {
     expect(controller, isNot(contains('dart:io')));
     expect(controller, isNot(contains('instantiateImageCodec')));
     expect(controller, isNot(contains('decodeWaiters')));
+    expect(controller, isNot(contains('reader_session_controller.dart')));
+    expect(controller, isNot(contains('onImagesChanged')));
   });
 
   test('download group storage and sync stay behind focused collaborators', () {

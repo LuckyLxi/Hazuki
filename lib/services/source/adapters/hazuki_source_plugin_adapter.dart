@@ -1,6 +1,7 @@
+import '../models/source_task.dart';
 import 'package:flutter/foundation.dart';
 import '../../../models/source_meta.dart';
-import '../../../shared/preferences/software_update_source.dart';
+import '../../preferences/software_update_source.dart';
 import '../gateways/source_plugin_gateway.dart';
 import '../plugins/source_plugin_manager.dart';
 import '../plugins/source_plugin_models.dart';
@@ -16,8 +17,15 @@ class HazukiSourcePluginAdapter implements SourcePluginGateway {
   final SourcePluginManager manager;
   final Future<SourceMeta?> Function(String) metadataLoader;
   final Object? Function(String, String) settingLoader;
-  final Future<void> Function(String, String, dynamic) settingWriter;
-  final Future<dynamic> Function(String, String) actionRunner;
+  final Future<void> Function(
+    String,
+    String,
+    dynamic, {
+    SourceTaskOrigin? taskOrigin,
+  })
+  settingWriter;
+  final Future<dynamic> Function(String, String, {SourceTaskOrigin? taskOrigin})
+  actionRunner;
   @override
   List<InstalledSourcePlugin> get installed => manager.installed;
   @override
@@ -66,6 +74,8 @@ class HazukiSourcePluginAdapter implements SourcePluginGateway {
   Future<void> setEnabled(String id, bool enabled) =>
       manager.setEnabled(id, enabled);
   @override
+  Future<void> reorder(List<String> ids) => manager.reorder(ids);
+  @override
   Future<void> uninstall(String id) => manager.uninstall(id);
   @override
   Future<SourcePluginIndexEntry?> checkUpdate(String id) =>
@@ -75,11 +85,18 @@ class HazukiSourcePluginAdapter implements SourcePluginGateway {
   @override
   Object? loadSetting(String id, String key) => settingLoader(id, key);
   @override
-  Future<void> saveSetting(String id, String key, dynamic value) =>
-      settingWriter(id, key, value);
+  Future<void> saveSetting(
+    String id,
+    String key,
+    dynamic value, {
+    SourceTaskOrigin? taskOrigin,
+  }) => settingWriter(id, key, value, taskOrigin: taskOrigin);
   @override
-  Future<dynamic> runAction(String id, String action) =>
-      actionRunner(id, action);
+  Future<dynamic> runAction(
+    String id,
+    String action, {
+    SourceTaskOrigin? taskOrigin,
+  }) => actionRunner(id, action, taskOrigin: taskOrigin);
   @override
   void addListener(VoidCallback listener) => manager.addListener(listener);
   @override

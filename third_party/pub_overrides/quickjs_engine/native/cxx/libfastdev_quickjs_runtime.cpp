@@ -3,6 +3,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
+#include "task_control.h"
+
+namespace {
+using HostReply = hazuki_tasks::Mailbox;
+std::mutex host_replies_mutex;
+std::unordered_map<uint64_t, std::shared_ptr<HostReply>> host_replies;
+uint64_t next_host_reply = 1;
+std::shared_ptr<HostReply> find_host_reply(uint64_t id) {
+    std::lock_guard<std::mutex> lock(host_replies_mutex);
+    auto it = host_replies.find(id);
+    return it == host_replies.end() ? nullptr : it->second;
+}
+}
 #ifdef __ANDROID__
 #include <android/log.h>
 #else
@@ -323,12 +341,240 @@ extern "C"
 
     typedef void *JSChannel(JSContext *ctx, size_t type, void *argv);
 
+    DLLEXPORT uint64_t jsHostReplyCreate() {
+        std::lock_guard<std::mutex> lock(host_replies_mutex);
+        const auto id = next_host_reply++;
+        host_replies.emplace(id, std::make_shared<HostReply>());
+        return id;
+    }
+    DLLEXPORT uint64_t jsHostReplyCreateForWork(uint64_t control_id, uint64_t task, uint64_t work) {
+        auto control = hazuki_tasks::find(control_id);
+        if (!control) return 0;
+        std::lock_guard<std::mutex> lock(control->mutex);
+        if (control->closed) return 0;
+        auto reply = std::make_shared<HostReply>();
+        reply->task = task; reply->work = work;
+        uint64_t id;
+        { std::lock_guard<std::mutex> registry_lock(host_replies_mutex);
+          id = next_host_reply++; host_replies.emplace(id, reply); }
+        control->mailboxes.push_back(reply);
+        control->wake_mailboxes();
+        return id;
+    }
+    DLLEXPORT int jsHostReplyComplete(uint64_t id, const uint8_t *bytes, intptr_t length) {
+        const auto reply = find_host_reply(id);
+        if (!reply) return 0;
+        std::lock_guard<std::mutex> lock(reply->mutex);
+        if (reply->closed || reply->ready || reply->stop_reason) return 0;
+        reply->bytes.assign(bytes, bytes + length);
+        reply->ready = true;
+        reply->changed.notify_all();
+        return 1;
+    }
+    DLLEXPORT void jsHostReplyClose(uint64_t id) {
+        std::shared_ptr<HostReply> reply;
+        {
+            std::lock_guard<std::mutex> lock(host_replies_mutex);
+            auto it = host_replies.find(id);
+            if (it == host_replies.end()) return;
+            reply = it->second;
+            host_replies.erase(it);
+        }
+        std::lock_guard<std::mutex> lock(reply->mutex);
+        reply->closed = true;
+        reply->changed.notify_all();
+    }
+    DLLEXPORT int jsHostReplyActive(uint64_t id) {
+        return find_host_reply(id) ? 1 : 0;
+    }
+    DLLEXPORT intptr_t jsHostReplyCount() {
+        std::lock_guard<std::mutex> lock(host_replies_mutex);
+        return static_cast<intptr_t>(host_replies.size());
+    }
+    // Copies into caller-owned memory; no pointer to a mailbox escapes its lock.
+    DLLEXPORT intptr_t jsHostReplyWait(uint64_t id, int64_t milliseconds, uint8_t **output) {
+        const auto reply = find_host_reply(id);
+        if (!reply) return -1;
+        std::unique_lock<std::mutex> lock(reply->mutex);
+        if (!reply->changed.wait_for(lock, std::chrono::milliseconds(milliseconds),
+                                    [&] { return reply->ready || reply->closed || reply->stop_reason; })) return -2;
+        if (reply->closed) return -1;
+        if (reply->stop_reason) return -3 - reply->stop_reason;
+        const auto size = reply->bytes.size();
+        *output = static_cast<uint8_t *>(malloc(size == 0 ? 1 : size));
+        if (!*output) return -3;
+        memcpy(*output, reply->bytes.data(), size);
+        return static_cast<intptr_t>(size);
+    }
+    DLLEXPORT void jsHostReplyFree(void *bytes) { free(bytes); }
+
+    static void task_reference(JSRuntime *rt, uint64_t token, int delta, void *data) {
+        int64_t message[2] = {static_cast<int64_t>(token), delta};
+        auto *channel = reinterpret_cast<JSChannel *>(data);
+        channel(reinterpret_cast<JSContext *>(rt), 4, message);
+    }
+
+    DLLEXPORT uint64_t jsGetTaskContext(JSRuntime *rt) { return JS_GetHostTaskContext(rt); }
+    DLLEXPORT void jsSetTaskContext(JSRuntime *rt, uint64_t token) { JS_SetHostTaskContext(rt, token); }
+    DLLEXPORT void jsRetainTaskContext(JSRuntime *rt, uint64_t token) { JS_RetainHostTaskContext(rt, token); }
+    DLLEXPORT void jsReleaseTaskContext(JSRuntime *rt, uint64_t token) { JS_ReleaseHostTaskContext(rt, token); }
+
     struct RuntimeOpaque
     {
         JSChannel *channel;
         int64_t timeout;
         std::chrono::steady_clock::time_point deadline;
+        uint64_t control_id = 0;
+        std::shared_ptr<hazuki_tasks::Control> control;
     };
+
+    DLLEXPORT uint64_t jsEnableTaskControl(JSRuntime *rt) {
+        auto *opaque = static_cast<RuntimeOpaque *>(JS_GetRuntimeOpaque(rt));
+        if (opaque->control) return opaque->control_id;
+        auto control = std::make_shared<hazuki_tasks::Control>();
+        uint64_t id = hazuki_tasks::next_id.fetch_add(1);
+        { std::lock_guard<std::mutex> lock(hazuki_tasks::registry_mutex);
+          hazuki_tasks::registry.emplace(id, control); }
+        opaque->control = control; opaque->control_id = id;
+        JS_SetHostWorkControl(rt, hazuki_tasks::work, control.get());
+        return id;
+    }
+    DLLEXPORT uint64_t jsTaskRegister(uint64_t id) {
+        auto control = hazuki_tasks::find(id);
+        if (!control) return 0;
+        std::lock_guard<std::mutex> lock(control->mutex);
+        if (control->closed) return 0;
+        uint64_t token = hazuki_tasks::next_id.fetch_add(1);
+        uint64_t entry = hazuki_tasks::next_id.fetch_add(1);
+        auto task = std::make_shared<hazuki_tasks::Task>(); task->entry = entry;
+        control->tasks.emplace(token, task);
+        control->works.emplace(entry, hazuki_tasks::Work{token, 1, true, {}});
+        return token;
+    }
+    // 0 invalid, 1 accepted, 2 already requested, 3 caller already completed.
+    DLLEXPORT int jsTaskStop(uint64_t id, uint64_t token, int reason) {
+        if (reason != 1 && reason != 2) return 0;
+        auto control = hazuki_tasks::find(id);
+        if (!control) return 0;
+        std::lock_guard<std::mutex> lock(control->mutex);
+        auto task = control->tasks.find(token);
+        if (control->closed || task == control->tasks.end()) return 0;
+        if (task->second->completed) return 3;
+        int previous = 0;
+        bool accepted = task->second->stop.compare_exchange_strong(previous, reason);
+        control->refresh();
+        return accepted ? 1 : 2;
+    }
+    DLLEXPORT int jsTaskStopRetained(uint64_t id, uint64_t token, int reason) {
+        if (reason != 1 && reason != 2) return 0;
+        auto control = hazuki_tasks::find(id);
+        if (!control) return 0;
+        std::lock_guard<std::mutex> lock(control->mutex);
+        auto task = control->tasks.find(token);
+        if (control->closed || task == control->tasks.end()) return 0;
+        int previous = 0;
+        bool accepted = task->second->stop.compare_exchange_strong(previous, reason);
+        control->refresh();
+        return accepted ? 1 : 2;
+    }
+    // 0 invalid, 1 active, 2 shared retained, 3 eligible to stop, 4 stop claimed.
+    DLLEXPORT int jsWorkState(uint64_t id, uint64_t work) {
+        auto control = hazuki_tasks::find(id);
+        if (!control) return 0;
+        std::lock_guard<std::mutex> lock(control->mutex);
+        auto it = control->works.find(work);
+        if (it == control->works.end()) return 0;
+        if (it->second.claimed_stop) return 4;
+        if (control->stop_reason(it->second)) return 3;
+        auto task = control->tasks.find(it->second.task);
+        return it->second.live && task != control->tasks.end() && task->second->stop.load() ? 2 : 1;
+    }
+    DLLEXPORT int jsWorkClaimStop(uint64_t id, uint64_t work) {
+        auto control = hazuki_tasks::find(id);
+        if (!control) return 0;
+        std::lock_guard<std::mutex> lock(control->mutex);
+        auto it = control->works.find(work);
+        if (it == control->works.end()) return 0;
+        int reason = control->stop_reason(it->second);
+        if (reason) { it->second.claimed_stop = reason; control->refresh(); }
+        return reason;
+    }
+    DLLEXPORT void jsTaskShutdown(uint64_t id) {
+        auto control = hazuki_tasks::find(id);
+        if (!control) return;
+        std::lock_guard<std::mutex> lock(control->mutex);
+        control->closed = true;
+        for (auto &task : control->tasks) { int previous = 0; task.second->stop.compare_exchange_strong(previous, 1); }
+        for (auto &work : control->works) work.second.claimed_stop = 1;
+        control->refresh();
+    }
+    DLLEXPORT JSValue *jsNewStoppedError(JSContext *ctx, uint64_t token, int reason) {
+        JSValue error = JS_NewError(ctx);
+        JSValue *result = new JSValue(error);
+        if (!JS_IsException(error)) JS_MarkHostStopError(error, token, reason);
+        return result;
+    }
+    DLLEXPORT int jsTaskComplete(uint64_t id, uint64_t token) {
+        auto control = hazuki_tasks::find(id);
+        if (!control) return 0;
+        std::lock_guard<std::mutex> lock(control->mutex);
+        auto task = control->tasks.find(token);
+        if (control->closed || task == control->tasks.end() || task->second->completed) return 0;
+        task->second->completed = true;
+        auto entry = control->works.find(task->second->entry);
+        if (entry != control->works.end()) --entry->second.refs;
+        control->collect();
+        return 1;
+    }
+    // Diagnostic fields: controls, task records, work records, stopped shared work.
+    DLLEXPORT uint64_t jsTaskCount(uint64_t id, int field) {
+        if (field == 0) { std::lock_guard<std::mutex> lock(hazuki_tasks::registry_mutex);
+            return hazuki_tasks::registry.size(); }
+        auto control = hazuki_tasks::find(id);
+        if (!control) return 0;
+        std::lock_guard<std::mutex> lock(control->mutex);
+        if (field == 1) return control->tasks.size();
+        if (field == 2) return control->works.size();
+        uint64_t retained = 0;
+        for (auto &entry : control->works) {
+            auto task = control->tasks.find(entry.second.task);
+            if (entry.second.live && task != control->tasks.end() && task->second->stop.load()) ++retained;
+        }
+        return retained;
+    }
+    DLLEXPORT uint64_t jsGetWorkContext(JSRuntime *rt) { return JS_GetHostWorkContext(rt); }
+    DLLEXPORT uint64_t jsCreateWorkContext(JSRuntime *rt) {
+        auto *opaque = static_cast<RuntimeOpaque *>(JS_GetRuntimeOpaque(rt));
+        if (!opaque->control) return 0;
+        auto work = hazuki_tasks::work(rt, 1, JS_GetHostTaskContext(rt), 0, opaque->control.get());
+        hazuki_tasks::work(rt, 4, work, JS_GetHostWorkContext(rt), opaque->control.get());
+        return work;
+    }
+    DLLEXPORT void jsSetWorkContext(JSRuntime *rt, uint64_t work) { JS_SetHostWorkContext(rt, work); }
+    DLLEXPORT void jsRetainWorkContext(JSRuntime *rt, uint64_t work) {
+        auto *opaque = static_cast<RuntimeOpaque *>(JS_GetRuntimeOpaque(rt));
+        if (opaque->control) hazuki_tasks::work(rt, 2, work, 0, opaque->control.get());
+    }
+    DLLEXPORT void jsReleaseWorkContext(JSRuntime *rt, uint64_t work) {
+        auto *opaque = static_cast<RuntimeOpaque *>(JS_GetRuntimeOpaque(rt));
+        if (opaque->control) hazuki_tasks::work(rt, 3, work, 0, opaque->control.get());
+    }
+    DLLEXPORT void jsSetHostObserver(JSRuntime *rt, int observer) { JS_SetHostObserver(rt, observer != 0); }
+    DLLEXPORT uint64_t jsLastJobTask(JSRuntime *rt) { return JS_GetLastJobTask(rt); }
+    DLLEXPORT int jsLastJobStopReason(JSRuntime *rt) { return JS_GetLastJobStopReason(rt); }
+    DLLEXPORT int jsStopErrorReason(JSValueConst *error) { return JS_GetHostStopError(*error, nullptr); }
+    DLLEXPORT uint64_t jsStopErrorTask(JSValueConst *error) {
+        uint64_t task = 0; JS_GetHostStopError(*error, &task); return task;
+    }
+    DLLEXPORT int jsSweepStoppedPromises(JSContext *ctx) { return JS_SweepStoppedPromises(ctx); }
+    DLLEXPORT int jsObserveHostPromise(JSContext *ctx, JSValueConst *promise, JSValueConst *resolve, JSValueConst *reject) {
+        return JS_ObserveHostPromise(ctx, *promise, *resolve, *reject);
+    }
+    static void begin_call(JSRuntime *rt);
+    DLLEXPORT JSValue *jsSettleHostFuture(JSContext *ctx, JSValueConst *resolver, JSValueConst *value) {
+        begin_call(JS_GetRuntime(ctx));
+        return new JSValue(JS_SettleHostFuture(ctx, *resolver, *value));
+    }
 
     static JSChannel *runtime_channel(JSRuntime *rt)
     {
@@ -339,11 +585,16 @@ extern "C"
     static int interrupt_handler(JSRuntime *rt, void *data)
     {
         auto *opaque = static_cast<RuntimeOpaque *>(data);
+        if (opaque->control) {
+            int reason = static_cast<int>(hazuki_tasks::work(rt, 5, JS_GetHostWorkContext(rt), 0, opaque->control.get()));
+            if (reason) { JS_SetHostStopReason(rt, reason); return 1; }
+        }
         if (opaque->timeout > 0 && std::chrono::steady_clock::now() >= opaque->deadline)
         {
             // Let QuickJS finish propagating the interruption, including
             // rejecting a Promise, before the next entry resets the deadline.
             opaque->deadline = std::chrono::steady_clock::time_point::max();
+            JS_SetHostStopReason(rt, 2);
             return 1;
         }
         return 0;
@@ -355,10 +606,20 @@ extern "C"
         auto *opaque = static_cast<RuntimeOpaque *>(JS_GetRuntimeOpaque(rt));
         if (opaque != nullptr)
             opaque->deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(opaque->timeout);
+        JS_SetHostStopReason(rt, 0);
+    }
+
+    DLLEXPORT int64_t jsRemainingExecutionMilliseconds(JSRuntime *rt) {
+        auto *opaque = static_cast<RuntimeOpaque *>(JS_GetRuntimeOpaque(rt));
+        if (!opaque || opaque->timeout <= 0) return 5000;
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+            opaque->deadline - std::chrono::steady_clock::now()).count();
+        return remaining < 0 ? 0 : (remaining > opaque->timeout ? opaque->timeout : remaining);
     }
 
     DLLEXPORT JSValue *jsThrow(JSContext *ctx, JSValue *obj)
     {
+        if (JS_GetHostStopError(*obj, nullptr)) JS_SetUncatchableError(ctx, *obj);
         return new JSValue(JS_Throw(ctx, JS_DupValue(ctx, *obj)));
     }
 
@@ -423,6 +684,7 @@ extern "C"
         JSRuntime *rt = JS_NewRuntime();
         auto *opaque = new RuntimeOpaque{channel, timeout, {}};
         JS_SetRuntimeOpaque(rt, opaque);
+        JS_SetHostTaskReference(rt, task_reference, reinterpret_cast<void *>(channel));
         JS_SetInterruptHandler(rt, interrupt_handler, opaque);
         JS_SetHostPromiseRejectionTracker(rt, js_promise_rejection_tracker, nullptr);
         JS_SetModuleLoaderFunc(rt, nullptr, js_module_loader, nullptr);
@@ -483,6 +745,12 @@ extern "C"
     DLLEXPORT void jsFreeRuntime(JSRuntime *rt)
     {
         auto *opaque = static_cast<RuntimeOpaque *>(JS_GetRuntimeOpaque(rt));
+        if (opaque->control) {
+            { std::lock_guard<std::mutex> lock(opaque->control->mutex);
+              opaque->control->closed = true; opaque->control->refresh(); }
+            { std::lock_guard<std::mutex> lock(hazuki_tasks::registry_mutex);
+              hazuki_tasks::registry.erase(opaque->control_id); }
+        }
         JS_SetRuntimeOpaque(rt, nullptr);
         JS_FreeRuntime(rt);
         delete opaque;
@@ -514,7 +782,8 @@ extern "C"
         begin_call(JS_GetRuntime(ctx));
         JSRuntime *rt = JS_GetRuntime(ctx);
         JS_UpdateStackTop(rt);
-        JSValue *ret = new JSValue(JS_Eval(ctx, input, input_len, filename, eval_flags));
+        JSValue *ret = new JSValue(JS_CheckHostTask(ctx) < 0 ? JS_EXCEPTION :
+            JS_Eval(ctx, input, input_len, filename, eval_flags));
         return ret;
     }
 
@@ -703,7 +972,8 @@ extern "C"
         begin_call(JS_GetRuntime(ctx));
         JSRuntime *rt = JS_GetRuntime(ctx);
         JS_UpdateStackTop(rt);
-        JSValue *ret = new JSValue(JS_Call(ctx, *func_obj, *this_obj, argc, argv));
+        JSValue *ret = new JSValue(JS_CheckHostTask(ctx) < 0 ? JS_EXCEPTION :
+            JS_Call(ctx, *func_obj, *this_obj, argc, argv));
         return ret;
     }
 

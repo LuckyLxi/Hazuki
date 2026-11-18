@@ -6,12 +6,11 @@ import 'package:hazuki/services/software_update/software_update_download_service
 import 'dart:async';
 
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'app/app_settings_store.dart';
 import 'app/app_startup_coordinator.dart';
-import 'app/appearance_settings.dart';
+import 'shared/appearance/appearance_settings.dart';
 import 'app/hazuki_app_controller.dart';
 import 'app/home/home_feature_entrypoints.dart';
 import 'app/service_locator.dart';
@@ -23,6 +22,8 @@ import 'app/launch_shortcut_coordinator.dart';
 import 'app/source_runtime/source_runtime_coordinator.dart';
 import 'app/source_runtime/source_runtime_bootstrap_overlay.dart';
 import 'app/source_runtime/source_update_dialog_support.dart';
+import 'app/source_runtime/source_plugin_dialog_presenter.dart';
+import 'services/source/interaction/source_ui_service.dart';
 import 'app/theme/theme_reveal_support.dart';
 import 'app/windows/windows_title_bar_controller.dart';
 import 'app/software_update/software_update_dialog_support.dart';
@@ -32,6 +33,7 @@ import 'package:hazuki/features/home/home.dart'
     show HomeFeatureEntrypoints, HomeServices;
 import 'package:hazuki/features/home/view/home_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'services/chinese_conversion_service.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
@@ -42,7 +44,7 @@ import 'shared/text/chinese_conversion_scope.dart';
 import 'services/source/source_capabilities.dart';
 import 'widgets/hazuki_prompt.dart';
 import 'widgets/source_image_gateway_scope.dart';
-import 'features/password_lock/view/password_lock_widgets.dart';
+import 'features/password_lock/password_lock.dart';
 
 Future<void> main() async {
   final bootstrap = await bootstrapApp();
@@ -114,6 +116,7 @@ class HazukiApp extends StatefulWidget {
 class _HazukiAppState extends State<HazukiApp>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  late final SourcePluginDialogPresenter _pluginDialogPresenter;
   final SourceRuntimeCoordinator _sourceRuntimeCoordinator =
       SourceRuntimeCoordinator();
   final SourceUpdateDialogSupport _sourceUpdateDialogSupport =
@@ -139,6 +142,15 @@ class _HazukiAppState extends State<HazukiApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _pluginDialogPresenter = SourcePluginDialogPresenter(
+      sourceUiService: sl<SourceUiService>(),
+      _navigatorKey,
+      comicDetailPageBuilder: _buildRootComicDetailPage,
+      searchPageBuilder: (keyword) => _homeFeatureEntrypoints.buildSearchPage(
+        initialKeyword: keyword,
+        comicDetailPageBuilder: _buildRootComicDetailPage,
+      ),
+    );
     _themeController = HazukiThemeController(
       settingsStore: widget.settingsStore,
       initialSettings: widget.initialAppearance,
@@ -180,6 +192,7 @@ class _HazukiAppState extends State<HazukiApp>
           HazukiLiquidGlass.setEnabled(appearance.liquidGlassEnabled),
       reloadLocale: _reloadLocalePreference,
       refreshHome: _startupCoordinator.refreshHome,
+      chineseConversion: sl<ChineseConversionService>(),
     );
     _appListenable = Listenable.merge([
       _themeController,
@@ -195,6 +208,12 @@ class _HazukiAppState extends State<HazukiApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      sl<SourceUiService>().setForeground(false);
+    } else if (state == AppLifecycleState.resumed) {
+      sl<SourceUiService>().setForeground(true);
+    }
     sl<MangaDownloadService>().handleAppLifecycleState(state);
     unawaited(sl<PasswordLockService>().handleAppLifecycleState(state));
   }
@@ -202,6 +221,7 @@ class _HazukiAppState extends State<HazukiApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pluginDialogPresenter.dispose();
     _launchShortcutCoordinator.dispose();
     _themeRevealSupport.dispose();
     _themeController.dispose();
@@ -313,14 +333,12 @@ class _HazukiAppState extends State<HazukiApp>
               debugShowCheckedModeBanner: false,
               onGenerateTitle: (context) => l10n(context).appTitle,
               locale: _locale,
-              localizationsDelegates: const [
-                AppLocalizations.delegate,
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
+              localizationsDelegates: hazukiLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
-              navigatorObservers: [hazukiPromptNavigatorObserver],
+              navigatorObservers: [
+                hazukiPromptNavigatorObserver,
+                _pluginDialogPresenter,
+              ],
               themeMode: _themeController.themeMode,
               theme: HazukiThemeFactory.buildLight(appearance, lightDynamic),
               darkTheme: HazukiThemeFactory.buildDark(appearance, darkDynamic),
@@ -338,6 +356,7 @@ class _HazukiAppState extends State<HazukiApp>
                           children: [
                             HazukiWindowFrame(
                               child: ChineseConversionScope(
+                                service: sl<ChineseConversionService>(),
                                 child: child ?? const SizedBox.shrink(),
                               ),
                             ),
@@ -410,16 +429,8 @@ class _HazukiAppState extends State<HazukiApp>
                                 ),
                               ),
                             ),
-                            ListenableBuilder(
-                              listenable: sl<PasswordLockService>(),
-                              builder: (context, _) {
-                                if (!sl<PasswordLockService>().shouldBlockApp) {
-                                  return const SizedBox.shrink();
-                                }
-                                return PasswordLockGateOverlay(
-                                  controller: sl<PasswordLockService>(),
-                                );
-                              },
+                            PasswordLockGateHost(
+                              controller: sl<PasswordLockService>(),
                             ),
                           ],
                         ),
@@ -427,41 +438,48 @@ class _HazukiAppState extends State<HazukiApp>
                     ),
                   ),
                 );
-                return TooltipVisibility(
-                  visible: false,
-                  child: SourceImageGatewayScope(
-                    gateway: sl<SourceImageGateway>(),
-                    sourceListenable: sl<SourceSelectionGateway>(),
-                    child: SourcePresentationScope(
-                      registry: sl<SourceRuntimeRegistry>(),
-                      child: WindowsComicDetailPresentationScope(
-                        panelBuilder:
-                            (
-                              comic,
-                              heroTag, {
-                              required shouldAnimatePanelReveal,
-                              required isRestoringPreviousDetail,
-                              required initialTabIndex,
-                              required showHomeAction,
-                              required onBackRequested,
-                              required onHomeRequested,
-                            }) => _homeFeatureEntrypoints.buildComicDetailPage(
-                              comic,
-                              heroTag,
-                              isDesktopPanel: true,
-                              // Restoring a previous detail rebuilds its widget
-                              // tree, but it must not replay loading-to-content
-                              // animations. New and replacement details still
-                              // keep their normal reveal independently of the
-                              // panel navigation transition.
-                              shouldAnimateInitialRevealOverride:
-                                  isRestoringPreviousDetail ? false : null,
-                              initialTabIndex: initialTabIndex,
-                              showHomeAction: showHomeAction,
-                              onCloseRequested: onBackRequested,
-                              onHomeRequested: onHomeRequested,
-                            ),
-                        child: app,
+                // 部分三方依赖仍基于 flutter/material，桥接把主题与本地化映射给旧组件；
+                // 待依赖迁移到 material_ui 后移除。
+                // ignore: deprecated_member_use
+                return MaterialUiCompatibilityBridge(
+                  child: TooltipVisibility(
+                    visible: false,
+                    child: SourceImageGatewayScope(
+                      gateway: sl<SourceImageGateway>(),
+                      sourceListenable: sl<SourceRuntimeGateway>(),
+                      child: SourcePresentationScope(
+                        sourceUiService: sl<SourceUiService>(),
+                        registry: sl<SourceRuntimeRegistry>(),
+                        sourcePlugins: sl<SourcePluginGateway>(),
+                        child: WindowsComicDetailPresentationScope(
+                          panelBuilder:
+                              (
+                                comic,
+                                heroTag, {
+                                required shouldAnimatePanelReveal,
+                                required isRestoringPreviousDetail,
+                                required initialTabIndex,
+                                required showHomeAction,
+                                required onBackRequested,
+                                required onHomeRequested,
+                              }) => _homeFeatureEntrypoints.buildComicDetailPage(
+                                comic,
+                                heroTag,
+                                isDesktopPanel: true,
+                                // Restoring a previous detail rebuilds its widget
+                                // tree, but it must not replay loading-to-content
+                                // animations. New and replacement details still
+                                // keep their normal reveal independently of the
+                                // panel navigation transition.
+                                shouldAnimateInitialRevealOverride:
+                                    isRestoringPreviousDetail ? false : null,
+                                initialTabIndex: initialTabIndex,
+                                showHomeAction: showHomeAction,
+                                onCloseRequested: onBackRequested,
+                                onHomeRequested: onHomeRequested,
+                              ),
+                          child: app,
+                        ),
                       ),
                     ),
                   ),

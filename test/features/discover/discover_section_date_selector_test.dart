@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/discover/view/discover_section_page_widgets.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 void main() {
@@ -13,7 +14,7 @@ void main() {
 
   Widget wrap({required ValueChanged<String> onSelected}) {
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: hazukiLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: DiscoverSectionSortBar(
@@ -93,7 +94,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: DiscoverSectionSortBar(
@@ -128,7 +129,7 @@ void main() {
     );
   });
 
-  testWidgets('regular sort bar uses a horizontally scrollable capsule', (
+  testWidgets('regular sort bar uses a horizontally scrollable chip row', (
     tester,
   ) async {
     var selectedValue = dates.first.value;
@@ -149,45 +150,43 @@ void main() {
     );
 
     expect(find.byType(ChoiceChip), findsNothing);
-    final capsule = find.byKey(
+    final group = find.byKey(
       const ValueKey<String>('discover_section_sort_group_0'),
     );
-    expect(capsule, findsOneWidget);
+    expect(group, findsOneWidget);
+    expect(tester.getSize(group).height, 34);
     expect(
-      find.descendant(
-        of: capsule,
-        matching: find.byType(SingleChildScrollView),
-      ),
+      find.descendant(of: group, matching: find.byType(ListView)),
       findsOneWidget,
     );
-    final material = tester.widget<Material>(capsule);
-    expect(material.borderRadius, BorderRadius.circular(999));
-    expect(
-      find.ancestor(of: capsule, matching: find.byType(BackdropFilter)),
-      findsOneWidget,
-    );
-    expect(material.color!.a, closeTo(0.72, 0.01));
-    final indicator = find.byKey(
-      const ValueKey<String>('discover_section_sort_indicator'),
-    );
-    final animatedIndicator = tester.widget<AnimatedPositioned>(indicator);
-    expect(animatedIndicator.duration, const Duration(milliseconds: 260));
+    expect(find.byType(BackdropFilter), findsNothing);
     expect(
       find.byKey(const ValueKey<String>('weekly_date_launcher')),
       findsNothing,
     );
 
-    final initialX = tester.getTopLeft(indicator).dx;
+    final colorScheme = Theme.of(tester.element(group)).colorScheme;
+    Color chipColor(String value) {
+      final container = tester.widget<AnimatedContainer>(
+        find.descendant(
+          of: find.byKey(
+            ValueKey<String>('discover_section_sort_option_0_$value'),
+          ),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+      return (container.decoration! as ShapeDecoration).color!;
+    }
+
+    expect(chipColor(dates.first.value), colorScheme.primaryContainer);
+    expect(chipColor(dates.last.value), colorScheme.surfaceContainerHigh);
+
     await tester.tap(find.text(dates.last.label));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    final movingX = tester.getTopLeft(indicator).dx;
     await tester.pumpAndSettle();
-    final settledX = tester.getTopLeft(indicator).dx;
 
     expect(selectedValue, dates.last.value);
-    expect(movingX, greaterThan(initialX));
-    expect(movingX, lessThan(settledX));
+    expect(chipColor(dates.first.value), colorScheme.surfaceContainerHigh);
+    expect(chipColor(dates.last.value), colorScheme.primaryContainer);
   });
 
   testWidgets('long sort labels stay complete at different text scales', (
@@ -205,7 +204,9 @@ void main() {
           home: MediaQuery(
             data: MediaQueryData(textScaler: TextScaler.linear(scale)),
             child: Scaffold(
+              // 每个缩放比例用新的筛选行，从头开始检查懒加载的胶囊
               body: SizedBox(
+                key: ValueKey<double>(scale),
                 width: 320,
                 child: DiscoverSectionSortBar(
                   sortOptions: options,
@@ -218,13 +219,24 @@ void main() {
         ),
       );
 
+      // 胶囊懒加载，逐个滚到可见后再检查文字是否完整
+      final scrollable = find.descendant(
+        of: find.byKey(const ValueKey<String>('discover_section_sort_group_0')),
+        matching: find.byType(Scrollable),
+      );
       for (final option in options) {
+        await tester.scrollUntilVisible(
+          find.text(option.label),
+          80,
+          scrollable: scrollable,
+        );
         final paragraph = tester.renderObject<RenderParagraph>(
           find.text(option.label),
         );
         expect(paragraph.didExceedMaxLines, isFalse);
       }
       await tester.ensureVisible(find.text(options.last.label));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(options.last.label));
       expect(selected, options.last.value);
       expect(tester.takeException(), isNull);
@@ -289,7 +301,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: DiscoverSectionSortBar(
@@ -334,7 +346,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: StatefulBuilder(
           builder: (context, setState) => Scaffold(

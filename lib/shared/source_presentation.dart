@@ -1,16 +1,52 @@
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_registry.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
+import 'package:hazuki/services/source/plugins/source_detail_tabs.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_exception.dart';
+import 'package:hazuki/services/source/gateways/source_plugin_gateway.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 export 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
+export 'package:hazuki/services/source/plugins/source_detail_tabs.dart';
 
 /// Injected catalog metadata for currently installed plugins.
 class SourcePresentationScope extends InheritedNotifier<SourceRuntimeRegistry> {
   const SourcePresentationScope({
     super.key,
     required SourceRuntimeRegistry registry,
+    required this.sourceUiService,
+    this.sourcePlugins,
     required super.child,
   }) : super(notifier: registry);
+  final SourceUiService sourceUiService;
+  final SourcePluginGateway? sourcePlugins;
+
+  static SourceUiService uiOf(BuildContext context) => context
+      .getInheritedWidgetOfExactType<SourcePresentationScope>()!
+      .sourceUiService;
+
+  static SourceUiService? maybeUiOf(BuildContext context) => context
+      .getInheritedWidgetOfExactType<SourcePresentationScope>()
+      ?.sourceUiService;
+
+  static SourcePluginGateway? pluginsOf(
+    BuildContext context, {
+    bool listen = true,
+  }) =>
+      (listen
+              ? context
+                    .dependOnInheritedWidgetOfExactType<
+                      SourcePresentationScope
+                    >()
+              : context
+                    .getInheritedWidgetOfExactType<SourcePresentationScope>())
+          ?.sourcePlugins;
+
+  @override
+  bool updateShouldNotify(covariant SourcePresentationScope oldWidget) =>
+      super.updateShouldNotify(oldWidget) ||
+      sourcePlugins != oldWidget.sourcePlugins ||
+      sourceUiService != oldWidget.sourceUiService;
   static SourceRuntimeRegistry? maybeOf(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<SourcePresentationScope>()
       ?.notifier;
@@ -46,6 +82,27 @@ bool sourceCommentsEnabled(
       : sourceKey.trim();
   if (registry?.isAllowedSourceKey(key) != true) return false;
   return registry!.definitionFor(key).presentation['showComments'] == true;
+}
+
+/// 详情页插件标签页只来自已安装且启用插件的声明。
+List<SourceDetailTab> sourceDetailTabs(
+  String sourceKey, {
+  required BuildContext context,
+  bool listen = true,
+}) {
+  final registry = listen
+      ? SourcePresentationScope.maybeOf(context)
+      : SourcePresentationScope.read(context);
+  final key = sourceKey.trim();
+  if (registry?.isAllowedSourceKey(key) != true) return const [];
+  try {
+    return SourceDetailTab.forPresentation(
+      registry!.definitionFor(key).presentation,
+    );
+  } on SourcePluginException {
+    // 安装时已校验；旧数据格式异常时不显示，避免详情页整体崩溃。
+    return const [];
+  }
 }
 
 /// Button visibility always comes from an installed plugin's declarations.

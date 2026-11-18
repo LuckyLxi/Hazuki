@@ -8,6 +8,7 @@ import '../../services/announcements/announcement_store.dart';
 import '../../services/cloud_sync/cloud_sync_participant_set.dart';
 import '../../services/cloud_sync_service.dart';
 import '../../services/comment_filter/comment_filter_sync_store.dart';
+import '../../services/chinese_conversion_service.dart';
 import '../../services/comment_filter_service.dart';
 import '../../services/discover_daily_recommendation_service.dart';
 import '../../services/download_groups_service.dart';
@@ -26,14 +27,109 @@ import '../../services/software_update/software_update_download_service.dart';
 import '../../services/software_update/software_update_service.dart';
 import '../../services/source/source_capabilities.dart';
 import '../../services/storage/hazuki_database.dart';
+import '../../services/translation/manga_translation_provider_factory.dart';
+import '../../services/translation/manga_translation_settings_store.dart';
+import '../../services/translation/translation_response_parser.dart';
+import '../../services/translation/translation_result_cache.dart';
+import '../../services/translation/translation_glossary_store.dart';
+import '../../services/translation/manga_translation_service.dart';
+import '../../services/translation/imaging/bubble_snapper.dart';
+import '../../services/translation/imaging/translation_image_processor.dart';
+import '../../services/translation/translation_usage_store.dart';
+import '../../services/translation/detection/translation_detector_model_store.dart';
+import '../../services/translation/detection/onnx_translation_text_detector.dart';
+import '../../services/translation/detection/translation_text_detector.dart';
 
 /// Registers application services against their contract-level dependencies.
 void registerApplicationServices(GetIt services) {
+  if (!services.isRegistered<TranslationDetectorModelStore>()) {
+    services.registerLazySingleton<TranslationDetectorModelStore>(
+      () => TranslationDetectorModelStore(
+        settings: services<MangaTranslationSettingsStore>(),
+        verifyLoadable: (spec, model, runtime) =>
+            OnnxTranslationTextDetector.verifyModel(model, runtime, spec: spec),
+        verifyRuntime: (spec, library) =>
+            OnnxTranslationTextDetector.verifyRuntime(library, spec.version),
+        releaseRuntime: () => services<TranslationTextDetector>().release(),
+      ),
+      dispose: (store) => store.dispose(),
+    );
+  }
+  if (!services.isRegistered<TranslationTextDetector>()) {
+    services.registerLazySingleton<TranslationTextDetector>(
+      OnnxTranslationTextDetector.new,
+      dispose: (detector) => detector.release(),
+    );
+  }
+  if (!services.isRegistered<TranslationUsageStore>()) {
+    services.registerLazySingleton<TranslationUsageStore>(
+      TranslationUsageStore.new,
+      dispose: (store) => store.dispose(),
+    );
+  }
+  if (!services.isRegistered<TranslationImageProcessor>()) {
+    services.registerLazySingleton<TranslationImageProcessor>(
+      TranslationImageProcessor.new,
+    );
+  }
+  if (!services.isRegistered<BubbleSnapper>()) {
+    services.registerLazySingleton<BubbleSnapper>(BubbleSnapper.new);
+  }
+  if (!services.isRegistered<MangaTranslationService>()) {
+    services.registerLazySingleton<MangaTranslationService>(
+      () => MangaTranslationService(
+        settings: services<MangaTranslationSettingsStore>(),
+        cache: services<TranslationResultCache>(),
+        glossary: services<TranslationGlossaryStore>(),
+        providers: services<MangaTranslationProviderFactory>(),
+        imageProcessor: services<TranslationImageProcessor>(),
+        snapper: services<BubbleSnapper>(),
+        parser: services<TranslationResponseParser>(),
+        usageStore: services<TranslationUsageStore>(),
+        models: services<TranslationDetectorModelStore>(),
+        detector: services<TranslationTextDetector>(),
+        log: (title, content) =>
+            services<SourceDebugGateway>().addApplicationLog(
+              level: 'info',
+              title: title,
+              content: content,
+              source: 'translation',
+            ),
+      ),
+    );
+  }
+  if (!services.isRegistered<TranslationResultCache>()) {
+    services.registerLazySingleton<TranslationResultCache>(
+      TranslationResultCache.new,
+    );
+  }
+  if (!services.isRegistered<TranslationGlossaryStore>()) {
+    services.registerLazySingleton<TranslationGlossaryStore>(
+      TranslationGlossaryStore.new,
+    );
+  }
+  if (!services.isRegistered<MangaTranslationSettingsStore>()) {
+    services.registerLazySingleton<MangaTranslationSettingsStore>(
+      MangaTranslationSettingsStore.new,
+      dispose: (store) => store.dispose(),
+    );
+  }
+  if (!services.isRegistered<MangaTranslationProviderFactory>()) {
+    services.registerLazySingleton<MangaTranslationProviderFactory>(
+      MangaTranslationProviderFactory.new,
+      dispose: (factory) => factory.dispose(),
+    );
+  }
+  if (!services.isRegistered<TranslationResponseParser>()) {
+    services.registerLazySingleton<TranslationResponseParser>(
+      TranslationResponseParser.new,
+    );
+  }
   if (!services.isRegistered<AnnouncementService>()) {
     services.registerLazySingleton<AnnouncementService>(
       () => AnnouncementService(
         remoteSource: HttpAnnouncementRemoteSource(),
-        store: SharedPreferencesAnnouncementStore(),
+        store: AnnouncementStore(),
       ),
       dispose: (service) => service.dispose(),
     );
@@ -54,6 +150,11 @@ void registerApplicationServices(GetIt services) {
       CommentFilterService.new,
     );
   }
+  if (!services.isRegistered<ChineseConversionService>()) {
+    services.registerLazySingleton<ChineseConversionService>(
+      ChineseConversionService.new,
+    );
+  }
   if (!services.isRegistered<CommentFilterSyncStore>()) {
     services.registerLazySingleton<CommentFilterSyncStore>(
       () => services<CommentFilterService>(),
@@ -66,7 +167,7 @@ void registerApplicationServices(GetIt services) {
   }
   if (!services.isRegistered<LocalFavoritesPersistence>()) {
     services.registerLazySingleton<LocalFavoritesPersistence>(
-      () => DriftLocalFavoritesPersistence(services<HazukiDatabase>()),
+      () => LocalFavoritesPersistence(services<HazukiDatabase>()),
     );
   }
   if (!services.isRegistered<LocalFavoritesSyncCodec>()) {
@@ -145,20 +246,25 @@ void registerApplicationServices(GetIt services) {
   }
   if (!services.isRegistered<MangaDownloadService>()) {
     services.registerLazySingleton<MangaDownloadService>(
-      () => MangaDownloadService(sourceReader: services<SourceReaderGateway>()),
+      () => MangaDownloadService(
+        sourceReader: services<SourceReaderGateway>(),
+        downloadSessions: services<SourceDownloadSessionGateway>(),
+        taskControl: services<SourceTaskControlGateway>(),
+      ),
     );
   }
   if (!services.isRegistered<DiscoverDailyRecommendationService>()) {
     services.registerLazySingleton<DiscoverDailyRecommendationService>(
       () => DiscoverDailyRecommendationService(
         source: services<SourceDailyRecommendationGateway>(),
+        taskControl: services<SourceTaskControlGateway>(),
       ),
     );
   }
   if (!services.isRegistered<CloudSyncParticipantSet>()) {
     services.registerLazySingleton<CloudSyncParticipantSet>(
       () => createCloudSyncParticipantSet(
-        source: services<SourceSyncGateway>(),
+        source: services<SourceScriptGateway>(),
         readHistory: services<ReadHistoryService>(),
         readingProgress: services<ReadingProgressService>(),
         localFavorites: services<LocalFavoritesSyncStore>(),

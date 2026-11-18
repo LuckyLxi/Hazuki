@@ -1,8 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
+import 'package:hazuki/widgets/hazuki_prompt.dart';
+import 'package:hazuki/widgets/source_plugin_interaction.dart';
 
 import '../settings_group.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 /// Shows declarations from enabled plugins without initializing their runtimes.
 class SourcePluginActionList extends StatelessWidget {
@@ -11,11 +16,15 @@ class SourcePluginActionList extends StatelessWidget {
     required this.gateway,
     required this.location,
     this.pluginId,
+    this.title,
   });
 
   final SourcePluginGateway gateway;
   final SourcePluginActionLocation location;
   final String? pluginId;
+
+  /// 分区标题，仅在存在插件操作时随卡片一起显示
+  final String? title;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -42,9 +51,16 @@ class SourcePluginActionList extends StatelessWidget {
           );
         }
       }
-      return tiles.isEmpty
-          ? const SizedBox.shrink()
-          : SettingsGroup(children: tiles);
+      if (tiles.isEmpty) return const SizedBox.shrink();
+      final title = this.title;
+      if (title == null) return SettingsGroup(children: tiles);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SettingsSectionHeader(title),
+          SettingsGroup(children: withSettingsDividers(context, tiles)),
+        ],
+      );
     },
   );
 }
@@ -70,68 +86,53 @@ class SourcePluginActionTile extends StatefulWidget {
 }
 
 class _SourcePluginActionTileState extends State<SourcePluginActionTile> {
-  bool _busy = false;
-  String? _error;
-
   Future<void> _run() async {
-    if (_busy) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    final scope = SourceUiScope.current;
     try {
       final result = await widget.gateway.runAction(
         widget.pluginId,
         widget.action.id,
       );
-      if (mounted && result != null) {
-        final translation = widget.translation;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Builder(
-              builder: (context) => Text(
-                localizeSourcePluginText(
-                  result,
-                  Localizations.localeOf(context).toLanguageTag(),
-                  translation: translation,
-                ),
-              ),
+      if (mounted && scope?.available != false && result != null) {
+        unawaited(
+          showHazukiPrompt(
+            context,
+            localizeSourcePluginText(
+              result,
+              Localizations.localeOf(context).toLanguageTag(),
+              translation: widget.translation,
             ),
           ),
         );
       }
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      if (isSourceUiCancellation(error)) return;
+      if (mounted && scope?.available != false) {
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+      }
     }
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      ListTile(
-        title: Text(
-          localizeSourcePluginText(
-            widget.action.title,
-            Localizations.localeOf(context).toLanguageTag(),
-            translation: widget.translation,
-            fallback: widget.action.id,
-          ),
-        ),
+  Widget build(BuildContext context) {
+    final title = localizeSourcePluginText(
+      widget.action.title,
+      Localizations.localeOf(context).toLanguageTag(),
+      translation: widget.translation,
+      fallback: widget.action.id,
+    );
+    return SourcePluginButtonInteraction.action(
+      id: widget.action.id,
+      title: title,
+      sourceKey: widget.pluginId,
+      gateway: widget.gateway,
+      onInvoke: _run,
+      builder: (context, activate) => ListTile(
+        title: Text(title),
         subtitle: widget.pluginName == null ? null : Text(widget.pluginName!),
         trailing: const Icon(Icons.chevron_right),
-        onTap: _busy ? null : _run,
+        onTap: activate,
       ),
-      if (_error != null)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SelectableText(
-            _error!,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ),
-    ],
-  );
+    );
+  }
 }

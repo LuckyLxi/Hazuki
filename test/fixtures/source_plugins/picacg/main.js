@@ -269,11 +269,46 @@ function picacgComment(comment) {
   };
 }
 
+// 宿主 comicHeaderVersion >= 2 时点赞走 comic.onHeaderAction；旧宿主仍用 likeComic。
+const picacgHeaderActions = (Hazuki.comicHeaderVersion ?? 1) >= 2;
+
+/** 详情页点赞状态，供 onHeaderAction 在不重载详情的情况下更新统计行。 */
+/** @type {Map<string, {likes: number | null, liked: boolean, pages: number | null}>} */
+const picacgHeaderState = new Map();
+
+/**
+ * @param {{likes: number | null, liked: boolean, pages: number | null}} state
+ * @returns {SourceComicHeaderStat[]}
+ */
+function picacgHeaderStats(state) {
+  const likeText =
+    state.likes == null
+      ? ""
+      : { zh: `${state.likes}点赞`, en: `${state.likes} likes` };
+  return [
+    picacgHeaderActions
+      ? {
+          text: likeText,
+          icon: state.liked ? "liked" : "like",
+          action: "plugin",
+          id: "like",
+        }
+      : { text: likeText, action: "like" },
+    {
+      text:
+        state.pages == null
+          ? ""
+          : { zh: `${state.pages}页`, en: `${state.pages} pages` },
+      ...(picacgHeaderActions ? { icon: "pages" } : {}),
+    },
+  ];
+}
+
 /** @type {HazukiSourceDefinition} */
 const source = {
   id: "picacg",
   name: "Picacg",
-  version: "1.0.3",
+  version: "1.1.0",
   apiVersion: 1,
   account: {
     login: picacgLogin,
@@ -450,6 +485,12 @@ const source = {
       episodes.sort((a, b) => a.order - b.order);
       const info = infoResponse.data.comic;
       const updated = new Date(info.updated_at);
+      const headerState = {
+        likes: info.likesCount == null ? null : Number(info.likesCount),
+        liked: Boolean(info.isLiked),
+        pages: info.pagesCount == null ? null : Number(info.pagesCount),
+      };
+      picacgHeaderState.set(String(id), headerState);
       return {
         id,
         title: String(info.title || ""),
@@ -503,27 +544,7 @@ const source = {
         isFavorite: Boolean(info.isFavourite),
         isLiked: Boolean(info.isLiked),
         recommend: (relatedResponse.data.comics || []).map(picacgComic),
-        headerStats: [
-          {
-            text:
-              info.likesCount == null
-                ? ""
-                : {
-                    zh: `${info.likesCount}点赞`,
-                    en: `${info.likesCount} likes`,
-                  },
-            action: "like",
-          },
-          {
-            text:
-              info.pagesCount == null
-                ? ""
-                : {
-                    zh: `${info.pagesCount}页`,
-                    en: `${info.pagesCount} pages`,
-                  },
-          },
-        ],
+        headerStats: picacgHeaderStats(headerState),
         likesCount: info.likesCount,
         uploader: String(info._creator?.name || ""),
         pageCount: info.pagesCount,
@@ -555,6 +576,20 @@ const source = {
       return { images };
     },
     onImageLoad: (url) => ({ url, headers: { "user-agent": "okhttp/3.8.1" } }),
+    onHeaderAction: async (id, action) => {
+      if (action !== "like") return;
+      // 网站接口为切换：返回 like 表示已点赞，unlike 表示已取消。
+      const result = await picacgRequest("POST", "comics/" + id + "/like", {});
+      const state = picacgHeaderState.get(String(id));
+      if (!state) return { reload: true };
+      const liked = result?.data?.action === "like";
+      if (state.likes != null && liked !== state.liked) {
+        state.likes += liked ? 1 : -1;
+      }
+      state.liked = liked;
+      return { headerStats: picacgHeaderStats(state) };
+    },
+    // 旧宿主（comicHeaderVersion < 2）仍通过 likeComic 点赞。
     likeComic: async (id) => {
       await picacgRequest("POST", "comics/" + id + "/like", {});
     },

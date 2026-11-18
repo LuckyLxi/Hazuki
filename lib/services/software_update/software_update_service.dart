@@ -7,12 +7,12 @@ import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../shared/preferences/hazuki_preference_keys.dart';
-import '../../shared/preferences/software_update_source.dart';
+import '../preferences/hazuki_preference_keys.dart';
+import '../preferences/software_update_source.dart';
 import '../network/hazuki_network.dart';
 import 'software_update_version_utils.dart';
 
-export '../../shared/preferences/software_update_source.dart';
+export '../preferences/software_update_source.dart';
 
 const _ghproxyBaseUrl = 'https://ghproxy.net/';
 const _jsDelivrUpdateManifestUrl =

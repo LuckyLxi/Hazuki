@@ -1,6 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
+import 'package:hazuki/widgets/widgets.dart';
+
+import '../settings_group.dart';
 import 'chinese_conversion_menu.dart';
 
 class ChineseConversionSetting extends StatefulWidget {
@@ -21,6 +25,7 @@ class ChineseConversionSetting extends StatefulWidget {
 class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
   final _anchorKey = GlobalKey();
   bool _menuOpen = false;
+  Animation<double>? _menuTransition;
 
   Future<void> _showMenu() async {
     if (!widget.enabled || _menuOpen) return;
@@ -29,7 +34,10 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
       final mode = await showChineseConversionMenu(
         context: context,
         anchorKey: _anchorKey,
-        selected: hazukiChineseConversion.mode,
+        selected: ChineseConversionScope.read(context).mode,
+        onTransitionChanged: (transition) {
+          if (mounted) setState(() => _menuTransition = transition);
+        },
       );
       if (mounted && widget.enabled && mode != null) widget.onChanged(mode);
     } finally {
@@ -40,6 +48,7 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
+    final conversion = ChineseConversionScope.read(context);
     String label(ChineseConversionMode mode) => switch (mode) {
       ChineseConversionMode.off => strings.otherChineseConversionOff,
       ChineseConversionMode.traditional =>
@@ -49,27 +58,24 @@ class _ChineseConversionSettingState extends State<ChineseConversionSetting> {
     };
 
     return ListenableBuilder(
-      listenable: hazukiChineseConversion,
+      listenable: conversion,
       builder: (context, _) => ListTile(
         key: const ValueKey('other-chinese-conversion-menu'),
         enabled: widget.enabled,
         onTap: widget.enabled ? _showMenu : null,
-        leading: const Icon(Icons.translate_rounded),
+        leading: const SettingsLeadingIcon(Icons.translate_rounded),
         title: Text(strings.otherChineseConversionTitle),
         subtitle: Text(strings.otherChineseConversionSubtitle),
-        trailing: InkWell(
-          key: _anchorKey,
-          borderRadius: BorderRadius.circular(20),
-          onTap: widget.enabled ? _showMenu : null,
-          child: Padding(
-            key: const ValueKey('chinese-conversion-button'),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(label(hazukiChineseConversion.mode)),
-                const Icon(Icons.arrow_drop_down_rounded),
-              ],
+        // 当前值胶囊与菜单设置项一致，同时作为菜单弹出锚点
+        trailing: HazukiMenuMorphAnchor(
+          anchorKey: _anchorKey,
+          transition: _menuTransition,
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: widget.enabled ? _showMenu : null,
+            child: HazukiMenuValuePill(
+              key: const ValueKey('chinese-conversion-button'),
+              label: label(conversion.mode),
             ),
           ),
         ),

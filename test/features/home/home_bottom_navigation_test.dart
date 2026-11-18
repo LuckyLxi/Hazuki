@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -234,7 +236,8 @@ void main() {
     expect(tabBar.interactionBehavior, GlassInteractionBehavior.full);
     expect(tabBar.indicatorBorderRadius, GlassDefaults.capsuleRadius);
     expect(tabBar.barBorderRadius, GlassDefaults.capsuleRadius);
-    expect(tabBar.settings?.thickness, 10);
+    // Windows 宿主同样走圆弧透镜，厚度与 premium 渲染一致
+    expect(tabBar.settings?.thickness, Platform.isWindows ? 72 : 10);
     expect(tabBar.settings?.blur, 2);
     expect(
       tabBar.settings?.glassColor,

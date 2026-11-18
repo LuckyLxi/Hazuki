@@ -122,7 +122,8 @@ class AppLogEvent {
       source: json['source']?.toString() ?? 'app',
       event: json['event']?.toString() ?? 'log',
       title: json['title']?.toString() ?? 'Log',
-      data: json['data'],
+      // 旧版本持久化的事件可能未截断，恢复时统一归一化。
+      data: normalizeLogValue(json['data']),
       tags:
           (json['tags'] as List?)
               ?.map((tag) => tag.toString())
@@ -153,10 +154,17 @@ Object? _deduplicationValue(Object? value) {
   return value;
 }
 
+/// 单个字符串字段保留的最大字符数，超出部分截断，避免响应体、堆栈撑大日志。
+const int maxLogStringLength = 4000;
+
+/// 单个列表字段保留的最大元素数。
+const int maxLogListLength = 50;
+
 Object? normalizeLogValue(Object? value) {
-  if (value == null || value is String || value is num || value is bool) {
+  if (value == null || value is num || value is bool) {
     return value;
   }
+  if (value is String) return truncateLogText(value);
   if (value is Map) {
     return <String, dynamic>{
       for (final entry in value.entries)
@@ -164,13 +172,27 @@ Object? normalizeLogValue(Object? value) {
     };
   }
   if (value is Iterable) {
-    return value.map(normalizeLogValue).toList(growable: false);
+    final items = value.toList(growable: false);
+    final kept = items
+        .take(maxLogListLength)
+        .map(normalizeLogValue)
+        .toList(growable: true);
+    if (items.length > maxLogListLength) {
+      kept.add('[${items.length - maxLogListLength} more items truncated]');
+    }
+    return List<Object?>.unmodifiable(kept);
   }
   try {
-    return jsonDecode(jsonEncode(value));
+    return normalizeLogValue(jsonDecode(jsonEncode(value)));
   } catch (_) {
-    return value.toString();
+    return truncateLogText(value.toString());
   }
+}
+
+String truncateLogText(String value, [int maxLength = maxLogStringLength]) {
+  if (value.length <= maxLength) return value;
+  return '${value.substring(0, maxLength)}'
+      '…[truncated, ${value.length} chars total]';
 }
 
 AppLogArea inferLogArea({required String source, String? category}) {

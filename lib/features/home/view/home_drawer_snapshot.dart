@@ -5,6 +5,11 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/shared/liquid_glass_support.dart';
 
+/// 抽屉内容的画面已更新（如背景图首次解码完成），需要重新截取转场缓存。
+class HomeDrawerRepaintNotification extends Notification {
+  const HomeDrawerRepaintNotification();
+}
+
 /// Caches stationary home content before the drawer transforms it.
 /// Scrolling content and tab transitions stay live; the app bar can cache itself.
 class HomeDrawerSnapshot extends StatefulWidget {

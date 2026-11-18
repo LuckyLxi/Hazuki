@@ -1,66 +1,62 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import '../state/discover_section_page_controller.dart';
 import 'discover_section_page_widgets.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/navigation/route_transition_settled.dart';
 
-/// 涓撴爮婕敾鍒楄〃锟?/// 锟?[section.viewMoreUrl] 涓嶄负绌猴紝鍒欒繘鍏ラ〉鍚庡姞杞借椤甸潰鑷繁鐨勭涓€椤垫暟鎹紱
-/// 鑻ヤ负绌猴紝鍒欑洿鎺ュ睍锟?[section.comics]
+/// 专栏漫画列表页
+/// 若 [section.viewMoreUrl] 不为空，则进入页后加载该页面自己的第一页数据；
+/// 若为空，则直接展示 [section.comics]
 class DiscoverSectionPage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const DiscoverSectionPage({
+    required this.taskControl,
     super.key,
     required this.section,
     required this.comicDetailPageBuilder,
     required this.sourceService,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
-    this.scrollSortBarWithContent = false,
   });
 
   final ExploreSection section;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final SourceDiscoverGateway sourceService;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
-  final bool scrollSortBarWithContent;
 
   @override
   State<DiscoverSectionPage> createState() => _DiscoverSectionPageState();
 }
 
-class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
+class _DiscoverSectionPageState extends State<DiscoverSectionPage>
+    with RouteTransitionSettledMixin {
   late final DiscoverSectionPageController _controller;
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<bool> _showBackToTop = ValueNotifier(false);
+  DiscoverSectionSortBar? _sortBar;
+  Widget? _sortBarHeader;
 
   @override
   void initState() {
     super.initState();
     _controller = DiscoverSectionPageController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       sourceService: widget.sourceService,
       viewMoreUrl: widget.section.viewMoreUrl,
       initialComics: widget.section.comics,
-      initiallyOffersInitialComicsFilter:
-          widget.section.offersInitialComicsFilter,
+      taskControl: widget.taskControl,
     );
     _scrollController.addListener(_onScroll);
     _scheduleInitialBootstrap();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _controller.setInitialComicsFilterLabel(
-      widget.section.viewMoreUrl != null && widget.section.comics.isNotEmpty
-          ? AppLocalizations.of(context)!.discoverSectionHomePreview
-          : null,
-    );
   }
 
   @override
@@ -137,11 +133,11 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   @override
   Widget build(BuildContext context) {
     return WindowsComicDetailHost(
+      suppressExistingPanel: true,
       child: Scaffold(
         appBar: hazukiFrostedAppBar(
           context: context,
           title: Text(widget.section.title),
-          enableBlur: false,
           backgroundAlpha: 1,
         ),
         body: ListenableBuilder(
@@ -151,58 +147,24 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
             final hasSortBar =
                 _controller.sortOptions.isNotEmpty ||
                 _controller.sortOptionGroups.any((group) => group.isNotEmpty);
-            final normalGroupCount = _controller.sortOptionGroups.isEmpty
-                ? (_controller.sortOptions.isEmpty ? 0 : 1)
-                : _controller.sortOptionGroups
-                      .where((group) => group.isNotEmpty)
-                      .length;
-            final sortBar = DiscoverSectionSortBar(
-              sortOptions: _controller.sortOptions,
-              sortOptionGroups: _controller.sortOptionGroups,
-              useDateMorphSelector: usesWeeklyDateSelector,
-              selectedSortValue: _controller.selectedSortValue,
-              selectedSortValues: _controller.selectedSortValues,
-              onSelectSortOption: _onSelectSortOption,
-              onSelectSortOptionInGroup: _onSelectSortOptionInGroup,
-            );
+            // 过渡动画结束前不放筛选栏，避免大量胶囊的构建挤进动画帧
+            final showSortBar = hasSortBar && routeTransitionSettled;
             final content = DiscoverSectionContent(
               controller: _controller,
               scrollController: _scrollController,
               section: widget.section,
               comicDetailPageBuilder: widget.comicDetailPageBuilder,
               comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-              scrollHeader: widget.scrollSortBarWithContent && hasSortBar
-                  ? sortBar
+              // 筛选栏作为列表头部随内容一起滚动，向上滑动时被推出视口
+              scrollHeader: showSortBar
+                  ? _sortBarHeaderFor(usesWeeklyDateSelector)
                   : null,
-              topPadding: widget.scrollSortBarWithContent
-                  ? (hasSortBar ? 8 : 16)
-                  : usesWeeklyDateSelector || !hasSortBar
-                  ? 16
-                  : 26 + normalGroupCount * 48,
+              topPadding: showSortBar ? 8 : 16,
             );
 
             return Stack(
               children: [
-                if (widget.scrollSortBarWithContent)
-                  content
-                else if (usesWeeklyDateSelector)
-                  Column(
-                    children: [
-                      if (hasSortBar) sortBar,
-                      Expanded(child: content),
-                    ],
-                  )
-                else
-                  Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      content,
-                      if (hasSortBar)
-                        Positioned(left: 0, top: 0, right: 0, child: sortBar),
-                    ],
-                  ),
-                if (_controller.showLoadMoreFooter)
-                  const DiscoverSectionLoadMoreFooterOverlay(),
+                content,
                 if (_controller.errorMessage != null)
                   DiscoverSectionErrorOverlay(
                     errorMessage: _controller.errorMessage!,
@@ -232,6 +194,41 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
           },
         ),
       ),
+    );
+  }
+
+  /// 筛选栏只在选项或选中项变化时重建；加载状态和漫画列表变化时复用同一实例，
+  /// Flutter 遇到相同的 widget 实例会直接跳过整栏重建
+  Widget _sortBarHeaderFor(bool usesWeeklyDateSelector) {
+    final cached = _sortBar;
+    final header = _sortBarHeader;
+    if (cached != null &&
+        header != null &&
+        identical(cached.sortOptions, _controller.sortOptions) &&
+        identical(cached.sortOptionGroups, _controller.sortOptionGroups) &&
+        identical(cached.selectedSortValues, _controller.selectedSortValues) &&
+        cached.selectedSortValue == _controller.selectedSortValue &&
+        cached.useDateMorphSelector == usesWeeklyDateSelector) {
+      return header;
+    }
+    final sortBar = DiscoverSectionSortBar(
+      sortOptions: _controller.sortOptions,
+      sortOptionGroups: _controller.sortOptionGroups,
+      useDateMorphSelector: usesWeeklyDateSelector,
+      selectedSortValue: _controller.selectedSortValue,
+      selectedSortValues: _controller.selectedSortValues,
+      onSelectSortOption: _onSelectSortOption,
+      onSelectSortOptionInGroup: _onSelectSortOptionInGroup,
+    );
+    _sortBar = sortBar;
+    // 首次出现时短淡入；之后目标值不变，重建不会重新播放
+    return _sortBarHeader = TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      builder: (context, opacity, child) =>
+          Opacity(opacity: opacity, child: child),
+      child: sortBar,
     );
   }
 

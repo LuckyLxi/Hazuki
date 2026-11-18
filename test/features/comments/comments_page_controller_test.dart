@@ -1,17 +1,29 @@
+import '../../support/source_presentation_fixtures.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comments/view/comments_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _Source source;
   late CommentFilterService filter;
   late CommentsPageController controller;
@@ -19,6 +31,7 @@ void main() {
 
   CommentsPageController create({CommentsInteractionState? state}) {
     final next = CommentsPageController(
+      sourceUiService: sourceUiService,
       sourceService: source,
       filterService: filter,
       comicId: 'comic',
@@ -26,6 +39,7 @@ void main() {
       chapterId: 'chapter',
       sourceKey: 'source',
       state: state,
+      taskControl: FakeSourceTaskControl(),
     );
     next.effects.listen(effects.add);
     return next;
@@ -339,6 +353,60 @@ void main() {
     },
   );
 
+  test(
+    'liking a quoted floor updates every occurrence and disables one-way unlike',
+    () async {
+      final quote = _comment('quote').copyWith(score: 4, canUnlike: false);
+      final parent = _comment('parent').copyWith(quotedComments: [quote]);
+      await load([parent, quote]);
+      controller.state.replyComments['other'] = [parent];
+      final pending = controller.toggleCommentLike(quote);
+      expect(controller.state.comments.first.quotedComments.single.score, 5);
+      expect(controller.state.comments.last.score, 5);
+      expect(
+        controller
+            .state
+            .replyComments['other']!
+            .single
+            .quotedComments
+            .single
+            .isLiked,
+        isTrue,
+      );
+      await controller.toggleCommentLike(quote);
+      expect(source.likes.length, 1);
+      source.likes.single.result.complete();
+      await pending;
+      await controller.toggleCommentLike(
+        controller.state.comments.first.quotedComments.single,
+      );
+      expect(source.likes.length, 1);
+      controller.setReplyTarget(
+        controller.state.comments.first.quotedComments.single,
+      );
+      expect(controller.state.replyToComment!.id, 'quote');
+    },
+  );
+
+  test(
+    'a failed quoted-floor like preserves each occurrence and its own quotes',
+    () async {
+      final first = _comment('first');
+      final quote = _comment('quote').copyWith(score: 4);
+      final quotedMain = quote.copyWith(quotedComments: [first]);
+      final parent = _comment(
+        'parent',
+      ).copyWith(quotedComments: [first, quote]);
+      await load([parent, quotedMain]);
+      final pending = controller.toggleCommentLike(quote);
+      source.likes.single.result.completeError(StateError('denied'));
+      await pending;
+      expect(controller.state.comments.first.quotedComments.last, same(quote));
+      expect(controller.state.comments.last.score, 4);
+      expect(controller.state.comments.last.quotedComments.single, same(first));
+    },
+  );
+
   test('a failed old like cannot overwrite refreshed comment data', () async {
     final old = _comment('a');
     await load([old]);
@@ -512,13 +580,18 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          builder: (context, child) => withTestSourcePresentation(
+            child!,
+            sourceUiService: sourceUiService,
+          ),
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: CommentsPage(
             sourceService: source,
             filterService: filter,
             comicId: 'comic',
+            taskControl: FakeSourceTaskControl(),
           ),
         ),
       );
@@ -627,6 +700,7 @@ class _Source extends Fake implements SourceCommentsGateway {
     int pageSize = 16,
     String? replyTo,
     String order = '',
+    SourceTaskOrigin? taskOrigin,
   }) {
     final request = _PageRequest(
       comicId: comicId,
@@ -649,6 +723,7 @@ class _Source extends Fake implements SourceCommentsGateway {
     String sourceKey = '',
     required String commentId,
     required bool isLike,
+    SourceTaskOrigin? taskOrigin,
   }) {
     final result = Completer<void>();
     likes.add((sourceKey: sourceKey, result: result));
@@ -663,6 +738,7 @@ class _Source extends Fake implements SourceCommentsGateway {
     String sourceKey = '',
     required String content,
     String? replyTo,
+    SourceTaskOrigin? taskOrigin,
   }) {
     final result = Completer<void>();
     sends.add((

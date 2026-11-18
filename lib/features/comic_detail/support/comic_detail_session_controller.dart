@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:hazuki/services/source/source_task_owner.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -6,9 +8,14 @@ import 'package:hazuki/models/hazuki_models.dart';
 
 import '../repository/comic_detail_repository.dart';
 import 'package:hazuki/shared/ui_flags.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class ComicDetailSessionController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
   ComicDetailSessionController({
+    required this.sourceUiService,
+    SourceTaskControlGateway? taskControl,
     required ComicDetailFeatureFacade repository,
     required ExploreComic comic,
     required String sourceKey,
@@ -17,7 +24,9 @@ class ComicDetailSessionController extends ChangeNotifier {
       required bool cloudFavoriteOverride,
     })
     applyInitialFavoriteOverrides,
-  }) : _repository = repository,
+  }) : _progressTasks = SourceTaskOwner(taskControl),
+       _progressWatchTasks = SourceTaskOwner(taskControl),
+       _repository = repository,
        _comic = comic,
        _sourceKey = sourceKey,
        _applyInitialFavoriteOverrides = applyInitialFavoriteOverrides;
@@ -32,6 +41,9 @@ class ComicDetailSessionController extends ChangeNotifier {
   _applyInitialFavoriteOverrides;
 
   bool _disposed = false;
+  late final _sourceUi = SourceUiOwner(sourceUiService);
+  final SourceTaskOwner _progressTasks;
+  final SourceTaskOwner _progressWatchTasks;
 
   late Future<ComicDetailsData> _future;
   Timer? _detailsTimeoutTimer;
@@ -50,10 +62,10 @@ class ComicDetailSessionController extends ChangeNotifier {
 
   void initialize() {
     _future = _createComicDetailsFuture();
-    unawaited(_warmupReaderImages());
+    unawaited(_sourceUi.runBackground(_warmupReaderImages));
     // Route return can precede the reader's asynchronous exit save.
     _readingProgressSubscription = _repository
-        .watchReadingProgressChanges()
+        .watchReadingProgressChanges(taskOrigin: _progressWatchTasks.origin())
         .listen(
           (_) => unawaited(loadReadingProgress()),
           onError: (Object _) {},
@@ -68,6 +80,17 @@ class ComicDetailSessionController extends ChangeNotifier {
     _startDetailRetry();
   }
 
+  /// 插件动作要求刷新时静默重载：新数据到达前继续显示旧详情，
+  /// 失败时保留旧详情而不进入错误页；返回的 Future 仍会抛出失败。
+  Future<void> reloadDetails() async {
+    if (_disposed) return;
+    final previous = _future;
+    final fresh = _createComicDetailsFuture(forceRefresh: true);
+    _future = fresh.catchError((Object _) => previous);
+    notifyListeners();
+    await fresh;
+  }
+
   void _startDetailRetry() {
     _detailsTimeoutTimer?.cancel();
     _detailsTimeoutTimer = null;
@@ -80,6 +103,9 @@ class ComicDetailSessionController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _progressTasks.dispose();
+    _progressWatchTasks.dispose();
+    _sourceUi.dispose();
     unawaited(_readingProgressSubscription?.cancel());
     _detailsTimeoutTimer?.cancel();
     _detailsTimeoutTimer = null;
@@ -87,10 +113,16 @@ class ComicDetailSessionController extends ChangeNotifier {
   }
 
   Future<void> loadReadingProgress() async {
+    if (_disposed) return;
     final request = ++_readingRequestId;
     _lastReadProgress = null;
+    _progressTasks.restart();
+    final origin = _progressTasks.origin();
     try {
-      final progress = await _repository.loadReadingProgress(_comic.id);
+      final progress = await _repository.loadReadingProgress(
+        _comic.id,
+        taskOrigin: origin,
+      );
       if (_disposed || request != _readingRequestId) return;
       _lastReadProgress = progress;
       notifyListeners();
@@ -146,6 +178,15 @@ class ComicDetailSessionController extends ChangeNotifier {
   Future<ComicDetailsData> _createComicDetailsFuture({
     bool forceRefresh = false,
   }) {
+    _sourceUi.restart();
+    return _sourceUi.run(
+      () => _createComicDetailsFutureWithUi(forceRefresh: forceRefresh),
+    );
+  }
+
+  Future<ComicDetailsData> _createComicDetailsFutureWithUi({
+    bool forceRefresh = false,
+  }) {
     final requestId = ++_detailsRequestId;
     final sourceFuture = _repository.loadComicDetails(
       _comic.id,
@@ -154,9 +195,9 @@ class ComicDetailSessionController extends ChangeNotifier {
     );
 
     late final Timer timeoutTimer;
-    timeoutTimer = Timer(const Duration(seconds: 30), () {
+    timeoutTimer = SourceUiScope.timer(const Duration(seconds: 30), () {
       if (_disposed || requestId != _detailsRequestId) return;
-      if (!_hasAutomaticallyRetriedDetails) {
+      if (!_hasAutomaticallyRetriedDetails && !_sourceUi.wasCancelled) {
         _hasAutomaticallyRetriedDetails = true;
         _startDetailRetry();
         return;

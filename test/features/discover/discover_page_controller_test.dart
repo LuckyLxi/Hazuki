@@ -1,13 +1,24 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../../support/fake_source_task_control.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/discover/state/discover_page_controller.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import '../../support/test_service_locator.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     await ensureTestServiceLocator();
@@ -15,7 +26,9 @@ void main() {
 
   test('forwards source service changes until disposed', () {
     final controller = DiscoverPageController(
+      sourceUiService: sourceUiService,
       sourceService: sl<SourceDiscoverGateway>(),
+      taskControl: FakeSourceTaskControl(),
     );
     var notifications = 0;
     controller.addListener(() {
@@ -34,6 +47,51 @@ void main() {
     expect(notifications, 1);
   });
 
+  for (final error in <Object>[
+    const SourceTaskCancelled('task', SourceTaskStopReason.sourceChanged),
+    const SourceUiCancelled('runtimeDisposed'),
+  ]) {
+    test(
+      'reloads instead of showing empty after lifecycle stop: $error',
+      () async {
+        final source = _DiscoverGateway(
+          section: ExploreSection(title: 'Comics', comics: _comics(0, 3)),
+          pages: const {},
+          failures: [error],
+        );
+        final controller = DiscoverPageController(
+          sourceUiService: sourceUiService,
+          sourceService: source,
+          taskControl: FakeSourceTaskControl(),
+        );
+        addTearDown(controller.dispose);
+        addTearDown(source.dispose);
+        await _load(controller);
+        expect(source.exploreLoads, 2);
+        expect(controller.sections, hasLength(1));
+        expect(controller.errorMessage, isNull);
+      },
+    );
+  }
+
+  test('does not retry stops owned by the page itself', () async {
+    final source = _DiscoverGateway(
+      section: ExploreSection(title: 'Comics', comics: _comics(0, 3)),
+      pages: const {},
+      failures: [const SourceTaskCancelled('task', SourceTaskStopReason.user)],
+    );
+    final controller = DiscoverPageController(
+      sourceUiService: sourceUiService,
+      sourceService: source,
+      taskControl: FakeSourceTaskControl(),
+    );
+    addTearDown(controller.dispose);
+    addTearDown(source.dispose);
+    await _load(controller);
+    expect(source.exploreLoads, 1);
+    expect(controller.sections, isEmpty);
+  });
+
   for (final initialPage in [0, 1]) {
     test(
       'continues past a full first page with initialPage=$initialPage',
@@ -50,7 +108,11 @@ void main() {
             2: CategoryComicsResult(comics: _comics(7, 7), maxPage: 2),
           },
         );
-        final controller = DiscoverPageController(sourceService: source);
+        final controller = DiscoverPageController(
+          sourceUiService: sourceUiService,
+          sourceService: source,
+          taskControl: FakeSourceTaskControl(),
+        );
         addTearDown(controller.dispose);
         addTearDown(source.dispose);
         await _load(controller);
@@ -91,7 +153,11 @@ void main() {
           ),
         },
       );
-      final controller = DiscoverPageController(sourceService: source);
+      final controller = DiscoverPageController(
+        sourceUiService: sourceUiService,
+        sourceService: source,
+        taskControl: FakeSourceTaskControl(),
+      );
       addTearDown(controller.dispose);
       addTearDown(source.dispose);
       await _load(controller);
@@ -120,7 +186,11 @@ void main() {
           2: CategoryComicsResult(comics: _comics(0, 7), maxPage: null),
         },
       );
-      final controller = DiscoverPageController(sourceService: source);
+      final controller = DiscoverPageController(
+        sourceUiService: sourceUiService,
+        sourceService: source,
+        taskControl: FakeSourceTaskControl(),
+      );
       addTearDown(controller.dispose);
       addTearDown(source.dispose);
       await _load(controller);
@@ -149,11 +219,17 @@ List<ExploreComic> _comics(int start, int count) => List.generate(
 );
 
 class _DiscoverGateway extends ChangeNotifier implements SourceDiscoverGateway {
-  _DiscoverGateway({required this.section, required this.pages});
+  _DiscoverGateway({
+    required this.section,
+    required this.pages,
+    List<Object> failures = const [],
+  }) : _failures = List.of(failures);
 
   final ExploreSection section;
   final Map<int, CategoryComicsResult> pages;
+  final List<Object> _failures;
   final requestedPages = <int>[];
+  var exploreLoads = 0;
 
   @override
   String get activeSourceKey => 'test';
@@ -164,16 +240,23 @@ class _DiscoverGateway extends ChangeNotifier implements SourceDiscoverGateway {
   @override
   bool get isLogged => false;
   @override
-  SourceRuntimeState get sourceRuntimeState => const SourceRuntimeState.idle();
+  SourceRuntimeState get runtimeState => const SourceRuntimeState.idle();
   @override
-  void logRuntimeRetryRequested(String source) {}
+  void requestRuntimeRetry(String source) {}
   @override
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
-  }) async => [section];
+    SourceTaskOrigin? taskOrigin,
+  }) async {
+    exploreLoads++;
+    if (_failures.isNotEmpty) throw _failures.removeAt(0);
+    return [section];
+  }
+
   @override
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
+    SourceTaskOrigin? taskOrigin,
   }) async => [];
   @override
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
@@ -181,6 +264,7 @@ class _DiscoverGateway extends ChangeNotifier implements SourceDiscoverGateway {
     required int page,
     String order = '',
     List<String>? orders,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     requestedPages.add(page);
     return pages[page]!;

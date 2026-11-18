@@ -1,12 +1,13 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/view/plugins/source_plugins_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_repository.dart';
-import 'package:hazuki/shared/preferences/software_update_source.dart';
+import 'package:hazuki/services/preferences/software_update_source.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockPlugins extends Mock implements SourcePluginGateway {}
@@ -46,7 +47,7 @@ Widget _app(
   double textScale = 1,
 }) => MaterialApp(
   locale: locale,
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: hazukiLocalizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   theme: ThemeData(
     colorScheme: ColorScheme.fromSeed(
@@ -157,14 +158,31 @@ void main() {
         expect(find.text(strings.pluginsLocallyEdited), findsOneWidget);
         expect(find.text(strings.pluginsDisabled), findsOneWidget);
         expect(find.byType(Switch), findsNWidgets(2));
-        final settingsButtons = tester.widgetList<TextButton>(
-          find.widgetWithText(TextButton, strings.settingsTitle),
+        Future<ListTile> settingsTileFor(String id) async {
+          final more = find.byKey(ValueKey('plugin-actions-$id'));
+          await _scrollTo(tester, more);
+          await tester.tap(more);
+          await tester.pumpAndSettle();
+          final tile = tester.widget<ListTile>(
+            find.widgetWithText(ListTile, strings.settingsTitle),
+          );
+          await tester.tapAt(const Offset(10, 10));
+          await tester.pumpAndSettle();
+          return tile;
+        }
+
+        expect((await settingsTileFor('local_source')).enabled, isTrue);
+        expect(
+          (await settingsTileFor(_installed.last.manifest.id)).enabled,
+          isFalse,
         );
-        expect(settingsButtons.first.onPressed, isNotNull);
-        expect(settingsButtons.last.onPressed, isNull);
         expect(tester.takeException(), isNull);
 
-        await tester.drag(find.byType(TabBarView), const Offset(-600, 0));
+        // 卡片上的 Switch 会吞掉横向拖动，窄屏下第二个 Tab 又可能在可滚动 TabBar 外，
+        // 因此通过控制器切换。
+        DefaultTabController.of(
+          tester.element(find.byType(TabBar)),
+        ).animateTo(SourcePluginsTab.market.index);
         await tester.pumpAndSettle();
         verifyNever(() => gateway.refreshRepository(_repository));
         expect(find.byType(DropdownButton<SoftwareUpdateSource>), findsNothing);
@@ -218,7 +236,7 @@ void main() {
     );
     verifyNever(gateway.checkStartupUpdates);
     verifyNever(() => gateway.refreshRepository(_repository));
-    await tester.tap(find.text(s.pluginsRefresh));
+    await tester.tap(find.byTooltip(s.pluginsRefresh));
     await tester.pumpAndSettle();
     verify(() => gateway.refreshRepository(_repository)).called(1);
     await tester.drag(find.byType(TabBarView), const Offset(600, 0));
@@ -245,7 +263,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('repository refresh only shows progress on the available tab', (
+  testWidgets('repository refresh spins the refresh button only', (
     tester,
   ) async {
     final pending = Completer<void>();
@@ -257,11 +275,21 @@ void main() {
     final s = AppLocalizations.of(
       tester.element(find.byType(SourcePluginsPage)),
     )!;
+    AnimationStatus refreshStatus() => tester
+        .widget<RotationTransition>(
+          find.descendant(
+            of: find.byTooltip(s.pluginsRefresh),
+            matching: find.byType(RotationTransition),
+          ),
+        )
+        .turns
+        .status;
     await tester.tap(find.widgetWithText(Tab, s.pluginsAvailable));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(s.pluginsRefresh));
+    await tester.tap(find.byTooltip(s.pluginsRefresh));
     await tester.pump();
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(refreshStatus(), AnimationStatus.forward);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
     await tester.tap(find.widgetWithText(Tab, s.pluginsInstalled));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -269,10 +297,10 @@ void main() {
     await tester.tap(find.widgetWithText(Tab, s.pluginsAvailable));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(refreshStatus(), AnimationStatus.forward);
     pending.complete();
     await tester.pumpAndSettle();
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(refreshStatus(), AnimationStatus.dismissed);
     expect(tester.takeException(), isNull);
   });
 
@@ -288,12 +316,15 @@ void main() {
       final s = AppLocalizations.of(
         tester.element(find.byType(SourcePluginsPage)),
       )!;
-      final checkUpdate = find
-          .widgetWithText(TextButton, s.pluginsCheckUpdate)
-          .first;
-      await _scrollTo(tester, checkUpdate);
-      await tester.tap(checkUpdate);
+      final more = find.byKey(
+        ValueKey('plugin-actions-${_installed.last.manifest.id}'),
+      );
+      await _scrollTo(tester, more);
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(s.pluginsCheckUpdate));
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.drag(
         find.byKey(const PageStorageKey('installed-plugins')),
         const Offset(0, 1000),
@@ -392,7 +423,56 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('initialization disables actions and reports failure', (
+  testWidgets('sort mode drags plugins and saves the new order', (
+    tester,
+  ) async {
+    var installed = _installed;
+    when(() => gateway.installed).thenAnswer((_) => installed);
+    final saved = Completer<void>();
+    when(
+      () => gateway.reorder([
+        'repository_source_with_long_identifier',
+        'local_source',
+      ]),
+    ).thenAnswer((_) async {
+      installed = [_installed.last, _installed.first];
+      saved.complete();
+    });
+    await tester.pumpWidget(_app(gateway));
+    await tester.pumpAndSettle();
+    final s = AppLocalizations.of(
+      tester.element(find.byType(SourcePluginsPage)),
+    )!;
+
+    await tester.tap(find.text(s.pluginsSort));
+    await tester.pumpAndSettle();
+    expect(find.text(s.pluginsSortHint), findsOneWidget);
+    expect(find.byType(Switch), findsNothing);
+    final handles = find.byIcon(Icons.drag_handle_rounded);
+    expect(handles, findsNWidgets(2));
+
+    final gesture = await tester.startGesture(tester.getCenter(handles.first));
+    await tester.pump(const Duration(milliseconds: 100));
+    for (var step = 0; step < 10; step++) {
+      await gesture.moveBy(const Offset(0, 15));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(saved.isCompleted, isTrue);
+    expect(
+      tester.getTopLeft(find.text(_installed.last.manifest.name)).dy,
+      lessThan(tester.getTopLeft(find.text('Local source')).dy),
+    );
+
+    await tester.tap(find.text(s.pluginsSortDone));
+    await tester.pumpAndSettle();
+    expect(find.byType(Switch), findsNWidgets(2));
+    expect(find.text(s.pluginsSortHint), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('initialization shows no progress and reports failure', (
     tester,
   ) async {
     final pending = Completer<void>();
@@ -402,19 +482,16 @@ void main() {
     final strings = AppLocalizations.of(
       tester.element(find.byType(SourcePluginsPage)),
     )!;
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.widgetWithText(FilledButton, strings.pluginsImportLocal),
-          )
-          .onPressed,
-      isNull,
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    final import = find.ancestor(
+      of: find.byTooltip(strings.pluginsImportLocal),
+      matching: find.byType(IconButton),
     );
+    expect(tester.widget<IconButton>(import).onPressed, isNotNull);
     expect(
       tester
           .widgetList<Switch>(find.byType(Switch))
-          .every((s) => s.onChanged == null),
+          .every((s) => s.onChanged != null),
       isTrue,
     );
     pending.completeError(StateError('Unable to load plugins'));
@@ -423,14 +500,7 @@ void main() {
     expect(find.textContaining('Unable to load plugins'), findsOneWidget);
     expect(find.byIcon(Icons.tips_and_updates_rounded), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.widgetWithText(FilledButton, strings.pluginsImportLocal),
-          )
-          .onPressed,
-      isNotNull,
-    );
+    expect(tester.widget<IconButton>(import).onPressed, isNotNull);
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

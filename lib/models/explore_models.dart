@@ -7,7 +7,6 @@ class ExploreSection {
     this.viewMoreUrl,
     this.maxPage,
     this.initialPage = 1,
-    this.offersInitialComicsFilter = false,
   });
 
   final String title;
@@ -21,19 +20,12 @@ class ExploreSection {
   /// Last complete page included in [comics]; zero for a homepage preview.
   final int initialPage;
 
-  /// Adds a local filter for the comics already returned by the explore page.
-  ///
-  /// This is used when multiple source sections share a category view-more
-  /// parameter and therefore cannot be distinguished by the source loader.
-  final bool offersInitialComicsFilter;
-
   ExploreSection copyWith({
     String? title,
     List<ExploreComic>? comics,
     String? viewMoreUrl,
     int? maxPage,
     int? initialPage,
-    bool? offersInitialComicsFilter,
   }) {
     return ExploreSection(
       title: title ?? this.title,
@@ -41,8 +33,6 @@ class ExploreSection {
       viewMoreUrl: viewMoreUrl ?? this.viewMoreUrl,
       maxPage: maxPage ?? this.maxPage,
       initialPage: initialPage ?? this.initialPage,
-      offersInitialComicsFilter:
-          offersInitialComicsFilter ?? this.offersInitialComicsFilter,
     );
   }
 }

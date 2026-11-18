@@ -80,9 +80,14 @@ class DiscoverDailyRecommendationState {
     this.pendingGeneratedAt,
     this.isRefreshing = false,
     this.isPendingReady = false,
+    this.isLoading = false,
   });
 
   const DiscoverDailyRecommendationState.disabled() : this(enabled: false);
+
+  /// 已开启但首批推荐尚未就绪，发现页据此展示骨架屏而非“暂无推荐”。
+  const DiscoverDailyRecommendationState.loading()
+    : this(enabled: true, isLoading: true);
 
   final bool enabled;
   final List<DiscoverDailyRecommendationEntry> displayedRecommendations;
@@ -93,6 +98,7 @@ class DiscoverDailyRecommendationState {
   final DateTime? pendingGeneratedAt;
   final bool isRefreshing;
   final bool isPendingReady;
+  final bool isLoading;
 
   List<DiscoverDailyRecommendationEntry> get recommendations =>
       displayedRecommendations;
@@ -111,6 +117,7 @@ class DiscoverDailyRecommendationState {
     Object? pendingGeneratedAt = _discoverRecommendationUnset,
     bool? isRefreshing,
     bool? isPendingReady,
+    bool? isLoading,
   }) {
     return DiscoverDailyRecommendationState(
       enabled: enabled ?? this.enabled,
@@ -133,6 +140,7 @@ class DiscoverDailyRecommendationState {
           : pendingGeneratedAt as DateTime?,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       isPendingReady: isPendingReady ?? this.isPendingReady,
+      isLoading: isLoading ?? this.isLoading,
     );
   }
 }

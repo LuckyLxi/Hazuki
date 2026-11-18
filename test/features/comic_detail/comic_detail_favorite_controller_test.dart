@@ -1,16 +1,20 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/comic_detail/repository/comic_detail_repository.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_favorite_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockRepository extends Mock implements ComicDetailFeatureFacade {}
+class _MockFolders extends Mock implements FavoriteFoldersRepository {}
 
 const _details = ComicDetailsData(
   id: 'comic-id',
@@ -27,17 +31,99 @@ const _details = ComicDetailsData(
   subId: '',
 );
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
+  for (final scenario in [
+    (
+      name: 'user cancellation',
+      error: const SourceTaskCancelled('rating', SourceTaskStopReason.user),
+      silent: true,
+    ),
+    (
+      name: 'source change cancellation',
+      error: const SourceTaskCancelled(
+        'rating',
+        SourceTaskStopReason.sourceChanged,
+      ),
+      silent: true,
+    ),
+    (
+      name: 'timeout',
+      error: const SourceTaskTimedOut(
+        'rating',
+        SourceTaskStopReason.executionTimeout,
+      ),
+      silent: false,
+    ),
+    (name: 'website failure', error: StateError('vote failed'), silent: false),
+  ]) {
+    testWidgets('header action handles ${scenario.name}', (tester) async {
+      final controller = ComicDetailFavoriteController(
+        sourceUiService: sourceUiService,
+        favoriteFolders: _MockFolders(),
+        runComicHeaderAction:
+            ({required comicId, required actionId, sourceKey = ''}) {
+              expect(comicId, _details.id);
+              expect(actionId, 'rating');
+              expect(sourceKey, '');
+              throw scenario.error;
+            },
+        taskControl: FakeSourceTaskControl(),
+      );
+      addTearDown(controller.dispose);
+      late BuildContext pageContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              pageContext = context;
+              return const Scaffold();
+            },
+          ),
+        ),
+      );
+
+      final reload = await controller.runHeaderAction(
+        pageContext,
+        _details,
+        const ComicHeaderStat(
+          text: '评分',
+          action: ComicHeaderStatAction.plugin,
+          actionId: 'rating',
+        ),
+      );
+      await tester.pump();
+      expect(reload, isFalse);
+      expect(controller.busyHeaderActionId, isNull);
+      expect(
+        find.textContaining('${scenario.error}'),
+        scenario.silent ? findsNothing : findsOneWidget,
+      );
+      // Drain the error prompt's hold and dismissal timers.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final saveFails in [false, true]) {
     testWidgets('confirmed save starts before dismissal and survives disposal '
         '(saveFails=$saveFails)', (tester) async {
-      final repository = _MockRepository();
+      final folders = _MockFolders();
+      when(() => folders.favoriteSingleFolderForSingleComic).thenReturn(false);
+      when(() => folders.isLogged).thenReturn(false);
       when(
-        () => repository.favoriteSingleFolderForSingleComic,
-      ).thenReturn(false);
-      when(() => repository.isLogged).thenReturn(false);
-      when(
-        () => repository.loadLocalFavoriteFolders(
+        () => folders.loadLocalFavoriteFolders(
           comicId: _details.id,
           sourceKey: '',
         ),
@@ -56,7 +142,7 @@ void main() {
       final saved = Completer<void>();
       var saveCalls = 0;
       when(
-        () => repository.toggleLocalFavorite(
+        () => folders.toggleLocalFavorite(
           details: _details,
           isAdding: true,
           folderId: 'local-folder',
@@ -65,7 +151,14 @@ void main() {
         saveCalls++;
         return saved.future;
       });
-      final controller = ComicDetailFavoriteController(repository: repository);
+      final controller = ComicDetailFavoriteController(
+        sourceUiService: sourceUiService,
+        favoriteFolders: folders,
+        runComicHeaderAction:
+            ({required comicId, required actionId, sourceKey = ''}) =>
+                throw StateError('Unexpected header action'),
+        taskControl: FakeSourceTaskControl(),
+      );
       var disposed = false;
       addTearDown(() {
         if (!disposed) controller.dispose();
@@ -73,7 +166,7 @@ void main() {
       late BuildContext pageContext;
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {

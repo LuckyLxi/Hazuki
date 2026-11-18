@@ -1,3 +1,8 @@
+import '../common/source_operation_stop.dart';
+import '../runtime/source_runtime_handle.dart';
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import '../debug/debug_log_internals.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
@@ -17,85 +22,134 @@ class SourceLoginOperations {
 
   HazukiSourceFacade get facade => _runtimeHost.activeHandle.facade;
 
-  Future<void> login({required String account, required String password}) =>
-      loginWithFacade(facade, account: account, password: password);
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  }) => loginWithHandle(
+    _runtimeHost.activeHandle,
+    account: account,
+    password: password,
+    taskOrigin: taskOrigin,
+  );
 
-  Future<void> loginWithFacade(
+  Future<void> loginWithHandle(
+    SourceRuntimeHandle handle, {
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+    bool serviceOwned = false,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    handle,
+    'account.login',
+    (operationContext) => _loginWithHandleTask(
+      operationContext,
+      handle.facade,
+      account: account,
+      password: password,
+    ),
+    origin: taskOrigin,
+    sensitiveValues: [account, password],
+    serviceOwned: serviceOwned,
+  );
+
+  Future<void> _loginWithHandleTask(
+    SourceOperationContext operationContext,
     HazukiSourceFacade facade, {
     required String account,
     required String password,
   }) async {
-    await facade.ensureInitialized();
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    if (facade.loadSourceData(facade.sourceKey, 'interactive_login') == true) {
-      throw StateError('login_interaction_required');
-    }
-    final engine = facade.js.engine;
-    final sourceMeta = facade.sourceMeta;
-    if (engine == null || sourceMeta == null) {
-      throw Exception('source_not_initialized');
-    }
+      if (facade.loadSourceData(facade.sourceKey, 'interactive_login') ==
+          true) {
+        throw StateError('login_interaction_required');
+      }
+      final engine = facade.js.engine;
+      final sourceMeta = facade.sourceMeta;
+      if (engine == null || sourceMeta == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final supportsAccount = facade.js.asBool(
-      facade.js.evaluate('!!this.__hazuki_source.account?.login'),
-    );
-    if (!supportsAccount) {
-      throw Exception('account_login_not_supported');
-    }
+      final supportsAccount = facade.js.asBool(
+        await operationContext.evaluate(
+          engine,
+          '!!this.__hazuki_source.account?.login',
+        ),
+      );
+      if (!supportsAccount) {
+        throw Exception('account_login_not_supported');
+      }
 
-    final script = const SourceLoginScriptFactory().generic(
-      account: account,
-      password: password,
-    );
-    final startedAt = DateTime.now();
-    dynamic resolvedResult;
+      final script = buildSourceLoginScript(
+        account: account,
+        password: password,
+      );
+      final startedAt = DateTime.now();
+      dynamic resolvedResult;
 
-    try {
-      final result = engine.evaluate(script.code, name: script.name);
-      resolvedResult = await facade.js.resolve(result);
-      await _sideData.persistLoginSideData(
-        facade,
-        sourceKey: sourceMeta.key,
-        result: resolvedResult,
-      );
-      _recordLoginDebugInfo(
-        facade,
-        account: account,
-        startedAt: startedAt,
-        result: resolvedResult,
-      );
-      _recordLoginNetworkEntry(
-        facade,
-        account: account,
-        startedAt: startedAt,
-        result: resolvedResult,
-      );
-      await facade.saveSourceData(sourceMeta.key, 'account', [
-        account,
-        password,
-      ]);
-      await facade.saveSourceData(
-        sourceMeta.key,
-        'login_session',
-        DateTime.now().microsecondsSinceEpoch.toString(),
-      );
-    } catch (error) {
-      _recordLoginDebugInfo(
-        facade,
-        account: account,
-        startedAt: startedAt,
-        result: resolvedResult,
-        error: error,
-      );
-      _recordLoginNetworkEntry(
-        facade,
-        account: account,
-        startedAt: startedAt,
-        result: resolvedResult,
-        error: error,
-      );
-      throw Exception('login_failed:$error');
-    }
+      try {
+        final result = await operationContext.evaluate(
+          engine,
+          script.code,
+          name: script.name,
+        );
+        resolvedResult = await operationContext.resolve(
+          facade.js.resolve(result),
+        );
+        await _sideData.persistLoginSideData(
+          facade,
+          sourceKey: sourceMeta.key,
+          result: resolvedResult,
+          checkActive: operationContext.checkActive,
+          commit: (write) => operationContext.commit(write),
+        );
+        _recordLoginDebugInfo(
+          facade,
+          account: account,
+          startedAt: startedAt,
+          result: resolvedResult,
+        );
+        _recordLoginNetworkEntry(
+          facade,
+          account: account,
+          startedAt: startedAt,
+          result: resolvedResult,
+        );
+        await operationContext.commit(
+          () => facade.saveSourceData(sourceMeta.key, 'account', [
+            account,
+            password,
+          ]),
+        );
+        await operationContext.commit(
+          () => facade.saveSourceData(
+            sourceMeta.key,
+            'login_session',
+            DateTime.now().microsecondsSinceEpoch.toString(),
+          ),
+        );
+      } catch (error) {
+        rethrowSourceOperationStop(error);
+        _recordLoginDebugInfo(
+          facade,
+          account: account,
+          startedAt: startedAt,
+          result: resolvedResult,
+          error: error,
+        );
+        _recordLoginNetworkEntry(
+          facade,
+          account: account,
+          startedAt: startedAt,
+          result: resolvedResult,
+          error: error,
+        );
+        throw Exception('login_failed:$error');
+      }
+    });
   }
 
   void _recordLoginDebugInfo(
@@ -136,5 +190,6 @@ class SourceLoginOperations {
     );
   }
 
-  Future<String?> loadCurrentAvatarUrl() => _sideData.loadCurrentAvatarUrl();
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin}) =>
+      _sideData.loadCurrentAvatarUrl(taskOrigin: taskOrigin);
 }

@@ -43,6 +43,23 @@ void main() {
   });
   tearDown(() => state.dispose());
 
+  test('old prefetch drain cannot reset a new generation runner', () async {
+    final old = Completer<void>();
+    final current = Completer<void>();
+    download = (_) => old.future;
+    scheduler.requestPrefetchAhead(0);
+    state.resetForImages(images);
+    download = (_) => current.future;
+    scheduler.requestPrefetchAhead(5);
+    old.complete();
+    await Future<void>.delayed(Duration.zero);
+    expect(state.prefetchAheadRunning, isTrue);
+    expect(downloads, hasLength(12));
+    current.complete();
+    await Future<void>.delayed(Duration.zero);
+    expect(state.prefetchAheadRunning, isFalse);
+  });
+
   test(
     'prioritizes both visible pages and skips cached neighbor requests',
     () async {
@@ -92,6 +109,28 @@ void main() {
       expect(downloads.skip(6), ['18', '19', '20', '21', '22', '23']);
       expect(state.prefetchAheadRunning, isFalse);
       expect(state.queuedPrefetchAheadIndex, isNull);
+    },
+  );
+
+  test(
+    'repeated requests for an unchanged position do not prefetch again',
+    () async {
+      // 滚动通知按帧触发，位置未变时不应反复发起同一批预取。
+      for (var i = 0; i < 20; i++) {
+        scheduler.requestPrefetchAhead(0);
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(downloads, ['2', '3', '4', '5', '6', '7']);
+
+      scheduler.requestPrefetchAhead(1);
+      await Future<void>.delayed(Duration.zero);
+      expect(downloads.skip(6), ['4', '5', '6', '7', '8', '9']);
+
+      // 换章（新代次）后同一位置重新预取。
+      state.resetForImages(images);
+      scheduler.requestPrefetchAhead(1);
+      await Future<void>.delayed(Duration.zero);
+      expect(downloads, hasLength(18));
     },
   );
 

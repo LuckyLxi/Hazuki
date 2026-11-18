@@ -3,30 +3,21 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 
-import 'source_account_dialogs.dart';
+import 'source_account_dialog_support.dart';
 import 'source_browser_authorization_dialog.dart';
 import 'source_external_authorization_dialog.dart';
 import 'source_login_interaction_text.dart';
 import 'source_login_dialog_controller.dart';
+import '../source_interaction/captcha_image_point.dart';
+import '../source_interaction/source_plugin_dialog.dart';
+import '../source_interaction/source_animated_dialog.dart';
+import '../../services/source/interaction/source_ui_service.dart';
 
-/// Maps logical widget coordinates to unscaled image pixels, excluding padding.
-Offset? captchaImagePoint(Offset local, Size canvas, Size image) {
-  if (image.isEmpty || canvas.isEmpty) return null;
-  final fitted = applyBoxFit(BoxFit.contain, image, canvas);
-  final destination = Alignment.center.inscribe(
-    fitted.destination,
-    Offset.zero & canvas,
-  );
-  if (!destination.contains(local)) return null;
-  return Offset(
-    (local.dx - destination.left) * image.width / destination.width,
-    (local.dy - destination.top) * image.height / destination.height,
-  );
-}
+export '../source_interaction/captcha_image_point.dart' show captchaImagePoint;
 
 Uint8List _imageBytes(Object? raw) {
   if (raw is Uint8List) return raw;
@@ -48,6 +39,22 @@ Future<Object?> showSourceLoginInteraction(
   SourceLoginDialogController? dialogController,
 }) async {
   cancellation.check();
+  if (request['type'] == 'pluginDialog') {
+    final dialog = request['session'] as SourceDialogSession;
+    if (dialogController == null) {
+      dialog.close('ownerGone');
+      throw StateError('plugin_ui_unavailable');
+    }
+    await dialogController.present((finish) {
+      unawaited(dialog.whenClosed.then((_) => finish(true)));
+      return SourcePluginDialog(
+        dialog: dialog,
+        embedded: true,
+        onUserClose: cancellation.cancel,
+      );
+    }, cancellation);
+    return true;
+  }
   if (!context.mounted) {
     cancellation.cancel();
     cancellation.check();
@@ -82,7 +89,7 @@ Future<Object?> showSourceLoginInteraction(
     );
   }
   final result = await Future.any<Object?>([
-    showHomeAnimatedDialog<Object>(
+    showSourceAnimatedDialog<Object>(
       context,
       child: _LoginInteraction(request: request, cancellation: cancellation),
     ),

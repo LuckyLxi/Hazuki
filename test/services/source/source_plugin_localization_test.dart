@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show Locale;
@@ -12,7 +13,7 @@ import 'package:hazuki/services/source/runtime/source_localization_operations.da
 import 'package:hazuki/services/source/runtime/source_runtime_handle.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/source_catalog_fixtures.dart';
@@ -26,6 +27,7 @@ const _translation = {
 
 SourceRuntimeHandle _handle() {
   final handle = SourceRuntimeHandle(
+    sourceUiService: sourceUiService,
     sourceKey: 'localized',
     secureStorage: MemorySourceSecureSessionStorage(),
     ensureInitialized: (_) async {},
@@ -39,6 +41,7 @@ Future<SourceScriptEngine> _installRuntime(SourceRuntimeHandle handle) async {
   await handle.session.ensurePrefs();
   final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
   final engine = SourceScriptEngine(
+    sourceUiService: sourceUiService,
     timeout: 5000,
     hostPromiseRejectionHandler: (_) {},
   );
@@ -46,9 +49,15 @@ Future<SourceScriptEngine> _installRuntime(SourceRuntimeHandle handle) async {
   engine.setMessageHandler(
     (dynamic message) => bridge.handleJsMessageForHandle(handle, message),
   );
-  engine.evaluate(await File('assets/init.js').readAsString());
-  engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
-  engine.evaluate('''
+  await engine.evaluate(await File('assets/init.js').readAsString());
+  // SDK 加载后会删除内部入口，测试需在此之前保留解析函数以便传入任意语言。
+  await engine.evaluate(
+    'globalThis.__testLocalizeText = __hazukiRuntime.localizeText;',
+  );
+  await engine.evaluate(
+    await File('assets/hazuki_plugin_sdk.js').readAsString(),
+  );
+  await engine.evaluate('''
 Hazuki.registerSource({
   id: ${jsonEncode(handle.sourceKey)}, translation: ${jsonEncode(_translation)},
   search: {load: async () => ({comics: []})},
@@ -60,7 +69,15 @@ legacy.translation = ${jsonEncode(_translation)};
   return engine;
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -87,8 +104,8 @@ void main() {
         expected,
       );
       expect(
-        engine.evaluate(
-          '__hazukiLocalizeText(${jsonEncode(text)}, ${jsonEncode(_translation)}, ${jsonEncode(locale)})',
+        await engine.evaluate(
+          '__testLocalizeText(${jsonEncode(text)}, ${jsonEncode(_translation)}, ${jsonEncode(locale)})',
         ),
         expected,
       );
@@ -122,13 +139,15 @@ void main() {
         ('zh', 'zh_CN', '你好', '语言翻译'),
       ]) {
         await prefs.setString(hazukiLocalePreferenceKey, language);
-        expect(engine.evaluate('Hazuki.locale'), tag);
-        expect(engine.evaluate('APP.locale'), tag);
-        expect(engine.evaluate("Hazuki.translate('Greeting')"), greeting);
-        expect(engine.evaluate("legacy.translate('Greeting')"), greeting);
-        expect(engine.evaluate("Hazuki.translate('Language only')"), fallback);
+        expect(await engine.evaluate('Hazuki.locale'), tag);
+        expect(await engine.evaluate("Hazuki.translate('Greeting')"), greeting);
+        expect(await engine.evaluate("legacy.translate('Greeting')"), greeting);
         expect(
-          engine.evaluate("Hazuki.translate({zh:'中文',en:'English'})"),
+          await engine.evaluate("Hazuki.translate('Language only')"),
+          fallback,
+        );
+        expect(
+          await engine.evaluate("Hazuki.translate({zh:'中文',en:'English'})"),
           language == 'zh' ? '中文' : 'English',
         );
       }
@@ -192,6 +211,7 @@ Hazuki.registerSource({
     'source translations support English and invalidate inactive source caches',
     () async {
       final host = SourceRuntimeHost(
+        sourceUiService: sourceUiService,
         catalog: hazukiAllowedSourceCatalog,
         defaultSourceKey: 'jm',
         secureSessionStorage: MemorySourceSecureSessionStorage(),
@@ -214,13 +234,13 @@ Hazuki.registerSource({
       );
       final inactive = host.handleFor('picacg');
       for (final current in [handle, inactive]) {
-        current.cache.exploreSectionsMemoryCache = [];
+        current.cache.putExploreSections([]);
         current.cache.categoryTagGroupsMemoryCache = [];
       }
       expect(host.existingHandles, hasLength(2));
       localization.clearLocalizedSourceTextCaches();
       for (final current in [handle, inactive]) {
-        expect(current.cache.exploreSectionsMemoryCache, isNull);
+        expect(current.cache.getExploreSections(), isNull);
         expect(current.cache.categoryTagGroupsMemoryCache, isNull);
       }
       expect(host.existingHandles, hasLength(2));

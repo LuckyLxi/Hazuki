@@ -156,7 +156,7 @@ void main() {
           )).comics.map((comic) => comic.id).toList();
       expect(await ids('savedNewest'), ['second', 'first']);
       expect(await ids('savedOldest'), ['first', 'second']);
-      expect(await ids('updatedNewest'), ['first', 'second']);
+      expect(await ids('readNewest'), ['second', 'first']);
     },
   );
 }

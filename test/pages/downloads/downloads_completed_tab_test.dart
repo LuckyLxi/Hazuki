@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/view/downloads_completed_tab.dart';
 import 'package:hazuki/features/downloads/view/downloads_shell_widgets.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 
@@ -127,7 +128,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: StatefulBuilder(
@@ -235,7 +236,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: StatefulBuilder(
@@ -289,7 +290,7 @@ void main() {
     late TabController controller;
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: DefaultTabController(
           length: 2,
@@ -330,7 +331,7 @@ void main() {
     late TabController controller;
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: DefaultTabController(
           length: 2,
@@ -374,7 +375,7 @@ void main() {
     late TabController controller;
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: DefaultTabController(
           length: 2,
@@ -564,6 +565,50 @@ void main() {
     );
   });
 
+  testWidgets('category dialog expands from an offset launcher', (
+    tester,
+  ) async {
+    // 模拟 Windows 侧栏常驻：下载页只占右侧内容区，弹窗仍铺满窗口。
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: hazukiLocalizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(width: 300),
+              Expanded(child: _buildTab()),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final launcher = find.byKey(
+      const ValueKey<String>('downloads_category_launcher'),
+    );
+    final launcherRect = tester.getRect(launcher);
+    expect(launcherRect.left, greaterThan(300));
+
+    await tester.tap(launcher);
+    await tester.pump();
+
+    final dialog = find.byKey(
+      const ValueKey<String>('downloads_category_dialog'),
+    );
+    final initialRect = tester.getRect(dialog);
+    expect(initialRect.left, closeTo(launcherRect.left, 0.5));
+    expect(initialRect.top, closeTo(launcherRect.top, 0.5));
+    expect(initialRect.width, closeTo(launcherRect.width, 0.5));
+
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(dialog).center.dx,
+      closeTo(launcherRect.center.dx, 0.5),
+    );
+  });
+
   testWidgets('category launcher visibly bounces after returning', (
     tester,
   ) async {
@@ -573,7 +618,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: StatefulBuilder(
@@ -1150,7 +1195,7 @@ Widget _wrapTab({
 }) {
   return MaterialApp(
     navigatorKey: navigatorKey,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: hazukiLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: _buildTab(
@@ -1171,7 +1216,7 @@ Widget _wrapTab({
 
 Widget _wrapTabInTabBarView() {
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: hazukiLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: DefaultTabController(
       length: 2,

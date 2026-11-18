@@ -1,15 +1,21 @@
+import '../../support/source_presentation_fixtures.dart';
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comments/view/comments_page.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_panels.dart';
+import 'package:hazuki/features/reader/view/reader_comments_sheet.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
+import 'package:hazuki/shared/comments/comments_sort_scope.dart';
 import 'package:hazuki/widgets/source_image_gateway_scope.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -51,6 +57,201 @@ void main() {
 
   tearDown(() => filter.dispose());
 
+  testWidgets('tab header sort fades in and out and updates comment ordering', (
+    tester,
+  ) async {
+    source.sortOptions = const SourceCommentSortOptions(
+      orders: {'new': 'Newest', 'old': 'Oldest'},
+      defaultOrder: 'new',
+    );
+    final binding = CommentsSortBinding();
+    final tabs = TabController(length: 3, vsync: tester);
+    addTearDown(binding.dispose);
+    addTearDown(tabs.dispose);
+    await tester.pumpWidget(
+      SourceImageGatewayScope(
+        gateway: source,
+        child: withTestSourcePresentation(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: hazukiLocalizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: CommentsSortScope(
+              binding: binding,
+              child: Scaffold(
+                body: NestedScrollView(
+                  headerSliverBuilder: (context, _) => [
+                    SliverOverlapAbsorber(
+                      handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                        context,
+                      ),
+                      sliver: SliverPersistentHeader(
+                        pinned: true,
+                        delegate: HazukiTabBarDelegate(
+                          TabBar(
+                            controller: tabs,
+                            isScrollable: true,
+                            tabs: const [
+                              Tab(text: 'Info'),
+                              Tab(text: 'Comments'),
+                              Tab(text: 'Related'),
+                            ],
+                          ),
+                          Colors.white,
+                          detailsReady: true,
+                          shouldAnimateInitialDetailReveal: false,
+                          trailing: ComicDetailCommentsSortAction(
+                            tabController: tabs,
+                            tabIndex: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  body: CommentsPage(
+                    sourceService: source,
+                    filterService: filter,
+                    comicId: 'comic',
+                    sourceKey: 'source',
+                    interactionState: state,
+                    isTabView: true,
+                    taskControl: FakeSourceTaskControl(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.swap_vert), findsNothing);
+
+    await tester.tap(find.text('Comments'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 50));
+    final fade = find
+        .ancestor(
+          of: find.byType(CommentsSortButton),
+          matching: find.byType(FadeTransition),
+        )
+        .first;
+    expect(
+      tester.widget<FadeTransition>(fade).opacity.value,
+      inExclusiveRange(0, 1),
+    );
+    await tester.pumpAndSettle();
+    final sort = find.byIcon(Icons.swap_vert);
+    expect(sort, findsOneWidget);
+    final header = tester.getRect(find.byType(TabBar));
+    final sortRect = tester.getRect(sort);
+    expect(sortRect.left, greaterThanOrEqualTo(header.right));
+    expect(sortRect.center.dy, closeTo(header.center.dy, 1));
+    await tester.tap(sort);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Oldest'));
+    await tester.pumpAndSettle();
+    expect(source.lastOrder, 'old');
+    expect(find.text('Oldest'), findsOneWidget);
+
+    await tester.tap(find.text('Related'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(
+      tester.widget<FadeTransition>(fade).opacity.value,
+      inExclusiveRange(0, 1),
+    );
+    expect(sort.hitTestable(), findsNothing);
+    await tester.pumpAndSettle();
+    expect(sort, findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  testWidgets('reader sheet sort sits left of close with a safe gap', (
+    tester,
+  ) async {
+    source.sortOptions = const SourceCommentSortOptions(
+      orders: {'new': 'Newest', 'old': 'Oldest'},
+      defaultOrder: 'new',
+    );
+    await tester.pumpWidget(
+      SourceImageGatewayScope(
+        gateway: source,
+        child: withTestSourcePresentation(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: hazukiLocalizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: TextButton(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => ReaderCommentsSheet(
+                      comicId: 'comic',
+                      subId: null,
+                      chapterId: 'chapter',
+                      sourceKey: 'source',
+                      interactionState: state,
+                      commentsWidgetBuilder:
+                          ({
+                            required comicId,
+                            required sourceKey,
+                            subId,
+                            chapterId,
+                            scrollController,
+                            onRequestTabFullscreen,
+                            interactionState,
+                          }) => CommentsPage(
+                            sourceService: source,
+                            filterService: filter,
+                            comicId: comicId,
+                            sourceKey: sourceKey,
+                            showAppBar: false,
+                            scrollController: scrollController,
+                            onRequestTabFullscreen: onRequestTabFullscreen,
+                            interactionState: interactionState,
+                            taskControl: FakeSourceTaskControl(),
+                          ),
+                    ),
+                  ),
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    final sort = find.byIcon(Icons.swap_vert);
+    expect(sort, findsOneWidget);
+    final sortButton = find
+        .ancestor(of: sort, matching: find.byType(InkWell))
+        .first;
+    final closeButton = find.widgetWithIcon(IconButton, Icons.close_rounded);
+    final sortRect = tester.getRect(sortButton);
+    final closeRect = tester.getRect(closeButton);
+    expect(closeRect.left - sortRect.right, closeTo(16, 0.01));
+    expect(sortRect.center.dy, closeTo(closeRect.center.dy, 0.01));
+    await tester.tap(sort);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Oldest'));
+    await tester.pumpAndSettle();
+    expect(source.lastOrder, 'old');
+    await tester.tap(closeButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(ReaderCommentsSheet), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   Future<void> pumpComments(
     WidgetTester tester, {
     Brightness brightness = Brightness.light,
@@ -67,54 +268,58 @@ void main() {
     await tester.pumpWidget(
       SourceImageGatewayScope(
         gateway: source,
-        child: MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          theme:
-              theme ??
-              ThemeData(
-                colorScheme: ColorScheme.fromSeed(
-                  seedColor: Colors.deepPurple,
-                  brightness: brightness,
+        child: withTestSourcePresentation(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: hazukiLocalizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme:
+                theme ??
+                ThemeData(
+                  colorScheme: ColorScheme.fromSeed(
+                    seedColor: Colors.deepPurple,
+                    brightness: brightness,
+                  ),
                 ),
-              ),
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: TextScaler.linear(textScale)),
-            child: child!,
-          ),
-          home: RepaintBoundary(
-            key: _backgroundBoundaryKey,
-            child: Scaffold(
-              body: Builder(
-                builder: (context) {
-                  final page = CommentsPage(
-                    sourceService: source,
-                    filterService: filter,
-                    comicId: 'comic',
-                    sourceKey: 'source',
-                    showAppBar: showAppBar,
-                    interactionState: state,
-                    isTabView: isTabView,
-                  );
-                  if (!isTabView) return page;
-                  return NestedScrollView(
-                    headerSliverBuilder: (context, _) => [
-                      SliverOverlapAbsorber(
-                        handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                          context,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(textScale)),
+              child: child!,
+            ),
+            home: RepaintBoundary(
+              key: _backgroundBoundaryKey,
+              child: Scaffold(
+                body: Builder(
+                  builder: (context) {
+                    final page = CommentsPage(
+                      sourceService: source,
+                      filterService: filter,
+                      comicId: 'comic',
+                      sourceKey: 'source',
+                      showAppBar: showAppBar,
+                      interactionState: state,
+                      isTabView: isTabView,
+                      taskControl: FakeSourceTaskControl(),
+                    );
+                    if (!isTabView) return page;
+                    return NestedScrollView(
+                      headerSliverBuilder: (context, _) => [
+                        SliverOverlapAbsorber(
+                          handle:
+                              NestedScrollView.sliverOverlapAbsorberHandleFor(
+                                context,
+                              ),
+                          sliver: const SliverAppBar(
+                            title: Text('Details'),
+                            pinned: true,
+                          ),
                         ),
-                        sliver: const SliverAppBar(
-                          title: Text('Details'),
-                          pinned: true,
-                        ),
-                      ),
-                    ],
-                    body: page,
-                  );
-                },
+                      ],
+                      body: page,
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -307,6 +512,88 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets(
+    'quoted floors show their authors and can be liked and replied to independently',
+    (tester) async {
+      const quote = ComicCommentData(
+        id: 'quoted-floor',
+        avatar: '',
+        userName: 'Quoted reader',
+        time: '',
+        content: 'Quoted content',
+        score: 4,
+        canUnlike: false,
+      );
+      state.comments = [
+        _parent.copyWith(quotedComments: [quote]),
+      ];
+      await pumpComments(tester);
+      expect(find.text('Quoted reader'), findsOneWidget);
+      expect(
+        find.textContaining('Quoted content', findRichText: true),
+        findsOneWidget,
+      );
+      await tester.tap(find.byIcon(Icons.favorite_border).first);
+      await tester.pump();
+      expect(source.lastLikedId, 'quoted-floor');
+      expect(state.comments.single.quotedComments.single.score, 5);
+      source.likeResult.complete();
+      await tester.pumpAndSettle();
+      final likedButton = tester.widget<TextButton>(
+        find.ancestor(
+          of: find.byIcon(Icons.favorite),
+          matching: find.byType(TextButton),
+        ),
+      );
+      expect(likedButton.onPressed, isNull);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Reply').first);
+      await tester.pumpAndSettle();
+      expect(state.replyToComment!.id, 'quoted-floor');
+      await tester.enterText(find.byType(TextField), 'Reply to quoted floor');
+      await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+      await tester.pumpAndSettle();
+      expect(source.sentReplyTo, 'quoted-floor');
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('long quote chains show first and last floors until expanded', (
+    tester,
+  ) async {
+    state.comments = [
+      _parent.copyWith(
+        quotedComments: List.generate(
+          5,
+          (i) => ComicCommentData(
+            id: 'quote-$i',
+            avatar: '',
+            userName: 'Floor $i',
+            time: '',
+            content: 'Content $i',
+          ),
+        ),
+      ),
+    ];
+    await pumpComments(tester);
+    expect(find.text('Floor 0'), findsOneWidget);
+    expect(find.text('Floor 4'), findsOneWidget);
+    expect(find.text('Floor 2'), findsNothing);
+    await tester.ensureVisible(find.text('Expand'));
+    await tester.tap(find.text('Expand'));
+    await tester.pumpAndSettle();
+    expect(find.text('Floor 2'), findsOneWidget);
+    await tester.ensureVisible(find.text('Collapse'));
+    await tester.tap(find.text('Collapse'));
+    await tester.pumpAndSettle();
+    expect(find.text('Floor 2'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('read-only sources retain content without card actions', (
     tester,
   ) async {
@@ -353,6 +640,7 @@ class _Source extends Fake
       sortOptions;
   bool supportActions = true;
   int likeCount = 0;
+  String? lastLikedId;
   final likeResult = Completer<void>();
   String? sentContent;
   String? sentReplyTo;
@@ -379,6 +667,7 @@ class _Source extends Fake
     int pageSize = 16,
     String? replyTo,
     String order = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     lastOrder = order;
     return ComicCommentsPageResult(
@@ -394,8 +683,10 @@ class _Source extends Fake
     String sourceKey = '',
     required String commentId,
     required bool isLike,
+    SourceTaskOrigin? taskOrigin,
   }) {
     likeCount++;
+    lastLikedId = commentId;
     return likeResult.future;
   }
 
@@ -407,6 +698,7 @@ class _Source extends Fake
     String sourceKey = '',
     required String content,
     String? replyTo,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     sentContent = content;
     sentReplyTo = replyTo;

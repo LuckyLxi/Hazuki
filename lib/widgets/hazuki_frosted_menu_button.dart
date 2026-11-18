@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'hazuki_frosted_menu.dart';
+import 'source_plugin_interaction.dart';
+export 'source_plugin_menu.dart' show SourcePluginMenuBinding;
 
-class HazukiFrostedMenuButton<T> extends StatefulWidget {
+class HazukiFrostedMenuButton<T> extends StatelessWidget {
   const HazukiFrostedMenuButton({
     super.key,
     required this.options,
@@ -13,6 +15,8 @@ class HazukiFrostedMenuButton<T> extends StatefulWidget {
     this.child,
     this.icon = const Icon(Icons.more_vert),
     this.enabled = true,
+    this.waitForDismissal = false,
+    this.pluginMenu,
   });
 
   final List<HazukiFrostedMenuOption<T>> options;
@@ -24,57 +28,36 @@ class HazukiFrostedMenuButton<T> extends StatefulWidget {
   final Widget icon;
   final bool enabled;
 
-  @override
-  State<HazukiFrostedMenuButton<T>> createState() =>
-      _HazukiFrostedMenuButtonState<T>();
-}
-
-class _HazukiFrostedMenuButtonState<T>
-    extends State<HazukiFrostedMenuButton<T>> {
-  final _anchorKey = GlobalKey();
-  bool _open = false;
-
-  Future<void> _showMenu() async {
-    if (_open || !widget.enabled || widget.options.isEmpty) return;
-    _open = true;
-    try {
-      widget.onOpened?.call();
-      final value = await showHazukiFrostedMenu<T>(
-        context: context,
-        anchorKey: _anchorKey,
-        options: widget.options,
-        selected: widget.selected,
-        label: widget.tooltip,
-      );
-      if (mounted && widget.enabled && value != null) widget.onSelected(value);
-    } finally {
-      _open = false;
-    }
-  }
+  /// Wait for the closing animation before an action can present another route.
+  final bool waitForDismissal;
+  final SourcePluginMenuBinding<T>? pluginMenu;
 
   @override
-  Widget build(BuildContext context) {
-    final onTap = widget.enabled && widget.options.isNotEmpty
-        ? _showMenu
-        : null;
-    if (widget.child == null) {
-      return IconButton(
-        key: _anchorKey,
-        tooltip: widget.tooltip,
-        onPressed: onTap,
-        icon: widget.icon,
+  Widget build(BuildContext context) => SourcePluginInteraction<T>(
+    binding: pluginMenu,
+    options: options,
+    selected: selected,
+    onSelected: onSelected,
+    label: tooltip,
+    enabled: enabled,
+    onOpened: onOpened,
+    waitForDismissal: waitForDismissal,
+    // 图标按钮、文字按钮与下拉框都由入口本身形变成菜单。
+    morphFromAnchor: true,
+    builder: (context, activate) {
+      if (child == null) {
+        return IconButton(tooltip: tooltip, onPressed: activate, icon: icon);
+      }
+      final button = InkWell(
+        onTap: activate,
+        borderRadius: BorderRadius.circular(20),
+        child: child,
       );
-    }
-    final button = InkWell(
-      key: _anchorKey,
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: widget.child,
-    );
-    return widget.tooltip == null
-        ? button
-        : Tooltip(message: widget.tooltip!, child: button);
-  }
+      return tooltip == null
+          ? button
+          : Tooltip(message: tooltip!, child: button);
+    },
+  );
 }
 
 class HazukiFrostedDropdown<T> extends StatelessWidget {
@@ -84,26 +67,24 @@ class HazukiFrostedDropdown<T> extends StatelessWidget {
     required this.onSelected,
     this.selected,
     this.tooltip,
+    this.pluginMenu,
   });
 
   final List<HazukiFrostedMenuOption<T>> options;
   final T? selected;
   final ValueChanged<T> onSelected;
   final String? tooltip;
+  final SourcePluginMenuBinding<T>? pluginMenu;
 
   @override
   Widget build(BuildContext context) {
-    final label =
-        options
-            .where((option) => option.value == selected)
-            .firstOrNull
-            ?.label ??
-        '';
+    final label = _selectedLabel(options, selected) ?? '';
     return HazukiFrostedMenuButton<T>(
       options: options,
       selected: selected,
       onSelected: onSelected,
       tooltip: tooltip,
+      pluginMenu: pluginMenu,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.sizeOf(context).width * 0.5,
@@ -121,4 +102,120 @@ class HazukiFrostedDropdown<T> extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 单选类设置行：左侧图标、标题与说明，右侧胶囊显示当前取值，点整行后菜单
+/// 由当前值胶囊形变展开。
+class HazukiMenuSettingTile<T> extends StatelessWidget {
+  const HazukiMenuSettingTile({
+    super.key,
+    required this.title,
+    required this.options,
+    required this.onSelected,
+    this.selected,
+    this.subtitle,
+    this.leading,
+    this.enabled = true,
+    this.pluginMenu,
+  });
+
+  final String title;
+  final List<HazukiFrostedMenuOption<T>> options;
+  final ValueChanged<T> onSelected;
+  final T? selected;
+  final String? subtitle;
+  final Widget? leading;
+  final bool enabled;
+  final SourcePluginMenuBinding<T>? pluginMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _selectedLabel(options, selected);
+    return SourcePluginInteraction<T>(
+      binding: pluginMenu,
+      options: options,
+      selected: selected,
+      onSelected: onSelected,
+      label: title,
+      enabled: enabled,
+      // 没有当前值胶囊时无处可长出，退回锚定整行的普通弹出。
+      morphFromAnchor: label != null,
+      innerAnchor: label != null,
+      builder: (context, activate) => ListTile(
+        enabled: enabled,
+        leading: leading,
+        title: Text(title),
+        subtitle: subtitle == null ? null : Text(subtitle!),
+        trailing: label == null
+            ? null
+            : SourcePluginMenuAnchor(child: HazukiMenuValuePill(label: label)),
+        onTap: activate,
+      ),
+    );
+  }
+}
+
+/// 菜单设置项右侧的当前值胶囊，也供自定义菜单入口复用。
+class HazukiMenuValuePill extends StatelessWidget {
+  const HazukiMenuValuePill({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return ConstrainedBox(
+      // 插件提供的文案长度不可控，限制宽度避免挤压标题。
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.4,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: scheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.expand_more_rounded,
+                size: 18,
+                color: scheme.onSecondaryContainer,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 在可能含子菜单的选项树中查找当前选中项的文案。
+String? _selectedLabel<T>(
+  List<HazukiFrostedMenuOption<T>> entries,
+  T? selected,
+) {
+  for (final option in entries) {
+    if (option.children.isEmpty) {
+      if (option.value == selected) return option.label;
+    } else {
+      final label = _selectedLabel(option.children, selected);
+      if (label != null) return label;
+    }
+  }
+  return null;
 }

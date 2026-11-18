@@ -8,15 +8,11 @@ class SourceLoginScript {
 }
 
 /// Encodes credentials for the plugin's standard account login entry point.
-class SourceLoginScriptFactory {
-  const SourceLoginScriptFactory();
-
-  SourceLoginScript generic({
-    required String account,
-    required String password,
-  }) => SourceLoginScript(
-    code:
-        'this.__hazuki_source.account.login(${jsonEncode(account)}, ${jsonEncode(password)})',
-    name: 'source_login.js',
-  );
-}
+SourceLoginScript buildSourceLoginScript({
+  required String account,
+  required String password,
+}) => SourceLoginScript(
+  code:
+      'this.__hazuki_source.account.login(${jsonEncode(account)}, ${jsonEncode(password)})',
+  name: 'source_login.js',
+);

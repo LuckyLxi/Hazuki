@@ -1,0 +1,224 @@
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
+
+import '../../../models/hazuki_models.dart';
+import '../common/source_json_coerce.dart';
+import '../runtime/source_runtime_host.dart';
+
+typedef SourceTextTranslator = String Function(String text, {String sourceKey});
+
+/// Loads and parses source explore data without depending on the service façade.
+class SourceExploreCapability {
+  SourceExploreCapability({
+    required SourceRuntimeHost runtimeHost,
+    required SourceTextTranslator translateSourceText,
+  }) : _runtimeHost = runtimeHost,
+       _translateSourceText = translateSourceText;
+
+  final SourceRuntimeHost _runtimeHost;
+  final SourceTextTranslator _translateSourceText;
+
+  Future<List<ExploreSection>> load({
+    bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  }) async {
+    if (!_runtimeHost.hasActiveSource) return const [];
+    return await runSourceOperation(
+      _runtimeHost,
+      _runtimeHost.activeHandle,
+      'discover.load',
+      (operationContext) =>
+          _loadTask(operationContext, forceRefresh: forceRefresh),
+      origin: taskOrigin,
+      serviceOwned: false,
+    );
+  }
+
+  Future<List<ExploreSection>> _loadTask(
+    SourceOperationContext operationContext, {
+    bool forceRefresh = false,
+  }) async {
+    if (!_runtimeHost.hasActiveSource) return const [];
+    final handle = operationContext.resource;
+    final facade = handle.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+
+      final cache = handle.cache;
+      if (!forceRefresh) {
+        final memoryCached = cache.getExploreSections();
+        if (memoryCached != null) {
+          return memoryCached;
+        }
+      } else {
+        cache.clearExploreSections();
+      }
+
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
+
+      final hasExplore = facade.js.asBool(
+        await operationContext.evaluate(
+          engine,
+          'Array.isArray(this.__hazuki_source.explore)',
+        ),
+      );
+      if (!hasExplore) {
+        return const [];
+      }
+
+      final exploreType =
+          (await operationContext.evaluate(
+                    engine,
+                    'this.__hazuki_source.explore?.[0]?.type',
+                  ) ??
+                  '')
+              .toString();
+      if (exploreType != 'multiPartPage' &&
+          exploreType != 'singlePageWithMultiPart' &&
+          exploreType != 'multiPageComicList') {
+        throw Exception('explore_type_not_supported:$exploreType');
+      }
+
+      final dynamic result = await operationContext.evaluate(
+        engine,
+        switch (exploreType) {
+          'multiPartPage' => 'this.__hazuki_source.explore[0].load(null)',
+          'singlePageWithMultiPart' => 'this.__hazuki_source.explore[0].load()',
+          _ =>
+            '''
+Promise.all(
+  this.__hazuki_source.explore
+    .filter((section) => section?.type === "multiPageComicList")
+    .map(async (section) => {
+      try {
+        return {
+          title: section.title ?? "__untitled_section__",
+          ...(await section.load(1))
+        };
+      } catch (error) {
+        return null;
+      }
+    })
+).then((sections) => sections.filter((section) => section != null))
+''',
+        },
+        name: 'source_explore_load.js',
+      );
+
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
+      final sections = switch (exploreType) {
+        'multiPartPage' => _parseMultiPartExploreSections(resolved),
+        'singlePageWithMultiPart' =>
+          _parseSinglePageWithMultiPartExploreSections(resolved),
+        _ => _parseMultiPageComicListExploreSections(resolved),
+      };
+
+      if (operationContext.canCache() && identical(facade.js.engine, engine)) {
+        cache.putExploreSections(sections);
+      }
+      return List<ExploreSection>.unmodifiable(sections);
+    });
+  }
+
+  List<ExploreSection> _parseMultiPartExploreSections(dynamic resolved) {
+    if (resolved is! List) return const [];
+    final sections = <ExploreSection>[];
+    for (final item in resolved) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final list = map['comics'];
+      if (list is! List) continue;
+      final comics = _parseExploreComics(list);
+      if (comics.isNotEmpty) {
+        final rawTitle = map['title']?.toString() ?? '__untitled_section__';
+        final viewMore = map['viewMore']?.toString().trim();
+        sections.add(
+          ExploreSection(
+            title: _translateSourceText(rawTitle),
+            comics: comics,
+            viewMoreUrl: viewMore?.isNotEmpty == true ? viewMore : null,
+            initialPage: 0,
+          ),
+        );
+      }
+    }
+    return sections;
+  }
+
+  List<ExploreSection> _parseSinglePageWithMultiPartExploreSections(
+    dynamic resolved,
+  ) {
+    if (resolved is! Map) return const [];
+    final sections = <ExploreSection>[];
+    for (final entry in Map<String, dynamic>.from(resolved).entries) {
+      if (entry.value is! List) continue;
+      final comics = _parseExploreComics(entry.value as List);
+      if (comics.isNotEmpty) {
+        sections.add(
+          ExploreSection(
+            title: _translateSourceText(entry.key),
+            comics: comics,
+          ),
+        );
+      }
+    }
+    return sections;
+  }
+
+  List<ExploreSection> _parseMultiPageComicListExploreSections(
+    dynamic resolved,
+  ) {
+    if (resolved is! List) return const [];
+    final sections = <ExploreSection>[];
+    for (final item in resolved) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final comicsRaw = map['comics'];
+      if (comicsRaw is! List) continue;
+      final comics = _parseExploreComics(comicsRaw);
+      if (comics.isEmpty) continue;
+      sections.add(
+        ExploreSection(
+          title: _translateSourceText(
+            map['title']?.toString() ?? '__untitled_section__',
+          ),
+          comics: comics,
+          viewMoreUrl: 'explore:${sections.length}',
+          maxPage: _parseSourcePageCount(map['maxPage']),
+        ),
+      );
+    }
+    return sections;
+  }
+
+  int? _parseSourcePageCount(dynamic value) => switch (value) {
+    int value => value,
+    num value => value.toInt(),
+    _ => int.tryParse(value?.toString() ?? ''),
+  };
+
+  List<ExploreComic> _parseExploreComics(List list) {
+    final comics = <ExploreComic>[];
+    for (final comic in list) {
+      if (comic is! Map) continue;
+      final map = Map<String, dynamic>.from(comic);
+      comics.add(
+        ExploreComic(
+          id: map['id']?.toString() ?? '',
+          title: map['title']?.toString() ?? '',
+          subTitle: (map['subTitle'] ?? map['subtitle'] ?? '').toString(),
+          cover: map['cover']?.toString() ?? '',
+          sourceKey: _runtimeHost.activeSourceKey,
+          tags: jsAsStringList(map['tags']),
+        ),
+      );
+    }
+    return comics;
+  }
+}

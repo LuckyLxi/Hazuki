@@ -1,16 +1,17 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/home/support/home_sidebar_models.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
 import 'package:hazuki/features/home/view/home_windows_sidebar.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/hazuki_m3e_loading_indicator.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _Gateway extends Mock implements SourceSwitchGateway {}
+class _Gateway extends Mock implements SourceRuntimeGateway {}
 
 const _profile = HomeSidebarProfileState(
   isLogged: false,
@@ -61,11 +62,12 @@ void main() {
     WidgetTester tester, {
     String locale = 'en',
     double scale = 1,
+    double sidebarWidth = 80,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
         locale: Locale(locale),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(
@@ -77,7 +79,7 @@ void main() {
           body: Row(
             children: [
               SizedBox(
-                width: 80,
+                width: sidebarWidth,
                 child: HomeWindowsSidebar(
                   profile: _profile,
                   actions: const HomeSidebarActions(),
@@ -320,4 +322,37 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('expanded sidebar shows labels and the active source name', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await pumpApp(tester, locale: 'zh', sidebarWidth: 232);
+    expect(find.text('发现'), findsOneWidget);
+    expect(find.text('收藏'), findsOneWidget);
+    expect(find.text('更多'), findsOneWidget);
+    expect(find.text('Plugin a'), findsOneWidget);
+    expect(find.text('guest'), findsOneWidget);
+    expect(
+      tester.getTopLeft(button).dy,
+      lessThan(tester.getTopLeft(find.byType(HomeProfileAvatar)).dy),
+    );
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(card, findsOneWidget);
+    expect(tester.getTopLeft(card).dx, greaterThanOrEqualTo(232));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('expanded sidebar fits a short window without overflow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 420);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await pumpApp(tester, sidebarWidth: 232, scale: 1.5);
+    expect(tester.takeException(), isNull);
+  });
 }

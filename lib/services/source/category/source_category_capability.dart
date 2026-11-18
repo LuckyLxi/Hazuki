@@ -1,3 +1,6 @@
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -6,7 +9,7 @@ import '../../../models/hazuki_models.dart';
 import '../common/source_prefs_keys.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
-import '../explore_capability.dart';
+import '../content/explore_capability.dart';
 
 typedef SourceComicParser =
     List<ExploreComic> Function(List comics, {String sourceKey});
@@ -28,71 +31,95 @@ class SourceCategoryCapability {
   Future<List<CategoryTagGroup>> loadTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.handleFor(
+      sourceKey.isEmpty ? _runtimeHost.activeSourceKey : sourceKey,
+    ),
+    'category.tags',
+    (operationContext) => _loadTagGroupsTask(
+      operationContext,
+      forceRefresh: forceRefresh,
+      sourceKey: sourceKey,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<List<CategoryTagGroup>> _loadTagGroupsTask(
+    SourceOperationContext operationContext, {
+    bool forceRefresh = false,
+    String sourceKey = '',
   }) async {
     final resolvedSourceKey = sourceKey.trim().isEmpty
         ? _runtimeHost.activeSourceKey
         : _runtimeHost.normalize(sourceKey);
-    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
-    await facade.ensureInitialized();
-    final startedAt = DateTime.now();
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      final startedAt = DateTime.now();
 
-    if (!forceRefresh) {
-      final memoryCached = facade.cache.getCategoryTagGroupsFromMemoryCache(
-        SourcePrefsKeys.discoverCacheTtl,
-      );
-      if (memoryCached != null) {
+      if (!forceRefresh) {
+        final memoryCached = facade.cache.getCategoryTagGroupsFromMemoryCache(
+          SourcePrefsKeys.discoverCacheTtl,
+        );
+        if (memoryCached != null) {
+          _logTagTiming(
+            'Source category tags loaded from memory cache',
+            startedAt: startedAt,
+            content: {
+              'groupCount': memoryCached.length,
+              'tagCount': memoryCached.fold<int>(
+                0,
+                (sum, group) => sum + group.tags.length,
+              ),
+            },
+            targetFacade: facade,
+          );
+          return memoryCached;
+        }
+      } else {
+        facade.cache.clearCategoryTagGroupsMemoryCache();
+      }
+
+      final engine = facade.js.engine;
+      if (engine == null) {
         _logTagTiming(
-          'Source category tags loaded from memory cache',
+          'Source category tags load failed',
           startedAt: startedAt,
-          content: {
-            'groupCount': memoryCached.length,
-            'tagCount': memoryCached.fold<int>(
-              0,
-              (sum, group) => sum + group.tags.length,
-            ),
-          },
+          level: 'error',
+          content: {'error': 'source_not_initialized'},
           targetFacade: facade,
         );
-        return memoryCached;
+        throw Exception('source_not_initialized');
       }
-    } else {
-      facade.cache.clearCategoryTagGroupsMemoryCache();
-    }
 
-    final engine = facade.js.engine;
-    if (engine == null) {
+      final hasCategoryEvaluateStartedAt = DateTime.now();
+      final hasCategory = facade.js.asBool(
+        await operationContext.evaluate(
+          engine,
+          '!!this.__hazuki_source.category',
+        ),
+      );
       _logTagTiming(
-        'Source category tags load failed',
-        startedAt: startedAt,
-        level: 'error',
-        content: {'error': 'source_not_initialized'},
+        'Source category tags availability evaluate finished',
+        startedAt: hasCategoryEvaluateStartedAt,
+        content: {'hasCategory': hasCategory},
         targetFacade: facade,
       );
-      throw Exception('source_not_initialized');
-    }
+      if (!hasCategory) {
+        _logTagTiming(
+          'Source category tags loaded',
+          startedAt: startedAt,
+          content: {'groupCount': 0, 'tagCount': 0, 'hasCategory': false},
+          targetFacade: facade,
+        );
+        return const [];
+      }
 
-    final hasCategoryEvaluateStartedAt = DateTime.now();
-    final hasCategory = facade.js.asBool(
-      facade.js.evaluate('!!this.__hazuki_source.category'),
-    );
-    _logTagTiming(
-      'Source category tags availability evaluate finished',
-      startedAt: hasCategoryEvaluateStartedAt,
-      content: {'hasCategory': hasCategory},
-      targetFacade: facade,
-    );
-    if (!hasCategory) {
-      _logTagTiming(
-        'Source category tags loaded',
-        startedAt: startedAt,
-        content: {'groupCount': 0, 'tagCount': 0, 'hasCategory': false},
-        targetFacade: facade,
-      );
-      return const [];
-    }
-
-    final evaluateStartedAt = DateTime.now();
-    final dynamic result = engine.evaluate('''(() => {
+      final evaluateStartedAt = DateTime.now();
+      final dynamic result = await operationContext.evaluate(engine, '''(() => {
         const category = this.__hazuki_source.category;
         const parts = Array.isArray(category?.parts) ? category.parts : [];
         const groups = [];
@@ -116,92 +143,111 @@ class SourceCategoryCapability {
         }
         return groups;
       })()''', name: 'source_category_tag_groups.js');
-    _logTagTiming(
-      'Source category tags evaluate finished',
-      startedAt: evaluateStartedAt,
-      targetFacade: facade,
-    );
+      _logTagTiming(
+        'Source category tags evaluate finished',
+        startedAt: evaluateStartedAt,
+        targetFacade: facade,
+      );
 
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! List) {
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
+      if (resolved is! List) {
+        _logTagTiming(
+          'Source category tags loaded',
+          startedAt: startedAt,
+          content: {
+            'groupCount': 0,
+            'tagCount': 0,
+            'resultType': resolved.runtimeType.toString(),
+          },
+          targetFacade: facade,
+        );
+        return const [];
+      }
+
+      final groups = <CategoryTagGroup>[];
+      for (final item in resolved) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        final name = map['name']?.toString().trim() ?? '';
+        final itemType = map['itemType']?.toString().trim() ?? 'search';
+        final tagsRaw = map['tags'];
+        if (name.isEmpty || tagsRaw is! List) continue;
+
+        final tags = tagsRaw
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList();
+        if (tags.isEmpty) continue;
+
+        final params = <String?>[];
+        if (map['params'] case final List paramsRaw) {
+          for (final item in paramsRaw) {
+            params.add(item?.toString());
+          }
+        }
+        groups.add(
+          CategoryTagGroup(
+            name: _translateSourceText(name, sourceKey: resolvedSourceKey),
+            tags: tags,
+            params: params,
+            itemType: itemType,
+          ),
+        );
+      }
+
+      final cached = List<CategoryTagGroup>.unmodifiable(
+        groups.map(
+          (group) => CategoryTagGroup(
+            name: group.name,
+            tags: List<String>.unmodifiable(group.tags),
+            params: List<String?>.unmodifiable(group.params),
+            itemType: group.itemType,
+          ),
+        ),
+      );
+      if (operationContext.canCache() && identical(facade.js.engine, engine)) {
+        facade.cache.putCategoryTagGroupsInMemoryCache(cached);
+      }
       _logTagTiming(
         'Source category tags loaded',
         startedAt: startedAt,
         content: {
-          'groupCount': 0,
-          'tagCount': 0,
-          'resultType': resolved.runtimeType.toString(),
+          'groupCount': cached.length,
+          'tagCount': cached.fold<int>(
+            0,
+            (sum, group) => sum + group.tags.length,
+          ),
         },
         targetFacade: facade,
       );
-      return const [];
-    }
-
-    final groups = <CategoryTagGroup>[];
-    for (final item in resolved) {
-      if (item is! Map) continue;
-      final map = Map<String, dynamic>.from(item);
-      final name = map['name']?.toString().trim() ?? '';
-      final itemType = map['itemType']?.toString().trim() ?? 'search';
-      final tagsRaw = map['tags'];
-      if (name.isEmpty || tagsRaw is! List) continue;
-
-      final tags = tagsRaw
-          .map((e) => e.toString().trim())
-          .where((e) => e.isNotEmpty)
-          .toSet()
-          .toList();
-      if (tags.isEmpty) continue;
-
-      final params = <String?>[];
-      if (map['params'] case final List paramsRaw) {
-        for (final item in paramsRaw) {
-          params.add(item?.toString());
-        }
-      }
-      groups.add(
-        CategoryTagGroup(
-          name: _translateSourceText(name, sourceKey: resolvedSourceKey),
-          tags: tags,
-          params: params,
-          itemType: itemType,
-        ),
-      );
-    }
-
-    final cached = List<CategoryTagGroup>.unmodifiable(
-      groups.map(
-        (group) => CategoryTagGroup(
-          name: group.name,
-          tags: List<String>.unmodifiable(group.tags),
-          params: List<String?>.unmodifiable(group.params),
-          itemType: group.itemType,
-        ),
-      ),
-    );
-    facade.cache.putCategoryTagGroupsInMemoryCache(cached);
-    _logTagTiming(
-      'Source category tags loaded',
-      startedAt: startedAt,
-      content: {
-        'groupCount': cached.length,
-        'tagCount': cached.fold<int>(
-          0,
-          (sum, group) => sum + group.tags.length,
-        ),
-      },
-      targetFacade: facade,
-    );
-    return cached;
+      return cached;
+    });
   }
 
-  Future<List<CategoryRankingOption>> loadRankingOptions() async {
-    final facade = _runtimeHost.activeHandle.facade;
-    await facade.ensureInitialized();
-    final engine = facade.js.engine;
-    if (engine == null) throw Exception('source_not_initialized');
+  Future<List<CategoryRankingOption>> loadRankingOptions({
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.rankingOptions',
+    (operationContext) => _loadRankingOptionsTask(operationContext),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
 
-    final dynamic result = engine.evaluate('''(() => {
+  Future<List<CategoryRankingOption>> _loadRankingOptionsTask(
+    SourceOperationContext operationContext,
+  ) async {
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      final engine = facade.js.engine;
+      if (engine == null) throw Exception('source_not_initialized');
+
+      final dynamic result = await operationContext.evaluate(engine, '''(() => {
         const rawOptions = this.__hazuki_source.categoryComics?.ranking?.options;
         if (!Array.isArray(rawOptions)) return [];
         return rawOptions.map((item) => {
@@ -212,77 +258,148 @@ class SourceCategoryCapability {
           return { value: text.slice(0, idx), label: text.slice(idx + 1) };
         }).filter(Boolean);
       })()''', name: 'source_category_ranking_options.js');
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! List) return const [];
-
-    final options = <CategoryRankingOption>[];
-    for (final item in resolved) {
-      if (item is! Map) continue;
-      final map = Map<String, dynamic>.from(item);
-      final value = map['value']?.toString().trim() ?? '';
-      final label = map['label']?.toString().trim() ?? '';
-      if (value.isEmpty || label.isEmpty) continue;
-      options.add(
-        CategoryRankingOption(value: value, label: _translateSourceText(label)),
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
       );
-    }
-    return options;
+      if (resolved is! List) return const [];
+
+      final options = <CategoryRankingOption>[];
+      for (final item in resolved) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        final value = map['value']?.toString().trim() ?? '';
+        final label = map['label']?.toString().trim() ?? '';
+        if (value.isEmpty || label.isEmpty) continue;
+        options.add(
+          CategoryRankingOption(
+            value: value,
+            label: _translateSourceText(label),
+          ),
+        );
+      }
+      return options;
+    });
   }
 
   Future<CategoryComicsResult> loadRankingComics({
     required String rankingOption,
     required int page,
-  }) async {
-    final facade = _runtimeHost.activeHandle.facade;
-    await facade.ensureInitialized();
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('婕敾婧愬皻鏈垵濮嬪寲瀹屾垚');
-    }
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.ranking',
+    (operationContext) => _loadRankingComicsTask(
+      operationContext,
+      rankingOption: rankingOption,
+      page: page,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
 
-    final option = rankingOption.trim();
-    if (option.isEmpty) {
-      throw Exception('鎺掕姒滃弬鏁颁笉鑳戒负绌?');
-    }
-    final dynamic result = engine.evaluate(
-      'this.__hazuki_source.categoryComics.ranking.load(${jsonEncode(option)}, ${_normalizePage(page)})',
-      name: 'source_category_ranking_load.js',
-    );
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! Map) {
-      return const CategoryComicsResult(comics: [], maxPage: null);
-    }
-    return _parseCategoryComicsResult(Map<String, dynamic>.from(resolved));
+  Future<CategoryComicsResult> _loadRankingComicsTask(
+    SourceOperationContext operationContext, {
+    required String rankingOption,
+    required int page,
+  }) async {
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
+
+      final option = rankingOption.trim();
+      if (option.isEmpty) {
+        throw StateError('ranking_option_required');
+      }
+      final dynamic result = await operationContext.evaluate(
+        engine,
+        'this.__hazuki_source.categoryComics.ranking.load(${jsonEncode(option)}, ${_normalizePage(page)})',
+        name: 'source_category_ranking_load.js',
+      );
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
+      if (resolved is! Map) {
+        return const CategoryComicsResult(comics: [], maxPage: null);
+      }
+      return _parseCategoryComicsResult(Map<String, dynamic>.from(resolved));
+    });
   }
 
   Future<List<CategoryRankingOption>> loadRankingOptionsByViewMore({
     required String viewMoreUrl,
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.viewMoreOptions',
+    (operationContext) => _loadRankingOptionsByViewMoreTask(
+      operationContext,
+      viewMoreUrl: viewMoreUrl,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<List<CategoryRankingOption>> _loadRankingOptionsByViewMoreTask(
+    SourceOperationContext operationContext, {
+    required String viewMoreUrl,
   }) async {
-    final groups = await loadOptionGroupsByViewMore(viewMoreUrl: viewMoreUrl);
+    final groups = await _loadOptionGroupsByViewMoreTask(
+      operationContext,
+      viewMoreUrl: viewMoreUrl,
+    );
     return groups.isEmpty ? const [] : groups.first;
   }
 
   Future<List<List<CategoryRankingOption>>> loadOptionGroupsByViewMore({
     required String viewMoreUrl,
-  }) async {
-    final facade = _runtimeHost.activeHandle.facade;
-    await facade.ensureInitialized();
-    final engine = facade.js.engine;
-    if (engine == null) throw Exception('source_not_initialized');
-    if (parseExploreViewMoreIndex(viewMoreUrl) != null) return const [];
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.viewMoreGroups',
+    (operationContext) => _loadOptionGroupsByViewMoreTask(
+      operationContext,
+      viewMoreUrl: viewMoreUrl,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
 
-    final parsed = parseCategoryViewMoreUrl(viewMoreUrl);
-    final categoryJson = jsonEncode(parsed.category);
-    final paramJson = parsed.param == null ? 'null' : jsonEncode(parsed.param);
-    final hasOptionLoader = facade.js.asBool(
-      engine.evaluate('!!this.__hazuki_source.categoryComics?.optionLoader'),
-    );
-    final dynamic result = hasOptionLoader
-        ? engine.evaluate(
-            'this.__hazuki_source.categoryComics.optionLoader($categoryJson, $paramJson)',
-            name: 'source_category_view_more_options.js',
-          )
-        : engine.evaluate('''(() => {
+  Future<List<List<CategoryRankingOption>>> _loadOptionGroupsByViewMoreTask(
+    SourceOperationContext operationContext, {
+    required String viewMoreUrl,
+  }) async {
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      final engine = facade.js.engine;
+      if (engine == null) throw Exception('source_not_initialized');
+      if (parseExploreViewMoreIndex(viewMoreUrl) != null) return const [];
+
+      final parsed = parseCategoryViewMoreUrl(viewMoreUrl);
+      final categoryJson = jsonEncode(parsed.category);
+      final paramJson = parsed.param == null
+          ? 'null'
+          : jsonEncode(parsed.param);
+      final hasOptionLoader = facade.js.asBool(
+        await operationContext.evaluate(
+          engine,
+          '!!this.__hazuki_source.categoryComics?.optionLoader',
+        ),
+      );
+      final dynamic result = hasOptionLoader
+          ? await operationContext.evaluate(
+              engine,
+              'this.__hazuki_source.categoryComics.optionLoader($categoryJson, $paramJson)',
+              name: 'source_category_view_more_options.js',
+            )
+          : await operationContext.evaluate(engine, '''(() => {
             const category = $categoryJson;
             const param = $paramJson;
             const raw = this.__hazuki_source.categoryComics?.optionList;
@@ -297,18 +414,21 @@ class SourceCategoryCapability {
               return showMatch && !hideMatch;
             });
           })()''', name: 'source_category_view_more_option_list.js');
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! List) return const [];
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
+      );
+      if (resolved is! List) return const [];
 
-    final groups = <List<CategoryRankingOption>>[];
-    for (final group in resolved) {
-      if (group is! Map) continue;
-      final rawOptions = Map<String, dynamic>.from(group)['options'];
-      if (rawOptions is! List) continue;
-      final options = _parseRankingOptionsList(rawOptions);
-      if (options.isNotEmpty) groups.add(options);
-    }
-    return groups;
+      final groups = <List<CategoryRankingOption>>[];
+      for (final group in resolved) {
+        if (group is! Map) continue;
+        final rawOptions = Map<String, dynamic>.from(group)['options'];
+        if (rawOptions is! List) continue;
+        final options = _parseRankingOptionsList(rawOptions);
+        if (options.isNotEmpty) groups.add(options);
+      }
+      return groups;
+    });
   }
 
   Future<CategoryComicsResult> loadComicsByViewMore({
@@ -316,45 +436,72 @@ class SourceCategoryCapability {
     required int page,
     String order = '',
     List<String>? orders,
+    SourceTaskOrigin? taskOrigin,
+  }) async => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.activeHandle,
+    'category.viewMore',
+    (operationContext) => _loadComicsByViewMoreTask(
+      operationContext,
+      viewMoreUrl: viewMoreUrl,
+      page: page,
+      order: order,
+      orders: orders,
+    ),
+    origin: taskOrigin,
+    serviceOwned: false,
+  );
+
+  Future<CategoryComicsResult> _loadComicsByViewMoreTask(
+    SourceOperationContext operationContext, {
+    required String viewMoreUrl,
+    required int page,
+    String order = '',
+    List<String>? orders,
   }) async {
-    final facade = _runtimeHost.activeHandle.facade;
-    await facade.ensureInitialized();
-    final engine = facade.js.engine;
-    if (engine == null) throw Exception('source_not_initialized');
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      final engine = facade.js.engine;
+      if (engine == null) throw Exception('source_not_initialized');
 
-    final normalizedPage = _normalizePage(page);
-    // Option groups are positional; empty values must not shift later groups.
-    final normalizedOrders = orders != null && orders.isNotEmpty
-        ? orders.map((value) => value.trim()).toList()
-        : order.trim().isNotEmpty
-        ? <String>[order.trim()]
-        : const <String>[];
-    final optionsJson = jsonEncode(normalizedOrders);
+      final normalizedPage = _normalizePage(page);
+      // Option groups are positional; empty values must not shift later groups.
+      final normalizedOrders = orders != null && orders.isNotEmpty
+          ? orders.map((value) => value.trim()).toList()
+          : order.trim().isNotEmpty
+          ? <String>[order.trim()]
+          : const <String>[];
+      final optionsJson = jsonEncode(normalizedOrders);
 
-    final exploreIndex = parseExploreViewMoreIndex(viewMoreUrl);
-    final dynamic result;
-    if (exploreIndex != null) {
-      result = engine.evaluate('''(() => {
+      final exploreIndex = parseExploreViewMoreIndex(viewMoreUrl);
+      final dynamic result;
+      if (exploreIndex != null) {
+        result = await operationContext.evaluate(engine, '''(() => {
           const section = this.__hazuki_source.explore?.[$exploreIndex];
           if (!section || section.type !== "multiPageComicList" || typeof section.load !== "function") return null;
           return Promise.resolve(section.load($normalizedPage)).then((value) => ({ title: section.title ?? "__untitled_section__", ...(value ?? {}) }));
         })()''', name: 'source_explore_view_more_load.js');
-    } else {
-      final parsed = parseCategoryViewMoreUrl(viewMoreUrl);
-      final categoryJson = jsonEncode(parsed.category);
-      final paramJson = parsed.param == null
-          ? 'null'
-          : jsonEncode(parsed.param);
-      result = engine.evaluate(
-        'this.__hazuki_source.categoryComics.load($categoryJson, $paramJson, $optionsJson, $normalizedPage)',
-        name: 'source_category_view_more_load.js',
+      } else {
+        final parsed = parseCategoryViewMoreUrl(viewMoreUrl);
+        final categoryJson = jsonEncode(parsed.category);
+        final paramJson = parsed.param == null
+            ? 'null'
+            : jsonEncode(parsed.param);
+        result = await operationContext.evaluate(
+          engine,
+          'this.__hazuki_source.categoryComics.load($categoryJson, $paramJson, $optionsJson, $normalizedPage)',
+          name: 'source_category_view_more_load.js',
+        );
+      }
+      final dynamic resolved = await operationContext.resolve(
+        facade.js.resolve(result),
       );
-    }
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! Map) {
-      return const CategoryComicsResult(comics: [], maxPage: null);
-    }
-    return _parseCategoryComicsResult(Map<String, dynamic>.from(resolved));
+      if (resolved is! Map) {
+        return const CategoryComicsResult(comics: [], maxPage: null);
+      }
+      return _parseCategoryComicsResult(Map<String, dynamic>.from(resolved));
+    });
   }
 
   @visibleForTesting

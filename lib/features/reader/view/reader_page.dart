@@ -1,19 +1,20 @@
 import 'package:hazuki/features/reader/support/reader_input_controller.dart';
-import 'package:hazuki/features/reader/support/reader_navigation_prefetch.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
+
 import 'dart:async';
+
 import 'package:hazuki/shared/reading/reader_entry_position.dart';
-import 'package:hazuki/services/source/content/source_cloud_reading.dart';
+
 import '../support/reader_progress_reporter.dart';
-import 'package:hazuki/services/source/gateways/source_content_gateways.dart';
+
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/shared/window/window_title_bar_control.dart';
+import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/reading/reader_filter_color.dart';
@@ -39,8 +40,14 @@ import 'package:hazuki/features/reader/view/reader_overlay_host.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/features/reader/view/reader_windows_shortcuts_dialog.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/ui_flags.dart';
+
 import '../state/reader_scroll_state.dart';
+import '../support/reader_translation_controller.dart';
+import 'reader_translation_actions_sheet.dart';
+import '../../../shared/translation/translation_failure_message.dart';
+import '../../../shared/translation/translation_confirmation_dialog.dart';
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
@@ -85,6 +92,11 @@ class ReaderPage extends StatefulWidget {
 class _ReaderPageHostState extends State<ReaderPage> {
   final _chapterNavigatorKey = GlobalKey<NavigatorState>();
   late ReaderPage _chapter = widget;
+  late final SourceReaderSession? _readerSession = widget.offlineMode
+      ? null
+      : widget.dependencies.readerSessions?.acquireReaderSession(
+          widget.sourceKey,
+        );
   bool _chapterCanHandlePop = false;
   bool _settingsDrawerOpen = false;
 
@@ -121,6 +133,7 @@ class _ReaderPageHostState extends State<ReaderPage> {
       skipEntrance: skipEntrance,
       builder: (_) => _ReaderChapterPage(
         page: chapter,
+        readerSession: _readerSession,
         restoreEntry: restoreEntry,
         onChapterChanged: _switchChapter,
         onExitReader: () => Navigator.of(context).maybePop(),
@@ -140,6 +153,12 @@ class _ReaderPageHostState extends State<ReaderPage> {
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _readerSession?.close();
+    super.dispose();
   }
 
   @override
@@ -186,6 +205,7 @@ class _ReaderChapterRoute extends MaterialPageRoute<void> {
 class _ReaderChapterPage extends StatefulWidget {
   const _ReaderChapterPage({
     required this.page,
+    this.readerSession,
     required this.onChapterChanged,
     required this.onExitReader,
     required this.onSettingsDrawerChanged,
@@ -193,6 +213,7 @@ class _ReaderChapterPage extends StatefulWidget {
   });
 
   final ReaderPage page;
+  final SourceReaderSession? readerSession;
   final bool restoreEntry;
   final ReaderChapterChanged onChapterChanged;
   final VoidCallback onExitReader;
@@ -220,6 +241,34 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   final ReaderRuntimeState _runtimeState = ReaderRuntimeState();
   final ReaderImagePipelineState _imagePipelineState =
       ReaderImagePipelineState();
+  late final ReaderTranslationController? _translationController = () {
+    final dependencies = widget.page.dependencies.translation;
+    if (dependencies == null) return null;
+    return ReaderTranslationController(
+      service: dependencies.service,
+      settings: dependencies.settings,
+      models: dependencies.models,
+      glossary: dependencies.glossary,
+      resolveImageBytes: _imagePipelineController.resolveImageBytes,
+      images: () => _noImageModeEnabled ? const [] : _runtimeState.images,
+      spreadImageIndices: _runtimeState.spreadImageIndices,
+      spreadStartIndex: _runtimeState.spreadStartIndex,
+      spreadSize: () => _runtimeState.readerSpreadSize,
+      sourceKey: _pageContext.sourceKey,
+      comicId: widget.page.comicId,
+      onFailure: (failure) {
+        if (mounted && _sessionController.isActive) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                translationFailureMessage(l10n(context), failure.kind),
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }();
   late final ReaderPageContext _pageContext = ReaderPageContext(
     title: widget.page.title,
     chapterTitle: widget.page.chapterTitle,
@@ -227,7 +276,8 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     epId: widget.page.epId,
     chapterIndex: widget.page.chapterIndex,
     images: widget.page.images,
-    sourceKey: widget.page.sourceKey,
+    // 阅读会话绑定的源优先；其余位置一律读取这里解析后的结果。
+    sourceKey: widget.readerSession?.sourceKey ?? widget.page.sourceKey,
     coverUrl: widget.page.coverUrl,
     comicTheme: widget.page.comicTheme,
     onFavoriteRequested: widget.page.onFavoriteRequested,
@@ -250,6 +300,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   );
   late final ReaderImagePipelineController _imagePipelineController =
       ReaderImagePipelineController(
+        sourceUiService: widget.page.dependencies.sourceUiService,
         runtimeState: _runtimeState,
         pipelineState: _imagePipelineState,
         diagnosticsState: _diagnosticsState,
@@ -263,11 +314,13 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         noImageModeEnabled: () => _noImageModeEnabled,
         comicId: widget.page.comicId,
         epId: widget.page.epId,
-        sourceKey: widget.page.sourceKey,
+        sourceKey: _pageContext.sourceKey,
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
         onImageAspectRatioResolved: _handleImageAspectRatioResolved,
         sourceService: widget.page.dependencies.sourceReader,
+        taskControl: widget.page.dependencies.taskControl,
+        readerSession: widget.readerSession,
       );
   late final ReaderZoomController _readerZoomController = ReaderZoomController(
     transformationController: _zoomController,
@@ -301,12 +354,6 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         chapterTitle: widget.page.chapterTitle,
         chapterIndex: widget.page.chapterIndex,
       );
-  late final ReaderNavigationPrefetch _navigationPrefetch =
-      ReaderNavigationPrefetch(
-        noImageModeEnabled: () => _noImageModeEnabled,
-        prefetchAround: _imagePipelineController.prefetchAround,
-        requestPrefetchAhead: _imagePipelineController.requestPrefetchAhead,
-      );
   late final ReaderNavigationController _navigationController =
       ReaderNavigationController(
         runtimeState: _runtimeState,
@@ -320,57 +367,52 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         logPayload: _readerLogPayload,
         logVisiblePageChange: _logVisiblePageChange,
         resetZoomImmediately: _readerZoomController.resetZoomImmediately,
-        onPageTargetChanged: (index) {
-          _cancelEntryRestore();
-          _navigationPrefetch.onPageTargetChanged(index);
-        },
+        onPageTargetChanged: (index) =>
+            _sessionController.onPageTargetChanged(index),
         onVisiblePageChanged: (_) => _scheduleViewportReport(),
         toggleControlsVisibility: _toggleControlsVisibility,
       );
+  late final ReaderViewBindings _viewBindings = ReaderViewBindings(
+    scrollController: _scrollController,
+    focusNode: _readerKeyFocusNode,
+    zoomController: _zoomController,
+    onNoImageModeChanged: () {
+      _sessionController.handleNoImageModeChanged();
+    },
+    onScrollPositionChanged: _navigationController.handleScrollPositionChanged,
+    onZoomChanged: () {
+      _readerZoomController.onZoomChanged();
+      _scheduleViewportReport();
+    },
+    noImageMode: hazukiNoImageModeNotifier,
+  );
   late final ReaderSessionController _sessionController =
       ReaderSessionController(
-        viewBindings: ReaderViewBindings(
-          scrollController: _scrollController,
-          pageController: _pageController,
-          focusNode: _readerKeyFocusNode,
-          zoomController: _zoomController,
-          onNoImageModeChanged:
-              _imagePipelineController.handleNoImageModeChanged,
-          onScrollPositionChanged:
-              _navigationController.handleScrollPositionChanged,
-          onZoomChanged: _readerZoomController.onZoomChanged,
-          noImageMode: hazukiNoImageModeNotifier,
-        ),
+        syncPositionToImageIndex:
+            _navigationController.syncPositionToImageIndex,
+        requestViewportReport: _scheduleViewportReport,
+        noImageModeEnabled: () => _noImageModeEnabled,
         runtimeState: _runtimeState,
         displayBridge: _displayBridge,
         displaySession: _displaySession,
         settingsStore: _readerSettingsStore,
-        applyInitialImages: _imagePipelineController.applyInitialImages,
-        loadChapterImages: _imagePipelineController.loadChapterImages,
+        imagePipeline: _imagePipelineController,
+        actions: _actionsController,
+        progressReporter: _progressReporter,
+        translation: _translationController,
         isMounted: () => mounted,
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
         comicId: widget.page.comicId,
         epId: widget.page.epId,
-        sourceKey: widget.page.sourceKey,
+        sourceKey: _pageContext.sourceKey,
         chapterTitle: widget.page.chapterTitle,
         chapterIndex: widget.page.chapterIndex,
         widgetImages: widget.page.images,
         readingProgressService: widget.page.dependencies.readingProgressService,
         offlineMode: widget.page.offlineMode,
-        shouldSaveLocalProgress: () async {
-          if (widget.page.offlineMode) return true;
-          final source = widget.page.dependencies.sourceReader;
-          return source is! SourceCloudReadingGateway ||
-              !await (source as SourceCloudReadingGateway).usesCloudReading(
-                widget.page.sourceKey,
-              );
-        },
-        onSettingsReady: () {
-          _entrySettingsReady = true;
-          _maybeRestoreEntry();
-        },
+        cloudReading: widget.page.dependencies.cloudReading,
       );
   late final ReaderSettingsController _settingsController =
       ReaderSettingsController(
@@ -382,6 +424,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
             _navigationController.syncPositionAfterPinchToggle,
         displaySession: _displaySession,
         resetZoomImmediately: _readerZoomController.resetZoomImmediately,
+        onViewportChanged: _scheduleViewportReport,
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
@@ -394,10 +437,13 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
         sourceReader: widget.page.dependencies.sourceReader,
+        taskControl: widget.page.dependencies.taskControl,
+        readerSession: widget.readerSession,
         pageContext: _pageContext,
         onChapterChanged: (chapter, {animate = true}) {
-          _progressReporter.close('chapter');
-          widget.onChapterChanged(chapter, animate: animate);
+          if (_sessionController.retireForChapterChange()) {
+            widget.onChapterChanged(chapter, animate: animate);
+          }
         },
         downloader: widget.page.dependencies.downloader,
       );
@@ -406,7 +452,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         context: () => context,
         resolveReaderTheme: _resolveReaderTheme,
         sourceReader: widget.page.dependencies.sourceReader,
-        isMounted: () => mounted,
+        isMounted: () => _isChapterActive,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
         comicId: widget.page.comicId,
@@ -416,6 +462,98 @@ class _ReaderPageState extends State<_ReaderChapterPage>
 
   WindowTitleBarControl? _windowsTitleBarController;
 
+  bool get _isChapterActive => mounted && _sessionController.isActive;
+
+  void _translationModeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _updateTranslationWindow() {
+    _sessionController.updateTranslationWindow();
+  }
+
+  Future<void> _loadTranslationSettings() async {
+    final controller = _translationController;
+    if (controller == null) return;
+    try {
+      await controller.load();
+      _updateTranslationWindow();
+    } catch (_) {
+      if (mounted && _sessionController.isActive) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n(context).translationSettingsFailed)),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleTranslation() async {
+    if (!_isChapterActive) return;
+    final controller = _translationController;
+    if (controller == null) return;
+    if (!controller.settings.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).translationConfigure)),
+      );
+      return;
+    }
+    if (!controller.ready) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).translationDetectorConfigure)),
+      );
+      return;
+    }
+    try {
+      await controller.toggleMode();
+    } catch (_) {
+      if (mounted && _sessionController.isActive) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n(context).translationSettingsFailed)),
+        );
+      }
+    }
+  }
+
+  Future<void> _translationMenu() async {
+    if (!_isChapterActive) return;
+    final controller = _translationController;
+    if (controller == null) return;
+    final action = await showModalBottomSheet<ReaderTranslationAction>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => const ReaderTranslationActionsSheet(),
+    );
+    if (!mounted || !_sessionController.isActive || action == null) return;
+    switch (action) {
+      case ReaderTranslationAction.retranslate:
+        controller.retranslateVisible();
+      case ReaderTranslationAction.glossary:
+        await showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          isScrollControlled: true,
+          builder: (_) =>
+              ReaderTranslationGlossarySheet(controller: controller),
+        );
+      case ReaderTranslationAction.clearGlossary:
+        if (await confirmTranslationClear(context) && _isChapterActive) {
+          try {
+            await controller.glossary.clear(
+              controller.sourceKey,
+              controller.comicId,
+            );
+          } catch (_) {
+            if (mounted && _sessionController.isActive) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l10n(context).translationUnknown)),
+              );
+            }
+          }
+        }
+    }
+  }
+
   bool get _noImageModeEnabled => hazukiNoImageModeNotifier.value;
 
   ReaderImageViews get _imageViews => ReaderImageViews(
@@ -424,7 +562,6 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     epId: widget.page.epId,
     comicTheme: widget.page.comicTheme,
     runtimeState: _runtimeState,
-    imagePipelineState: _imagePipelineState,
     zoomController: _zoomController,
     imagePipelineController: _imagePipelineController,
     navigationController: _navigationController,
@@ -435,54 +572,24 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     blockPageScrolling: _inputState.blockPageScrolling,
     wrapImageWidget: _wrapImageWidget,
     noImageModeEnabled: _noImageModeEnabled,
+    translationController: _translationController,
     onFrameDisplayed: (index) {
       _displayedImages.add(index);
-      _reportActualViewport();
+      // 同一帧内多张图片的回调合并为一次视口上报，避免重复扫描整章。
+      if (!_frameReportQueued) {
+        _frameReportQueued = true;
+        scheduleMicrotask(() {
+          _frameReportQueued = false;
+          if (mounted) _reportActualViewport();
+        });
+      }
+      _updateTranslationWindow();
     },
   );
 
+  bool _frameReportQueued = false;
+
   final _displayedImages = <int>{};
-  Map<String, dynamic>? _entryPosition;
-  bool _entryReady = false;
-  bool _entrySettingsReady = false;
-  bool _entryStarted = false;
-  int? _restoringImage;
-
-  void _cancelEntryRestore() {
-    _entryStarted = true;
-    _restoringImage = null;
-  }
-
-  void _maybeRestoreEntry() {
-    if (!mounted ||
-        !_entryReady ||
-        !_entrySettingsReady ||
-        _entryStarted ||
-        _runtimeState.imageCount == 0) {
-      return;
-    }
-    _entryStarted = true;
-    final position = _entryPosition;
-    if (position?['epId'] != widget.page.epId) {
-      _scheduleViewportReport();
-      return;
-    }
-    final rawPage = position?['imagePage'];
-    final oldPage = position?['pageIndex'];
-    final target =
-        (rawPage is int
-                ? rawPage - 1
-                : (oldPage is int
-                      ? oldPage * _runtimeState.readerSpreadSize
-                      : 0))
-            .clamp(0, _runtimeState.imageCount - 1);
-    _restoringImage = target;
-    _navigationController.syncPositionToImageIndex(
-      target,
-      trigger: 'entry_restore',
-    );
-    _scheduleViewportReport();
-  }
 
   bool _viewportReportScheduled = false;
 
@@ -495,28 +602,21 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     });
   }
 
-  bool _foreground = true;
   late final _progressReporter = ReaderProgressReporter(
     comicId: widget.page.comicId,
     chapterId: widget.page.epId,
     send: (progress) {
-      final gateway = widget.page.dependencies.sourceReader;
-      return gateway is SourceReadingProgressGateway
-          ? (gateway as SourceReadingProgressGateway).reportReadingProgress(
-              progress,
-              sourceKey: widget.page.sourceKey,
-            )
-          : Future<void>.value();
+      final uploads = widget.page.dependencies.readingProgressUploads;
+      return uploads?.reportReadingProgress(
+            progress,
+            sourceKey: _pageContext.sourceKey,
+          ) ??
+          Future<void>.value();
     },
   );
 
   void _reportActualViewport() {
-    _maybeRestoreEntry();
-    if (!mounted ||
-        !_entryStarted ||
-        !_foreground ||
-        widget.page.offlineMode ||
-        _noImageModeEnabled ||
+    if (!_isChapterActive ||
         !TickerMode.valuesOf(context).enabled ||
         _runtimeState.imageCount == 0 ||
         ModalRoute.of(context)?.isCurrent != true) {
@@ -556,23 +656,17 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     if (first == null || last == null || !_displayedImages.contains(first)) {
       return;
     }
-    final target = _restoringImage;
-    if (target != null) {
-      if (target < first || target > last) return;
-      _restoringImage = null;
-    }
-    _progressReporter.observe(
-      firstImage: first,
-      lastImage: last,
-      totalPages: _runtimeState.imageCount,
-    );
+    _sessionController.observeVisibleRange(firstImage: first, lastImage: last);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final foreground = state == AppLifecycleState.resumed;
-    if (_foreground && !foreground) _progressReporter.flush('background');
-    _foreground = foreground;
+    _sessionController.setForeground(state == AppLifecycleState.resumed);
+  }
+
+  @override
+  void didChangeMetrics() {
+    _scheduleViewportReport();
   }
 
   void _updateReaderState(VoidCallback update) {
@@ -580,7 +674,6 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       return;
     }
     setState(update);
-    _scheduleViewportReport();
   }
 
   ReaderInputState get _inputState => ReaderInputState(
@@ -603,26 +696,26 @@ class _ReaderPageState extends State<_ReaderChapterPage>
 
   Future<void> _openFavoriteDialogAndRestoreFocus() async {
     await _actionsController.openFavoriteDialog();
-    if (!mounted) {
+    if (!_isChapterActive) {
       return;
     }
     _readerKeyFocusNode.requestFocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (_isChapterActive) {
         _readerKeyFocusNode.requestFocus();
       }
     });
   }
 
   Future<void> _showWindowsShortcutsGuide() async {
-    if (!Platform.isWindows || !mounted) {
+    if (!Platform.isWindows || !mounted || !_sessionController.isActive) {
       return;
     }
     await showReaderWindowsShortcutsDialog(
       context,
       theme: _resolveReaderTheme(context),
     );
-    if (mounted) {
+    if (_isChapterActive) {
       _readerKeyFocusNode.requestFocus();
     }
   }
@@ -630,7 +723,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   Future<void> _showInitialWindowsShortcutsGuideIfNeeded() async {
     if (!Platform.isWindows ||
         await _readerSettingsStore.hasSeenWindowsShortcutsGuide() ||
-        !mounted) {
+        !_isChapterActive) {
       return;
     }
     await _showWindowsShortcutsGuide();
@@ -641,10 +734,15 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _viewBindings.attach();
     _sessionController.initialize();
+    _viewBindings.requestFocusAfterFrame(isMounted: () => _isChapterActive);
+    _translationController?.addListener(_translationModeChanged);
+    _runtimeState.pageIndexNotifier.addListener(_updateTranslationWindow);
+    unawaited(_loadTranslationSettings());
     _sourceImageQuality = ReaderSourceImageQualitySettings.load(
       _sourceSettings,
-      widget.page.sourceKey,
+      _pageContext.sourceKey,
     );
     if (Platform.isWindows) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -656,39 +754,11 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_entryReady) {
-      _entryReady = true;
-      _entryPosition = widget.restoreEntry
-          ? ReaderEntryPosition.of(context)
-          : null;
-      if (widget.page.offlineMode &&
-          widget.restoreEntry &&
-          _entryPosition == null) {
-        _entryReady = false;
-        unawaited(
-          widget.page.dependencies.readingProgressService
-              .load(
-                comicId: widget.page.comicId,
-                sourceKey: widget.page.sourceKey,
-              )
-              .then(
-                (position) {
-                  if (!mounted) return;
-                  _entryPosition = position;
-                  _entryReady = true;
-                  _maybeRestoreEntry();
-                },
-                onError: (Object _) {
-                  if (mounted) {
-                    _entryReady = true;
-                    _maybeRestoreEntry();
-                  }
-                },
-              ),
-        );
-      }
-      _maybeRestoreEntry();
-    }
+    _sessionController.initializeEntry(
+      position: widget.restoreEntry ? ReaderEntryPosition.of(context) : null,
+      restoreEntry: widget.restoreEntry,
+    );
+    _scheduleViewportReport();
     if (!Platform.isWindows) {
       return;
     }
@@ -703,11 +773,18 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   @override
   void dispose() {
     _windowsTitleBarController?.releaseCustomTitleBarSuppression(this);
+    _runtimeState.pageIndexNotifier.removeListener(_updateTranslationWindow);
+    _translationController?.removeListener(_translationModeChanged);
+    _viewBindings.dispose();
     _resetAnimController.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    _progressReporter.close('exit');
     _sessionController.dispose();
-    _imagePipelineController.dispose();
+    _scrollController.dispose();
+    _pageController.dispose();
+    _readerKeyFocusNode.dispose();
+    _zoomController.dispose();
+    _imagePipelineState.dispose();
+    _runtimeState.dispose();
     super.dispose();
   }
 
@@ -725,13 +802,8 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         message: _runtimeState.loadImagesError!,
         retryLabel: l10n(context).commonRetry,
         onRetry: () {
-          setState(() {
-            _runtimeState.markLoadingImages();
-          });
           unawaited(
-            _imagePipelineController.loadChapterImages(
-              trigger: 'retry_after_error',
-            ),
+            _sessionController.loadChapterImages(trigger: 'retry_after_error'),
           );
         },
       );
@@ -744,6 +816,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       );
     }
 
+    final imageViews = _imageViews;
     return AnimatedTheme(
       data: readerTheme,
       duration: const Duration(milliseconds: 320),
@@ -758,7 +831,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
           autofocus: true,
           focusNode: _readerKeyFocusNode,
           onKeyEvent: (node, event) {
-            if (event is KeyDownEvent) _cancelEntryRestore();
+            if (event is KeyDownEvent) _sessionController.cancelEntryRestore();
             return _inputController.handleKeyEvent(node, event);
           },
           child: SafeArea(
@@ -793,6 +866,14 @@ class _ReaderPageState extends State<_ReaderChapterPage>
                   : () {
                       unawaited(_actionsController.openCommentsSheet());
                     },
+              onTranslation: _translationController?.settings.enabled == true
+                  ? _toggleTranslation
+                  : null,
+              onTranslationLongPress:
+                  _translationController?.settings.enabled == true
+                  ? _translationMenu
+                  : null,
+              translationSelected: _translationController?.modeOn ?? false,
               onNextChapter: () {
                 unawaited(_actionsController.jumpToAdjacentChapter(1));
               },
@@ -800,15 +881,15 @@ class _ReaderPageState extends State<_ReaderChapterPage>
               child: Listener(
                 behavior: HitTestBehavior.translucent,
                 onPointerDown: (event) {
-                  _cancelEntryRestore();
+                  _sessionController.cancelEntryRestore();
                   _readerZoomController.handlePointerDown(event);
                 },
                 onPointerUp: _readerZoomController.handlePointerEnd,
                 onPointerCancel: _readerZoomController.handlePointerEnd,
-                child: _wrapReaderTapPaging(
+                child: imageViews.wrapReaderTapPaging(
                   _runtimeState.readerMode == ReaderMode.rightToLeft
-                      ? _buildReaderPageView()
-                      : _buildTopToBottomReaderView(),
+                      ? imageViews.buildReaderPageView()
+                      : imageViews.buildTopToBottomReaderView(),
                 ),
               ),
             ),
@@ -819,17 +900,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   }
 
   ThemeData _resolveReaderTheme([BuildContext? buildContext]) {
-    return _imageViews.resolveReaderTheme(buildContext);
-  }
-
-  Widget _buildReaderPageView() => _imageViews.buildReaderPageView();
-
-  Widget _buildTopToBottomReaderView() {
-    return _imageViews.buildTopToBottomReaderView();
-  }
-
-  Widget _wrapReaderTapPaging(Widget child) {
-    return _imageViews.wrapReaderTapPaging(child);
+    return widget.page.comicTheme ?? Theme.of(buildContext ?? context);
   }
 
   Widget _wrapImageWidget(Widget imageWidget, String url) {
@@ -855,13 +926,10 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         ],
       );
     }
-    if (_runtimeState.longPressToSave) {
-      result = GestureDetector(
-        onLongPress: () => _showSaveImageDialog(url),
-        child: result,
-      );
-    }
-    return result;
+    return GestureDetector(
+      onLongPress: () => _showSaveImageDialog(url),
+      child: result,
+    );
   }
 
   Widget _buildReaderSettingsDrawer(ThemeData readerTheme) {
@@ -877,7 +945,11 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       onVolumeButtonTurnPageChanged:
           _settingsController.toggleVolumeButtonTurnPage,
       onPinchToZoomChanged: _settingsController.togglePinchToZoom,
-      onLongPressToSaveChanged: _settingsController.toggleLongPressToSave,
+      // 只影响下次进入阅读器，本次已完成的入口恢复不会重新执行。
+      restorePagePosition: _sessionController.restorePagePosition,
+      onRestorePagePositionChanged: (value) {
+        setState(() => _sessionController.setRestorePagePosition(value));
+      },
       onImmersiveModeChanged: _settingsController.toggleImmersiveMode,
       onKeepScreenOnChanged: _settingsController.toggleKeepScreenOn,
       onPageIndicatorChanged: _settingsController.togglePageIndicator,
@@ -906,7 +978,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
         });
         await ReaderSourceImageQualitySettings.updateImageQuality(
           _sourceSettings,
-          widget.page.sourceKey,
+          _pageContext.sourceKey,
           normalized,
         );
       },
@@ -928,8 +1000,9 @@ class _ReaderPageState extends State<_ReaderChapterPage>
     );
   }
 
-  Future<void> _handlePlatformVolumeButtonPressed(String? direction) {
-    return _navigationController.handlePlatformVolumeButtonPressed(direction);
+  Future<void> _handlePlatformVolumeButtonPressed(String? direction) async {
+    if (!_isChapterActive) return;
+    await _navigationController.handlePlatformVolumeButtonPressed(direction);
   }
 
   void _handleImageAspectRatioResolved({
@@ -942,6 +1015,7 @@ class _ReaderPageState extends State<_ReaderChapterPage>
       previousAspectRatio: previousAspectRatio,
       resolvedAspectRatio: resolvedAspectRatio,
     );
+    _scheduleViewportReport();
   }
 
   void _openReaderSettingsDrawer() {
@@ -955,7 +1029,13 @@ class _ReaderPageState extends State<_ReaderChapterPage>
   }
 
   Future<void> _showSaveImageDialog(String imageUrl) {
-    return _saveImageController.showSaveImageDialog(imageUrl);
+    final translation = _translationController;
+    return _saveImageController.showSaveImageDialog(
+      imageUrl,
+      onRetranslate: translation?.modeOn == true
+          ? () => translation!.retranslate(imageUrl)
+          : null,
+    );
   }
 
   Map<String, dynamic> _readerLogPayload([Map<String, dynamic>? extra]) {

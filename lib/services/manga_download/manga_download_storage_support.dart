@@ -121,7 +121,9 @@ class MangaDownloadStateStore {
       'tasks': tasks.map((e) => e.toJson()).toList(),
       'downloaded': downloaded.map((e) => e.toJson()).toList(),
     };
-    await prefs.setString(_statePrefsKey, jsonEncode(payload));
+    if (!await prefs.setString(_statePrefsKey, jsonEncode(payload))) {
+      throw StateError('manga_download_state_not_saved');
+    }
   }
 }
 
@@ -182,10 +184,17 @@ class MangaDownloadAccess {
     final resolvedPrefs = prefs ?? await SharedPreferences.getInstance();
     final normalized = normalizeDownloadsRootPath(path);
     if (normalized == defaultDownloadsRootPath) {
-      await resolvedPrefs.remove(_downloadsRootPathPrefsKey);
+      if (!await resolvedPrefs.remove(_downloadsRootPathPrefsKey)) {
+        throw StateError('manga_download_root_not_saved');
+      }
       return;
     }
-    await resolvedPrefs.setString(_downloadsRootPathPrefsKey, normalized);
+    if (!await resolvedPrefs.setString(
+      _downloadsRootPathPrefsKey,
+      normalized,
+    )) {
+      throw StateError('manga_download_root_not_saved');
+    }
   }
 
   static Future<void> ensureNoMediaMarkerForPath(String dirPath) async {

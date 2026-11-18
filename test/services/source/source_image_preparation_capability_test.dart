@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/image/source_image_preparation_capability.dart';
@@ -5,7 +6,15 @@ import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   test('identifies and normalizes local image paths', () {
     final capability = _createCapability();
 
@@ -50,6 +59,108 @@ void main() {
     );
   });
 
+  test('validates plugin-declared image regions', () {
+    SourceImageRegionLayout? parse(dynamic raw) =>
+        SourceImagePreparationCapability.parseImageRegions(
+          raw,
+          sourceWidth: 10,
+          sourceHeight: 20,
+        );
+    Map<String, int> region([Map<String, int> overrides = const {}]) => {
+      'sx': 0,
+      'sy': 0,
+      'sw': 10,
+      'sh': 10,
+      'dx': 0,
+      'dy': 10,
+      ...overrides,
+    };
+    final invalid = throwsA(
+      isA<StateError>().having(
+        (error) => error.message,
+        'message',
+        'plugin_invalid_image_regions',
+      ),
+    );
+
+    expect(parse(null), isNull);
+    expect(parse({'regions': []}), isNull);
+    final layout = parse({
+      'regions': [region()],
+    })!;
+    expect((layout.width, layout.height), (10, 20));
+    expect(layout.regions.single, (
+      sx: 0,
+      sy: 0,
+      sw: 10,
+      sh: 10,
+      dx: 0,
+      dy: 10,
+    ));
+    expect(
+      parse({
+        'width': 20,
+        'height': 10,
+        'regions': [
+          region({'dx': 10, 'dy': 0}),
+        ],
+      })!.width,
+      20,
+    );
+
+    expect(() => parse('regions'), invalid);
+    expect(() => parse({'regions': 'x'}), invalid);
+    expect(
+      () => parse({
+        'regions': [
+          region({'sx': 1}),
+        ],
+      }),
+      invalid,
+    );
+    expect(
+      () => parse({
+        'regions': [
+          region({'dy': 11}),
+        ],
+      }),
+      invalid,
+    );
+    expect(
+      () => parse({
+        'regions': [
+          region({'sx': -1, 'sw': 1}),
+        ],
+      }),
+      invalid,
+    );
+    expect(
+      () => parse({
+        'regions': [
+          region({'sh': 0}),
+        ],
+      }),
+      invalid,
+    );
+    expect(
+      () => parse({
+        'regions': [
+          {...region(), 'sw': 1.5},
+        ],
+      }),
+      invalid,
+    );
+    expect(
+      () => parse({
+        'width': 100,
+        'height': 100,
+        'regions': [region()],
+      }),
+      invalid,
+    );
+    expect(() => parse({'regions': List.filled(4097, region())}), invalid);
+  });
+
   test('keeps download arguments and skips GIF preprocessing', () async {
     Map<String, Object?>? arguments;
     final capability = _createCapability(
@@ -62,6 +173,7 @@ void main() {
             useDiskCache = true,
             priority = false,
             sourceKey = '',
+            taskOrigin,
           }) async {
             arguments = {
               'url': url,
@@ -105,6 +217,7 @@ SourceImagePreparationCapability _createCapability({
 }) {
   return SourceImagePreparationCapability(
     runtimeHost: SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(key: 'jm', name: 'JM', fileName: 'jm.js'),
       ],
@@ -124,6 +237,7 @@ SourceImagePreparationCapability _createCapability({
           useDiskCache = true,
           priority = false,
           sourceKey = '',
+          taskOrigin,
         }) async => Uint8List(0),
   );
 }

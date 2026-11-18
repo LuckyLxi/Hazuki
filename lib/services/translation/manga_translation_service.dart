@@ -1,0 +1,525 @@
+import 'dart:async';
+import 'dart:isolate';
+import 'dart:typed_data';
+import 'dart:ui';
+
+import 'package:dio/dio.dart';
+import 'package:image/image.dart' as img;
+
+import 'detection/translation_detector_model_store.dart';
+import 'detection/translation_detector_models.dart';
+import 'detection/translation_text_detector.dart';
+import 'imaging/bubble_snapper.dart';
+import 'imaging/translation_image_processor.dart';
+import 'manga_translation_provider.dart';
+import 'manga_translation_provider_factory.dart';
+import 'manga_translation_settings_store.dart';
+import 'models/translation_models.dart';
+import 'translation_failure.dart';
+import 'translation_glossary_store.dart';
+import 'translation_prompt.dart';
+import 'translation_response_parser.dart';
+import 'translation_result_cache.dart';
+import 'translation_usage_store.dart';
+
+class MangaTranslationService {
+  MangaTranslationService({
+    required MangaTranslationSettingsStore settings,
+    required TranslationResultCache cache,
+    required TranslationGlossaryStore glossary,
+    required MangaTranslationProviderFactory providers,
+    required TranslationImageProcessor imageProcessor,
+    required BubbleSnapper snapper,
+    required TranslationResponseParser parser,
+    required TranslationUsageStore usageStore,
+    required TranslationDetectorModelStore models,
+    required TranslationTextDetector detector,
+    void Function(String title, Map<String, Object?> content)? log,
+  }) : _log = log,
+       _settings = settings,
+       _cache = cache,
+       _glossary = glossary,
+       _providers = providers,
+       _imageProcessor = imageProcessor,
+       _snapper = snapper,
+       _parser = parser,
+       _usageStore = usageStore,
+       _models = models,
+       _detector = detector;
+
+  final MangaTranslationSettingsStore _settings;
+  final TranslationResultCache _cache;
+  final TranslationGlossaryStore _glossary;
+  final MangaTranslationProviderFactory _providers;
+  final TranslationImageProcessor _imageProcessor;
+  final BubbleSnapper _snapper;
+  final TranslationResponseParser _parser;
+  final TranslationUsageStore _usageStore;
+  final TranslationDetectorModelStore _models;
+  final TranslationTextDetector _detector;
+
+  /// 本地检测模式的诊断日志，记录检测框与 AI 原始响应，用于排查漏翻与错位。
+  final void Function(String title, Map<String, Object?> content)? _log;
+
+  /// 释放检测模型会话与工作 isolate；离开阅读器或关闭翻译模式时调用。
+  Future<void> releaseDetector() => _detector.release();
+
+  /// 按当前服务商配置拉取可用模型列表。
+  Future<List<String>> listProviderModels({CancelToken? cancelToken}) =>
+      _providers
+          .create(_settings.providerPreset, _settings.configuration)
+          .listModels(cancelToken: cancelToken);
+
+  /// 先拉模型列表，再用固定测试图走一遍识别与解析，验证服务商配置可用；失败时原样抛出。
+  Future<void> testProviderConnection({CancelToken? cancelToken}) async {
+    final provider = _providers.create(
+      _settings.providerPreset,
+      _settings.configuration,
+    );
+    await provider.listModels(cancelToken: cancelToken);
+    final image = await Isolate.run(_buildConnectionTestImage);
+    final raw = await provider.translateImage(
+      image,
+      buildTranslationSystemPrompt(
+        targetLanguage: _settings.targetLanguage,
+        translateSfx: _settings.translateSfx,
+        customInstructions: _settings.customSystemPrompt,
+      ),
+      buildTranslationUserPrompt(),
+      cancelToken: cancelToken,
+    );
+    _parser.parse(raw.text, translateSfx: _settings.translateSfx);
+  }
+
+  static TranslationImagePayload _buildConnectionTestImage() {
+    final image = img.Image(width: 120, height: 48);
+    img.fill(image, color: img.ColorRgb8(255, 255, 255));
+    img.drawString(
+      image,
+      'Hello',
+      font: img.arial24,
+      x: 12,
+      y: 10,
+      color: img.ColorRgb8(0, 0, 0),
+    );
+    return TranslationImagePayload(
+      jpegBytes: img.encodeJpg(image, quality: 85),
+      width: image.width,
+      height: image.height,
+    );
+  }
+
+  Future<PageTranslationResult> translatePage({
+    required Uint8List imageBytes,
+    required String sourceKey,
+    required String comicId,
+    bool bypassCache = false,
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      _checkCancelled(cancelToken);
+      await _settings.load();
+      final preset = _settings.providerPreset;
+      final configuration = _settings.configuration;
+      final targetLanguage = _settings.targetLanguage;
+      final translateSfx = _settings.translateSfx;
+      final customSystemPrompt = _settings.customSystemPrompt;
+      TranslationDetectorModelSpec? detectorSpec;
+      if (_settings.textLocator == TranslationTextLocator.detector) {
+        await _models.load();
+        detectorSpec = translationDetectorModelSpec(_settings.detectorModelId);
+        if (detectorSpec == null ||
+            !_models.isInstalled(detectorSpec.id) ||
+            !_models.isRuntimeInstalled) {
+          throw const TranslationFailure(
+            TranslationFailureKind.detectorUnavailable,
+          );
+        }
+      }
+      final key = await TranslationResultCache.keyFor(
+        imageBytes: imageBytes,
+        targetLanguage: targetLanguage.code,
+        providerPreset: preset,
+        model: configuration.model,
+        translateSfx: translateSfx,
+        reasoningEffort: configuration.reasoningEffort,
+        customSystemPrompt: customSystemPrompt,
+        detector: detectorSpec == null
+            ? null
+            : TranslationDetectorCacheKey(
+                modelId: detectorSpec.id,
+                modelSha256: detectorSpec.sha256,
+              ),
+      );
+      _checkCancelled(cancelToken);
+      if (!bypassCache) {
+        final cached = await _cache.read(key);
+        _checkCancelled(cancelToken);
+        if (cached != null) return cached;
+      }
+      final prepared = await _imageProcessor.prepare(
+        imageBytes,
+        detectionMaxSide: detectorSpec?.detectionMaxSide,
+      );
+      _checkCancelled(cancelToken);
+      final glossary = (await _glossary.load(
+        sourceKey,
+        comicId,
+      )).map((entry) => entry.term).toList();
+      final systemPrompt = detectorSpec == null
+          ? buildTranslationSystemPrompt(
+              targetLanguage: targetLanguage,
+              translateSfx: translateSfx,
+              customInstructions: customSystemPrompt,
+            )
+          : buildDetectorTranslationSystemPrompt(
+              targetLanguage: targetLanguage,
+              translateSfx: translateSfx,
+              customInstructions: customSystemPrompt,
+            );
+      MangaTranslationProvider? provider;
+      final regions = <TranslationRegion>[];
+      final textBoxes = <Rect>[];
+      final terms = <TranslationTerm>[];
+      var inputTokens = 0, outputTokens = 0;
+      for (var index = 0; index < prepared.slices.length; index++) {
+        final slice = prepared.slices[index];
+        PageTranslationResult result;
+        if (detectorSpec == null) {
+          provider ??= _providers.create(preset, configuration);
+          result = await _translateSlice(
+            provider,
+            slice.payload,
+            systemPrompt,
+            buildTranslationUserPrompt(glossary: glossary),
+            (text, usage) =>
+                _parser.parse(text, translateSfx: translateSfx, usage: usage),
+            cancelToken,
+          );
+        } else {
+          final model = _models.modelFile(detectorSpec.id);
+          final runtime = _models.runtimeFile;
+          final detection = slice.detection;
+          if (model == null || runtime == null) {
+            throw const TranslationFailure(
+              TranslationFailureKind.detectorUnavailable,
+            );
+          }
+          if (detection == null) {
+            throw const TranslationFailure(
+              TranslationFailureKind.detectorFailed,
+            );
+          }
+          final detectedBlocks = await _detector.detect(
+            detection,
+            detectorSpec,
+            model,
+            runtime,
+            cancelToken: cancelToken,
+          );
+          _checkCancelled(cancelToken);
+          final detected = await _splitPassagesInIsolate(
+            detection,
+            detectedBlocks,
+          );
+          _checkCancelled(cancelToken);
+          textBoxes.addAll(detected.map(slice.mapRect));
+          // 没有检测到文字的切片不调用 AI，也不计请求数和 token。
+          if (detected.isEmpty) {
+            _log?.call('Translation detection found no text', {
+              'model': detectorSpec.id,
+              'slice': index,
+              'sliceCount': prepared.slices.length,
+            });
+            continue;
+          }
+          // 框编号带切片序号，避免长图多切片之间重复。
+          final boxes = {
+            for (var box = 0; box < detected.length; box++)
+              '$index-$box': detected[box],
+          };
+          final annotated = await _annotateInIsolate(slice.payload, boxes);
+          _checkCancelled(cancelToken);
+          provider ??= _providers.create(preset, configuration);
+          var pending = <String, Rect>{};
+          result = await _translateSlice(
+            provider,
+            annotated,
+            systemPrompt,
+            buildDetectorTranslationUserPrompt(
+              boxes: boxes,
+              glossary: glossary,
+            ),
+            (text, usage) {
+              final parsed = _parser.parseNumberedWithPending(
+                text,
+                boxes: boxes,
+                translateSfx: translateSfx,
+                usage: usage,
+              );
+              pending = parsed.pending;
+              _logDetectorSlice(
+                detectorSpec!,
+                index,
+                prepared.slices.length,
+                boxes,
+                text,
+                parsed.result,
+                translateSfx,
+              );
+              return parsed.result;
+            },
+            cancelToken,
+          );
+          if (pending.isNotEmpty) {
+            final missing = Map<String, Rect>.of(pending);
+            _log?.call('Translation passages need completion', {
+              'slice': index,
+              'ids': missing.keys.toList(),
+            });
+            final supplementImage = await _annotateInIsolate(
+              slice.payload,
+              missing,
+            );
+            _checkCancelled(cancelToken);
+            final supplement = await _translateSlice(
+              provider,
+              supplementImage,
+              systemPrompt,
+              '${buildDetectorTranslationUserPrompt(boxes: missing, glossary: glossary)}\n'
+              'These passages were missing or incorrectly grouped in the previous response. '
+              'Translate each independent passage separately, including every column and each lobe of a connected balloon. '
+              'Account for every supplied id in regions or ignored.',
+              (text, usage) {
+                final parsed = _parser.parseNumberedWithPending(
+                  text,
+                  boxes: missing,
+                  translateSfx: translateSfx,
+                  usage: usage,
+                );
+                _logDetectorSlice(
+                  detectorSpec!,
+                  index,
+                  prepared.slices.length,
+                  missing,
+                  text,
+                  parsed.result,
+                  translateSfx,
+                );
+                if (parsed.pending.isNotEmpty) {
+                  throw const TranslationFailure(
+                    TranslationFailureKind.badResponse,
+                  );
+                }
+                return parsed.result;
+              },
+              cancelToken,
+            );
+            result = PageTranslationResult(
+              regions: [...result.regions, ...supplement.regions],
+              terms: [...result.terms, ...supplement.terms],
+              usage: TranslationUsage(
+                inputTokens:
+                    result.usage.inputTokens + supplement.usage.inputTokens,
+                outputTokens:
+                    result.usage.outputTokens + supplement.usage.outputTokens,
+              ),
+            );
+          }
+        }
+        regions.addAll(slice.mapRegions(result.regions));
+        terms.addAll(result.terms);
+        inputTokens += result.usage.inputTokens;
+        outputTokens += result.usage.outputTokens;
+      }
+      _checkCancelled(cancelToken);
+      final snapped = await _snapInIsolate(
+        _snapper,
+        prepared,
+        regions,
+        textBoxes,
+      );
+      final result = PageTranslationResult(
+        regions: [
+          for (var index = 0; index < snapped.length; index++)
+            TranslationRegion(
+              id: 'r$index',
+              box: snapped[index].box,
+              kind: snapped[index].kind,
+              sourceText: snapped[index].sourceText,
+              translatedText: snapped[index].translatedText,
+              sourceVertical: snapped[index].sourceVertical,
+              backgroundColor: snapped[index].backgroundColor,
+              boxSource: snapped[index].boxSource,
+              sourceBoxes: snapped[index].sourceBoxes,
+              sourceIds: snapped[index].sourceIds,
+              layoutBox: snapped[index].layoutBox,
+              textPatches: snapped[index].textPatches,
+            ),
+        ],
+        terms: terms,
+        usage: TranslationUsage(
+          inputTokens: inputTokens,
+          outputTokens: outputTokens,
+        ),
+      );
+      _checkCancelled(cancelToken);
+      await _cache.write(key, result);
+      _checkCancelled(cancelToken);
+      await _glossary.merge(
+        sourceKey,
+        comicId,
+        terms,
+        pageText: result.regions.map((region) => region.sourceText).join('\n'),
+      );
+      _checkCancelled(cancelToken);
+      await _usageStore.record(pages: 1);
+      return result;
+    } catch (error) {
+      _checkCancelled(cancelToken);
+      throw TranslationFailure.from(error);
+    }
+  }
+
+  Future<PageTranslationResult> _translateSlice(
+    MangaTranslationProvider provider,
+    TranslationImagePayload image,
+    String systemPrompt,
+    String userPrompt,
+    PageTranslationResult Function(String text, TranslationUsage usage) parse,
+    CancelToken? cancelToken,
+  ) async {
+    var inputTokens = 0, outputTokens = 0;
+    for (var attempt = 0; ; attempt++) {
+      _checkCancelled(cancelToken);
+      try {
+        ProviderRawResponse? raw;
+        try {
+          raw = await provider.translateImage(
+            image,
+            systemPrompt,
+            userPrompt,
+            cancelToken: cancelToken,
+          );
+        } finally {
+          await _usageStore.record(
+            requests: 1,
+            usage: raw?.usage ?? const TranslationUsage(),
+          );
+        }
+        inputTokens += raw.usage.inputTokens;
+        outputTokens += raw.usage.outputTokens;
+        _checkCancelled(cancelToken);
+        return parse(
+          raw.text,
+          TranslationUsage(
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+          ),
+        );
+      } catch (error) {
+        _checkCancelled(cancelToken);
+        final failure = TranslationFailure.from(error);
+        if (attempt > 0 ||
+            failure.kind != TranslationFailureKind.rateLimited &&
+                failure.kind != TranslationFailureKind.badResponse) {
+          throw failure;
+        }
+        if (failure.kind == TranslationFailureKind.rateLimited) {
+          final delay = failure.retryAfter ?? const Duration(seconds: 3);
+          await Future.any<void>([
+            Future<void>.delayed(
+              delay > const Duration(seconds: 10)
+                  ? const Duration(seconds: 10)
+                  : delay,
+            ),
+            if (cancelToken != null)
+              cancelToken.whenCancel.then<void>(
+                (_) => throw const TranslationFailure(
+                  TranslationFailureKind.cancelled,
+                ),
+              ),
+          ]);
+        }
+      }
+    }
+  }
+
+  // 闭包在静态方法中创建，避免捕获服务实例等无法跨 isolate 发送的上下文。
+  static Future<List<TranslationRegion>> _snapInIsolate(
+    BubbleSnapper snapper,
+    PreparedTranslationImage prepared,
+    List<TranslationRegion> regions,
+    List<Rect> textBoxes,
+  ) {
+    final rgba = prepared.snapRgba,
+        width = prepared.snapWidth,
+        height = prepared.snapHeight;
+    return Isolate.run(
+      () => snapper.snap(rgba, width, height, regions, textBoxes: textBoxes),
+    );
+  }
+
+  void _logDetectorSlice(
+    TranslationDetectorModelSpec spec,
+    int slice,
+    int sliceCount,
+    Map<String, Rect> boxes,
+    String response,
+    PageTranslationResult parsed,
+    bool translateSfx,
+  ) {
+    final log = _log;
+    if (log == null) return;
+    int scale(double value) => (value * 1000).round().clamp(0, 1000);
+    log('Translation detection slice', {
+      'model': spec.id,
+      'slice': slice,
+      'sliceCount': sliceCount,
+      'translateSfx': translateSfx,
+      'boxes': {
+        for (final MapEntry(key: id, value: box) in boxes.entries)
+          id: [
+            scale(box.left),
+            scale(box.top),
+            scale(box.right),
+            scale(box.bottom),
+          ],
+      },
+      'regions': [
+        for (final region in parsed.regions)
+          {
+            'kind': region.kind.name,
+            'box': [
+              scale(region.box.left),
+              scale(region.box.top),
+              scale(region.box.right),
+              scale(region.box.bottom),
+            ],
+            'dst': region.translatedText,
+          },
+      ],
+      'response': response,
+    });
+  }
+
+  static Future<TranslationImagePayload> _annotateInIsolate(
+    TranslationImagePayload payload,
+    Map<String, Rect> boxes,
+  ) => Isolate.run(
+    () => TranslationImageProcessor.annotateBoxes(payload, boxes),
+  );
+
+  static Future<List<Rect>> _splitPassagesInIsolate(
+    DetectionImage image,
+    List<Rect> boxes,
+  ) => Isolate.run(
+    () => TranslationImageProcessor.splitDetectedPassages(image, boxes),
+  );
+
+  static void _checkCancelled(CancelToken? token) {
+    if (token?.isCancelled ?? false) {
+      throw const TranslationFailure(TranslationFailureKind.cancelled);
+    }
+  }
+}

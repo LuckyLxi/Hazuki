@@ -1,14 +1,20 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class HomeShellController extends ChangeNotifier {
-  HomeShellController({required int initialTabIndex})
-    : _currentIndex = initialTabIndex.clamp(0, 1).toInt();
+  HomeShellController({
+    required int initialTabIndex,
+    required SourceUiService sourceUi,
+  }) : _currentIndex = initialTabIndex.clamp(0, 1).toInt(),
+       _sourceUi = sourceUi;
+
+  final SourceUiService _sourceUi;
 
   int _currentIndex;
   DateTime? _lastBackPressedAt;
@@ -32,6 +38,8 @@ class HomeShellController extends ChangeNotifier {
       return;
     }
     await HapticFeedback.lightImpact();
+    // 发现/收藏两页常驻，切页只收起插件交互，不能中断两页仍在进行的加载。
+    _sourceUi.cancelInteractions('ownerGone');
     _currentIndex = index;
     notifyListeners();
   }

@@ -1,16 +1,16 @@
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
-import 'package:hazuki/shared/window/window_title_bar_control.dart';
+import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'downloaded_comic_detail_widgets.dart';
 import 'downloads_cover_widgets.dart';
-import '../support/downloads_shared.dart';
+import 'package:hazuki/shared/downloads/downloaded_comic_reader_page_builder.dart';
 
 class DownloadedComicDetailPage extends StatelessWidget {
   const DownloadedComicDetailPage({
@@ -149,7 +149,7 @@ class DownloadedComicDetailPage extends StatelessWidget {
                     titleBarSuppressionOwner,
                   );
                   try {
-                    await Navigator.of(context).push(
+                    await Navigator.of(context, rootNavigator: true).push(
                       MaterialPageRoute<void>(
                         builder: (_) => readerPageBuilder(comic, chapter),
                       ),

@@ -1,6 +1,8 @@
+import '../models/source_task.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
+import '../account/source_login_interaction.dart';
 import '../models/source_contract_models.dart';
 
 abstract interface class SourceAccountGateway implements Listenable {
@@ -9,94 +11,39 @@ abstract interface class SourceAccountGateway implements Listenable {
   bool get isInitialized;
   bool get isActiveDailyCheckInSource;
   String? get currentAccount;
-  SourceRuntimeState get sourceRuntimeState;
+  SourceRuntimeState get runtimeState;
 
   Future<void> ensureInitialized({String? sourceKey});
   Future<void> loadActiveSourcePreference();
-  Future<void> login({required String account, required String password});
-  Future<void> logout();
-  Future<String?> loadCurrentAvatarUrl();
-  Future<bool> isDailyCheckInCompletedToday();
-  Future<DailyCheckInResult> performDailyCheckIn();
-}
-
-abstract interface class SourceBootstrapGateway {
-  Future<void> prepareSources();
-  bool get hasActiveSource;
-  Future<bool> hasLocalJmSourceFile();
-  Future<void> init({void Function(int received, int total)? onProgress});
-  Future<void> ensureInitialized({String? sourceKey});
-}
-
-abstract interface class SourceUpdateGateway {
-  Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud();
-  Future<bool> downloadActiveSourceAndReload({
-    void Function(int received, int total)? onProgress,
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
   });
-  Future<bool> refreshSourceOnNetworkRecovery();
-}
-
-abstract interface class SourceScriptGateway {
-  Future<String> loadEditableActiveSource();
-  Future<void> saveEditedActiveSource(String content);
-  Future<bool> hasCustomEditedActiveSource();
-  Future<bool> restoreActiveSourceBackup();
-  Future<String?> readLocalActiveSourceIfExists();
-  Future<void> writeLocalActiveSource(String content);
-  Future<void> reloadFromLocalSourceFiles();
+  Future<void> logout({SourceTaskOrigin? taskOrigin});
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin});
+  Future<bool> isDailyCheckInCompletedToday({SourceTaskOrigin? taskOrigin});
+  Future<DailyCheckInResult> performDailyCheckIn({
+    SourceTaskOrigin? taskOrigin,
+  });
 }
 
 abstract interface class SourceLocalizationGateway {
   void clearLocalizedSourceTextCaches();
 }
 
-abstract interface class SourceSelectionGateway implements Listenable {
-  String? get activeSourceKey;
-  bool get supportsDirectComicId;
-  bool get supportsDailyRecommendation;
-  bool get supportsLegacyRanking;
-  bool get isActiveDailyCheckInSource;
-  bool get isInitialized;
-  SourceMeta? get sourceMeta;
-  SourceRuntimeState get runtimeState;
-  List<SourceCatalogEntry> get allowedSources;
-
-  Future<void> loadActiveSourcePreference();
-  Future<void> activateSource(String sourceKey);
-  Future<void> prewarmInBackground();
-}
-
 abstract interface class SourceHomeGateway
-    implements Listenable, SourceAccountGateway {
+    implements
+        Listenable,
+        SourceAccountGateway,
+        SourceInteractiveAccountGateway {
   String? get cachedAvatarUrl;
   String? get sourceRevision;
   bool get supportsLegacyRanking;
   SourceMeta? get sourceMeta;
-  SourceRuntimeState get runtimeState;
 
   Future<void> prewarmInBackground();
   Future<void> warmUpFavoritesDebugInfo();
-}
-
-abstract interface class SourceSwitchGateway {
-  String? get activeSourceKey;
-  List<SourceCatalogEntry> get allowedSources;
-
-  Future<void> loadActiveSourcePreference();
-  Future<void> activateSource(String sourceKey);
-  Future<void> ensureInitialized({String? sourceKey});
-  Future<bool> hasLocalSourceFile(String sourceKey);
-  Future<void> downloadSourceFile(
-    String sourceKey, {
-    void Function(int received, int total)? onProgress,
-  });
-}
-
-abstract interface class SourceAdvancedGateway implements Listenable {
-  Future<bool> hasCustomEditedActiveSource();
-  Future<bool> hasActiveSourceBackup();
-  Future<bool> loadSoftwareLogCaptureEnabled();
-  Future<void> setSoftwareLogCaptureEnabled(bool enabled);
 }
 
 abstract interface class SourceDebugGateway {
@@ -121,37 +68,6 @@ abstract interface class SourceDebugGateway {
   Future<void> clearCapturedLogs();
 }
 
-abstract interface class SourceRuntimeGateway
-    implements Listenable, SourceAccountGateway {
-  bool get supportsDirectComicId;
-  bool get supportsDailyRecommendation;
-  bool get supportsLegacyRanking;
-  SourceMeta? get sourceMeta;
-  SourceRuntimeState get runtimeState;
-  List<SourceCatalogEntry> get allowedSources;
-
-  bool isLoggedForSource(String sourceKey);
-  String? currentAccountForSource(String sourceKey);
-  Future<void> activateSource(String sourceKey);
-  Future<void> prewarmInBackground();
-  Future<void> warmUpFavoritesDebugInfo();
-  Future<bool> hasLocalSourceFile(String sourceKey);
-  Future<void> downloadSourceFile(
-    String sourceKey, {
-    void Function(int received, int total)? onProgress,
-  });
-  Future<void> deleteLocalSourceFile(String sourceKey);
-  Future<String> loadEditableActiveSource();
-  Future<void> saveEditedActiveSource(String content);
-  Future<bool> hasCustomEditedActiveSource();
-  Future<void> reloadFromLocalSourceFiles();
-  Future<bool> downloadActiveSourceAndReload({
-    void Function(int received, int total)? onProgress,
-  });
-  Future<bool> loadSoftwareLogCaptureEnabled();
-  Future<void> setSoftwareLogCaptureEnabled(bool enabled);
-}
-
 abstract interface class SourceSettingsGateway {
   Map<String, dynamic>? presentationForSource(String id);
   String? get activeSourceKey;
@@ -159,17 +75,70 @@ abstract interface class SourceSettingsGateway {
   int get imageCacheMaxBytes;
 
   Object? loadSourceSetting(String sourceKey, String key);
-  Future<void> updateSourceSetting(String sourceKey, String key, dynamic value);
+  Future<void> updateSourceSetting(
+    String sourceKey,
+    String key,
+    dynamic value, {
+    SourceTaskOrigin? taskOrigin,
+  });
   Object? loadActiveSourceSetting(String key);
   Future<void> updateActiveSourceSetting(String key, dynamic value);
-  Future<Map<String, dynamic>> getLineSettingsSnapshot();
+  Future<Map<String, dynamic>> getLineSettingsSnapshot({
+    SourceTaskOrigin? taskOrigin,
+  });
   Future<void> updateLineSetting(String key, dynamic value);
   Future<void> refreshLines({
     bool refreshApiDomains = true,
     bool refreshImageHost = true,
+    SourceTaskOrigin? taskOrigin,
   });
   Future<Map<String, dynamic>> getImageCacheStatus();
   Future<void> setImageCacheMaxBytes(int value);
   Future<void> setImageCacheAutoCleanMode(String mode);
   Future<void> clearImageCache();
+}
+
+/// 运行时与选源：启动初始化、活动源切换、源脚本文件的就绪检查与下载。
+abstract interface class SourceRuntimeGateway implements Listenable {
+  String? get activeSourceKey;
+  bool get hasActiveSource;
+  bool get supportsDirectComicId;
+  bool get supportsDailyRecommendation;
+  bool get supportsLegacyRanking;
+  bool get isActiveDailyCheckInSource;
+  bool get isInitialized;
+  SourceMeta? get sourceMeta;
+  SourceRuntimeState get runtimeState;
+  List<SourceCatalogEntry> get allowedSources;
+
+  Future<void> loadActiveSourcePreference();
+  Future<void> init({void Function(int received, int total)? onProgress});
+  Future<void> ensureInitialized({String? sourceKey});
+  Future<void> activateSource(String sourceKey);
+  Future<void> prewarmInBackground();
+  Future<bool> hasLocalActiveSourceFile();
+  Future<bool> hasLocalSourceFile(String sourceKey);
+  Future<void> downloadSourceFile(
+    String sourceKey, {
+    void Function(int received, int total)? onProgress,
+  });
+}
+
+/// 活动源脚本：本地编辑、备份恢复、云端更新与同步写回。
+abstract interface class SourceScriptGateway implements Listenable {
+  String? get activeSourceKey;
+
+  Future<String> loadEditableActiveSource();
+  Future<void> saveEditedActiveSource(String content);
+  Future<bool> hasCustomEditedActiveSource();
+  Future<bool> hasActiveSourceBackup();
+  Future<bool> restoreActiveSourceBackup();
+  Future<String?> readLocalActiveSourceIfExists();
+  Future<void> writeLocalActiveSource(String content);
+  Future<void> reloadFromLocalSourceFiles();
+  Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud();
+  Future<bool> downloadActiveSourceAndReload({
+    void Function(int received, int total)? onProgress,
+  });
+  Future<bool> refreshSourceOnNetworkRecovery();
 }

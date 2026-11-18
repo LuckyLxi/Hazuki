@@ -6,6 +6,8 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 
 import '../support/search_contracts.dart';
+import '../support/search_task_lifetime.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 typedef AggregateSearchPageLoader =
     Future<SearchComicsResult> Function({
@@ -16,10 +18,14 @@ typedef AggregateSearchPageLoader =
     });
 
 class AggregateSearchSectionState {
-  AggregateSearchSectionState({required this.source})
-    : order = normalizeSourceSearchOrder('', source.presentation);
+  final SourceUiService sourceUiService;
+  AggregateSearchSectionState({
+    required this.sourceUiService,
+    required this.source,
+  }) : order = normalizeSourceSearchOrder('', source.presentation);
 
   SourceCatalogEntry source;
+  late final SourceUiOwner sourceUi = SourceUiOwner(sourceUiService);
   String order;
   List<ExploreComic> comics = const [];
   String? errorMessage;
@@ -29,32 +35,52 @@ class AggregateSearchSectionState {
   int page = 0;
   int? maxPage;
   int requestToken = 0;
+  String taskGroupId = createSourceTaskId();
+  SourceTaskCancellation lifetime = SourceTaskCancellation();
 }
 
 class AggregateSearchResultsController extends ChangeNotifier {
-  AggregateSearchResultsController({required SourceSearchGateway sourceService})
-    : _sourceService = sourceService,
-      _loader = null,
-      sections = sourceService.allowedSources
-          .map((source) => AggregateSearchSectionState(source: source))
-          .toList() {
+  final SourceUiService sourceUiService;
+  AggregateSearchResultsController({
+    required this.sourceUiService,
+    required SourceSearchGateway sourceService,
+    required this.taskControl,
+  }) : _sourceService = sourceService,
+       _loader = null,
+       sections = sourceService.allowedSources
+           .map(
+             (source) => AggregateSearchSectionState(
+               sourceUiService: sourceUiService,
+               source: source,
+             ),
+           )
+           .toList() {
     _sourceService.addListener(_syncSources);
   }
 
   AggregateSearchResultsController.withLoader({
+    required this.sourceUiService,
     required SourceSearchGateway sourceService,
+    required this.taskControl,
     required AggregateSearchPageLoader loader,
   }) : _sourceService = sourceService,
        _loader = loader,
        sections = sourceService.allowedSources
-           .map((source) => AggregateSearchSectionState(source: source))
+           .map(
+             (source) => AggregateSearchSectionState(
+               sourceUiService: sourceUiService,
+               source: source,
+             ),
+           )
            .toList() {
     _sourceService.addListener(_syncSources);
   }
 
   final SourceSearchGateway _sourceService;
+  final SourceTaskControlGateway taskControl;
   final AggregateSearchPageLoader? _loader;
   final List<AggregateSearchSectionState> sections;
+  final String _taskOwnerId = createSourceTaskId();
 
   String _keyword = '';
   SearchMessages? _lastMessages;
@@ -64,9 +90,48 @@ class AggregateSearchResultsController extends ChangeNotifier {
   bool get isLoading => sections.any((section) => section.loading);
   bool get hasResults => sections.any((section) => section.comics.isNotEmpty);
 
+  void _stopSection(
+    AggregateSearchSectionState section,
+    SourceTaskStopReason reason,
+  ) {
+    section.lifetime.cancel(reason);
+    section.sourceUi.cancel(
+      reason == SourceTaskStopReason.ownerDisposed ? 'ownerGone' : reason.name,
+    );
+    taskControl
+        .cancelGroup(
+          ownerId: _taskOwnerId,
+          groupId: section.taskGroupId,
+          pluginId: section.source.normalizedKey,
+          reason: reason,
+        )
+        .then<void>((receipt) => receipt.whenSettled.ignore())
+        .ignore();
+  }
+
+  void stopPending(SourceTaskStopReason reason) {
+    for (final section in sections) {
+      section.requestToken++;
+      section.lifetime.cancel(reason);
+      section.sourceUi.cancel(
+        reason == SourceTaskStopReason.ownerDisposed
+            ? 'ownerGone'
+            : reason.name,
+      );
+      section.loading = false;
+      section.loadingMore = false;
+    }
+    taskControl
+        .cancelOwner(_taskOwnerId, reason)
+        .then<void>((receipt) => receipt.whenSettled.ignore())
+        .ignore();
+  }
+
   void clear() {
+    stopPending(SourceTaskStopReason.superseded);
     _keyword = '';
     for (final section in sections) {
+      section.sourceUi.restart();
       section
         ..requestToken = section.requestToken + 1
         ..comics = const []
@@ -83,11 +148,15 @@ class AggregateSearchResultsController extends ChangeNotifier {
   Future<void> search(SearchMessages messages, String keyword) async {
     final normalized = keyword.trim();
     if (normalized.isEmpty) return;
+    stopPending(SourceTaskStopReason.superseded);
 
     _keyword = normalized;
     _lastMessages = messages;
+    final groupId = createSourceTaskId();
     for (final section in sections) {
+      section.sourceUi.restart();
       section
+        ..taskGroupId = groupId
         ..requestToken = section.requestToken + 1
         ..comics = const []
         ..errorMessage = null
@@ -112,6 +181,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
     if (_keyword.isEmpty || section.loading || section.loadingMore) {
       return Future.value();
     }
+    _stopSection(section, SourceTaskStopReason.superseded);
     section
       ..requestToken = section.requestToken + 1
       ..errorMessage = null
@@ -130,10 +200,12 @@ class AggregateSearchResultsController extends ChangeNotifier {
     }
     final normalized = _normalizeOrder(order, section.source.normalizedKey);
     if (section.order == normalized) return Future.value();
+    _stopSection(section, SourceTaskStopReason.superseded);
 
     section
       ..requestToken = section.requestToken + 1
       ..order = normalized
+      ..taskGroupId = createSourceTaskId()
       ..comics = const []
       ..errorMessage = null
       ..loading = true
@@ -174,11 +246,57 @@ class AggregateSearchResultsController extends ChangeNotifier {
     required bool append,
   }) async {
     final token = section.requestToken;
+    section.lifetime = SourceTaskCancellation();
+    section.sourceUi.restart();
+    try {
+      await section.sourceUi.run(
+        () => _loadSectionPageWithUi(
+          messages,
+          section,
+          page: page,
+          append: append,
+        ),
+      );
+    } catch (error) {
+      if (!_isCurrent(section, token)) return;
+      section
+        ..errorMessage = isSilentSearchStop(error)
+            ? null
+            : searchFailureMessage(error, messages)
+        ..loading = false
+        ..loadingMore = false;
+      _notify();
+    }
+  }
+
+  Future<void> _loadSectionPageWithUi(
+    SearchMessages messages,
+    AggregateSearchSectionState section, {
+    required int page,
+    required bool append,
+  }) async {
+    final token = section.requestToken;
+    final lifetime = section.lifetime;
+    final taskOrigin = SourceTaskOrigin(
+      ownerId: _taskOwnerId,
+      groupId: section.taskGroupId,
+      requestSequence: token,
+      cancellation: lifetime,
+      resultDisposition: () {
+        if (_disposed) return SourceTaskResultDisposition.disposed;
+        if (lifetime.reason == SourceTaskStopReason.deadlineExceeded) {
+          return SourceTaskResultDisposition.timedOut;
+        }
+        return _isCurrent(section, token)
+            ? SourceTaskResultDisposition.current
+            : SourceTaskResultDisposition.superseded;
+      },
+    );
     try {
       final sourceKey = section.source.normalizedKey;
       final order = section.order;
       final loader = _loader;
-      final request = loader != null
+      Future<SearchComicsResult> request() => loader != null
           ? loader(
               sourceKey: sourceKey,
               keyword: _keyword,
@@ -190,11 +308,9 @@ class AggregateSearchResultsController extends ChangeNotifier {
               page: page,
               order: order,
               sourceKey: sourceKey,
+              taskOrigin: taskOrigin,
             );
-      final result = await request.timeout(
-        searchLoadTimeout,
-        onTimeout: () => throw Exception(messages.timeout),
-      );
+      final result = await runSearchOperation(request, lifetime);
       if (!_isCurrent(section, token)) return;
 
       final previousCount = section.comics.length;
@@ -220,7 +336,9 @@ class AggregateSearchResultsController extends ChangeNotifier {
           !reachedMaxPage && result.comics.isNotEmpty && !noNewItems;
     } catch (error) {
       if (!_isCurrent(section, token)) return;
-      section.errorMessage = messages.failed('$error');
+      section.errorMessage = isSilentSearchStop(error)
+          ? null
+          : searchFailureMessage(error, messages);
     } finally {
       if (_isCurrent(section, token)) {
         section
@@ -254,9 +372,11 @@ class AggregateSearchResultsController extends ChangeNotifier {
           source.presentation,
         );
         if (order != previous.order) {
+          _stopSection(previous, SourceTaskStopReason.superseded);
           previous
             ..requestToken = previous.requestToken + 1
             ..order = order
+            ..taskGroupId = createSourceTaskId()
             ..comics = const []
             ..errorMessage = null
             ..page = 0
@@ -268,11 +388,22 @@ class AggregateSearchResultsController extends ChangeNotifier {
         }
         updated.add(previous);
       } else {
-        if (previous != null) previous.requestToken++;
-        updated.add(AggregateSearchSectionState(source: source));
+        if (previous != null) {
+          _stopSection(previous, SourceTaskStopReason.pluginUpdated);
+          previous.sourceUi.dispose();
+          previous.requestToken++;
+        }
+        updated.add(
+          AggregateSearchSectionState(
+            sourceUiService: sourceUiService,
+            source: source,
+          ),
+        );
       }
     }
     for (final removed in current.values) {
+      _stopSection(removed, SourceTaskStopReason.pluginDisabled);
+      removed.sourceUi.dispose();
       removed.requestToken++;
     }
     sections
@@ -302,8 +433,10 @@ class AggregateSearchResultsController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    stopPending(SourceTaskStopReason.ownerDisposed);
     _sourceService.removeListener(_syncSources);
     for (final section in sections) {
+      section.sourceUi.dispose();
       section.requestToken++;
     }
     super.dispose();

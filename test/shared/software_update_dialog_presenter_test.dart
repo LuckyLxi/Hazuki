@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/software_update/software_update_dialog_support.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/services/software_update/software_update_reminder_policy.dart';
@@ -47,7 +48,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: navigatorKey,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: const Locale('en'),
         home: const Scaffold(),
@@ -92,7 +93,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: navigatorKey,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: const Locale('en'),
         home: const Scaffold(),
@@ -130,7 +131,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: navigatorKey,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: const Locale('en'),
         home: const Scaffold(),

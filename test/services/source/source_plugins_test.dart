@@ -1,5 +1,5 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
-import 'package:hazuki/services/source/gateways/source_content_gateways.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 import 'package:dio/dio.dart';
 import 'dart:convert';
@@ -39,7 +39,15 @@ List<int> package({
   );
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   test('declared buttons require callbacks supplied by that plugin', () async {
     SharedPreferences.setMockInitialValues({});
     final inspector = SourcePluginScriptInspector();
@@ -93,6 +101,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
       );
       final storage = MemorySourceSecureSessionStorage();
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: storage,
       );
@@ -112,7 +121,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
         }}});''',
         ),
       );
-      final gateway = assembly.gateways.home as SourceInteractiveAccountGateway;
+      final gateway = assembly.gateways.home;
       expect((await gateway.loadLoginMethods()).single.id, 'sms');
       final before = assembly.testing.handleFor('independent');
       expect(before.facade.loadSourceData('independent', 'initRan'), isNull);
@@ -157,6 +166,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
             ),
       );
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -166,7 +176,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
         package(
           script: '''Hazuki.registerSource({
       search:{load:async()=>({comics:[]})},
-      comic:{loadInfo:async id=>new ComicDetails({title:'Grouped',chapterGroups:[
+      comic:{loadInfo:async id=>({title:'Grouped',chapterGroups:[
         {id:'a',title:'Serial',chapters:[{id:'10',title:'First'},{id:'2',title:'Second'}]},
         {id:'b',title:'Other',chapters:[{id:'1',title:'Other'}]}]}),
       loadEp:async()=>({images:['image']}),
@@ -185,7 +195,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
       final details = await assembly.gateways.reader.loadComicDetails('comic');
       expect(details.chapters.keys, ['10', '2', '1']);
       final handle = assembly.testing.handleFor('independent');
-      final reporter = assembly.gateways.reader as SourceReadingProgressGateway;
+      final reporter = assembly.gateways.readingProgressUploads;
       Map<String, Object> event(int page, String reason) => {
         'comicId': 'comic',
         'chapterId': '10',
@@ -207,6 +217,9 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
         'user',
         'password',
       ]);
+      await handle.session.saveBrowserUserAgents({
+        'https://example.com': 'Synthetic UA',
+      });
       await assembly.gateways.reader.loadChapterImages(
         comicId: 'comic',
         epId: '10',
@@ -286,6 +299,71 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
   );
 
   test(
+    'reorder persists, drives catalog order and rolls back on failure',
+    () async {
+      await manager.initialize();
+      for (final id in ['alpha', 'beta', 'gamma']) {
+        await manager.importPackage(package(id: id));
+      }
+      final published = <List<String>>[];
+      manager.onCatalogChanged = (catalog) async =>
+          published.add([for (final entry in catalog) entry.key]);
+
+      await manager.reorder(['gamma', 'alpha', 'beta']);
+      expect(manager.installed.map((plugin) => plugin.manifest.id), [
+        'gamma',
+        'alpha',
+        'beta',
+      ]);
+      expect(published.single, ['gamma', 'alpha', 'beta']);
+
+      // 顺序不变时不写注册表，也不重新发布目录。
+      await manager.reorder(['gamma', 'alpha', 'beta']);
+      expect(published, hasLength(1));
+
+      for (final invalid in [
+        ['gamma', 'alpha'],
+        ['gamma', 'alpha', 'alpha'],
+        ['gamma', 'alpha', 'missing'],
+      ]) {
+        await expectLater(
+          manager.reorder(invalid),
+          throwsA(isA<SourcePluginException>()),
+        );
+      }
+
+      manager.onCatalogChanged = (_) async => throw StateError('runtime busy');
+      await expectLater(
+        manager.reorder(['beta', 'gamma', 'alpha']),
+        throwsA(isA<StateError>()),
+      );
+      expect(manager.installed.map((plugin) => plugin.manifest.id), [
+        'gamma',
+        'alpha',
+        'beta',
+      ]);
+      manager.onCatalogChanged = null;
+
+      final restored = SourcePluginManager(
+        directory: () async => root,
+        legacyDirectories: [],
+      );
+      await restored.initialize();
+      expect(restored.installed.map((plugin) => plugin.manifest.id), [
+        'gamma',
+        'alpha',
+        'beta',
+      ]);
+      expect(restored.catalog.map((entry) => entry.key), [
+        'gamma',
+        'alpha',
+        'beta',
+      ]);
+      restored.dispose();
+    },
+  );
+
+  test(
     'rejects incompatible or malformed JS and missing runtime methods',
     () async {
       for (final bytes in [
@@ -339,6 +417,7 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
 
   test('runtime reads new capabilities independently of plugin identity', () async {
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -402,6 +481,25 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
     },
   );
 
+  test('plugin scripts see only Hazuki APIs and generic JS helpers', () async {
+    final manifest = await SourcePluginScriptInspector().inspect('''
+const hidden = {
+  Network: typeof Network, Convert: typeof Convert, HtmlDocument: typeof HtmlDocument,
+  ComicSource: typeof ComicSource, UI: typeof UI, APP: typeof APP, Image: typeof Image,
+  Comic: typeof Comic, ComicDetails: typeof ComicDetails, fetch: typeof fetch,
+  compute: typeof compute, setClipboard: typeof setClipboard, getClipboard: typeof getClipboard,
+  createUuid: typeof createUuid, runtime: typeof __hazukiRuntime,
+};
+const leaked = Object.keys(hidden).filter(name => hidden[name] !== 'undefined');
+if (leaked.length) throw new Error('leaked: ' + leaked.join(','));
+if ([typeof setTimeout, typeof setInterval, typeof console, typeof HazukiSource]
+    .some(type => type === 'undefined')) throw new Error('missing helper');
+Hazuki.registerSource({id:'hazuki_only',search:{load:async()=>({comics:[]})},
+comic:{loadInfo:async()=>({title:'',chapters:{}}),loadEp:async()=>({images:[]})}});
+''');
+    expect(manifest.id, 'hazuki_only');
+  });
+
   test(
     'registers a class source without headers or a registration call',
     () async {
@@ -410,12 +508,13 @@ class PlainSource extends HazukiSource {
   key = ['plain', 'source'].join('_');
   search = {load: async () => ({comics: [], maxPage: 1})};
   comic = {
-    loadInfo: async id => new ComicDetails({title: 'Comic', chapters: {}, tags: {}, viewsCount: 12, headerStats: [{text: {zh: '每周更新', en: 'Weekly'}}], infoFields: [{label: {zh: '状态', en: 'Status'}, values: 'Ongoing'}]}),
+    loadInfo: async id => ({title: 'Comic', chapters: {}, tags: {}, viewsCount: 12, headerStats: [{text: {zh: '每周更新', en: 'Weekly'}}], infoFields: [{label: {zh: '状态', en: 'Status'}, values: 'Ongoing'}]}),
     loadEp: async () => ({images: []})
   };
 }
 """;
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -473,6 +572,7 @@ class PlainSource extends HazukiSource {
 
   test('import defers init and its side effects until first use', () async {
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -511,6 +611,7 @@ Hazuki.registerSource({
 
   test('init failure is reported on first use and keeps the package', () async {
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -537,6 +638,7 @@ Hazuki.registerSource({
     'SDK defaults remain live and stored falsy values take precedence',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -546,21 +648,24 @@ Hazuki.registerSource({
       await assembly.ensureSourceInitialized('independent');
       final handle = assembly.testing.handleFor('independent');
       final engine = handle.runtime.engine!;
-      engine.evaluate(
+      await engine.evaluate(
         "globalThis.__hazuki_source.settings.option = {default:'initial'}",
       );
-      expect(engine.evaluate("Hazuki.settings.get('option')"), 'initial');
-      engine.evaluate(
+      expect(await engine.evaluate("Hazuki.settings.get('option')"), 'initial');
+      await engine.evaluate(
         "globalThis.__hazuki_source.settings.option.default = 'refreshed'",
       );
-      expect(engine.evaluate("Hazuki.settings.get('option')"), 'refreshed');
+      expect(
+        await engine.evaluate("Hazuki.settings.get('option')"),
+        'refreshed',
+      );
       for (final value in [false, 0, '', null]) {
         await handle.facade.js.resolve(
           engine.evaluate(
             "Hazuki.settings.set('option', ${jsonEncode(value)})",
           ),
         );
-        expect(engine.evaluate("Hazuki.settings.get('option')"), value);
+        expect(await engine.evaluate("Hazuki.settings.get('option')"), value);
       }
     },
   );
@@ -569,6 +674,7 @@ Hazuki.registerSource({
     'placed actions run in their own plugin without switching sources',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -638,7 +744,7 @@ Hazuki.registerSource({
         expect(manifest.version, switch (id) {
           'example' => '1.0.0',
           'jm' => '1.0.4',
-          'picacg' => '1.0.3',
+          'picacg' => '1.1.0',
           _ => '1.0.2',
         });
         expect(manifest.presentation['searchDefaultOrder'], isNotEmpty);
@@ -648,6 +754,7 @@ Hazuki.registerSource({
 
   test('registered identity stays fixed for SDK storage calls', () async {
     final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -658,7 +765,7 @@ Hazuki.registerSource({
     final handle = assembly.testing.handleFor('independent');
     final engine = handle.runtime.engine!;
     expect(
-      () => engine.evaluate(
+      () async => await engine.evaluate(
         "'use strict'; globalThis.__hazuki_source.key = 'other';",
       ),
       throwsA(anything),
@@ -666,7 +773,7 @@ Hazuki.registerSource({
     await handle.facade.js.resolve(
       engine.evaluate("Hazuki.storage.set('marker', 'private')"),
     );
-    expect(engine.evaluate("Hazuki.storage.get('marker')"), 'private');
+    expect(await engine.evaluate("Hazuki.storage.get('marker')"), 'private');
     expect(handle.facade.loadSourceData('independent', 'marker'), 'private');
   });
 
@@ -846,6 +953,7 @@ Hazuki.registerSource({
     () async {
       final secure = MemorySourceSecureSessionStorage();
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: secure,
       );
@@ -865,6 +973,7 @@ Hazuki.registerSource({
       final restored = assembly.testing.handleFor('independent');
       await restored.session.ensurePrefs();
       expect(restored.facade.loadAccountDataSync(), ['user', 'password']);
+      expect(restored.session.loadBrowserUserAgents(), isEmpty);
       // Manager belongs to the test; dispose the host separately at teardown.
       addTearDown(
         () => assembly.testing.handleFor('independent').requestDispose(),
@@ -876,6 +985,7 @@ Hazuki.registerSource({
     'deleting an inactive plugin through runtime operations preserves its backup',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -889,9 +999,7 @@ Hazuki.registerSource({
       final backup = await manager.sourceFileFor('inactive');
       final content = await backup.readAsString();
 
-      await assembly.testing.runtimeOperations.deleteLocalSourceFile(
-        'inactive',
-      );
+      await assembly.testing.scriptEditing.deleteLocalSourceFile('inactive');
 
       expect(manager.pluginFor('inactive'), isNull);
       expect(assembly.runtimeRegistry.activeSourceKey, 'independent');
@@ -907,6 +1015,7 @@ Hazuki.registerSource({
     'invalid native update keeps the previous registration and emits the final catalog',
     () async {
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -932,82 +1041,86 @@ Hazuki.registerSource({
     },
   );
 
-  test(
-    'new plugin searches, reads details and loads local chapter bytes',
-    () async {
-      final image = File('${root.path}/page.png');
-      final bytes = base64Decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQ0AAAAASUVORK5CYII=',
-      );
-      await image.writeAsBytes(bytes);
-      final assembly = SourceRuntimeAssembly(
-        pluginManager: manager,
-        secureSessionStorage: MemorySourceSecureSessionStorage(),
-      );
-      addTearDown(assembly.dispose);
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+  test('new plugin searches, reads details and loads local chapter bytes', () async {
+    final image = File('${root.path}/page.png');
+    final bytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQ0AAAAASUVORK5CYII=',
+    );
+    await image.writeAsBytes(bytes);
+    final assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
+      pluginManager: manager,
+      secureSessionStorage: MemorySourceSecureSessionStorage(),
+    );
+    addTearDown(assembly.dispose);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (_) async => root.path,
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
             const MethodChannel('plugins.flutter.io/path_provider'),
-            (_) async => root.path,
-          );
-      addTearDown(
-        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(
-              const MethodChannel('plugins.flutter.io/path_provider'),
-              null,
-            ),
-      );
-      await assembly.runtimeRegistry.loadActiveSourcePreference();
-      await manager.importPackage(
-        package(
-          script:
-              "Hazuki.registerSource({resources:{'about.txt':'embedded'},search:{load:async(k)=>({comics:[{id:'a',title:k,cover:''}],maxPage:1})},comic:{loadInfo:async(id)=>({id,title:'Comic',chapters:{'c':'Chapter'},tags:{}}),loadEp:async()=>({images:['https://fixture.example/page.png']}),transformImageBytes:async(bytes)=>({bytes,extension:'png'})}});",
-        ),
-      );
-      assembly.testing.handleFor('independent').dio.httpClientAdapter =
-          _ImageAdapter(bytes);
-      await assembly.runtimeRegistry.ensureInitialized(
-        sourceKey: 'independent',
-      );
-      final engine = assembly.testing.handleFor('independent').runtime.engine!;
-      expect(
-        await engine.evaluate("Hazuki.resources.readText('about.txt')"),
-        'embedded',
-      );
-      await expectLater(
-        engine.evaluate("Hazuki.resources.readText('toString')")
-            as Future<dynamic>,
-        throwsA(anything),
-      );
-      expect(
-        (await assembly.gateways.search.searchComics(
-          keyword: 'hello',
-          page: 1,
-        )).comics.single.title,
-        'hello',
-      );
-      expect((await assembly.gateways.reader.loadComicDetails('a')).chapters, {
-        'c': 'Chapter',
-      });
-      expect(
-        await assembly.gateways.reader.loadChapterImages(
-          comicId: 'a',
-          epId: 'c',
-        ),
-        ['https://fixture.example/page.png'],
-      );
-      final prepared = await assembly.gateways.reader.prepareChapterImageData(
-        'https://fixture.example/page.png',
-        comicId: 'a',
-        epId: 'c',
-        useDiskCache: false,
-      );
-      expect(prepared.bytes, bytes);
-      expect(prepared.wasProcessed, true);
-      await manager.setEnabled('independent', false);
-      expect(assembly.runtimeRegistry.activeSourceKey, null);
-    },
-  );
+            null,
+          ),
+    );
+    await assembly.runtimeRegistry.loadActiveSourcePreference();
+    await manager.importPackage(
+      package(
+        script:
+            "Hazuki.registerSource({resources:{'about.txt':'embedded'},search:{load:async(k)=>({comics:[{id:'a',title:k,cover:''}],maxPage:1})},comic:{loadInfo:async(id)=>({id,title:'Comic',chapters:{'c':'Chapter'},tags:{}}),loadEp:async()=>({images:['https://fixture.example/page.png']}),transformImageBytes:async(bytes)=>({bytes,extension:'png'})}});",
+      ),
+    );
+    assembly.testing.handleFor('independent').dio.httpClientAdapter =
+        _ImageAdapter(bytes);
+    await assembly.runtimeRegistry.ensureInitialized(sourceKey: 'independent');
+    final engine = assembly.testing.handleFor('independent').runtime.engine!;
+    expect(
+      await engine.evaluate("Hazuki.resources.readText('about.txt')"),
+      'embedded',
+    );
+    await expectLater(
+      engine.evaluate("Hazuki.resources.readText('toString')"),
+      throwsA(anything),
+    );
+    expect(
+      await engine.evaluate(
+        'JSON.stringify(Hazuki.images.regions([{sx:0,sy:1,sw:2,sh:3,dx:4,dy:5,extra:6}],{width:8}))',
+      ),
+      '{"width":8,"regions":[{"sx":0,"sy":1,"sw":2,"sh":3,"dx":4,"dy":5}]}',
+    );
+    await expectLater(
+      engine.evaluate(
+        'Hazuki.images.regions([{sx:0,sy:0,sw:0,sh:1,dx:0,dy:0}])',
+      ),
+      throwsA(anything),
+    );
+    expect(
+      (await assembly.gateways.search.searchComics(
+        keyword: 'hello',
+        page: 1,
+      )).comics.single.title,
+      'hello',
+    );
+    expect((await assembly.gateways.reader.loadComicDetails('a')).chapters, {
+      'c': 'Chapter',
+    });
+    expect(
+      await assembly.gateways.reader.loadChapterImages(comicId: 'a', epId: 'c'),
+      ['https://fixture.example/page.png'],
+    );
+    final prepared = await assembly.gateways.reader.prepareChapterImageData(
+      'https://fixture.example/page.png',
+      comicId: 'a',
+      epId: 'c',
+      useDiskCache: false,
+    );
+    expect(prepared.bytes, bytes);
+    expect(prepared.wasProcessed, true);
+    await manager.setEnabled('independent', false);
+    expect(assembly.runtimeRegistry.activeSourceKey, null);
+  });
 }
 
 class _ImageAdapter implements HttpClientAdapter {

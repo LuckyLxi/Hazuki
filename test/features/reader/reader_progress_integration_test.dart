@@ -1,25 +1,27 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
+import 'package:hazuki/widgets/reader_settings_content.dart';
 import 'package:hazuki/shared/ui_flags.dart';
-import 'package:hazuki/shared/window/window_title_bar_control.dart';
+import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/test_service_locator.dart';
 
-class _Reader extends Fake
-    implements SourceReaderGateway, SourceReadingProgressGateway {
-  final events = <Map<String, Object>>[];
+class _Reader extends Fake implements SourceReaderGateway {
   @override
   bool isLocalImagePath(String value) => true;
   @override
@@ -41,10 +43,16 @@ class _Reader extends Fake
     Iterable<String> urls, {
     String sourceKey = '',
   }) async {}
+}
+
+class _ProgressUploads implements SourceReadingProgressGateway {
+  final events = <Map<String, Object>>[];
+
   @override
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {
     required String sourceKey,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     events.add(progress);
   }
@@ -63,7 +71,15 @@ class _TitleBar extends ChangeNotifier implements WindowTitleBarControl {
   Future<void> updateUseSystemTitleBar(bool value) async {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   for (final mode in ['right_to_left', 'top_to_bottom']) {
     for (final doublePage in [false, true]) {
       testWidgets(
@@ -73,6 +89,7 @@ void main() {
             ReaderSettingsStore.readingModeKey: mode,
             ReaderSettingsStore.doublePageModeKey: doublePage,
             ReaderSettingsStore.windowsShortcutsGuideSeenKey: true,
+            'reader_long_press_save': false,
           });
           await ensureTestServiceLocator();
           final previous = hazukiNoImageModeNotifier.value;
@@ -86,7 +103,7 @@ void main() {
             for (var i = 0; i < 6; i++) {
               images.add(
                 (await File(
-                  'assets/images/downloaded_cover_placeholder.png',
+                  'assets/images/downloaded_cover_placeholder.webp',
                 ).copy('${directory.path}/$i.png')).path,
               );
             }
@@ -94,13 +111,13 @@ void main() {
           }))!;
           final directory = files.directory;
           final images = files.images;
-          final reader = _Reader();
+          final uploads = _ProgressUploads();
           final titleBar = _TitleBar();
           addTearDown(titleBar.dispose);
           await tester.pumpWidget(
             MaterialApp(
               locale: const Locale('en'),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: hazukiLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               builder: (context, child) => withTestSourcePresentation(
                 HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
@@ -114,7 +131,9 @@ void main() {
                 images: images,
                 sourceKey: 'jm',
                 dependencies: ReaderDependencies(
-                  sourceReader: reader,
+                  sourceUiService: sourceUiService,
+                  sourceReader: _Reader(),
+                  readingProgressUploads: uploads,
                   sourceSettings: sl<SourceSettingsGateway>(),
                   readingProgressService: sl<ReadingProgressService>(),
                   downloader: sl<MangaDownloadService>(),
@@ -143,12 +162,18 @@ void main() {
 
           await decode();
           await decode();
-          expect(reader.events, isNotEmpty);
-          expect(reader.events.first['page'], 1);
-          expect(reader.events.first['totalPages'], 6);
+          await tester.longPress(find.byType(Image).first);
+          await tester.pumpAndSettle();
+          expect(find.text('Save image'), findsOneWidget);
+          expect(find.text('Retranslate image'), findsNothing);
+          await tester.tap(find.text('Cancel'));
+          await tester.pumpAndSettle();
+          expect(uploads.events, isNotEmpty);
+          expect(uploads.events.first['page'], 1);
+          expect(uploads.events.first['totalPages'], 6);
           if (mode == 'right_to_left') {
             expect(
-              reader.events.first['visiblePages'],
+              uploads.events.first['visiblePages'],
               doublePage ? [1, 2] : [1],
             );
             final page = tester.widget<PageView>(find.byType(PageView));
@@ -158,7 +183,7 @@ void main() {
               curve: Curves.linear,
             );
             // Starting an animation has not changed the visible page yet.
-            expect(reader.events.last['page'], 1);
+            expect(uploads.events.last['page'], 1);
             await tester.pump();
             await tester.pump(const Duration(milliseconds: 240));
             await future;
@@ -170,20 +195,72 @@ void main() {
           }
           await decode();
           await tester.pump(const Duration(seconds: 5));
-          expect(reader.events.last['page'], greaterThan(1));
+          expect(uploads.events.last['page'], greaterThan(1));
+
+          Future<void> changeLayout(
+            void Function(ReaderSettingsContent settings) change,
+          ) async {
+            final scaffold = tester.state<ScaffoldState>(
+              find.byType(Scaffold).last,
+            );
+            scaffold.openEndDrawer();
+            await tester.pumpAndSettle();
+            change(tester.widget(find.byType(ReaderSettingsContent)));
+            await tester.pumpAndSettle();
+            scaffold.closeEndDrawer();
+            await tester.pumpAndSettle();
+            await decode();
+            await tester.pump(const Duration(seconds: 5));
+          }
+
+          void expectMeasuredPages({required bool paged}) {
+            final viewport = tester.getRect(
+              find.byType(paged ? PageView : ListView).first,
+            );
+            final visible = <int>[];
+            for (var i = 0; i < images.length; i++) {
+              final image = find.byWidgetPredicate(
+                (widget) =>
+                    widget is Image &&
+                    widget.key ==
+                        ValueKey(
+                          paged ? 'reader-page-${images[i]}' : images[i],
+                        ),
+              );
+              if (image.evaluate().isEmpty) continue;
+              final rect = tester.getRect(image).intersect(viewport);
+              if (rect.width > 0.5 && rect.height > 0.5) visible.add(i + 1);
+            }
+            expect(visible, isNotEmpty);
+            expect(uploads.events.last['visiblePages'], visible);
+            expect(uploads.events.last['page'], visible.first);
+          }
+
+          await changeLayout(
+            (settings) => settings.onDoublePageModeChanged(!doublePage),
+          );
+          expectMeasuredPages(paged: mode == 'right_to_left');
+          await changeLayout(
+            (settings) => settings.onReaderModeChanged(
+              mode == 'right_to_left'
+                  ? ReaderMode.topToBottom
+                  : ReaderMode.rightToLeft,
+            ),
+          );
+          expectMeasuredPages(paged: mode != 'right_to_left');
           tester.binding.handleAppLifecycleStateChanged(
             AppLifecycleState.inactive,
           );
           await tester.pump();
-          expect(reader.events.last['reason'], 'background');
+          expect(uploads.events.last['reason'], 'background');
           tester.binding.handleAppLifecycleStateChanged(
             AppLifecycleState.resumed,
           );
-          final before = reader.events.last['page'];
+          final before = uploads.events.last['page'];
           await tester.pumpWidget(const SizedBox.shrink());
           await tester.pump();
-          expect(reader.events.last['reason'], 'exit');
-          expect(reader.events.last['page'], before);
+          expect(uploads.events.last['reason'], 'exit');
+          expect(uploads.events.last['page'], before);
           expect(tester.takeException(), isNull);
           await tester.runAsync(() => directory.delete(recursive: true));
         },

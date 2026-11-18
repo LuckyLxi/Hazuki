@@ -58,9 +58,28 @@ Pointer<JSValue> _dartToJs(
   dynamic val, {
   Map<dynamic, Pointer<JSValue>>? cache,
 }) {
+  if (val is QuickJsWorkResult) {
+    final work = val.context;
+    if (work._released || !work._alive)
+      throw StateError('QuickJS work context is released');
+    final rt = jsGetRuntime(ctx);
+    final previous = jsGetTaskContext(rt);
+    final previousWork = jsGetWorkContext(rt);
+    jsSetTaskContext(rt, work.taskToken);
+    jsSetWorkContext(rt, work.workId);
+    try {
+      return _dartToJs(ctx, val.value, cache: cache);
+    } finally {
+      jsSetTaskContext(rt, previous);
+      jsSetWorkContext(rt, previousWork);
+    }
+  }
   if (val == null) return jsUNDEFINED();
   if (val is Error) return _dartToJs(ctx, JSError(val, val.stackTrace));
   if (val is Exception) return _dartToJs(ctx, JSError(val));
+  if (val is QuickJsTaskStoppedError) {
+    return jsNewStoppedError(ctx, val.taskToken, val.reason.index + 1);
+  }
   if (val is JSError) {
     final ret = jsNewError(ctx);
     _definePropertyValue(ctx, ret, "name", "");
@@ -70,6 +89,37 @@ Pointer<JSValue> _dartToJs(
   }
   if (val is _JSObject) return jsDupValue(ctx, val._val!);
   if (val is Future) {
+    final futureRuntime = jsGetRuntime(ctx);
+    final futureEpoch = runtimeOpaques[futureRuntime];
+    final futureTask = jsGetTaskContext(futureRuntime);
+    final futureWork = jsGetWorkContext(futureRuntime);
+    jsRetainTaskContext(futureRuntime, futureTask);
+    jsRetainWorkContext(futureRuntime, futureWork);
+    void settle(_JSFunction callback, dynamic value) {
+      if (futureEpoch == null ||
+          !identical(runtimeOpaques[futureRuntime], futureEpoch))
+        return;
+      final previous = jsGetTaskContext(futureRuntime);
+      final previousWork = jsGetWorkContext(futureRuntime);
+      jsSetTaskContext(futureRuntime, futureTask);
+      jsSetWorkContext(futureRuntime, futureWork);
+      try {
+        final argument = _dartToJs(ctx, value);
+        try {
+          final result = jsSettleHostFuture(ctx, callback._val!, argument);
+          final failed = jsIsException(result) != 0;
+          jsFreeValue(ctx, result);
+          if (failed) throw _parseJSException(ctx);
+        } finally {
+          jsFreeValue(ctx, argument);
+          futureEpoch.notifyJobs();
+        }
+      } finally {
+        jsSetTaskContext(futureRuntime, previous);
+        jsSetWorkContext(futureRuntime, previousWork);
+      }
+    }
+
     final resolvingFunc = malloc<Uint8>(sizeOfJSValue * 2).cast<JSValue>();
     final resolvingFunc2 = Pointer<JSValue>.fromAddress(
       resolvingFunc.address + sizeOfJSValue,
@@ -87,15 +137,20 @@ Pointer<JSValue> _dartToJs(
     val
         .then(
           (value) {
-            res.invoke([value]);
+            settle(res, value);
           },
           onError: (e) {
-            rej.invoke([e]);
+            settle(rej, e);
           },
         )
         .whenComplete(() {
+          if (futureEpoch == null ||
+              !identical(runtimeOpaques[futureRuntime], futureEpoch))
+            return;
           refRes.free();
           refRej.free();
+          jsReleaseTaskContext(futureRuntime, futureTask);
+          jsReleaseWorkContext(futureRuntime, futureWork);
         });
     return ret;
   }
@@ -191,6 +246,19 @@ dynamic _jsToDart(
       if (jsIsFunction(ctx, val) != 0) {
         return _JSFunction(ctx, val);
       } else if (jsIsError(ctx, val) != 0) {
+        final stopReason = jsStopErrorReason(val);
+        if (stopReason != 0) {
+          final stackValue = _jsGetPropertyValue(ctx, val, 'stack');
+          final stack = jsToBool(ctx, stackValue) != 0
+              ? jsToCString(ctx, stackValue)
+              : null;
+          jsFreeValue(ctx, stackValue);
+          return QuickJsTaskStoppedError(
+            jsStopErrorTask(val),
+            QuickJsStopReason.values[stopReason - 1],
+            stack,
+          );
+        }
         final err = jsToCString(ctx, val);
         final pstack = _jsGetPropertyValue(ctx, val, 'stack');
         final stack = jsToBool(ctx, pstack) != 0
@@ -199,6 +267,43 @@ dynamic _jsToDart(
         jsFreeValue(ctx, pstack);
         return JSError(err, stack);
       } else if (jsIsPromise(ctx, val) != 0) {
+        final completer = Completer();
+        completer.future.catchError((e) {});
+        final handlers = <dynamic>[
+          (dynamic value) {
+            JSRef.dupRecursive(value);
+            if (!completer.isCompleted) completer.complete(value);
+          },
+          (dynamic error) {
+            JSRef.dupRecursive(error);
+            if (!completer.isCompleted) completer.completeError(error);
+          },
+        ];
+        if (runtimeOpaques[rt]?.taskControlEnabled == true) {
+          // A Dart observer pins the value for settlement, without becoming a
+          // business root in the native execution graph.
+          final epoch = runtimeOpaques[rt];
+          final pin = _JSObject(ctx, val);
+          void release() {
+            if (identical(runtimeOpaques[rt], epoch)) pin.free();
+          }
+
+          completer.future.then<void>(
+            (_) => release(),
+            onError: (_) => release(),
+          );
+          final resolve = _dartToJs(ctx, handlers[0]);
+          final reject = _dartToJs(ctx, handlers[1]);
+          try {
+            if (jsObserveHostPromise(ctx, val, resolve, reject) < 0) {
+              throw _parseJSException(ctx);
+            }
+          } finally {
+            jsFreeValue(ctx, resolve);
+            jsFreeValue(ctx, reject);
+          }
+          return completer.future;
+        }
         final jsPromiseThen = _jsGetPropertyValue(ctx, val, 'then');
         final _JSFunction promiseThen = _jsToDart(
           ctx,
@@ -206,19 +311,8 @@ dynamic _jsToDart(
           cache: cache,
         );
         jsFreeValue(ctx, jsPromiseThen);
-        final completer = Completer();
-        completer.future.catchError((e) {});
         final jsPromise = _JSObject(ctx, val);
-        final jsRet = promiseThen._invoke([
-          (v) {
-            JSRef.dupRecursive(v);
-            if (!completer.isCompleted) completer.complete(v);
-          },
-          (e) {
-            JSRef.dupRecursive(e);
-            if (!completer.isCompleted) completer.completeError(e);
-          },
-        ], jsPromise);
+        final jsRet = promiseThen._invoke(handlers, jsPromise);
         jsPromise.free();
         promiseThen.free();
         final isException = jsIsException(jsRet) != 0;

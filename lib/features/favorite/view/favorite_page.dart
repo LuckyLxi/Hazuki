@@ -2,7 +2,7 @@ import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
@@ -32,7 +32,9 @@ AppLocalizations _strings(BuildContext context) =>
     AppLocalizations.of(context)!;
 
 class FavoritePage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const FavoritePage({
+    required this.taskControl,
     super.key,
     required this.sourceService,
     this.readerService,
@@ -86,6 +88,7 @@ class FavoritePageState extends State<FavoritePage>
   void initState() {
     super.initState();
     _controller = FavoritePageController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       sourceService: widget.sourceService,
       readerService: widget.readerService,
       presentationFor:
@@ -93,6 +96,7 @@ class FavoritePageState extends State<FavoritePage>
           emptySourcePresentation,
       localFavoritesRepository: widget.localFavoritesRepository,
       localFavoritesPreferences: widget.localFavoritesPreferences,
+      taskControl: widget.taskControl,
     );
     _coverPrefetcher = ComicCoverPrefetcher(imageGateway: widget.imageGateway);
     _controller.addListener(_handleControllerChanged);
@@ -317,18 +321,24 @@ class FavoritePageState extends State<FavoritePage>
     unawaited(showHazukiPrompt(context, error, isError: true));
   }
 
-  Future<void> _renameLocalFolder(FavoriteFolder folder) async {
-    if (_controller.mode != FavoritePageMode.local || folder.isAllFolder) {
+  Future<void> _renameFolder(FavoriteFolder folder) async {
+    if (!_controller.supportsFolderRename || folder.isAllFolder) {
       return;
     }
 
+    final mode = _controller.mode;
+    final sourceKey = widget.sourceService.activeSourceKey;
     unawaited(HapticFeedback.lightImpact());
     final strings = _strings(context);
     final renamed = await showFavoriteRenameFolderDialog(
       context,
       initialName: folder.name,
     );
-    if (renamed == null) {
+    if (!mounted ||
+        renamed == null ||
+        mode != _controller.mode ||
+        sourceKey != widget.sourceService.activeSourceKey ||
+        !_controller.supportsFolderRename) {
       return;
     }
 
@@ -337,7 +347,7 @@ class FavoritePageState extends State<FavoritePage>
       return;
     }
 
-    final error = await _controller.renameLocalFolder(folder.id, normalized);
+    final error = await _controller.renameFolder(folder.id, normalized);
     if (!mounted || error == null) {
       return;
     }
@@ -518,9 +528,8 @@ class FavoritePageState extends State<FavoritePage>
                       enableDeleteAction: _controller.canDeleteSelectedFolder,
                       onDeleteCurrentFolder: _deleteCurrentFolder,
                       onSelectFolder: _handleSelectFolder,
-                      onLongPressFolder:
-                          _controller.mode == FavoritePageMode.local
-                          ? _renameLocalFolder
+                      onLongPressFolder: _controller.supportsFolderRename
+                          ? _renameFolder
                           : null,
                     ),
                   FavoritePageContentSection(

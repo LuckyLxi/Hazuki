@@ -1,10 +1,11 @@
 import '../../support/source_presentation_fixtures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hazuki/features/comic_detail/view/comic_detail_meta.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 void main() {
@@ -59,7 +60,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ComicDetailMetaSection(
@@ -158,6 +159,85 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('compact tags and ID follow the animated detail palette', (
+    tester,
+  ) async {
+    final initial = ColorScheme.fromSeed(seedColor: Colors.blue);
+    final cover = ColorScheme.fromSeed(seedColor: Colors.red);
+    final appTheme = ThemeData(colorScheme: initial);
+
+    Future<void> render(ColorScheme scheme) => tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedTheme(
+          data: appTheme.copyWith(colorScheme: scheme),
+          child: Scaffold(
+            body: Column(
+              children: [
+                ComicDetailIdRow(
+                  useMobileStyle: true,
+                  id: '123',
+                  onCopy: () {},
+                ),
+                ComicDetailMetaRow(
+                  useMobileStyle: true,
+                  label: 'Tags',
+                  values: const ['Adventure'],
+                  onValuePressed: (_) {},
+                  onValueLongPress: (_) {},
+                ),
+                ComicDetailMetaRow(
+                  useMobileStyle: true,
+                  label: 'Status',
+                  values: const ['Ongoing'],
+                  onValuePressed: null,
+                  onValueLongPress: (_) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Color tagFill(ColorScheme scheme) {
+      final fills = tester
+          .widgetList<Ink>(
+            find.descendant(
+              of: find.byWidgetPredicate(
+                (widget) => widget is Chip || widget is ActionChip,
+              ),
+              matching: find.byType(Ink),
+            ),
+          )
+          .map((ink) => (ink.decoration! as ShapeDecoration).color!)
+          .toList();
+      expect(fills, hasLength(3));
+      expect(fills.toSet(), hasLength(1));
+      final fill = fills.first;
+      expect(fill.a, 1);
+      expect(
+        fill.computeLuminance(),
+        lessThan(scheme.surface.computeLuminance()),
+      );
+      for (final label in ['ID: 123', 'Adventure', 'Ongoing']) {
+        expect(
+          tester.widget<Text>(find.text(label)).style?.color,
+          scheme.onSurfaceVariant,
+        );
+      }
+      return fill;
+    }
+
+    await render(initial);
+    await tester.pumpAndSettle();
+    final initialFill = tagFill(initial);
+    expect(initialFill.b, greaterThan(initialFill.r));
+    await render(cover);
+    await tester.pumpAndSettle();
+    final coverFill = tagFill(cover);
+    expect(coverFill.r, greaterThan(coverFill.b));
+  });
+
   testWidgets('detail authors and tags use category-aware tag callback', (
     tester,
   ) async {
@@ -197,7 +277,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ComicDetailMetaSection(
@@ -271,7 +351,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ComicDetailMetaSection(
@@ -346,7 +426,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ComicDetailMetaSection(
@@ -383,7 +463,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: ComicDetailMetaSection(
@@ -429,7 +509,7 @@ void main() {
     Future<void> render(Locale locale) => tester.pumpWidget(
       MaterialApp(
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ComicDetailMetaSection(

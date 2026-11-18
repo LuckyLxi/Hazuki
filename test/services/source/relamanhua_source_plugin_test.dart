@@ -1,3 +1,5 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../../support/fake_source_task_control.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -49,7 +51,15 @@ List<String> _decryptImages(String name) {
       .toList();
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory root;
   late SourcePluginManager manager;
@@ -65,6 +75,7 @@ void main() {
       download: (_) async => throw StateError('Unexpected plugin download'),
     );
     assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -98,7 +109,7 @@ void main() {
       );
       await assembly.ensureSourceInitialized(_sourceId);
       expect(assembly.sourceMetadata(_sourceId)!.supportsAccount, isTrue);
-      expect(assembly.gateways.selection.runtimeState.isReady, isTrue);
+      expect(assembly.gateways.runtimeGateway.runtimeState.isReady, isTrue);
       expect(fixtures.requests, isEmpty);
     },
   );
@@ -168,7 +179,9 @@ void main() {
       'homepage preview $sectionIndex continues from catalog page one',
       () async {
         final controller = DiscoverPageController(
+          sourceUiService: sourceUiService,
           sourceService: assembly.gateways.discover,
+          taskControl: FakeSourceTaskControl(),
         );
         addTearDown(controller.dispose);
         await controller.loadInitial(

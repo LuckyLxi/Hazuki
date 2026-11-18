@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/state/downloads_page_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/l10n/app_localizations_zh.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
@@ -199,7 +200,7 @@ void main() {
     late BuildContext context;
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (builderContext) {

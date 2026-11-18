@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -280,6 +281,8 @@ class _FakeRuntimeResource implements SourceRuntimeResource {
 }
 
 class _FakeRuntimeHandle implements SourceRuntimeHandleView {
+  @override
+  final SourceUiService sourceUiService = SourceUiService();
   var activeOperationCount = 0;
 
   @override

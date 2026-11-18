@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import '../plugins/source_search_capabilities.dart';
 import 'package:flutter/foundation.dart';
 
@@ -17,6 +18,7 @@ abstract interface class SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
 }
 
@@ -27,8 +29,10 @@ abstract interface class SourceDailyRecommendationGateway
     implements SourceSearchGateway, SourceImageGateway {
   bool get isInitialized;
   bool get supportsDailyRecommendation;
+  String? get sourceRevision;
   DailyRecommendationConfig? dailyRecommendationForSource(String sourceKey);
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   });
 }

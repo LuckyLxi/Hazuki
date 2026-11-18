@@ -1,19 +1,23 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'dart:async';
 import 'dart:io';
-import 'package:hazuki/shared/reading/reader_entry_position.dart';
-import 'package:hazuki/services/source/content/source_cloud_reading.dart';
 
-import 'package:flutter/material.dart';
+import 'package:hazuki/shared/reading/reader_entry_position.dart';
+
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/shared/ui_flags.dart';
-import 'package:hazuki/shared/window/window_title_bar_control.dart';
+import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/source_presentation_fixtures.dart';
@@ -25,7 +29,10 @@ class _Reader extends Fake
         SourceReadingProgressGateway,
         SourceCloudReadingGateway {
   @override
-  Future<bool> usesCloudReading(String sourceKey) async => true;
+  Future<bool> usesCloudReading(
+    String sourceKey, {
+    SourceTaskOrigin? taskOrigin,
+  }) async => true;
   final events = <Map<String, Object>>[];
   @override
   bool isLocalImagePath(String value) => true;
@@ -52,9 +59,78 @@ class _Reader extends Fake
   Future<void> reportReadingProgress(
     Map<String, Object> progress, {
     required String sourceKey,
+    SourceTaskOrigin? taskOrigin,
   }) async {
     events.add(progress);
   }
+}
+
+class _NavigationReader extends _Reader {
+  _NavigationReader(this.bytes);
+
+  final Uint8List bytes;
+  final imageRequests = <(String, String)>[];
+
+  @override
+  bool isLocalImagePath(String value) {
+    imageRequests.add(('resolve', value));
+    return false;
+  }
+
+  @override
+  Future<PreparedChapterImageData> prepareChapterImageData(
+    String imageUrl, {
+    required String comicId,
+    required String epId,
+    bool useDiskCache = true,
+    bool priority = false,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) async => PreparedChapterImageData(
+    bytes: bytes,
+    extension: 'webp',
+    wasProcessed: false,
+    aspectRatio: 1,
+  );
+
+  @override
+  Future<Uint8List> downloadImageBytes(
+    String url, {
+    String comicId = '',
+    String epId = '',
+    bool keepInMemory = false,
+    bool useDiskCache = true,
+    bool priority = false,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) async {
+    imageRequests.add(('download', url));
+    return bytes;
+  }
+}
+
+class _DelayedProgress extends Fake implements ReadingProgressService {
+  final position = Completer<Map<String, dynamic>?>();
+  bool requested = false;
+
+  @override
+  Future<Map<String, dynamic>?> load({
+    required String comicId,
+    required String sourceKey,
+  }) {
+    requested = true;
+    return position.future;
+  }
+
+  @override
+  Future<void> save({
+    required String comicId,
+    required String sourceKey,
+    required String epId,
+    required String title,
+    required int chapterIndex,
+    required int pageIndex,
+  }) async {}
 }
 
 class _TitleBar extends ChangeNotifier implements WindowTitleBarControl {
@@ -70,7 +146,107 @@ class _TitleBar extends ChangeNotifier implements WindowTitleBarControl {
   Future<void> updateUseSystemTitleBar(bool value) async {}
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
+  testWidgets(
+    'navigation wins over a pending restore and prefetch follows no-image mode',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        ReaderSettingsStore.readingModeKey: 'right_to_left',
+        ReaderSettingsStore.windowsShortcutsGuideSeenKey: true,
+        ReaderSettingsStore.restorePagePositionKey: true,
+      });
+      await ensureTestServiceLocator();
+      final previous = hazukiNoImageModeNotifier.value;
+      hazukiNoImageModeNotifier.value = true;
+      addTearDown(() => hazukiNoImageModeNotifier.value = previous);
+      final data = await rootBundle.load(
+        'assets/images/downloaded_cover_placeholder.webp',
+      );
+      final reader = _NavigationReader(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+      final progress = _DelayedProgress();
+      final titleBar = _TitleBar();
+      addTearDown(titleBar.dispose);
+      final images = List.generate(6, (index) => 'https://example.test/$index');
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => withTestSourcePresentation(
+            HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
+          ),
+          home: ReaderPage(
+            title: 'Comic',
+            chapterTitle: 'Chapter',
+            comicId: 'c',
+            epId: 'e',
+            chapterIndex: 0,
+            images: images,
+            sourceKey: 'jm',
+            offlineMode: true,
+            dependencies: ReaderDependencies(
+              sourceUiService: sourceUiService,
+              sourceReader: reader,
+              cloudReading: reader,
+              readingProgressUploads: reader,
+              sourceSettings: sl<SourceSettingsGateway>(),
+              readingProgressService: progress,
+              downloader: sl<MangaDownloadService>(),
+            ),
+            commentsWidgetBuilder:
+                ({
+                  required comicId,
+                  required sourceKey,
+                  subId,
+                  chapterId,
+                  scrollController,
+                  onRequestTabFullscreen,
+                  interactionState,
+                }) => const SizedBox.shrink(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(progress.requested, isTrue);
+      final controller = tester
+          .widget<PageView>(find.byType(PageView))
+          .controller!;
+
+      // Isolate requests from navigation after the initial image setup.
+      reader.imageRequests.clear();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(controller.page, 1);
+      expect(reader.imageRequests, isEmpty);
+
+      progress.position.complete({'epId': 'e', 'imagePage': 5});
+      await tester.pumpAndSettle();
+      expect(controller.page, 1);
+
+      hazukiNoImageModeNotifier.value = false;
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(controller.page, 2);
+      expect(reader.imageRequests.first, ('resolve', images[2]));
+      expect(reader.imageRequests, contains(('download', images[3])));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final targetPage in [5, 99]) {
     final expectedTarget = targetPage.clamp(1, 6);
     for (final mode in ['right_to_left', 'top_to_bottom']) {
@@ -82,6 +258,7 @@ void main() {
               ReaderSettingsStore.readingModeKey: mode,
               ReaderSettingsStore.doublePageModeKey: doublePage,
               ReaderSettingsStore.windowsShortcutsGuideSeenKey: true,
+              ReaderSettingsStore.restorePagePositionKey: true,
             });
             await ensureTestServiceLocator();
             final previous = hazukiNoImageModeNotifier.value;
@@ -95,7 +272,7 @@ void main() {
               for (var i = 0; i < 6; i++) {
                 images.add(
                   (await File(
-                    'assets/images/downloaded_cover_placeholder.png',
+                    'assets/images/downloaded_cover_placeholder.webp',
                   ).copy('${directory.path}/$i.png')).path,
                 );
               }
@@ -109,7 +286,7 @@ void main() {
             await tester.pumpWidget(
               MaterialApp(
                 locale: const Locale('en'),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                localizationsDelegates: hazukiLocalizationsDelegates,
                 supportedLocales: AppLocalizations.supportedLocales,
                 builder: (context, child) => withTestSourcePresentation(
                   HazukiWindowsTitleBarScope(
@@ -132,7 +309,10 @@ void main() {
                     images: images,
                     sourceKey: 'jm',
                     dependencies: ReaderDependencies(
+                      sourceUiService: sourceUiService,
                       sourceReader: reader,
+                      cloudReading: reader,
+                      readingProgressUploads: reader,
                       sourceSettings: sl<SourceSettingsGateway>(),
                       readingProgressService: sl<ReadingProgressService>(),
                       downloader: sl<MangaDownloadService>(),

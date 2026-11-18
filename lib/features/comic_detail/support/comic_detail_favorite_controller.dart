@@ -1,11 +1,15 @@
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/source_task_owner.dart';
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
 
 import 'package:hazuki/shared/favorites/favorite_folders_view_model.dart';
@@ -13,30 +17,52 @@ import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/shared/favorites/favorite_selection_applier.dart';
 import 'package:hazuki/shared/favorites/favorite_selection_result.dart';
 
-import '../repository/comic_detail_repository.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 
 typedef ComicDetailFavoriteDialogBuilder =
     Widget Function(FavoriteFoldersViewModel viewModel);
 
-class ComicDetailFavoriteController extends ChangeNotifier {
-  ComicDetailFavoriteController({required ComicDetailFeatureFacade repository})
-    : _repository = repository;
+typedef ComicDetailHeaderActionRunner =
+    Future<ComicHeaderActionResult> Function({
+      required String comicId,
+      required String actionId,
+      String sourceKey,
+    });
 
-  final ComicDetailFeatureFacade _repository;
+class ComicDetailFavoriteController extends ChangeNotifier {
+  final SourceUiService sourceUiService;
+  ComicDetailFavoriteController({
+    required this.sourceUiService,
+    required SourceTaskControlGateway taskControl,
+    required FavoriteFoldersRepository favoriteFolders,
+    required ComicDetailHeaderActionRunner runComicHeaderAction,
+  }) : _readTasks = SourceTaskOwner(taskControl),
+       _favoriteFolders = favoriteFolders,
+       _runComicHeaderAction = runComicHeaderAction;
+
+  final FavoriteFoldersRepository _favoriteFolders;
+  final ComicDetailHeaderActionRunner _runComicHeaderAction;
   bool _disposed = false;
+  late final _sourceUi = SourceUiOwner(sourceUiService);
+  final SourceTaskOwner _readTasks;
 
   bool _busy = false;
-  bool _likeBusy = false;
+  String? _busyHeaderActionId;
   bool? _favoriteOverride;
   bool? _cloudFavoriteOverride;
-  bool? _likedOverride;
+  List<ComicHeaderStat>? _headerStatsOverride;
+  List<ComicHeaderBadge>? _headerBadgesOverride;
 
   bool get isBusy => _busy;
-  bool get isLikeBusy => _likeBusy;
-  bool get supportComicLike => _repository.supportComicLike;
+
+  /// 正在执行的插件顶部动作；执行期间其他插件动作暂不可点。
+  String? get busyHeaderActionId => _busyHeaderActionId;
   bool? get favoriteOverride => _favoriteOverride;
   bool? get cloudFavoriteOverride => _cloudFavoriteOverride;
-  bool? get likedOverride => _likedOverride;
+
+  /// 插件动作返回的新顶部内容，优先于详情数据显示。
+  List<ComicHeaderStat>? get headerStatsOverride => _headerStatsOverride;
+  List<ComicHeaderBadge>? get headerBadgesOverride => _headerBadgesOverride;
 
   void applyInitialOverrides({
     required bool favoriteOverride,
@@ -48,57 +74,60 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> toggleLike(
+  /// 执行插件声明的顶部动作，返回插件是否要求重新加载详情。
+  Future<bool> runHeaderAction(
     BuildContext context,
     ComicDetailsData details,
+    ComicHeaderStat stat,
   ) async {
-    if (_likeBusy) return;
-    if (!supportComicLike) {
-      unawaited(
-        showHazukiPrompt(
-          context,
-          l10n(context).comicDetailLikeActionFailed('not_supported'),
-          isError: true,
-        ),
-      );
-      return;
-    }
-
-    final nextLiked = !(_likedOverride ?? details.isLiked);
-    _likeBusy = true;
+    if (_busyHeaderActionId != null) return false;
+    _busyHeaderActionId = stat.actionId;
     notifyListeners();
 
     try {
-      await _repository.toggleComicLike(
-        comicId: details.id,
-        isLike: nextLiked,
-        sourceKey: details.sourceKey,
-      );
-      if (_disposed) return;
-      _likedOverride = nextLiked;
-      unawaited(
-        showHazukiPrompt(
-          context,
-          nextLiked
-              ? l10n(context).comicDetailLiked
-              : l10n(context).comicDetailUnliked,
+      // 插件可能在回调中弹窗，需要页面级交互作用域。
+      final result = await _sourceUi.run(
+        () => _runComicHeaderAction(
+          comicId: details.id,
+          actionId: stat.actionId,
+          sourceKey: details.sourceKey,
         ),
       );
+      if (_disposed) return false;
+      _headerStatsOverride = result.headerStats ?? _headerStatsOverride;
+      _headerBadgesOverride = result.headerBadges ?? _headerBadgesOverride;
+      return result.reload;
     } catch (e) {
-      if (_disposed) return;
+      if (_disposed ||
+          isSourceUiCancellation(e) ||
+          isSourceTaskCancellation(e)) {
+        return false;
+      }
       unawaited(
         showHazukiPrompt(
           context,
-          l10n(context).comicDetailLikeActionFailed('$e'),
+          l10n(context).comicDetailHeaderActionFailed('$e'),
           isError: true,
         ),
       );
+      return false;
     } finally {
       if (!_disposed) {
-        _likeBusy = false;
+        _busyHeaderActionId = null;
         notifyListeners();
       }
     }
+  }
+
+  /// 详情重新加载成功后，以新数据为准。
+  void clearHeaderOverrides() {
+    if (_disposed ||
+        _headerStatsOverride == null && _headerBadgesOverride == null) {
+      return;
+    }
+    _headerStatsOverride = null;
+    _headerBadgesOverride = null;
+    notifyListeners();
   }
 
   Future<void> showFoldersDialog(
@@ -111,9 +140,13 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     if (_busy) return;
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final singleFolderOnly = _repository.favoriteSingleFolderForSingleComic;
+    final folders = _favoriteFolders;
+    final singleFolderOnly = folders.favoriteSingleFolderForSingleComic;
+    _readTasks.restart();
     final viewModel = FavoriteFoldersViewModel(
-      repository: _repository,
+      sourceUiService: sourceUiService,
+      readTaskOrigin: _readTasks.origin(),
+      repository: folders,
       details: details,
       cloudFavoriteOverride: _cloudFavoriteOverride,
       initialIsFavorite: details.isFavorite,
@@ -213,16 +246,19 @@ class ComicDetailFavoriteController extends ChangeNotifier {
       if (changed == null || _disposed) return;
 
       if (!changed.hasChanges) return;
+      final selection = changed;
 
       _busy = true;
       notifyListeners();
 
       try {
-        final result = await applyFavoriteFolderSelectionChanges(
-          repository: _repository,
-          details: details,
-          selection: changed,
-          singleFolderOnly: singleFolderOnly,
+        final result = await _sourceUi.run(
+          () => applyFavoriteFolderSelectionChanges(
+            repository: folders,
+            details: details,
+            selection: selection,
+            singleFolderOnly: singleFolderOnly,
+          ),
         );
         if (_disposed) return;
         _favoriteOverride = result.hasSelection;
@@ -235,7 +271,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
           ),
         );
       } catch (e) {
-        if (_disposed) return;
+        if (_disposed || isSourceUiCancellation(e)) return;
         unawaited(
           showHazukiPrompt(
             context,
@@ -258,6 +294,8 @@ class ComicDetailFavoriteController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _readTasks.dispose();
+    _sourceUi.dispose();
     _disposed = true;
     super.dispose();
   }

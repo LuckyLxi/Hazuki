@@ -1,7 +1,9 @@
+import 'package:hazuki/services/source/source_task_owner.dart';
 import 'dart:async';
 import 'dart:ui' show FrameTiming;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../models/hazuki_models.dart';
@@ -9,11 +11,16 @@ import '../../../services/source/source_capabilities.dart';
 import '../../../shared/navigation_tags.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
-import '../support/category_tag_navigation.dart';
+import 'package:hazuki/shared/category_tag_navigation.dart';
+import 'package:hazuki/shared/navigation/route_transition_settled.dart';
 import 'discover_section_page.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 
 class TagCategoryPage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const TagCategoryPage({
+    required this.taskControl,
     super.key,
     required this.searchPageBuilder,
     required this.comicDetailPageBuilder,
@@ -74,7 +81,61 @@ class _TagCategoryGroupCard extends StatelessWidget {
   }
 }
 
-class _TagCategoryPageState extends State<TagCategoryPage> {
+/// 分组出现动画：仅淡入。
+///
+/// 只驱动透明度，内部卡片作为固定 child 不会随动画重建；
+/// 卡片自带 RepaintBoundary，淡入时只合成已缓存的图层。
+class _TagCategoryGroupReveal extends StatefulWidget {
+  const _TagCategoryGroupReveal({
+    required this.animateOnAppear,
+    required this.child,
+  });
+
+  final bool Function() animateOnAppear;
+  final Widget child;
+
+  @override
+  State<_TagCategoryGroupReveal> createState() =>
+      _TagCategoryGroupRevealState();
+}
+
+class _TagCategoryGroupRevealState extends State<_TagCategoryGroupReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _progress;
+
+  @override
+  void initState() {
+    super.initState();
+    final animate = widget.animateOnAppear();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+      value: animate ? 0 : 1,
+    );
+    _progress = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    if (animate) _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(opacity: _progress, child: widget.child);
+  }
+}
+
+class _TagCategoryPageState extends State<TagCategoryPage>
+    with RouteTransitionSettledMixin {
+  late final SourceUiOwner _sourceUi;
+  late final _readTasks = SourceTaskOwner(widget.taskControl);
   static const _loadTimeout = Duration(seconds: 25);
 
   SourceCategoryGateway get _sourceService => widget.categorySource;
@@ -88,11 +149,17 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
   late final String _sessionId;
   bool _frameTimingsCallbackAttached = false;
   DateTime? _lastJankLogAt;
+  // 分组卡片只在数据到达时创建一次，逐组展开时已显示的卡片复用同一实例而不重建
+  List<Widget> _groupCards = const <Widget>[];
   int _visibleGroupCount = 0;
+  int _revealGeneration = 0;
+  bool _revealStarted = false;
+  bool _revealingGroups = false;
 
   @override
   void initState() {
     super.initState();
+    _sourceUi = SourceUiOwner(SourcePresentationScope.uiOf(context));
     _sessionStartedAt = DateTime.now();
     _sessionId = _sessionStartedAt.microsecondsSinceEpoch.toString();
     if (_sourceService.softwareLogCaptureEnabled) {
@@ -118,6 +185,8 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
 
   @override
   void dispose() {
+    _readTasks.dispose();
+    _sourceUi.dispose();
     _logTagCategoryEvent('Tag category session ended');
     if (_frameTimingsCallbackAttached) {
       WidgetsBinding.instance.removeTimingsCallback(_handleFrameTimings);
@@ -180,13 +249,17 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
 
   Future<List<CategoryTagGroup>> _loadTagGroups() {
     final timeoutMessage = AppLocalizations.of(context)!.tagCategoryLoadTimeout;
-    return _sourceService.loadCategoryTagGroups().timeout(
-      _loadTimeout,
-      onTimeout: () => throw Exception(timeoutMessage),
+    return _sourceUi.run(
+      () => SourceUiScope.timeout(
+        _sourceService.loadCategoryTagGroups(taskOrigin: _readTasks.origin()),
+        _loadTimeout,
+        onTimeout: () => throw Exception(timeoutMessage),
+      ),
     );
   }
 
   Future<void> _loadInitial() async {
+    _readTasks.restart();
     if (!mounted) {
       return;
     }
@@ -195,7 +268,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
       setState(() {
         _initialLoading = true;
         _errorMessage = null;
-        _visibleGroupCount = 0;
+        _resetGroupReveal();
       });
     }
 
@@ -210,13 +283,18 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
 
       setState(() {
         _tagGroups = tagGroups;
+        _groupCards = [
+          for (final group in tagGroups)
+            _TagCategoryGroupReveal(
+              animateOnAppear: _isRevealingGroups,
+              child: _TagCategoryGroupCard(group: group, onOpenTag: _openTag),
+            ),
+        ];
         _errorMessage = null;
         _initialLoading = false;
-        _visibleGroupCount = tagGroups.isEmpty ? 0 : 1;
+        _resetGroupReveal();
+        _startGroupReveal();
       });
-      if (tagGroups.length > 1) {
-        _revealGroupsIncrementally(tagGroups);
-      }
       _logTagCategoryEvent(
         'Tag category load succeeded',
         content: {
@@ -236,7 +314,6 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
       setState(() {
         _errorMessage = message;
         _initialLoading = false;
-        _visibleGroupCount = 0;
       });
       _logTagCategoryEvent(
         'Tag category load failed',
@@ -249,13 +326,38 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
     }
   }
 
-  void _revealGroupsIncrementally(List<CategoryTagGroup> tagGroups) {
+  @override
+  void didSettleRouteTransition() => _startGroupReveal();
+
+  void _resetGroupReveal() {
+    _revealGeneration++;
+    _revealStarted = false;
+    _revealingGroups = false;
+    _visibleGroupCount = 0;
+  }
+
+  /// 逐组展开期间新出现的分组播放出现动画；展开结束后滚动带出的分组直接显示
+  bool _isRevealingGroups() => _revealingGroups;
+
+  /// 入场动画结束且数据已到达后，每帧多显示一组，把标签构建分摊到多帧
+  void _startGroupReveal() {
+    if (_revealStarted || !routeTransitionSettled || _initialLoading) return;
+    if (_groupCards.isEmpty) return;
+    _revealStarted = true;
+    _revealingGroups = true;
+    _visibleGroupCount = 1;
+    _scheduleNextGroupReveal(_revealGeneration);
+  }
+
+  void _scheduleNextGroupReveal(int generation) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _visibleGroupCount >= tagGroups.length) return;
-      setState(() {
-        _visibleGroupCount++;
-      });
-      _revealGroupsIncrementally(tagGroups);
+      if (!mounted || generation != _revealGeneration) return;
+      if (_visibleGroupCount >= _groupCards.length) {
+        _revealingGroups = false;
+        return;
+      }
+      setState(() => _visibleGroupCount++);
+      _scheduleNextGroupReveal(generation);
     });
   }
 
@@ -275,7 +377,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
             ),
             comicDetailPageBuilder: widget.comicDetailPageBuilder,
             sourceService: widget.discoverSource,
-            scrollSortBarWithContent: true,
+            taskControl: widget.taskControl,
           ),
         ),
       );
@@ -297,7 +399,8 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
           context: context,
           title: Text(strings.tagCategoryTitle),
         ),
-        body: _initialLoading
+        // 过渡动画结束前保持加载态，避免大量标签的构建挤进动画帧
+        body: _initialLoading || !routeTransitionSettled
             ? ListView(
                 children: [
                   const SizedBox(height: 160),
@@ -361,11 +464,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
                     );
                   }
 
-                  final group = _tagGroups[index - 1];
-                  return _TagCategoryGroupCard(
-                    group: group,
-                    onOpenTag: _openTag,
-                  );
+                  return _groupCards[index - 1];
                 },
               ),
       ),

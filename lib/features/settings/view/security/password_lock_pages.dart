@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/password_lock_service.dart';
-import 'package:hazuki/features/password_lock/view/password_lock_widgets.dart';
+import 'package:hazuki/features/password_lock/password_lock.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class PasswordLockIntroPage extends StatefulWidget {
@@ -94,12 +94,7 @@ class _PasswordLockSetupPageState extends State<PasswordLockSetupPage> {
   String _input = '';
   bool _saving = false;
   bool _errorHighlight = false;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(PasswordLockAnimationCache.ensureLoaded());
-  }
+  int _errorVersion = 0;
 
   Future<void> _appendDigit(String digit) async {
     if (_saving || _input.length >= 4) {
@@ -116,7 +111,13 @@ class _PasswordLockSetupPageState extends State<PasswordLockSetupPage> {
     setState(() {
       _saving = true;
     });
-    await Future<void>.delayed(const Duration(milliseconds: 180));
+    // 锁梁扣合的瞬间震动，并留出扣合与对勾动画的时间再离开页面
+    await Future<void>.delayed(const Duration(milliseconds: 230));
+    if (!mounted) {
+      return;
+    }
+    unawaited(HapticFeedback.heavyImpact());
+    await Future<void>.delayed(const Duration(milliseconds: 420));
     try {
       await widget.service.enableWithPin(_input);
       if (!mounted) {
@@ -131,6 +132,7 @@ class _PasswordLockSetupPageState extends State<PasswordLockSetupPage> {
         _saving = false;
         _input = '';
         _errorHighlight = true;
+        _errorVersion++;
       });
       unawaited(
         showHazukiPrompt(
@@ -171,7 +173,12 @@ class _PasswordLockSetupPageState extends State<PasswordLockSetupPage> {
               child: Column(
                 children: [
                   const SizedBox(height: 8),
-                  const PasswordLockAnimationHeader(size: 244),
+                  PasswordLockAnimationHeader(
+                    size: 244,
+                    filledCount: _input.length,
+                    errorVersion: _errorVersion,
+                    completed: _saving,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     l10n(context).privacyPasswordLockSetupInstruction,

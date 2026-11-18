@@ -1,8 +1,12 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/app/source_runtime/source_plugin_dialog_presenter.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/models/source_script_execution.dart';
 import 'package:hazuki/services/source/account/source_browser_authorization.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 import 'package:hazuki/shared/source_account/source_authorization_browser.dart';
@@ -11,6 +15,8 @@ import 'package:hazuki/shared/source_account/source_browser_authorization_dialog
 class _Browser
     implements SourceAuthorizationBrowser, SourceAuthorizationCookieBrowser {
   List<Map<String, Object?>> cookies = [];
+  @override
+  Future<String> readUserAgent() async => 'Synthetic browser UA';
   @override
   Future<List<Map<String, Object?>>> readCookies(
     List<SourceAuthorizationCookieScope> scopes,
@@ -32,13 +38,282 @@ class _Browser
   }
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
+  testWidgets(
+    'plugin close waits for WebView exit before showing the next dialog',
+    (tester) async {
+      final key = GlobalKey<NavigatorState>();
+      final browser = _Browser()..ready.complete();
+      final presenter = SourcePluginDialogPresenter(
+        sourceUiService: sourceUiService,
+        key,
+        browserFactory: () => browser,
+      );
+      addTearDown(presenter.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: key,
+          navigatorObservers: [presenter],
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: Text('Home')),
+        ),
+      );
+      final service = sourceUiService;
+      const task = SourceScriptExecution(
+        taskId: 'web-close',
+        pluginId: 'test',
+        method: 'callback',
+      );
+      final id = service.handle(
+        {
+          'method': 'ui_browser_create',
+          'options': {'url': 'https://site.example/', 'completion': 'manual'},
+        },
+        task,
+        'web-runtime',
+        'Test',
+      );
+      final result =
+          service.handle(
+                {'method': 'ui_browser_result', 'id': id},
+                task,
+                'web-runtime',
+                'Test',
+              )
+              as Future;
+      await tester.pumpAndSettle();
+      final next =
+          service.handle(
+                {
+                  'method': 'ui_open',
+                  'options': {
+                    'title': 'Next dialog',
+                    'content': [],
+                    'buttons': [
+                      {'id': 'ok', 'text': 'OK'},
+                    ],
+                  },
+                },
+                task,
+                'web-runtime',
+                'Test',
+              )
+              as Future;
+      var finished = false;
+      final closing =
+          (service.handle(
+                    {'method': 'ui_browser_close', 'id': id},
+                    task,
+                    'web-runtime',
+                    'Test',
+                  )
+                  as Future)
+              .then((_) => finished = true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(browser.closed, false);
+      expect(finished, false);
+      expect(find.text('Browser content'), findsOneWidget);
+      expect(find.text('Next dialog'), findsNothing);
+      await tester.pumpAndSettle();
+      await closing;
+      expect(browser.closed, true);
+      expect(finished, true);
+      expect(await result, {'status': 'closed', 'reason': 'plugin'});
+      expect(find.text('Next dialog'), findsOneWidget);
+      service.handle(
+        {'method': 'ui_browser_close', 'id': id},
+        task,
+        'web-runtime',
+        'Test',
+      );
+      expect(find.text('Next dialog'), findsOneWidget);
+      service.handle(
+        {'method': 'ui_close', 'id': await next},
+        task,
+        'web-runtime',
+        'Test',
+      );
+      await tester.pumpAndSettle();
+      service.releaseExecution(task, 'web-runtime');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final factoryFailure in [false, true]) {
+    testWidgets('global browser preserves failures and permits retry: '
+        'factoryFailure=$factoryFailure', (tester) async {
+      final key = GlobalKey<NavigatorState>();
+      final failedBrowser = _Browser()..ready.complete();
+      final retryBrowser = _Browser()..ready.complete();
+      var attempts = 0;
+      final code = factoryFailure
+          ? 'login_browser_unavailable'
+          : 'login_browser_load_failed';
+      final presenter = SourcePluginDialogPresenter(
+        sourceUiService: sourceUiService,
+        key,
+        browserFactory: () {
+          if (attempts++ == 0) {
+            if (factoryFailure) {
+              throw SourceBrowserAuthorizationException(code);
+            }
+            return failedBrowser;
+          }
+          return retryBrowser;
+        },
+      );
+      addTearDown(presenter.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: key,
+          navigatorObservers: [presenter],
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: Text('Home')),
+        ),
+      );
+      const execution = SourceScriptExecution(
+        taskId: 'browser-retry',
+        pluginId: 'test',
+        method: 'download',
+      );
+      final service = sourceUiService;
+      Future<dynamic> open() => service.runBrowserAuthorization(
+        () => service.handle(
+          {
+            'method': 'ui_browser',
+            'options': {'url': 'https://site.example/', 'completion': 'manual'},
+          },
+          execution,
+          'retry-runtime',
+          'Test',
+        ),
+        execution: execution,
+        runtimeId: 'retry-runtime',
+        timeout: const Duration(minutes: 5),
+      );
+      final rejected = expectLater(
+        open(),
+        throwsA(
+          isA<SourceBrowserAuthorizationException>().having(
+            (error) => error.code,
+            'code',
+            code,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      if (!factoryFailure) failedBrowser.session.fail(code);
+      await tester.pumpAndSettle();
+      await rejected;
+      expect(service.scopes.single.available, true);
+      final retry = open();
+      await tester.pumpAndSettle();
+      expect(find.text('Browser content'), findsOneWidget);
+      await retryBrowser.session.complete();
+      await tester.pumpAndSettle();
+      expect((await retry as Map)['status'], 'completed');
+      expect(find.text('Home'), findsOneWidget);
+      expect(retryBrowser.closed, true);
+      expect(tester.takeException(), isNull);
+      service.releaseExecution(execution, 'retry-runtime');
+      await tester.pumpAndSettle();
+      expect(service.scopes, isEmpty);
+    });
+  }
+
+  for (final covered in [false, true]) {
+    testWidgets(
+      'global WebView completes without a login scope, covered: $covered',
+      (tester) async {
+        final key = GlobalKey<NavigatorState>();
+        final browser = _Browser()..ready.complete();
+        final presenter = SourcePluginDialogPresenter(
+          sourceUiService: sourceUiService,
+          key,
+          browserFactory: () => browser,
+        );
+        addTearDown(presenter.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            navigatorKey: key,
+            navigatorObservers: [presenter],
+            locale: const Locale('en'),
+            localizationsDelegates: hazukiLocalizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: Text('Home')),
+          ),
+        );
+        const execution = SourceScriptExecution(
+          taskId: 'global-web',
+          pluginId: 'test',
+          method: 'download',
+        );
+        final result =
+            sourceUiService.handle(
+                  {
+                    'method': 'ui_browser',
+                    'options': {
+                      'title': 'Verify website',
+                      'url': 'https://site.example/',
+                      'completion': 'manual',
+                    },
+                  },
+                  execution,
+                  'web-runtime',
+                  'Test',
+                )
+                as Future;
+        await tester.pumpAndSettle();
+        expect(find.text('Browser content'), findsOneWidget);
+        if (covered) {
+          unawaited(
+            key.currentState!.push(
+              MaterialPageRoute<void>(
+                builder: (_) => const Scaffold(body: Text('New page')),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        browser.session.navigate(
+          'https://site.example/verified',
+          isMainFrame: true,
+        );
+        if (covered) {
+          await browser.session.complete();
+        } else {
+          await tester.tap(find.text('Complete login'));
+        }
+        await tester.pumpAndSettle();
+        expect(await result, {
+          'status': 'completed',
+          'url': 'https://site.example/verified',
+        });
+        expect(browser.closed, true);
+        expect(find.text(covered ? 'New page' : 'Home'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        sourceUiService.releaseExecution(execution, 'web-runtime');
+      },
+    );
+  }
+
   Future<BuildContext> mount(WidgetTester tester) async {
     late BuildContext context;
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (c) {
@@ -96,6 +371,10 @@ void main() {
         },
       ];
       await tester.tap(find.text('Complete login'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(browser.closed, isFalse);
+      expect(find.text('Browser content'), findsOneWidget);
       await tester.pumpAndSettle();
       expect((await future as Map)['status'], 'completed');
       expect(browser.closed, isTrue);
@@ -282,6 +561,10 @@ void main() {
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
       messenger.setMockMethodCallHandler(channel, (call) async {
         calls.add(call.method);
+        if (call.method == 'userAgent') {
+          expect(call.arguments['id'], isA<String>());
+          return 'Actual Android UA';
+        }
         return true;
       });
       addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
@@ -291,6 +574,7 @@ void main() {
       );
       final backend = AndroidSourceAuthorizationBrowser();
       await backend.prepare(session);
+      expect(await backend.readUserAgent(), 'Actual Android UA');
       Future<void> event(String value) async {
         final done = Completer<void>();
         await messenger.handlePlatformMessage(
@@ -310,7 +594,7 @@ void main() {
         'url': 'https://site.example/done?token=synthetic',
       });
       await backend.close();
-      expect(calls, ['prepare', 'close']);
+      expect(calls, ['prepare', 'userAgent', 'close']);
       session.dispose();
     },
   );

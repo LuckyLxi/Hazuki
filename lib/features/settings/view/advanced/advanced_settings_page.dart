@@ -1,34 +1,31 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/ui_flags.dart';
+import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'advanced_settings_content.dart';
+import '../debug/favorites_debug_page.dart';
 import '../settings_group.dart';
+import '../source_editor/source_editor_page.dart';
 import '../../support/other_settings_actions.dart';
 import '../plugins/source_plugin_action_widgets.dart';
 
 class AdvancedSettingsPage extends StatefulWidget {
   const AdvancedSettingsPage({
     super.key,
-    required this.logsPageBuilder,
-    required this.comicSourceEditorPageBuilder,
-    required this.restoreComicSource,
-    this.redownloadComicSource,
     required this.sourceService,
+    required this.debugGateway,
     required this.softwareUpdateService,
     this.sourcePlugins,
   });
 
-  final WidgetBuilder logsPageBuilder;
-  final WidgetBuilder comicSourceEditorPageBuilder;
-  final Future<bool> Function(BuildContext context) restoreComicSource;
-  final Future<bool> Function(BuildContext context)? redownloadComicSource;
-  final SourceAdvancedGateway sourceService;
+  final SourceScriptGateway sourceService;
+  final SourceDebugGateway debugGateway;
   final SoftwareUpdateService softwareUpdateService;
   final SourcePluginGateway? sourcePlugins;
 
@@ -37,7 +34,7 @@ class AdvancedSettingsPage extends StatefulWidget {
 }
 
 class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
-  SourceAdvancedGateway get _sourceService => widget.sourceService;
+  SourceScriptGateway get _sourceService => widget.sourceService;
   SoftwareUpdateService get _softwareUpdateService =>
       widget.softwareUpdateService;
   bool _noImageMode = false;
@@ -69,9 +66,10 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final noImageMode = await const HazukiGeneralPreferencesStore()
+        .loadNoImageModeEnabled();
     final hasSourceBackup = await _sourceService.hasActiveSourceBackup();
-    final softwareLogCaptureEnabled = await _sourceService
+    final softwareLogCaptureEnabled = await widget.debugGateway
         .loadSoftwareLogCaptureEnabled();
     final softwareUpdateSource = await _softwareUpdateService
         .loadUpdateSource();
@@ -80,7 +78,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
       return;
     }
     setState(() {
-      _noImageMode = prefs.getBool(hazukiNoImageModePreferenceKey) ?? false;
+      _noImageMode = noImageMode;
       _softwareLogCaptureEnabled = softwareLogCaptureEnabled;
       _hasSourceBackup = hasSourceBackup;
       _autoSourceUpdateCheckEnabled = updateChecks.source;
@@ -97,7 +95,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   Future<void> _toggleSoftwareLogCaptureEnabled(bool value) async {
     setState(() => _softwareLogCaptureEnabled = value);
-    await _sourceService.setSoftwareLogCaptureEnabled(value);
+    await widget.debugGateway.setSoftwareLogCaptureEnabled(value);
   }
 
   Future<void> _setSoftwareUpdateSource(SoftwareUpdateSource value) async {
@@ -127,7 +125,9 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   Future<void> _openComicSourceEditor() async {
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: widget.comicSourceEditorPageBuilder),
+      MaterialPageRoute<void>(
+        builder: (_) => ComicSourceEditorPage(sourceService: _sourceService),
+      ),
     );
     if (!mounted) {
       return;
@@ -136,7 +136,11 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   }
 
   Future<void> _restoreComicSource() async {
-    final restored = await widget.restoreComicSource(context);
+    final restored = await showComicSourceRestoreDialog(
+      context,
+      sourceService: _sourceService,
+      backupService: _sourceService,
+    );
     if (!mounted || !restored) {
       return;
     }
@@ -149,7 +153,10 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   }
 
   Future<void> _redownloadComicSource() async {
-    final restored = await widget.redownloadComicSource!(context);
+    final restored = await showComicSourceRestoreDialog(
+      context,
+      sourceService: _sourceService,
+    );
     if (!mounted || !restored) return;
     await _refreshSourceBackupState();
     if (!mounted) return;
@@ -164,12 +171,13 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
     SourcePluginButton button,
   ) async {
     final strings = AppLocalizations.of(context)!;
+    final scope = SourceUiScope.current;
     try {
       final result = await widget.sourcePlugins!.runAction(
         sourceKey,
         button.action!,
       );
-      if (!mounted) {
+      if (!mounted || scope?.available == false) {
         return;
       }
       await showHazukiPrompt(
@@ -186,7 +194,9 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
         ),
       );
     } catch (error) {
-      if (!mounted) {
+      if (!mounted ||
+          scope?.available == false ||
+          isSourceUiCancellation(error)) {
         return;
       }
       await showHazukiPrompt(
@@ -226,6 +236,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
               : SourcePluginActionList(
                   gateway: widget.sourcePlugins!,
                   location: SourcePluginActionLocation.advanced,
+                  title: strings.otherSectionPlugins,
                 ),
           loading: _loading,
           noImageMode: _noImageMode,
@@ -235,24 +246,33 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           softwareUpdateSource: _softwareUpdateSource,
           hasSourceBackup: _hasSourceBackup,
           onRedownloadComicSource:
-              widget.redownloadComicSource != null &&
-                  widget.sourcePlugins?.pluginFor(sourceKey)?.repository != null
+              widget.sourcePlugins?.pluginFor(sourceKey)?.repository != null
               ? _redownloadComicSource
               : null,
           sourceDeviceAction:
               deviceAction == null || widget.sourcePlugins == null
               ? null
-              : ListTile(
-                  leading: const Icon(Icons.phonelink_erase_outlined),
-                  title: Text(
-                    buttonText(deviceAction.title ?? deviceAction.id),
+              : SourcePluginButtonInteraction(
+                  id: deviceAction.id,
+                  sourceKey: sourceKey,
+                  gateway: widget.sourcePlugins,
+                  title: buttonText(deviceAction.title ?? deviceAction.id),
+                  onInvoke: () =>
+                      _runSourceDeviceAction(sourceKey, deviceAction),
+                  builder: (context, activate) => ListTile(
+                    leading: const SettingsLeadingIcon(
+                      Icons.phonelink_erase_outlined,
+                    ),
+                    title: Text(
+                      buttonText(deviceAction.title ?? deviceAction.id),
+                    ),
+                    subtitle: deviceAction.subtitle == null
+                        ? null
+                        : Text(buttonText(deviceAction.subtitle)),
+                    onTap: activate,
                   ),
-                  subtitle: deviceAction.subtitle == null
-                      ? null
-                      : Text(buttonText(deviceAction.subtitle)),
-                  onTap: () => _runSourceDeviceAction(sourceKey, deviceAction),
                 ),
-          logsPageBuilder: widget.logsPageBuilder,
+          logsPageBuilder: (_) => LogsPage(debugGateway: widget.debugGateway),
           onToggleNoImageMode: _toggleNoImageMode,
           onToggleSoftwareLogCaptureEnabled: _toggleSoftwareLogCaptureEnabled,
           onToggleAutoSourceUpdateCheck: _toggleAutoSourceUpdateCheck,

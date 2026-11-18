@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app_settings_store.dart';
-import 'package:hazuki/app/appearance_settings.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/app/hazuki_app_controller.dart';
 import 'package:hazuki/app/theme/hazuki_theme_controller.dart';
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -51,6 +51,9 @@ void main() {
     ).thenAnswer((_) async {});
     when(windowsTitleBarController.reloadFromStore).thenAnswer((_) async {});
 
+    final chineseConversion = ChineseConversionService();
+    addTearDown(chineseConversion.dispose);
+
     final controller = HazukiAppController(
       settingsStore: settingsStore,
       themeController: themeController,
@@ -64,6 +67,7 @@ void main() {
       refreshHome: () {
         refreshCount++;
       },
+      chineseConversion: chineseConversion,
     );
 
     await controller.applyCloudSyncRestore(
@@ -79,7 +83,7 @@ void main() {
     expect(appliedRuntimeAppearances, [appearance]);
     expect(localeReloadCount, 1);
     expect(refreshCount, 1);
-    expect(hazukiChineseConversion.mode, ChineseConversionMode.simplified);
+    expect(chineseConversion.mode, ChineseConversionMode.simplified);
     verify(() => themeController.applyRestoredSettings(appearance)).called(1);
     verify(() => windowsTitleBarController.reloadFromStore()).called(1);
   });

@@ -1,9 +1,12 @@
-import 'package:flutter/material.dart';
+import '../../support/source_presentation_fixtures.dart';
+import '../../support/fake_source_task_control.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/discover/view/ranking_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -23,12 +26,15 @@ void main() {
 
   testWidgets('starts initial ranking load after first build', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: RankingPage(
-          sourceService: _FakeRankingSource(),
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: RankingPage(
+            sourceService: _FakeRankingSource(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     );
@@ -55,12 +61,15 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: RankingPage(
-          sourceService: _FakeRankingSource(),
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: RankingPage(
+            sourceService: _FakeRankingSource(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     );
@@ -110,12 +119,15 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: RankingPage(
-          sourceService: _FakeRankingSource(),
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: RankingPage(
+            sourceService: _FakeRankingSource(),
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     );
@@ -136,13 +148,15 @@ class _FakeRankingSource implements SourceCategoryGateway {
   bool get softwareLogCaptureEnabled => false;
 
   @override
-  Future<List<CategoryRankingOption>> loadCategoryRankingOptions() async =>
-      const [CategoryRankingOption(value: 'all', label: 'All')];
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptions({
+    SourceTaskOrigin? taskOrigin,
+  }) async => const [CategoryRankingOption(value: 'all', label: 'All')];
 
   @override
   Future<CategoryComicsResult> loadCategoryRankingComics({
     required String rankingOption,
     required int page,
+    SourceTaskOrigin? taskOrigin,
   }) async => CategoryComicsResult(
     maxPage: 1,
     comics: List.generate(
@@ -160,6 +174,7 @@ class _FakeRankingSource implements SourceCategoryGateway {
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async => const [];
 
   @override

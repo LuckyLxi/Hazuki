@@ -38,6 +38,13 @@ uniform float uFresnelStrength;
 // 34: uBodyMode — 0.0 = adaptive (default, iOS 26 Glass.regular), 1.0 = clear (iOS 26 Glass.clear).
 // In clear mode, luminance normalization is bypassed for direct alpha compositing.
 uniform float uBodyMode;
+// 35..40: opt-in circular lens, using the premium material's logical units.
+uniform float uLensModel;
+uniform float uRefractionAmount;
+uniform float uRimShade;
+uniform float uRimShadeEnds;
+uniform float uRimLight;
+uniform float uBlur;
 
 uniform sampler2D uBackground; // The captured background texture
 // Slot 22 (uData5.z): specular sharpness level — passed as float 0.0/1.0/2.0, cast to int.
@@ -141,6 +148,24 @@ float meniscusAbsorption(
 
 out vec4 fragColor;
 
+vec4 sampleCircularBackdrop(vec2 position, vec2 backgroundSize) {
+  vec2 uv = position / backgroundSize;
+  float coverage = step(0.0, uv.x) * step(uv.x, 1.0)
+                 * step(0.0, uv.y) * step(uv.y, 1.0);
+  vec4 color = texture(uBackground, clamp(uv, 0.0, 1.0));
+  if (uBlur > 0.001) {
+    // A small separable-kernel approximation, sampled from the shared texture.
+    // Unlike a live backdrop blur, this is applied before the lens displacement.
+    vec2 delta = vec2(uBlur * 1.5) / backgroundSize;
+    color *= 0.4;
+    color += texture(uBackground, clamp(uv + vec2(delta.x, 0.0), 0.0, 1.0)) * 0.15;
+    color += texture(uBackground, clamp(uv - vec2(delta.x, 0.0), 0.0, 1.0)) * 0.15;
+    color += texture(uBackground, clamp(uv + vec2(0.0, delta.y), 0.0, 1.0)) * 0.15;
+    color += texture(uBackground, clamp(uv - vec2(0.0, delta.y), 0.0, 1.0)) * 0.15;
+  }
+  return color * coverage;
+}
+
 void main() {
   vec2 uSize = uData0.xy;
   vec2 uOrigin = uData0.zw;
@@ -213,6 +238,59 @@ void main() {
   // we do not need to re-clamp and calculate vector magnitudes.
   bool isEdge = maxQLen > kNormalThreshold;
   vec2 surfaceNormal = isEdge ? (sign(p) * maxQ / maxQLen) : vec2(0.0);
+
+  if (uLensModel > 1.5) {
+    // Match the premium circular-arc bevel (thickness is expressed at 3x).
+    if (!isEdge) {
+      surfaceNormal = q.x > q.y ? vec2(sign(p.x), 0.0) : vec2(0.0, sign(p.y));
+    }
+    float inset = max(-dist, 0.0);
+    float bevel = max(0.001, min(uThickness / 3.0, min(halfSize.x, halfSize.y)));
+    float slope = clamp(1.0 - inset / bevel, 0.0, 1.0);
+    float arc = 1.0 - sqrt(max(0.0, 1.0 - slope * slope));
+    vec2 direction = surfaceNormal;
+    if (uLensModel > 2.5) {
+      direction += p / max(length(p), 1e-4);
+      direction /= max(length(direction), 1e-4);
+    }
+    vec2 displacement = -direction * arc
+                      * min(uRefractionAmount, min(halfSize.x, halfSize.y));
+    float hairline = (1.0 - smoothstep(0.25, 0.667, inset))
+                   * step(0.001, uRimShade);
+    displacement = mix(displacement, surfaceNormal * 0.833, hairline);
+    vec4 background = vec4(0.0);
+    if (uBackgroundSize.x > 1.0) {
+      background = sampleCircularBackdrop(
+        uBackgroundOrigin + localLogical + displacement, uBackgroundSize);
+    }
+    // Premultiplied coverage keeps true black artwork valid and lets uncaptured
+    // areas show their live backdrop instead of inventing a solid texture.
+    vec3 straightBg = background.rgb / max(background.a, 1e-4);
+    float luma = dot(straightBg, LUMA_WEIGHTS);
+    vec3 saturated = mix(vec3(luma), straightBg, uSaturation);
+    float alpha = background.a + uGlassColor.a * (1.0 - background.a);
+    vec3 rgb = saturated * background.a * (1.0 - uGlassColor.a)
+             + uGlassColor.rgb * uGlassColor.a;
+    float along = dot(surfaceNormal, uLightDirection);
+    float primary = pow(max(along, 0.0), 4.0);
+    float secondary = pow(max(-along, 0.0), 4.0) * 0.4;
+    float core = 1.0 - smoothstep(0.0, 1.0, inset);
+    float bloom = exp(-inset / 2.0);
+    float reflection = clamp((0.08 * uFresnelStrength
+                     + (primary + secondary) * uLightIntensity)
+                     * (0.65 * core + 0.35 * bloom), 0.0, 0.85);
+    rgb = mix(rgb, vec3(1.0), reflection);
+    alpha += reflection * (1.0 - alpha);
+    float across = pow(max(1.0 - along * along, 0.0), 1.75);
+    float shade = uRimShade * 0.314 * mix(uRimShadeEnds, 1.0, across);
+    rgb = max(rgb - vec3(shade * hairline * alpha), 0.0);
+    float innerLight = uRimLight * (primary + secondary)
+                     * (0.175 * exp(-inset / 0.667)
+                     + 0.035 * exp(-inset / 2.667)) * (1.0 - hairline);
+    rgb = clamp(rgb + vec3(innerLight * alpha), 0.0, alpha);
+    fragColor = vec4(rgb * mask, alpha * mask);
+    return;
+  }
 
   // normalZ: the Z component of the 3D surface normal (view-facing component).
   // normalZ → 0 at the rim (surface nearly perpendicular to view ray)

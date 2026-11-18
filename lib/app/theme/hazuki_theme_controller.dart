@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../shared/appearance/appearance_settings_scope.dart';
 export '../../shared/appearance/appearance_settings_scope.dart';
 
 import '../app_settings_store.dart';
-import '../appearance_settings.dart';
+import '../../shared/appearance/appearance_settings.dart';
 
 class HazukiThemeController extends ChangeNotifier
     implements AppearanceSettingsSource {

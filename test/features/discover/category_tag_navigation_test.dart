@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/discover/support/category_tag_navigation.dart';
+import 'package:hazuki/shared/category_tag_navigation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 void main() {

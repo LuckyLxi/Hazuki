@@ -1,15 +1,15 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
-import 'package:hazuki/services/cloud_sync/cloud_sync_restore_applier.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
@@ -38,6 +38,7 @@ class _CloudSyncFixture {
   factory _CloudSyncFixture.create() {
     final database = HazukiDatabase.memory();
     final source = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       initialCatalog: hazukiAllowedSourceCatalog,
     );
     final readHistory = ReadHistoryService(database: database);
@@ -54,7 +55,7 @@ class _CloudSyncFixture {
       downloadGroups: downloadGroups,
       searchHistory: searchHistory,
       participants: createCloudSyncParticipantSet(
-        source: source.gateways.sync,
+        source: source.gateways.script,
         readHistory: readHistory,
         readingProgress: readingProgress,
         localFavorites: localFavorites,
@@ -99,7 +100,15 @@ class _FakeCloudSyncRemoteClient extends CloudSyncRemoteClient {
   Future<String?> tryGetBackupFile(String fileName) async => files[fileName];
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     _fixture = _CloudSyncFixture.create();
@@ -107,7 +116,7 @@ void main() {
   });
   tearDown(() => _fixture.dispose());
 
-  group('CloudSyncRestoreApplier source-scoped reading data', () {
+  group('source-scoped reading restore', () {
     setUp(() {
       SharedPreferences.setMockInitialValues(const {});
     });
@@ -115,9 +124,7 @@ void main() {
     test(
       'restores progress with sourceKey in the preference key and payload',
       () async {
-        await CloudSyncRestoreApplier(
-          participants: _participants,
-        ).applyReadingSnapshot(
+        await _participants.reading.restoreSnapshot(
           jsonEncode({
             'history': [
               {
@@ -445,9 +452,7 @@ void main() {
 
       final snapshot = await historyService.exportSyncJsonl();
       await historyService.clear();
-      await CloudSyncRestoreApplier(
-        participants: _participants,
-      ).applySearchHistoryJsonl(snapshot);
+      await _participants.searchHistory.restoreSnapshot(snapshot);
 
       expect(await historyService.load(), ['keyword']);
     });
@@ -458,9 +463,7 @@ void main() {
         (index) => jsonEncode({'keyword': 'keyword-$index'}),
       ).join('\n');
 
-      await CloudSyncRestoreApplier(
-        participants: _participants,
-      ).applySearchHistoryJsonl(backupSearchHistory);
+      await _participants.searchHistory.restoreSnapshot(backupSearchHistory);
 
       final history = await _fixture.searchHistory.load();
       expect(history, hasLength(hazukiSearchHistoryMaxCount));
@@ -541,9 +544,7 @@ void main() {
     });
 
     test('restores local favorites into Drift', () async {
-      await CloudSyncRestoreApplier(
-        participants: _participants,
-      ).applySettingsJson(
+      await _participants.settings.restoreSnapshot(
         jsonEncode({
           'version': 2,
           'data': {

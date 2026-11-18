@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_comment_filter_participant.dart';
 import 'package:hazuki/services/comment_filter/comment_filter_sync_store.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 
 class _Store implements CommentFilterSyncStore {
   CommentFilterMergeSnapshot? written;

@@ -1,3 +1,4 @@
+import 'source/source_task_owner.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
@@ -14,11 +15,13 @@ export 'discover_daily_recommendation/discover_recommendation_policy.dart';
 
 class DiscoverDailyRecommendationService extends ChangeNotifier {
   DiscoverDailyRecommendationService({
+    required SourceTaskControlGateway taskControl,
     required SourceDailyRecommendationGateway source,
     DiscoverDailyRecommendationCacheStore? cacheStore,
     DiscoverDailyRecommendationCandidateGenerator? candidateGenerator,
     DateTime Function()? now,
-  }) : _source = source,
+  }) : _tasks = SourceTaskOwner(taskControl),
+       _source = source,
        _now = now ?? DateTime.now,
        _cacheStore =
            cacheStore ??
@@ -30,6 +33,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
           random: math.Random(),
           now: _now,
         );
+    _stateSourceRevision = _source.sourceRevision;
     _stateSourceKey = (_source.activeSourceKey ?? '').trim();
     _stateConfigurationKey = _source
         .dailyRecommendationForSource(_stateSourceKey)
@@ -37,6 +41,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     _source.addListener(_handleSourceChanged);
   }
 
+  final SourceTaskOwner _tasks;
   final SourceDailyRecommendationGateway _source;
   final DiscoverDailyRecommendationCacheStore _cacheStore;
   late final DiscoverDailyRecommendationCandidateGenerator _candidateGenerator;
@@ -59,6 +64,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   bool _disposed = false;
   late String _stateSourceKey;
   String? _stateConfigurationKey;
+  String? _stateSourceRevision;
 
   bool _isCurrent(int generation, String sourceKey) =>
       !_disposed &&
@@ -77,6 +83,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   Future<void> setEnabled(bool enabled) async {
     await _cacheStore.setEnabled(enabled);
     if (!enabled) {
+      _tasks.restart();
       _generation++;
       _setState(const DiscoverDailyRecommendationState.disabled());
       return;
@@ -85,7 +92,12 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       _setState(const DiscoverDailyRecommendationState.disabled());
       return;
     }
-    _setState(_state.copyWith(enabled: true));
+    _setState(
+      _state.copyWith(
+        enabled: true,
+        isLoading: _state.displayedRecommendations.isEmpty,
+      ),
+    );
   }
 
   Future<bool> loadEnabled() async {
@@ -96,6 +108,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     required bool enabled,
   }) async {
     if (!enabled || !_supportsActiveSource) {
+      _tasks.restart();
       _generation++;
       _setState(const DiscoverDailyRecommendationState.disabled());
       return _state;
@@ -104,8 +117,9 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     final generation = _generation;
     final sourceKey = (_source.activeSourceKey ?? '').trim();
     if (_stateSourceKey != sourceKey) {
+      _stateSourceRevision = _source.sourceRevision;
       _stateSourceKey = sourceKey;
-      _setState(const DiscoverDailyRecommendationState.disabled());
+      _setState(const DiscoverDailyRecommendationState.loading());
     }
 
     if (_state.isPendingReady && _state.hasPendingRecommendations) {
@@ -119,6 +133,11 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         unawaited(_refreshPendingRecommendations());
       }
       return _state;
+    }
+
+    // 首批推荐就绪前先进入加载态，让发现页立即展示骨架屏
+    if (!_state.enabled || !_state.isLoading) {
+      _setState(const DiscoverDailyRecommendationState.loading());
     }
 
     final cached = await _cacheStore.readSnapshot(activeSourceKey: sourceKey);
@@ -137,7 +156,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     }
 
     if (!_source.isInitialized) {
-      _setState(const DiscoverDailyRecommendationState(enabled: true));
+      // 源初始化完成后会再次触发准备流程，期间保持加载态
       return _state;
     }
 
@@ -187,6 +206,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       pendingGeneratedAt: next.pendingGeneratedAt,
       isRefreshing: next.isRefreshing,
       isPendingReady: next.isPendingReady,
+      isLoading: next.isLoading,
     );
     notifyListeners();
   }
@@ -260,6 +280,8 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
           isPendingReady: true,
         ),
       );
+    } on SourceTaskCancelled {
+      // Disabling recommendations or replacing their source ends this refresh.
     } finally {
       if (identical(_refreshInFlight, completer.future)) {
         _refreshInFlight = null;
@@ -323,6 +345,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   Future<DiscoverDailyRecommendationSnapshot?>
   _generateRecommendations() async {
     return _candidateGenerator.generate(
+      taskOrigin: _tasks.origin(),
       previous: _state.displayedRecommendations,
     );
   }
@@ -344,12 +367,20 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         .dailyRecommendationForSource(sourceKey)
         ?.cacheKey;
     if (sourceKey != _stateSourceKey ||
-        configurationKey != _stateConfigurationKey) {
+        configurationKey != _stateConfigurationKey ||
+        _stateSourceRevision != _source.sourceRevision) {
+      final wasEnabled = _state.enabled;
+      _tasks.restart();
       _generation++;
       _stateSourceKey = sourceKey;
       _stateConfigurationKey = configurationKey;
       _refreshInFlight = null;
-      _setState(const DiscoverDailyRecommendationState.disabled());
+      // 已开启时直接切到加载态，避免轮播区域在重新准备期间先收起再出现
+      _setState(
+        wasEnabled
+            ? const DiscoverDailyRecommendationState.loading()
+            : const DiscoverDailyRecommendationState.disabled(),
+      );
     }
     if (!_supportsActiveSource) {
       _setState(const DiscoverDailyRecommendationState.disabled());
@@ -368,7 +399,9 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _tasks.dispose();
     _disposed = true;
+    _tasks.restart();
     _generation++;
     _source.removeListener(_handleSourceChanged);
     super.dispose();

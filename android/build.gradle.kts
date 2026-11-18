@@ -16,6 +16,16 @@ subprojects {
             if (ext.namespace == null) {
                 ext.namespace = "com.lxi.hazuki.generated.${project.name.replace('-', '_')}"
             }
+            // Flutter 3.50 会用 initWith 把 app 的 profile 构建类型复制给插件库，
+            // 连带复制 applicationIdSuffix，AGP 9 会拒绝库模块设置该属性。
+            // 预先按 Flutter 自身的方式创建库的 profile，Flutter 检测到已存在后就跳过复制。
+            if (ext.buildTypes.findByName("profile") == null) {
+                ext.buildTypes.create("profile") {
+                    initWith(ext.buildTypes.getByName("debug"))
+                    matchingFallbacks.clear()
+                    matchingFallbacks.addAll(listOf("debug", "release"))
+                }
+            }
         }
     }
 }

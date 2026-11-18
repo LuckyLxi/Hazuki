@@ -1,0 +1,21 @@
+name: onnxruntime_v2
+description: Flutter plugin for OnnxRuntime provides an easy, flexible, and fast Dart API to integrate Onnx models in flutter apps across mobile and desktop platforms.
+version: 1.23.2+2
+homepage: https://github.com/Persie0/onnxruntime_flutter_1_22_0
+publish_to: none
+
+environment:
+  sdk: '>=2.17.0 <4.0.0'
+  flutter: '>=3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.5
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+# Hazuki downloads the ONNX Runtime library on demand, so this override no
+# longer declares a native plugin: no library is bundled into the app and the
+# Android build does not fetch onnxruntime-android or the legacy AGP classpath.

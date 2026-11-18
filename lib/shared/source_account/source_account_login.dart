@@ -12,20 +12,32 @@ Future<HomeLoginDialogProfile> loginSourceAccountForDialog({
   required String account,
   required String password,
   SourceAccountLoginOperation? loginOverride,
+  SourceTaskOrigin? taskOrigin,
   Future<void> Function()? afterLogin,
   String Function()? usernameFallback,
   String? Function()? avatarUrlFallback,
-}) {
-  return buildSourceAccountDialogProfileAfterLogin(
-    account: account,
-    password: password,
-    login: loginOverride ?? sourceService.login,
-    currentAccount: () => sourceService.currentAccount,
-    loadAvatarUrl: sourceService.loadCurrentAvatarUrl,
-    afterLogin: afterLogin,
-    usernameFallback: usernameFallback,
-    avatarUrlFallback: avatarUrlFallback,
-  );
+}) async {
+  try {
+    return await buildSourceAccountDialogProfileAfterLogin(
+      account: account,
+      password: password,
+      login:
+          loginOverride ??
+          ({required account, required password}) => sourceService.login(
+            account: account,
+            password: password,
+            taskOrigin: taskOrigin,
+          ),
+      currentAccount: () => sourceService.currentAccount,
+      loadAvatarUrl: () =>
+          sourceService.loadCurrentAvatarUrl(taskOrigin: taskOrigin),
+      afterLogin: afterLogin,
+      usernameFallback: usernameFallback,
+      avatarUrlFallback: avatarUrlFallback,
+    );
+  } on SourceTaskCancelled {
+    throw const SourceLoginCancelled();
+  }
 }
 
 Future<HomeLoginDialogProfile> buildSourceAccountDialogProfileAfterLogin({

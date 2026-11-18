@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/settings/state/reading_settings_controller.dart';
@@ -70,7 +70,7 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
               tapToTurnPage: _controller.tapToTurnPage,
               volumeButtonTurnPage: _controller.volumeButtonTurnPage,
               pinchToZoom: _controller.pinchToZoom,
-              longPressToSave: _controller.longPressToSave,
+              restorePagePosition: _controller.restorePagePosition,
               immersiveMode: _controller.immersiveMode,
               keepScreenOn: _controller.keepScreenOn,
               pageIndicator: _controller.pageIndicator,
@@ -89,7 +89,8 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
               onVolumeButtonTurnPageChanged:
                   _controller.toggleVolumeButtonTurnPage,
               onPinchToZoomChanged: _controller.togglePinchToZoom,
-              onLongPressToSaveChanged: _controller.toggleLongPressToSave,
+              onRestorePagePositionChanged:
+                  _controller.toggleRestorePagePosition,
               onImmersiveModeChanged: _controller.toggleImmersiveMode,
               onKeepScreenOnChanged: _controller.toggleKeepScreenOn,
               onPageIndicatorChanged: _controller.togglePageIndicator,

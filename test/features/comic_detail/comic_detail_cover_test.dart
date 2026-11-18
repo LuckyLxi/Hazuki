@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_cover.dart';
@@ -235,6 +235,7 @@ class _CoverImageGateway implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
     downloadCount += 1;
     return _imageBytes;

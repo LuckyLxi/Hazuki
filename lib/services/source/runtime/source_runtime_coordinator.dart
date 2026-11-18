@@ -11,16 +11,19 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
     required String defaultSourceKey,
     required T Function(String sourceKey) createHandle,
     required void Function() onActiveSourceChanged,
+    bool Function(String sourceKey)? retainOnSourceChange,
   }) : _catalog = List.unmodifiable(catalog),
        _defaultSourceKey = defaultSourceKey,
        _createHandle = createHandle,
        _onActiveSourceChanged = onActiveSourceChanged,
+       _retainOnSourceChange = retainOnSourceChange,
        _activeSourceKey = defaultSourceKey;
 
   List<SourceCatalogEntry> _catalog;
   final String _defaultSourceKey;
   final T Function(String sourceKey) _createHandle;
   final void Function() _onActiveSourceChanged;
+  final bool Function(String sourceKey)? _retainOnSourceChange;
   final Map<String, T> _handles = {};
   String _activeSourceKey;
   Future<void> _activationTail = Future.value();
@@ -85,7 +88,8 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
       final nextHandle = handleFor(normalized);
       await persistSelection(nextHandle);
       _activeSourceKey = normalized;
-      if (identical(_handles[previousSourceKey], previousHandle)) {
+      if (identical(_handles[previousSourceKey], previousHandle) &&
+          _retainOnSourceChange?.call(previousSourceKey) != true) {
         _handles.remove(previousSourceKey);
         previousHandle?.requestDispose();
       }
@@ -99,22 +103,35 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
     return removed;
   }
 
+  /// 换成 [catalog] 后需要淘汰的 handle：来源被移除，或插件版本、目录变化。
+  ///
+  /// 宿主停止任务与这里释放 handle 共用同一判定，避免两处规则不一致。
+  List<T> staleHandlesFor(List<SourceCatalogEntry> catalog) {
+    final previous = {for (final entry in _catalog) entry.normalizedKey: entry};
+    final next = {for (final entry in catalog) entry.normalizedKey: entry};
+    return [
+      for (final handle in _handles.entries)
+        if (!next.containsKey(handle.key) ||
+            next[handle.key]?.pluginDirectory !=
+                previous[handle.key]?.pluginDirectory ||
+            next[handle.key]?.pluginVersion !=
+                previous[handle.key]?.pluginVersion)
+          handle.value,
+    ];
+  }
+
   Future<void> replaceCatalog(
     List<SourceCatalogEntry> catalog, {
     Future<void> Function(String activeSourceKey)? beforeReplace,
   }) => _serialize(() async {
-    final previous = {for (final entry in _catalog) entry.key: entry};
     final next = {for (final entry in catalog) entry.key: entry};
     final nextActiveSourceKey = next.containsKey(_activeSourceKey)
         ? _activeSourceKey
         : (catalog.firstOrNull?.normalizedKey ?? '');
     await beforeReplace?.call(nextActiveSourceKey);
-    for (final key in _handles.keys.toList()) {
-      if (!next.containsKey(key) ||
-          next[key]?.pluginDirectory != previous[key]?.pluginDirectory ||
-          next[key]?.pluginVersion != previous[key]?.pluginVersion) {
-        _handles.remove(key)?.requestDispose();
-      }
+    for (final handle in staleHandlesFor(catalog)) {
+      _handles.remove(handle.sourceKey);
+      handle.requestDispose();
     }
     _catalog = List.unmodifiable(catalog);
     _activeSourceKey = nextActiveSourceKey;

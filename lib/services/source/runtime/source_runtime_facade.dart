@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'source_script_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,8 +13,10 @@ import 'source_cookie_store.dart';
 import 'source_runtime_kernel.dart';
 import 'source_session_store.dart';
 import '../../logging/app_log_store.dart';
+import '../interaction/source_ui_service.dart';
 
 abstract interface class SourceRuntimeHandleView {
+  SourceUiService get sourceUiService;
   String get sourceKey;
   bool get isDisposed;
   SourceCookieStore get cookieStore;
@@ -38,9 +38,10 @@ class SourceJsBridge {
   final SourceRuntimeHandleView _handle;
 
   SourceScriptEngine? get engine => _runtime.engine;
+  dynamic cachedValue(String code) => engine?.cachedValue(code);
 
-  dynamic evaluate(String code, {String? name}) {
-    return engine?.evaluate(code, name: name);
+  Future<dynamic> evaluate(String code, {String? name}) async {
+    return await engine?.evaluate(code, name: name);
   }
 
   Future<dynamic> resolve(dynamic value) =>
@@ -50,8 +51,8 @@ class SourceJsBridge {
 
   int? asInt(dynamic value) => jsAsInt(value);
 
-  String evaluateString(String code) {
-    return (evaluate(code) ?? '').toString().trim();
+  Future<String> evaluateString(String code) async {
+    return (await evaluate(code) ?? '').toString().trim();
   }
 }
 
@@ -69,22 +70,13 @@ class HazukiSourceFacade {
     required Future<void> Function(String sourceKey) ensureInitialized,
     required void Function(String sourceKey) notifyRuntimeStateChanged,
     required SourceApplicationLogAppender addApplicationLog,
-    required Future<Directory> Function() ensureImageCacheDir,
-    required Future<int> Function() computeImageCacheSizeBytes,
-    required Future<void> Function({bool force}) enforceImageCachePolicy,
   }) : _ensureInitialized = ensureInitialized,
        _notifyRuntimeStateChanged = notifyRuntimeStateChanged,
-       _addApplicationLog = addApplicationLog,
-       _ensureImageCacheDir = ensureImageCacheDir,
-       _computeImageCacheSizeBytes = computeImageCacheSizeBytes,
-       _enforceImageCachePolicy = enforceImageCachePolicy;
+       _addApplicationLog = addApplicationLog;
 
   final Future<void> Function(String sourceKey) _ensureInitialized;
   final void Function(String sourceKey) _notifyRuntimeStateChanged;
   final SourceApplicationLogAppender _addApplicationLog;
-  final Future<Directory> Function() _ensureImageCacheDir;
-  final Future<int> Function() _computeImageCacheSizeBytes;
-  final Future<void> Function({bool force}) _enforceImageCachePolicy;
   final SourceRuntimeHandleView handle;
   final SourceRuntimeKernel runtime;
   final SourceSessionStore session;
@@ -107,20 +99,9 @@ class HazukiSourceFacade {
 
   bool get softwareLogCaptureEnabled => appLogStore.captureEnabled;
 
-  DateTime? get lastReloginAt => runtime.lastReloginAt;
-  set lastReloginAt(DateTime? value) => runtime.lastReloginAt = value;
-
-  bool get isRefreshingSource => runtime.isRefreshingSource;
-  set isRefreshingSource(bool value) => runtime.isRefreshingSource = value;
-
   SourceRuntimeState get runtimeState => runtime.runtimeState;
-  set runtimeState(SourceRuntimeState value) => runtime.runtimeState = value;
 
   String get statusText => runtime.statusText;
-  set statusText(String value) => runtime.statusText = value;
-
-  Future<void>? get initFuture => runtime.initFuture;
-  set initFuture(Future<void>? value) => runtime.initFuture = value;
 
   void notifyRuntimeStateChanged() {
     _notifyRuntimeStateChanged(sourceKey);
@@ -188,14 +169,6 @@ class HazukiSourceFacade {
 
   Future<void> saveCookieStore(List<SourceCookie> cookies) {
     return session.saveCookieStore(cookies);
-  }
-
-  Future<Directory> ensureImageCacheDir() => _ensureImageCacheDir();
-
-  Future<int> computeImageCacheSizeBytes() => _computeImageCacheSizeBytes();
-
-  Future<void> enforceImageCachePolicy({bool force = false}) {
-    return _enforceImageCachePolicy(force: force);
   }
 
   Uri resolveImageBaseUri(String imageUrl, Uri baseUri) {

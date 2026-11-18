@@ -5,7 +5,6 @@ import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_participant.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
-import 'package:hazuki/services/cloud_sync/cloud_sync_restore_applier.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_settings_participant.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
@@ -17,7 +16,7 @@ import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,7 +27,7 @@ const _config = CloudSyncConfig(
   password: 'pass',
 );
 
-class _Source extends Mock implements SourceSyncGateway {}
+class _Source extends Mock implements SourceScriptGateway {}
 
 class _Remote extends CloudSyncRemoteClient {
   _Remote(this.files) : super(_config, configStore: CloudSyncConfigStore());
@@ -330,9 +329,10 @@ void main() {
         final fixture = await _Fixture.create();
         var notifications = 0;
         fixture.filter.addListener(() => notifications++);
-        await CloudSyncRestoreApplier(
-          participants: fixture.participants,
-        ).applySettingsJson(jsonEncode({'version': 2, 'data': data}));
+        final remote = _Remote(_remoteFiles(data));
+        await fixture
+            .service(remote)
+            .restoreLatestBackup(configOverride: _config);
         expect(fixture.filter.userKeywords, ['local']);
         expect(fixture.filter.mode, CommentFilterMode.collapse);
         expect((await fixture.filter.captureMergeSnapshot()).updatedAtMs, 100);
@@ -367,14 +367,31 @@ void main() {
       final fixture = await _Fixture.create();
       var notifications = 0;
       fixture.filter.addListener(() => notifications++);
+      final remote = _Remote(
+        _remoteFiles({})
+          ..[CloudSyncConfigStore.settingsFileName] = '{'
+          ..[CloudSyncConfigStore.readingFileName] = jsonEncode({
+            'history': [
+              {
+                'id': 'comic',
+                'sourceKey': 'jm',
+                'title': 'Comic',
+                'timestamp': 1,
+              },
+            ],
+            'progress': [],
+          })
+          ..[CloudSyncConfigStore.searchHistoryFileName] =
+              '{"keyword":"remote"}',
+      );
       await expectLater(
-        CloudSyncRestoreApplier(
-          participants: fixture.participants,
-        ).applySettingsJson('{'),
+        fixture.service(remote).restoreLatestBackup(configOverride: _config),
         throwsException,
       );
       expect(notifications, 0);
       expect(fixture.filter.userKeywords, ['local']);
+      expect(await fixture.history.exportJsonList(), isEmpty);
+      expect(await fixture.participants.searchHistory.exportCount(), 0);
     },
   );
 }

@@ -1,14 +1,20 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
+import '../../support/fake_source_task_control.dart';
 import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_cover.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_header.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_header_favorite_row.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_header_cover.dart';
@@ -28,19 +34,25 @@ import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_commands.dart'
+    show MangaDownloadCommands;
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/widgets/source_image_gateway_scope.dart';
+import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
-import 'package:hazuki/shared/window/window_title_bar_control.dart';
+import 'package:hazuki/shared/windows/window_title_bar_control.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/widgets/cached_image_widgets.dart';
 import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
-import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
+import 'package:hazuki/widgets/comic_chapters_panel.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
+import 'package:hazuki/shared/favorites/source_favorite_folders_repository.dart';
 import '../../support/test_service_locator.dart';
 
 Widget _buildComments({
@@ -64,6 +76,7 @@ final ReaderCommentsWidgetBuilder _buildReaderComments =
 
 ReaderDependencies _readerDependencies() {
   return ReaderDependencies(
+    sourceUiService: sourceUiService,
     sourceReader: sl<SourceReaderGateway>(),
     sourceSettings: sl<SourceSettingsGateway>(),
     readingProgressService: sl<ReadingProgressService>(),
@@ -71,23 +84,170 @@ ReaderDependencies _readerDependencies() {
   );
 }
 
-ComicDetailDependencies _comicDetailDependencies() {
+ComicDetailDependencies _comicDetailDependencies({
+  MangaDownloadCommands? downloader,
+}) {
   return ComicDetailDependencies(
+    sourceUiService: sourceUiService,
     source: sl<SourceComicDetailGateway>(),
     localFavorites: sl<LocalFavoritesRepository>(),
-    downloader: sl<MangaDownloadService>(),
+    downloader: downloader ?? sl<MangaDownloadService>(),
     readingProgress: sl<ReadingProgressService>(),
     readHistory: sl<ReadHistoryService>(),
     imageGateway: sl<SourceImageGateway>(),
+    taskControl: FakeSourceTaskControl(),
   );
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await ensureTestServiceLocator();
   });
+  for (final saved in [true, false]) {
+    testWidgets('cover saving reports the gallery result ($saved)', (
+      tester,
+    ) async {
+      final facade = _CoverSaveDetailFacade();
+      final noImageMode = hazukiNoImageModeNotifier.value;
+      hazukiNoImageModeNotifier.value = true;
+      addTearDown(() => hazukiNoImageModeNotifier.value = noImageMode);
+      const channel = MethodChannel('hazuki.comics/media');
+      final calls = <MethodCall>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return saved ? 'content://gallery/cover' : null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(channel, null);
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => SourceImageGatewayScope(
+            gateway: sl<SourceImageGateway>(),
+            child: child!,
+          ),
+          home: _buildDesktopTestDetail(
+            comic: const ExploreComic(
+              id: 'cover-save',
+              sourceKey: 'copy_manga',
+              title: 'Comic',
+              subTitle: '',
+              cover: '',
+            ),
+            facade: facade,
+            shouldAnimateInitialRevealOverride: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scope = find.byType(ComicDetailScope);
+      unawaited(
+        tester
+            .widget<ComicDetailScope>(scope)
+            .actions
+            .showCoverPreview(
+              tester.element(scope),
+              'https://example.test/cover.PNG',
+            ),
+      );
+      await tester.pumpAndSettle();
+      tester
+          .widget<ComicCoverPreviewPage>(find.byType(ComicCoverPreviewPage))
+          .onLongPress();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(calls.single.method, 'saveImage');
+      expect(calls.single.arguments, {
+        'bytes': facade.bytes,
+        'extension': 'png',
+        'fileName': 'cover.PNG',
+      });
+      expect(find.text('Saved'), saved ? findsOneWidget : findsNothing);
+      expect(
+        find.textContaining('Failed to save:'),
+        saved ? findsNothing : findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+  }
+
+  for (final multiSelect in [null, false, true]) {
+    testWidgets(
+      'download confirmation queues every selected chapter regardless of legacy declaration ($multiSelect)',
+      (tester) async {
+        final facade = _DownloadSelectionDetailFacade();
+        final downloader = _DownloadSelectionCommands();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.android),
+            locale: const Locale('en'),
+            localizationsDelegates: hazukiLocalizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => withTestSourcePresentation(
+              child!,
+              catalog: [
+                const SourceCatalogEntry(
+                  key: 'jm',
+                  name: 'Other',
+                  fileName: 'other.js',
+                  presentation: {'downloadMultiSelect': true},
+                ),
+                SourceCatalogEntry(
+                  key: 'copy_manga',
+                  name: 'Sample',
+                  fileName: 'sample.js',
+                  presentation: {'downloadMultiSelect': ?multiSelect},
+                ),
+              ],
+            ),
+            home: _buildDesktopTestDetail(
+              comic: const ExploreComic(
+                id: 'download-policy',
+                sourceKey: 'copy_manga',
+                title: 'Comic',
+                subTitle: '',
+                cover: '',
+              ),
+              facade: facade,
+              downloader: downloader,
+              shouldAnimateInitialRevealOverride: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
+        await tester.pumpAndSettle();
+        // Legacy plugin metadata must not truncate a batch download.
+        tester
+            .widget<ComicChaptersPanel>(find.byType(ComicChaptersPanel))
+            .onDownloadConfirm({'2', '1'});
+        await tester.pumpAndSettle();
+        expect(downloader.queued, ['1', '2']);
+        expect(tester.takeException(), isNull);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
   for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
     testWidgets('reader icon moves smoothly as the label shrinks ($platform)', (
       tester,
@@ -102,7 +262,7 @@ void main() {
           theme: ThemeData(platform: platform),
           locale: const Locale('en'),
           builder: (context, child) => withTestSourcePresentation(child!),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _buildDesktopTestDetail(
             comic: const ExploreComic(
@@ -167,7 +327,7 @@ void main() {
             builder: (context, child) => withTestSourcePresentation(
               HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
             ),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: ComicDetailPage(
               comic: const ExploreComic(
@@ -193,6 +353,8 @@ void main() {
                     coverUrl = '',
                     comicTheme,
                     onFavoriteRequested,
+                    offlineMode = false,
+                    offlineChapters = const <ReaderOfflineChapterData>[],
                   }) => ReaderPage(
                     title: title,
                     chapterTitle: chapterTitle,
@@ -202,7 +364,9 @@ void main() {
                     images: const [],
                     sourceKey: sourceKey,
                     offlineMode: true,
+                    offlineChapters: offlineChapters,
                     dependencies: ReaderDependencies(
+                      sourceUiService: sourceUiService,
                       sourceReader: sl<SourceReaderGateway>(),
                       sourceSettings: sl<SourceSettingsGateway>(),
                       readingProgressService: progress,
@@ -287,15 +451,18 @@ void main() {
         await tester.pumpAndSettle();
       },
     );
-    for (final canLike in [false, true]) {
+    for (final reload in [false, true]) {
       testWidgets(
-        'custom header stats keep order, localization and like behavior ($platform, like=$canLike)',
+        'custom header stats keep order, localization and plugin actions ($platform, reload=$reload)',
         (tester) async {
           tester.view.physicalSize = const Size(1200, 1800);
           tester.view.devicePixelRatio = 1;
           addTearDown(tester.view.resetPhysicalSize);
           addTearDown(tester.view.resetDevicePixelRatio);
-          final facade = _CompletingLikeDetailFacade()..canLike = canLike;
+          final facade = _CompletingHeaderActionDetailFacade();
+          if (reload) {
+            facade.result = const ComicHeaderActionResult(reload: true);
+          }
           final locale = ValueNotifier(const Locale('en'));
           addTearDown(locale.dispose);
           final page = _buildDesktopTestDetail(
@@ -315,7 +482,7 @@ void main() {
               builder: (_, value, child) => MaterialApp(
                 locale: value,
                 theme: ThemeData(platform: platform),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                localizationsDelegates: hazukiLocalizationsDelegates,
                 supportedLocales: AppLocalizations.supportedLocales,
                 home: page,
               ),
@@ -327,59 +494,53 @@ void main() {
               ComicHeaderStat(text: ''),
               ComicHeaderStat(
                 text: {'zh': '自定义点赞', 'en': 'Custom likes'},
-                action: ComicHeaderStatAction.like,
+                icon: 'like',
+                action: ComicHeaderStatAction.plugin,
+                actionId: 'like',
               ),
               ComicHeaderStat(text: {'zh': '每周更新', 'en': 'Weekly'}),
             ],
           );
           await tester.pumpAndSettle();
           final row = find.byType(ComicDetailHeaderFavoriteRow);
-          final desktop = platform == TargetPlatform.windows;
-          if (desktop) {
-            expect(
-              find.descendant(
-                of: row,
-                matching: find.text('Rating 9.8 / Custom likes / Weekly'),
-              ),
-              findsOneWidget,
-            );
-          } else if (canLike) {
-            expect(
-              tester.getTopLeft(find.text('Rating 9.8')).dx,
-              lessThan(tester.getTopLeft(find.text('Custom likes')).dx),
-            );
-            expect(
-              tester.getTopLeft(find.text('Custom likes')).dx,
-              lessThan(tester.getTopLeft(find.text('Weekly')).dx),
-            );
-            await tester.tap(find.text('Custom likes'));
-            await tester.pumpAndSettle();
-            expect(facade.likeCalls, [
-              ('desktop-loading-reveal', true, 'copy_manga'),
-            ]);
-            expect(find.byIcon(Icons.thumb_up_alt_rounded), findsOneWidget);
+          expect(
+            tester.getTopLeft(find.text('Rating 9.8')).dx,
+            lessThan(tester.getTopLeft(find.text('Custom likes')).dx),
+          );
+          expect(
+            tester.getTopLeft(find.text('Custom likes')).dx,
+            lessThan(tester.getTopLeft(find.text('Weekly')).dx),
+          );
+          expect(find.byIcon(Icons.thumb_up_alt_outlined), findsOneWidget);
+          expect(facade.refreshCalls, [false]);
+          await tester.tap(find.text('Custom likes'));
+          await tester.pumpAndSettle();
+          expect(facade.actionCalls, [
+            ('desktop-loading-reveal', 'like', 'copy_manga'),
+          ]);
+          if (reload) {
+            // 插件要求重载：静默强制刷新，旧内容保持显示。
+            expect(facade.refreshCalls, [false, true]);
+            expect(find.text('Custom likes'), findsOneWidget);
           } else {
-            expect(
-              find.descendant(
-                of: row,
-                matching: find.text('Rating 9.8 · Custom likes · Weekly'),
-              ),
-              findsOneWidget,
-            );
-            expect(find.byIcon(Icons.thumb_up_alt_outlined), findsNothing);
-            expect(facade.likeCalls, isEmpty);
+            // 插件返回的新统计项替换整行。
+            expect(find.text('43 likes'), findsOneWidget);
+            expect(find.text('Rating 9.8'), findsNothing);
+            expect(find.byIcon(Icons.thumb_up_alt_rounded), findsOneWidget);
           }
           expect(find.text('42 likes'), findsNothing);
           locale.value = const Locale('zh', 'CN');
           await tester.pumpAndSettle();
-          expect(
-            find.descendant(of: row, matching: find.textContaining('评分9.8')),
-            findsOneWidget,
-          );
-          expect(
-            find.descendant(of: row, matching: find.textContaining('每周更新')),
-            findsOneWidget,
-          );
+          if (reload) {
+            expect(
+              find.descendant(of: row, matching: find.textContaining('评分9.8')),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(of: row, matching: find.textContaining('每周更新')),
+              findsOneWidget,
+            );
+          }
           expect(tester.takeException(), isNull);
           await tester.pump(const Duration(seconds: 4));
           await tester.pumpWidget(const SizedBox());
@@ -393,11 +554,11 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        final facade = _CompletingLikeDetailFacade()..canLike = true;
+        final facade = _CompletingHeaderActionDetailFacade();
         await tester.pumpWidget(
           MaterialApp(
             theme: ThemeData(platform: platform),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: _buildDesktopTestDetail(
               comic: const ExploreComic(
@@ -415,10 +576,8 @@ void main() {
         facade.complete(headerStats: []);
         await tester.pumpAndSettle();
         expect(find.text('42 likes'), findsNothing);
-        expect(
-          find.byIcon(Icons.thumb_up_alt_outlined),
-          platform == TargetPlatform.windows ? findsOneWidget : findsNothing,
-        );
+        // 宿主不再自动放置点赞按钮，桌面端同样只由插件声明。
+        expect(find.byIcon(Icons.thumb_up_alt_outlined), findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
       },
@@ -457,7 +616,7 @@ void main() {
                   ),
                 ],
               ),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: hazukiLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: _buildDesktopTestDetail(
                 comic: const ExploreComic(
@@ -504,6 +663,113 @@ void main() {
       );
     }
   }
+  testWidgets('plugin detail tabs follow built-in tabs and prefetch content', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final facade = _PluginTabsDetailFacade();
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        builder: (context, child) => withTestSourcePresentation(
+          SourceImageGatewayScope(
+            gateway: sl<SourceImageGateway>(),
+            child: child!,
+          ),
+          activeSourceKey: 'copy_manga',
+          catalog: [
+            const SourceCatalogEntry(
+              key: 'copy_manga',
+              name: 'Custom',
+              fileName: 'main.js',
+              presentation: {
+                'buttons': [
+                  {'id': 'relatedComics', 'location': 'comicDetailTabs'},
+                ],
+                'detailTabs': [
+                  {
+                    'id': 'notes',
+                    'title': {'zh_CN': '说明', 'en_US': 'Notes'},
+                  },
+                  {'id': 'empty', 'title': 'Empty'},
+                  {'id': 'broken', 'title': 'Broken'},
+                ],
+              },
+            ),
+          ],
+        ),
+        localizationsDelegates: hazukiLocalizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: _buildDesktopTestDetail(
+          comic: const ExploreComic(
+            id: 'plugin-tabs',
+            sourceKey: 'copy_manga',
+            title: 'Comic',
+            subTitle: '',
+            cover: '',
+          ),
+          facade: facade,
+          shouldAnimateInitialRevealOverride: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // 打开详情时即预取所有插件标签页，而不是等切换过去。
+    expect(facade.requests, [
+      'plugin-tabs/notes',
+      'plugin-tabs/empty',
+      'plugin-tabs/broken',
+    ]);
+    final tabs = tester.widget<TabBar>(find.byType(TabBar));
+    expect(tabs.tabs.length, 5);
+
+    await tester.tap(find.text('Related'));
+    await tester.pumpAndSettle();
+    expect(tabs.controller!.index, 1);
+
+    await tester.tap(find.text('Notes'));
+    // 图片在测试环境中不会加载完成，只推进切换动画。
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(tabs.controller!.index, 2);
+    expect(find.text('Intro'), findsOneWidget);
+    expect(find.text('Plugin notes'), findsOneWidget);
+    expect(find.text('Gallery'), findsOneWidget);
+    final grid = tester.widget<SliverGrid>(find.byType(SliverGrid));
+    expect(
+      (grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount)
+          .crossAxisCount,
+      3,
+    );
+    final tileSizes = tester
+        .widgetList<Hero>(find.byType(Hero))
+        .where((hero) => '${hero.tag}'.startsWith('comic-detail-plugin-tab-'))
+        .map((hero) => tester.getSize(find.byWidget(hero)))
+        .toList();
+    expect(tileSizes, hasLength(3));
+    expect(
+      tileSizes.first.height / tileSizes.first.width,
+      closeTo(4 / 3, 0.01),
+    );
+
+    await tester.tap(find.text('Empty'));
+    await tester.pumpAndSettle();
+    expect(find.text('No content yet'), findsOneWidget);
+
+    await tester.tap(find.text('Broken'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ComicDetailLoadErrorView), findsOneWidget);
+    facade.failBroken = false;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Recovered'), findsOneWidget);
+    expect(facade.requests.last, 'plugin-tabs/broken');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
     testWidgets(
       'authors stay in plugin info rows before and after loading in $platform',
@@ -517,7 +783,7 @@ void main() {
           MaterialApp(
             theme: ThemeData(platform: platform),
             builder: (context, child) => withTestSourcePresentation(child!),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: _buildDesktopTestDetail(
               comic: const ExploreComic(
@@ -563,50 +829,41 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
-    testWidgets(
-      'like button follows the initialized plugin capability in $platform',
-      (tester) async {
-        tester.view.physicalSize = const Size(1200, 2200);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final facade = _CompletingLikeDetailFacade();
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: ThemeData(platform: platform),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: _buildDesktopTestDetail(
-              comic: const ExploreComic(
-                id: 'like-capability',
-                sourceKey: 'copy_manga',
-                title: 'Comic',
-                subTitle: '',
-                cover: '',
-              ),
-              facade: facade,
-              shouldAnimateInitialRevealOverride: false,
+    testWidgets('plugin header badges show under the title in $platform', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 2200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final facade = _BadgeDetailFacade();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: platform),
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: _buildDesktopTestDetail(
+            comic: const ExploreComic(
+              id: 'badges',
+              sourceKey: 'copy_manga',
+              title: 'Comic',
+              subTitle: '',
+              cover: '',
             ),
+            facade: facade,
+            shouldAnimateInitialRevealOverride: false,
           ),
-        );
-        await tester.pump();
-        expect(find.byIcon(Icons.thumb_up_alt_outlined), findsNothing);
-        facade.canLike = true;
-        facade.complete();
-        await tester.pumpAndSettle();
-        final like = find.byIcon(Icons.thumb_up_alt_outlined);
-        expect(like, findsOneWidget);
-        await tester.tap(like);
-        await tester.pumpAndSettle();
-        expect(facade.likeCalls, [
-          ('desktop-loading-reveal', true, 'copy_manga'),
-        ]);
-        expect(find.byIcon(Icons.thumb_up_alt_rounded), findsOneWidget);
-        expect(tester.takeException(), isNull);
-        await tester.pump(const Duration(seconds: 4));
-        await tester.pumpAndSettle();
-      },
-    );
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Ongoing'), findsOneWidget);
+      expect(find.text('Paid'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Ongoing')).dy,
+        greaterThan(tester.getTopLeft(find.text('Stable title')).dy),
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
   for (final openReader in [true, false]) {
     testWidgets('mobile detail uses horizontal routing for '
@@ -623,7 +880,7 @@ void main() {
           builder: (context, child) => withTestSourcePresentation(
             HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
           ),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ComicDetailPage(
             comic: const ExploreComic(
@@ -649,6 +906,8 @@ void main() {
                   coverUrl = '',
                   comicTheme,
                   onFavoriteRequested,
+                  offlineMode = false,
+                  offlineChapters = const <ReaderOfflineChapterData>[],
                 }) => const Scaffold(body: Text('Reader destination')),
             searchPageBuilder: (keyword) =>
                 Scaffold(body: Text('Search destination: $keyword')),
@@ -711,7 +970,7 @@ void main() {
                   ),
                 ),
               ),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: hazukiLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: ComicDetailPage(
                 comic: const ExploreComic(
@@ -737,6 +996,8 @@ void main() {
                       coverUrl = '',
                       comicTheme,
                       onFavoriteRequested,
+                      offlineMode = false,
+                      offlineChapters = const <ReaderOfflineChapterData>[],
                     }) => Scaffold(
                       body: Text('Reader: $epId $chapterTitle $chapterIndex'),
                     ),
@@ -756,9 +1017,7 @@ void main() {
           if (!disableAnimations) {
             // A repeated selection during expansion must not open two readers.
             tester
-                .widget<ComicDetailChaptersPanel>(
-                  find.byType(ComicDetailChaptersPanel),
-                )
+                .widget<ComicChaptersPanel>(find.byType(ComicChaptersPanel))
                 .onChapterTap('1', 'Chapter 1', 0);
             await tester.pump(const Duration(milliseconds: 180));
             final expandingRect = tester.getRect(sheet);
@@ -786,7 +1045,7 @@ void main() {
             await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
             await tester.pumpAndSettle();
             final sheetContext = tester.element(
-              find.byType(ComicDetailChaptersPanel),
+              find.byType(ComicChaptersPanel),
             );
             final sheetRoute = ModalRoute.of(sheetContext)!;
             final navigator = Navigator.of(sheetContext);
@@ -819,7 +1078,7 @@ void main() {
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.android),
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -879,22 +1138,18 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final (canLike, likesCount, textScale, width) in [
-    (false, '42', 1.0, 390.0),
-    (true, '42', 1.0, 390.0),
-    (false, '', 1.0, 390.0),
-    (false, '12345678901234567890', 2.0, 320.0),
-    (true, '12345678901234567890', 2.0, 320.0),
+  for (final (likesCount, textScale, width) in [
+    ('42', 1.0, 390.0),
+    ('', 1.0, 390.0),
+    ('12345678901234567890', 2.0, 320.0),
   ]) {
     testWidgets('Android keeps controls stable from loading to resolved stats '
-        '(like: $canLike, count: $likesCount, scale: $textScale)', (
-      tester,
-    ) async {
+        '(count: $likesCount, scale: $textScale)', (tester) async {
       tester.view.physicalSize = Size(width, 1600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final facade = _CompletingLikeDetailFacade();
+      final facade = _CompletingHeaderActionDetailFacade();
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(platform: TargetPlatform.android),
@@ -906,7 +1161,7 @@ void main() {
               child: child!,
             ),
           ),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _buildDesktopTestDetail(
             comic: const ExploreComic(
@@ -926,8 +1181,6 @@ void main() {
       final tabs = find.byType(TabBar);
       final loadingActionTop = tester.getTopLeft(actions).dy;
       final loadingTabTop = tester.getTopLeft(tabs).dy;
-      // Plugin capabilities can become available with the detail response.
-      facade.canLike = canLike;
       facade.complete(likesCount: likesCount);
       await tester.pump();
       await tester.pump();
@@ -941,10 +1194,7 @@ void main() {
         expect(tester.getTopLeft(tabs).dy, closeTo(loadingTabTop, 0.5));
         expect(tester.takeException(), isNull);
       }
-      expect(
-        find.byIcon(Icons.thumb_up_alt_outlined),
-        canLike ? findsOneWidget : findsNothing,
-      );
+      expect(find.byIcon(Icons.thumb_up_alt_outlined), findsOneWidget);
     });
   }
 
@@ -960,7 +1210,7 @@ void main() {
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.android),
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -1022,7 +1272,7 @@ void main() {
     expect(tester.widget<Opacity>(buttonOpacity).opacity, 1);
     await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
     await tester.pumpAndSettle();
-    expect(find.byType(ComicDetailChaptersPanel), findsOneWidget);
+    expect(find.byType(ComicChaptersPanel), findsOneWidget);
     expect(find.text('Chapter 1'), findsOneWidget);
     expect(tester.takeException(), isNull);
     tester.state<NavigatorState>(find.byType(Navigator)).pop();
@@ -1041,7 +1291,7 @@ void main() {
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.android),
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -1100,7 +1350,7 @@ void main() {
         MaterialApp(
           theme: ThemeData(platform: TargetPlatform.android),
           builder: (context, child) => withTestSourcePresentation(child!),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _buildDesktopTestDetail(
             comic: const ExploreComic(
@@ -1171,7 +1421,7 @@ void main() {
       MaterialApp(
         theme: ThemeData(platform: TargetPlatform.android),
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -1233,7 +1483,7 @@ void main() {
                 child: child!,
               ),
             ),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: hazukiLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: _buildDesktopTestDetail(
               comic: const ExploreComic(
@@ -1319,7 +1569,7 @@ void main() {
             platform: TargetPlatform.windows,
             brightness: brightness,
           ),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ComicDetailPage(
             comic: const ExploreComic(
@@ -1346,6 +1596,8 @@ void main() {
                   coverUrl = '',
                   comicTheme,
                   onFavoriteRequested,
+                  offlineMode = false,
+                  offlineChapters = const <ReaderOfflineChapterData>[],
                 }) => const Scaffold(body: Text('Reader destination')),
             searchPageBuilder: (_) => const SizedBox.shrink(),
             commentsWidgetBuilder: _buildComments,
@@ -1363,27 +1615,31 @@ void main() {
         tester.getTopLeft(actions).dx,
         greaterThan(tester.getTopRight(cover).dx),
       );
-      expect(tester.getSize(actions).width, lessThanOrEqualTo(420));
+      expect(tester.getSize(actions).width, lessThanOrEqualTo(440));
+      // 桌面端沿用手机端样式：收藏按钮并入操作行，操作行贴齐封面底边。
       expect(
         tester.widget<ComicDetailHeaderActionRow>(actions).useMobileStyle,
-        isFalse,
+        isTrue,
       );
       expect(
         tester.widget<ComicDetailMetaSection>(metadata).useMobileStyle,
-        isFalse,
-      );
-      final favoriteButton = find.widgetWithIcon(
-        OutlinedButton,
-        Icons.favorite_border,
-      );
-      expect(favoriteButton, findsOneWidget);
-      expect(
-        tester.getTopLeft(favoriteButton).dx,
-        closeTo(tester.getTopLeft(actions).dx, 1),
+        isTrue,
       );
       expect(
-        tester.getTopLeft(metadata).dx,
-        greaterThan(tester.getTopRight(summary).dx),
+        find.descendant(
+          of: actions,
+          matching: find.byType(ComicDetailFavoriteButton),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getBottomLeft(actions).dy,
+        closeTo(tester.getBottomLeft(cover).dy, 1),
+      );
+      // 简介与信息栏上下排列，不再左右分卡片。
+      expect(
+        tester.getTopLeft(metadata).dy,
+        greaterThan(tester.getBottomLeft(summary).dy),
       );
 
       tester.view.physicalSize = const Size(560, 1000);
@@ -1420,7 +1676,7 @@ void main() {
         MaterialApp(
           builder: (context, child) => withTestSourcePresentation(child!),
           theme: ThemeData(platform: TargetPlatform.windows),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ComicDetailPage(
             comic: const ExploreComic(
@@ -1446,6 +1702,8 @@ void main() {
                   coverUrl = '',
                   comicTheme,
                   onFavoriteRequested,
+                  offlineMode = false,
+                  offlineChapters = const <ReaderOfflineChapterData>[],
                 }) => const SizedBox.shrink(),
             searchPageBuilder: (_) => const SizedBox.shrink(),
             commentsWidgetBuilder: _buildComments,
@@ -1498,15 +1756,19 @@ void main() {
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
         theme: ThemeData(platform: TargetPlatform.windows),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
           comic: const ExploreComic(
             id: 'desktop-title-resize',
             sourceKey: 'copy_manga',
+            // 标题需高过封面，操作行才会被推到封面底边以下。
             title:
                 'A deliberately long loading title that wraps across several lines '
-                'so the controls need to move upward when the shorter resolved title arrives',
+                'so the controls need to move upward when the shorter resolved title arrives '
+                'and it keeps going well past the cover height so the action row is pushed '
+                'below the cover bottom edge before the resolved details replace it with '
+                'something much shorter that fits beside the cover again',
             subTitle: 'Stable subtitle',
             cover: '',
           ),
@@ -1526,6 +1788,8 @@ void main() {
                 coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
+                offlineMode = false,
+                offlineChapters = const <ReaderOfflineChapterData>[],
               }) => const SizedBox.shrink(),
           searchPageBuilder: (_) => const SizedBox.shrink(),
           commentsWidgetBuilder: _buildComments,
@@ -1539,7 +1803,8 @@ void main() {
     facade.complete(title: 'Short title');
     await tester.pump();
     final animationStartTop = tester.getTopLeft(actions).dy;
-    await tester.pump(const Duration(milliseconds: 160));
+    // 标题收缩到封面高度以内后操作行即停在封面底边，取动画前段采样。
+    await tester.pump(const Duration(milliseconds: 40));
     final animationMiddleTop = tester.getTopLeft(actions).dy;
     await tester.pumpAndSettle();
     final resolvedTop = tester.getTopLeft(actions).dy;
@@ -1563,7 +1828,7 @@ void main() {
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
         theme: ThemeData(platform: TargetPlatform.windows),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: _buildDesktopTestDetail(
           comic: const ExploreComic(
@@ -1618,7 +1883,7 @@ void main() {
         MaterialApp(
           builder: (context, child) => withTestSourcePresentation(child!),
           theme: ThemeData(platform: TargetPlatform.windows),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: _buildDesktopTestDetail(
             comic: const ExploreComic(
@@ -1742,7 +2007,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
           comic: comic,
@@ -1760,6 +2025,8 @@ void main() {
                 coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
+                offlineMode = false,
+                offlineChapters = const <ReaderOfflineChapterData>[],
               }) => ReaderPage(
                 title: title,
                 chapterTitle: chapterTitle,
@@ -1770,6 +2037,10 @@ void main() {
                 dependencies: readerDependencies,
                 sourceKey: sourceKey,
                 coverUrl: coverUrl,
+                comicTheme: comicTheme,
+                onFavoriteRequested: onFavoriteRequested,
+                offlineMode: offlineMode,
+                offlineChapters: offlineChapters,
                 commentsWidgetBuilder: _buildReaderComments,
               ),
           searchPageBuilder: (_) => const SizedBox.shrink(),
@@ -1802,7 +2073,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => withTestSourcePresentation(child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
           comic: comic,
@@ -1820,6 +2091,8 @@ void main() {
                 coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
+                offlineMode = false,
+                offlineChapters = const <ReaderOfflineChapterData>[],
               }) => ReaderPage(
                 title: title,
                 chapterTitle: chapterTitle,
@@ -1830,6 +2103,10 @@ void main() {
                 dependencies: readerDependencies,
                 sourceKey: sourceKey,
                 coverUrl: coverUrl,
+                comicTheme: comicTheme,
+                onFavoriteRequested: onFavoriteRequested,
+                offlineMode: offlineMode,
+                offlineChapters: offlineChapters,
                 commentsWidgetBuilder: _buildReaderComments,
               ),
           searchPageBuilder: (_) => const SizedBox.shrink(),
@@ -1853,7 +2130,6 @@ class _DesktopDetailFacade extends ComicDetailFeatureFacade {
     : super(
         source: sl<SourceComicDetailGateway>(),
         local: sl<LocalFavoritesRepository>(),
-        downloader: sl<MangaDownloadService>(),
         readingProgress: sl<ReadingProgressService>(),
         readHistory: sl<ReadHistoryService>(),
         sourceKey: 'copy_manga',
@@ -1864,6 +2140,7 @@ class _DesktopDetailFacade extends ComicDetailFeatureFacade {
     String id, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) async => ComicDetailsData(
     id: id,
     sourceKey: 'copy_manga',
@@ -1898,6 +2175,85 @@ class _DesktopDetailFacade extends ComicDetailFeatureFacade {
   );
 }
 
+class _CoverSaveDetailFacade extends _DesktopDetailFacade {
+  final bytes = Uint8List.fromList([1, 2, 3]);
+
+  @override
+  Future<Uint8List> downloadImageBytes(
+    String url, {
+    bool keepInMemory = false,
+    String sourceKey = '',
+  }) async => bytes;
+}
+
+class _PluginTabsDetailFacade extends _DesktopDetailFacade {
+  final requests = <String>[];
+  var failBroken = true;
+
+  @override
+  Future<List<SourceDetailTabBlock>> loadDetailTab({
+    required String comicId,
+    required String tabId,
+  }) async {
+    requests.add('$comicId/$tabId');
+    return switch (tabId) {
+      'notes' => const [
+        SourceDetailTextBlock(title: 'Intro', text: 'Plugin notes'),
+        SourceDetailImagesBlock(
+          title: 'Gallery',
+          urls: ['https://a/1.jpg', 'https://a/2.jpg', 'https://a/3.jpg'],
+        ),
+      ],
+      'broken' when failBroken => throw Exception('broken'),
+      'broken' => const [SourceDetailTextBlock(text: 'Recovered')],
+      _ => const [],
+    };
+  }
+}
+
+class _DownloadSelectionDetailFacade extends _DesktopDetailFacade {
+  @override
+  Future<ComicDetailsData> loadComicDetails(
+    String id, {
+    String sourceKey = '',
+    bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  }) async => (await super.loadComicDetails(
+    id,
+  )).copyWith(chapters: const {'1': 'Chapter 1', '2': 'Chapter 2'});
+}
+
+class _DownloadSelectionCommands implements MangaDownloadCommands {
+  final queued = <String>[];
+
+  @override
+  Future<MangaDownloadConflict> checkDownloadConflict({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) async => MangaDownloadConflict(
+    comicTitle: details.title,
+    existingChapters: const [],
+  );
+
+  @override
+  Future<MangaDownloadConflict> checkDownloadTaskConflict({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) => checkDownloadConflict(details: details, chapters: chapters);
+
+  @override
+  Future<MangaDownloadEnqueueResult> enqueueDownload({
+    required ComicDetailsData details,
+    required String coverUrl,
+    required String description,
+    required List<MangaChapterDownloadTarget> chapters,
+    bool redownloadExisting = false,
+  }) async {
+    queued.addAll(chapters.map((chapter) => chapter.epId));
+    return MangaDownloadEnqueueResult.queued;
+  }
+}
+
 class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
   final Completer<ComicDetailsData> _completer = Completer<ComicDetailsData>();
 
@@ -1922,7 +2278,9 @@ class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
             [
               ComicHeaderStat(
                 text: likesCount.isEmpty ? 'Like' : '$likesCount likes',
-                action: ComicHeaderStatAction.like,
+                icon: 'like',
+                action: ComicHeaderStatAction.plugin,
+                actionId: 'like',
               ),
             ],
         chapters: {'1': 'Chapter 1'},
@@ -1948,12 +2306,15 @@ class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
     String id, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) => _completer.future;
 }
 
 class _NavigationDetailFacade extends _DesktopDetailFacade {
   @override
-  Future<List<CategoryTagGroup>> loadCategoryTagGroups() async => [];
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
+    SourceTaskOrigin? taskOrigin,
+  }) async => [];
 }
 
 class _ReadingProgressDetailFacade extends _NavigationDetailFacade {
@@ -1962,6 +2323,7 @@ class _ReadingProgressDetailFacade extends _NavigationDetailFacade {
     String id, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
   }) async => (await super.loadComicDetails(id)).copyWith(
     chapters: const {'1': 'Chapter 1', '2': 'Chapter 2', '3': 'Chapter 3'},
   );
@@ -1975,8 +2337,10 @@ class _MutableReadingProgressDetailFacade extends _ReadingProgressDetailFacade {
   };
 
   @override
-  Future<Map<String, dynamic>?> loadReadingProgress(String comicId) async =>
-      progress;
+  Future<Map<String, dynamic>?> loadReadingProgress(
+    String comicId, {
+    SourceTaskOrigin? taskOrigin,
+  }) async => progress;
 }
 
 class _DelayedReadingProgressService extends ReadingProgressService {
@@ -2021,22 +2385,95 @@ class _NavigationTitleBarControl extends ChangeNotifier
   Future<void> updateUseSystemTitleBar(bool value) async {}
 }
 
-class _CompletingLikeDetailFacade extends _CompletingDesktopDetailFacade {
-  bool canLike = false;
-  final likeCalls = <(String, bool, String)>[];
+class _BadgeDetailFacade extends _DesktopDetailFacade {
   @override
-  bool get supportComicLike => canLike;
+  Future<ComicDetailsData> loadComicDetails(
+    String id, {
+    String sourceKey = '',
+    bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  }) async => (await super.loadComicDetails(id)).copyWith(
+    title: 'Stable title',
+    headerBadges: const [
+      ComicHeaderBadge(text: 'Ongoing', tone: ComicHeaderBadgeTone.primary),
+      ComicHeaderBadge(text: 'Paid', tone: ComicHeaderBadgeTone.warning),
+    ],
+  );
+}
+
+class _CompletingHeaderActionDetailFacade
+    extends _CompletingDesktopDetailFacade {
+  final actionCalls = <(String, String, String)>[];
+  final refreshCalls = <bool>[];
+  ComicHeaderActionResult result = const ComicHeaderActionResult(
+    headerStats: [
+      ComicHeaderStat(
+        text: '43 likes',
+        icon: 'liked',
+        action: ComicHeaderStatAction.plugin,
+        actionId: 'like',
+      ),
+    ],
+  );
+
   @override
-  Future<void> toggleComicLike({
+  Future<ComicDetailsData> loadComicDetails(
+    String id, {
+    String sourceKey = '',
+    bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  }) {
+    refreshCalls.add(forceRefresh);
+    return super.loadComicDetails(
+      id,
+      sourceKey: sourceKey,
+      forceRefresh: forceRefresh,
+      taskOrigin: taskOrigin,
+    );
+  }
+
+  @override
+  Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
-    required bool isLike,
+    required String actionId,
     String sourceKey = '',
   }) async {
-    likeCalls.add((comicId, isLike, sourceKey));
+    actionCalls.add((comicId, actionId, sourceKey));
+    return result;
   }
 }
 
 class _CompletingMobileDetailFacade extends _CompletingDesktopDetailFacade {
+  _CompletingMobileDetailFacade([FavoriteFoldersRepository? folders])
+    : _folders = folders ?? _MobileFavoriteFolders();
+
+  final FavoriteFoldersRepository _folders;
+
+  @override
+  FavoriteFoldersRepository get favoriteFolders => _folders;
+}
+
+class _MorphDismissalDetailFacade extends _CompletingMobileDetailFacade {
+  _MorphDismissalDetailFacade() : super(_MorphDismissalFavoriteFolders());
+}
+
+class _SlowMorphDetailFacade extends _CompletingMobileDetailFacade {
+  _SlowMorphDetailFacade() : this._(_SlowMorphFavoriteFolders());
+  _SlowMorphDetailFacade._(this._slowFolders) : super(_slowFolders);
+
+  final _SlowMorphFavoriteFolders _slowFolders;
+
+  void completeFolders() => _slowFolders.complete();
+}
+
+class _MobileFavoriteFolders extends SourceFavoriteFoldersRepository {
+  _MobileFavoriteFolders()
+    : super(
+        source: sl<SourceComicDetailGateway>(),
+        local: sl<LocalFavoritesRepository>(),
+        sourceKey: 'copy_manga',
+      );
+
   @override
   bool get isLogged => false;
 
@@ -2048,7 +2485,7 @@ class _CompletingMobileDetailFacade extends _CompletingDesktopDetailFacade {
       const FavoriteFoldersResult.success(folders: [], favoritedFolderIds: {});
 }
 
-class _MorphDismissalDetailFacade extends _CompletingMobileDetailFacade {
+class _MorphDismissalFavoriteFolders extends _MobileFavoriteFolders {
   @override
   Future<FavoriteFoldersResult> loadLocalFavoriteFolders({
     required String comicId,
@@ -2065,10 +2502,10 @@ class _MorphDismissalDetailFacade extends _CompletingMobileDetailFacade {
   );
 }
 
-class _SlowMorphDetailFacade extends _CompletingMobileDetailFacade {
+class _SlowMorphFavoriteFolders extends _MobileFavoriteFolders {
   final _folders = Completer<FavoriteFoldersResult>();
 
-  void completeFolders() => _folders.complete(
+  void complete() => _folders.complete(
     const FavoriteFoldersResult.success(folders: [], favoritedFolderIds: {}),
   );
 
@@ -2082,12 +2519,13 @@ class _SlowMorphDetailFacade extends _CompletingMobileDetailFacade {
 Widget _buildDesktopTestDetail({
   required ExploreComic comic,
   required ComicDetailFeatureFacade facade,
+  MangaDownloadCommands? downloader,
   bool? shouldAnimateInitialRevealOverride,
   int initialTabIndex = 0,
 }) {
   return ComicDetailPage(
     comic: comic,
-    dependencies: _comicDetailDependencies(),
+    dependencies: _comicDetailDependencies(downloader: downloader),
     repository: facade,
     heroTag: 'test-${comic.id}',
     initialTabIndex: initialTabIndex,
@@ -2104,6 +2542,8 @@ Widget _buildDesktopTestDetail({
           coverUrl = '',
           comicTheme,
           onFavoriteRequested,
+          offlineMode = false,
+          offlineChapters = const <ReaderOfflineChapterData>[],
         }) => const SizedBox.shrink(),
     searchPageBuilder: (_) => const SizedBox.shrink(),
     commentsWidgetBuilder: _buildComments,

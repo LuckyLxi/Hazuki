@@ -1,7 +1,10 @@
-import 'package:flutter/material.dart';
+import '../../support/source_presentation_fixtures.dart';
+import '../../support/fake_source_task_control.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
@@ -75,12 +78,11 @@ Future<_Source> _pumpPage(
   final source = _Source();
   when(() => source.activeSourceKey).thenReturn('test');
   when(() => source.isLogged).thenReturn(true);
-  when(
-    () => source.sourceRuntimeState,
-  ).thenReturn(const SourceRuntimeState.idle());
+  when(() => source.runtimeState).thenReturn(const SourceRuntimeState.idle());
   when(() => source.supportFavoriteSortOrder).thenReturn(false);
   when(() => source.supportFavoriteFolderAdd).thenReturn(false);
   when(() => source.supportFavoriteFolderDelete).thenReturn(false);
+  when(() => source.supportFavoriteFolderRename).thenReturn(false);
   when(() => source.supportFavoriteFolderLoad).thenReturn(false);
   when(() => source.favoriteSortOrder).thenReturn('');
   when(() => source.favoriteSortOrders).thenReturn([]);
@@ -88,34 +90,49 @@ Future<_Source> _pumpPage(
     () => source.cloudFavoritesChangedStream,
   ).thenAnswer((_) => const Stream<void>.empty());
   when(source.ensureInitialized).thenAnswer((_) async {});
-  when(() => source.loadFavoriteComics(page: 1, folderId: '0')).thenAnswer(
+  when(
+    () => source.loadFavoriteComics(
+      page: 1,
+      folderId: '0',
+      taskOrigin: any(named: 'taskOrigin'),
+    ),
+  ).thenAnswer(
     (_) async => FavoriteComicsResult.success(
       paginated ? _comics.take(12).toList() : _comics,
       maxPage: paginated ? 2 : 1,
     ),
   );
-  when(() => source.loadFavoriteComics(page: 2, folderId: '0')).thenAnswer(
+  when(
+    () => source.loadFavoriteComics(
+      page: 2,
+      folderId: '0',
+      taskOrigin: any(named: 'taskOrigin'),
+    ),
+  ).thenAnswer(
     (_) async =>
         FavoriteComicsResult.success(_comics.skip(12).toList(), maxPage: 2),
   );
   final appearance = _Appearance(layout);
   addTearDown(appearance.dispose);
   await tester.pumpWidget(
-    MaterialApp(
-      theme: ThemeData(platform: TargetPlatform.android),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: HazukiThemeControllerScope(
-        controller: appearance,
-        child: Scaffold(
-          body: FavoritePage(
-            sourceService: source,
-            localFavoritesRepository: _Local(),
-            localFavoritesPreferences:
-                SharedPreferencesLocalFavoritesPreferencesStore(),
-            imageGateway: _Images(),
-            authVersion: 0,
-            onComicTap: (_, _) async {},
+    withTestSourcePresentation(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.android),
+        localizationsDelegates: hazukiLocalizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HazukiThemeControllerScope(
+          controller: appearance,
+          child: Scaffold(
+            body: FavoritePage(
+              sourceService: source,
+              localFavoritesRepository: _Local(),
+              localFavoritesPreferences:
+                  SharedPreferencesLocalFavoritesPreferencesStore(),
+              imageGateway: _Images(),
+              authVersion: 0,
+              onComicTap: (_, _) async {},
+              taskControl: FakeSourceTaskControl(),
+            ),
           ),
         ),
       ),
@@ -248,7 +265,13 @@ void main() {
           .controller!;
       scroll.jumpTo(scroll.position.maxScrollExtent);
       await tester.pumpAndSettle();
-      verify(() => source.loadFavoriteComics(page: 2, folderId: '0')).called(1);
+      verify(
+        () => source.loadFavoriteComics(
+          page: 2,
+          folderId: '0',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      ).called(1);
       expect(_progress(tester, 0), 1);
       await _expectAnimatedEntry(tester, 20);
       expect(tester.takeException(), isNull);

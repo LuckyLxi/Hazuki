@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -237,7 +237,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
 
 Future<bool> showComicSourceRestoreDialog(
   BuildContext context, {
-  required SourceUpdateGateway sourceService,
+  required SourceScriptGateway sourceService,
   SourceScriptGateway? backupService,
 }) {
   return showSourceEditorRestoreDialog(

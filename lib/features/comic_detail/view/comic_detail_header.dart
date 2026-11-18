@@ -1,16 +1,112 @@
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_header_action_row.dart';
 import 'comic_detail_header_cover.dart';
 import 'comic_detail_header_favorite_row.dart';
+
+/// 标题下方的插件短标签。插件未提供 headerBadges 时，
+/// 兼容旧的 showComicStatus：从「状态」标签取第一个值显示。
+class ComicDetailHeaderBadges extends StatelessWidget {
+  const ComicDetailHeaderBadges({super.key, required this.details});
+
+  final ComicDetailsData? details;
+
+  List<(String, ComicHeaderBadgeTone)> _resolve(BuildContext context) {
+    final details = this.details;
+    if (details == null) return const [];
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final badges =
+        ComicDetailScope.of(context).favorite.headerBadgesOverride ??
+        details.headerBadges;
+    if (badges.isNotEmpty) {
+      return [
+        for (final badge in badges)
+          if (localizeSourcePluginText(badge.text, locale).trim()
+              case final text when text.isNotEmpty)
+            (text, badge.tone),
+      ];
+    }
+    if (!sourceFeature(
+      details.sourceKey,
+      'showComicStatus',
+      context: context,
+    )) {
+      return const [];
+    }
+    final status = details.tags.entries
+        .where(
+          (entry) =>
+              entry.key.trim().toLowerCase() == 'status' ||
+              entry.key.trim() == '状态',
+        )
+        .expand((entry) => entry.value)
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .firstOrNull;
+    return status == null ? const [] : [(status, ComicHeaderBadgeTone.primary)];
+  }
+
+  bool hasContent(BuildContext context) => _resolve(context).isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final (text, tone) in _resolve(context))
+          Builder(
+            builder: (context) {
+              final (foreground, background) = switch (tone) {
+                ComicHeaderBadgeTone.normal => (
+                  colors.onSurfaceVariant,
+                  colors.surfaceContainerHighest,
+                ),
+                ComicHeaderBadgeTone.primary => (
+                  colors.primary,
+                  colors.primary.withValues(alpha: 0.08),
+                ),
+                ComicHeaderBadgeTone.warning => (
+                  colors.tertiary,
+                  colors.tertiary.withValues(alpha: 0.1),
+                ),
+                ComicHeaderBadgeTone.error => (
+                  colors.error,
+                  colors.error.withValues(alpha: 0.08),
+                ),
+              };
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: foreground,
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
 
 class ComicDetailHeaderSection extends StatelessWidget {
   const ComicDetailHeaderSection({
@@ -69,6 +165,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
                     actions.showCoverPreview(context, displayCoverUrl),
                   ),
           );
+          final badges = ComicDetailHeaderBadges(details: details);
           final title = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -77,10 +174,18 @@ class ComicDetailHeaderSection extends StatelessWidget {
                 key: headerTitleKey,
                 style:
                     (wide
-                            ? theme.textTheme.headlineMedium
+                            ? theme.textTheme.headlineSmall
                             : theme.textTheme.titleLarge)
-                        ?.copyWith(fontWeight: FontWeight.w700, height: 1.25),
+                        ?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.5,
+                          letterSpacing: -0.3,
+                        ),
               ),
+              if (badges.hasContent(context)) ...[
+                const SizedBox(height: 10),
+                badges,
+              ],
             ],
           );
           final animatedTitle = shouldAnimateInitialDetailReveal
@@ -92,50 +197,60 @@ class ComicDetailHeaderSection extends StatelessWidget {
                   child: title,
                 )
               : title;
-          final controls = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ComicDetailHeaderFavoriteRow(
-                details: details,
-                favoriteRowKey: favoriteRowKey,
-                skeletonColor: skeletonColor,
-                shouldAnimateInitialDetailReveal:
-                    shouldAnimateInitialDetailReveal,
-                isDesktop: true,
-              ),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: ComicDetailHeaderActionRow(
-                  details: details,
-                  actionButtonsKey: actionButtonsKey,
-                  shouldAnimateInitialDetailReveal:
-                      shouldAnimateInitialDetailReveal,
-                ),
-              ),
-            ],
+          final stats = ComicDetailHeaderFavoriteRow(
+            details: details,
+            favoriteRowKey: favoriteRowKey,
+            skeletonColor: skeletonColor,
+            shouldAnimateInitialDetailReveal: shouldAnimateInitialDetailReveal,
+            isDesktop: true,
+          );
+          // 沿用手机端的操作行样式：阅读、章节、收藏三个按钮同一行。
+          final actionRow = ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: ComicDetailHeaderActionRow(
+              details: details,
+              actionButtonsKey: actionButtonsKey,
+              shouldAnimateInitialDetailReveal:
+                  shouldAnimateInitialDetailReveal,
+              useMobileStyle: true,
+            ),
           );
           return Padding(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.only(bottom: 20),
             child: wide
                 ? Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       cover,
-                      const SizedBox(width: 36),
+                      const SizedBox(width: 32),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            animatedTitle,
-                            const SizedBox(height: 28),
-                            controls,
+                            // 上半部分至少撑到「封面高度 - 操作行高度」，
+                            // 标题短时操作行贴齐封面底边，标题长时自然下推。
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: coverHeight - 48,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  animatedTitle,
+                                  const SizedBox(height: 8),
+                                  stats,
+                                  const SizedBox(height: 16),
+                                ],
+                              ),
+                            ),
+                            actionRow,
                           ],
                         ),
                       ),
                     ],
                   )
                 : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,8 +260,10 @@ class ComicDetailHeaderSection extends StatelessWidget {
                           Expanded(child: animatedTitle),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      controls,
+                      const SizedBox(height: 16),
+                      stats,
+                      const SizedBox(height: 8),
+                      actionRow,
                     ],
                   ),
           );
@@ -157,28 +274,10 @@ class ComicDetailHeaderSection extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final theme = Theme.of(context);
-        final colors = theme.colorScheme;
         final contentWidth = constraints.maxWidth;
         final coverWidth = (contentWidth * 0.37).clamp(104.0, 128.0);
         final coverHeight = coverWidth * 190 / 135;
-        final status =
-            sourceFeature(
-              details?.sourceKey ?? '',
-              'showComicStatus',
-              context: context,
-            )
-            ? details?.tags.entries
-                      .where(
-                        (entry) =>
-                            entry.key.trim().toLowerCase() == 'status' ||
-                            entry.key.trim() == '状态',
-                      )
-                      .expand((entry) => entry.value)
-                      .map((value) => value.trim())
-                      .where((value) => value.isNotEmpty)
-                      .firstOrNull ??
-                  ''
-            : '';
+        final badges = ComicDetailHeaderBadges(details: details);
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Column(
@@ -225,24 +324,9 @@ class ComicDetailHeaderSection extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (status.isNotEmpty) ...[
+                        if (badges.hasContent(context)) ...[
                           const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              status,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: colors.primary,
-                              ),
-                            ),
-                          ),
+                          badges,
                         ],
                       ],
                     ),
@@ -261,8 +345,8 @@ class ComicDetailHeaderSection extends StatelessWidget {
               ComicDetailHeaderActionRow(
                 details: details,
                 actionButtonsKey: actionButtonsKey,
-                shouldAnimateInitialDetailReveal:
-                    shouldAnimateInitialDetailReveal,
+                // 手机端操作行不做下滑揭示动画。
+                shouldAnimateInitialDetailReveal: false,
                 useMobileStyle: true,
               ),
             ],

@@ -1,3 +1,4 @@
+import '../comic/comic_details_capability.dart';
 import '../plugins/source_search_capabilities.dart';
 import 'package:flutter/foundation.dart';
 
@@ -5,59 +6,32 @@ import '../../../models/hazuki_models.dart';
 import '../content/source_content_operations.dart';
 import '../debug/source_debug_operations.dart';
 import '../gateways/source_image_gateways.dart';
+import '../gateways/source_runtime_gateways.dart';
 import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
-import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_diagnostics_operations.dart';
 import '../runtime/source_runtime_view.dart';
+import '../runtime/source_runtime_recovery_operations.dart';
+import '../models/source_task.dart';
 import 'hazuki_source_adapter_base.dart';
 
-class HazukiSourceImageAdapter implements SourceImageGateway {
+/// 图片与诊断日志 Gateway 共用一个实现，推荐区同时依赖这两者。
+class HazukiSourceImageAdapter
+    implements
+        SourceImageGateway,
+        SourceDebugGateway,
+        SourceRecommendationGateway {
   const HazukiSourceImageAdapter({
     required SourceRuntimeView runtime,
     required SourceImageOperations image,
-  }) : _image = image,
-       _runtime = runtime;
-
-  final SourceImageOperations _image;
-  final SourceRuntimeView _runtime;
-
-  @override
-  String? get activeSourceKey => _runtime.activeSourceKey;
-  @override
-  Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) =>
-      _image.peekImageBytesFromMemory(url, sourceKey: sourceKey);
-  @override
-  Future<Uint8List> downloadImageBytes(
-    String url, {
-    String comicId = '',
-    String epId = '',
-    bool keepInMemory = false,
-    bool useDiskCache = true,
-    bool priority = false,
-    String sourceKey = '',
-  }) => _image.downloadImageBytes(
-    url,
-    comicId: comicId,
-    epId: epId,
-    keepInMemory: keepInMemory,
-    useDiskCache: useDiskCache,
-    priority: priority,
-    sourceKey: sourceKey,
-  );
-}
-
-class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
-  HazukiSourceRecommendationAdapter({
-    required SourceRuntimeView runtime,
-    required SourceImageOperations image,
-    required SourceRuntimeOperations runtimeOperations,
+    required SourceRuntimeDiagnosticsOperations diagnostics,
     required SourceDebugOperations debug,
   }) : _runtime = runtime,
        _image = image,
-       _runtimeOperations = runtimeOperations,
+       _diagnostics = diagnostics,
        _debug = debug;
 
-  final SourceRuntimeOperations _runtimeOperations;
+  final SourceRuntimeDiagnosticsOperations _diagnostics;
   final SourceDebugOperations _debug;
   final SourceRuntimeView _runtime;
   final SourceImageOperations _image;
@@ -76,6 +50,7 @@ class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _image.downloadImageBytes(
     url,
     comicId: comicId,
@@ -84,6 +59,7 @@ class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
     useDiskCache: useDiskCache,
     priority: priority,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
 
   @override
@@ -92,10 +68,10 @@ class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
   Listenable get logChanges => _debug.logStore;
   @override
   Future<bool> loadSoftwareLogCaptureEnabled() =>
-      _runtimeOperations.loadSoftwareLogCaptureEnabled();
+      _diagnostics.loadSoftwareLogCaptureEnabled();
   @override
   Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
-      _runtimeOperations.setSoftwareLogCaptureEnabled(enabled);
+      _diagnostics.setSoftwareLogCaptureEnabled(enabled);
   @override
   void addApplicationLog({
     required String level,
@@ -135,13 +111,19 @@ class HazukiSourceDailyRecommendationAdapter
     implements SourceDailyRecommendationGateway {
   HazukiSourceDailyRecommendationAdapter({
     required SourceRuntimeView runtime,
+    required SourceRuntimeRecoveryOperations recovery,
     required SourceImageOperations image,
     required SourceContentOperations content,
+    required SourceComicDetailsCapability comicDetails,
   }) : _content = content,
+       _comicDetails = comicDetails,
        _image = image,
+       _recovery = recovery,
        super(runtime);
 
+  final SourceRuntimeRecoveryOperations _recovery;
   final SourceContentOperations _content;
+  final SourceComicDetailsCapability _comicDetails;
   final SourceImageOperations _image;
 
   @override
@@ -156,37 +138,50 @@ class HazukiSourceDailyRecommendationAdapter
   @override
   bool get supportsDailyRecommendation => runtime.supportsDailyRecommendation;
   @override
+  String? get sourceRevision => runtime.sourceRevision;
+  @override
   DailyRecommendationConfig? dailyRecommendationForSource(String sourceKey) =>
       runtime.dailyRecommendationForSource(sourceKey);
   @override
   Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
     String sourceKey = '',
-  }) => _content.loadDailyRecommendations(sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _content.loadDailyRecommendations(
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
-  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
+  SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
   List<SourceCatalogEntry> get allowedSources =>
       runtime.runtimeRegistry.allowedSources;
   @override
-  void logRuntimeRetryRequested(String value) =>
-      runtime.logRuntimeRetryRequested(value);
+  void requestRuntimeRetry(String trigger) =>
+      _recovery.requestRuntimeRetry(trigger);
   @override
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
     String order = '',
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _content.searchComics(
     keyword: keyword,
     page: page,
     order: order,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
-  }) => _content.loadComicDetails(comicId, sourceKey: sourceKey);
+    SourceTaskOrigin? taskOrigin,
+  }) => _comicDetails.loadComicDetails(
+    comicId,
+    sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
+  );
   @override
   Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) =>
       _image.peekImageBytesFromMemory(url, sourceKey: sourceKey);
@@ -199,6 +194,7 @@ class HazukiSourceDailyRecommendationAdapter
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) => _image.downloadImageBytes(
     url,
     comicId: comicId,
@@ -207,5 +203,6 @@ class HazukiSourceDailyRecommendationAdapter
     useDiskCache: useDiskCache,
     priority: priority,
     sourceKey: sourceKey,
+    taskOrigin: taskOrigin,
   );
 }

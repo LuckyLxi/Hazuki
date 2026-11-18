@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../shared/preferences/hazuki_preference_keys.dart';
+import '../preferences/hazuki_preference_keys.dart';
 import '../comment_filter/comment_filter_sync_store.dart'
     show commentFilterSyncPreferenceKeys;
 import 'cloud_sync_config_store.dart';

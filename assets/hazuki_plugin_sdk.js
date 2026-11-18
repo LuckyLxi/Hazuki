@@ -1,12 +1,53 @@
 // Hazuki Source API v1. Identity comes from the registered source.
-class HazukiSource extends ComicSource {}
+const {Hazuki, HazukiSource} = (() => {
+// 取走 init.js 的内部实现后删除临时入口，插件只能经由 Hazuki.* 使用这些能力。
+const {Network, Convert, HtmlDocument, getLocale, localizeText} = globalThis.__hazukiRuntime;
+delete globalThis.__hazukiRuntime;
 
-const Hazuki = (() => {
+class HazukiSource {
+    name = '';
+
+    key = '';
+
+    version = '';
+
+    translation = {};
+
+    loadData(dataKey) {
+        return sendMessage({method: 'load_data', key: this.key, data_key: dataKey});
+    }
+
+    loadSetting(key) {
+        return sendMessage({method: 'load_setting', key: this.key, setting_key: key});
+    }
+
+    saveData(dataKey, data) {
+        return sendMessage({method: 'save_data', key: this.key, data_key: dataKey, data});
+    }
+
+    deleteData(dataKey) {
+        return sendMessage({method: 'delete_data', key: this.key, data_key: dataKey});
+    }
+
+    get isLogged() {
+        return sendMessage({method: 'isLogged', key: this.key});
+    }
+
+    translate(key) {
+        return localizeText(key, this.translation);
+    }
+
+    init() { }
+}
+
 let sourceKey;
-return Object.freeze({
+const Hazuki = Object.freeze({
     apiVersion: 1,
-    get locale() { return APP.locale; },
-    translate: text => __hazukiLocalizeText(text, globalThis.__hazuki_source?.translation),
+    // 2：详情页顶部支持 headerBadges、统计项图标与 plugin/link/search/copy 动作，
+    // 点赞改由插件通过 comic.onHeaderAction 处理。旧宿主没有该字段。
+    comicHeaderVersion: 2,
+    get locale() { return getLocale(); },
+    translate: text => localizeText(text, globalThis.__hazuki_source?.translation),
     registerSource(source) {
         if (globalThis.__hazuki_source) throw new Error('plugin_duplicate_registration');
         if (!source || typeof source.search?.load !== 'function' ||
@@ -59,12 +100,134 @@ return Object.freeze({
     images: Object.freeze({reverseVerticalTiles(segments) {
         if (!Number.isInteger(segments) || segments < 0 || segments > 4096) throw new Error('plugin_invalid_image_segments');
         return {segments};
+    }, regions(regions, size = {}) {
+        // 宿主会再次严格校验边界，这里只拦截明显的格式错误。
+        const isIndex = value => Number.isInteger(value) && value >= 0;
+        if (!Array.isArray(regions) || regions.length > 4096 ||
+            !regions.every(r => r && ['sx', 'sy', 'sw', 'sh', 'dx', 'dy'].every(k => isIndex(r[k])) &&
+                r.sw > 0 && r.sh > 0) ||
+            (size.width != null && !(isIndex(size.width) && size.width > 0)) ||
+            (size.height != null && !(isIndex(size.height) && size.height > 0))) {
+            throw new Error('plugin_invalid_image_regions');
+        }
+        return {width: size.width, height: size.height,
+            regions: regions.map(({sx, sy, sw, sh, dx, dy}) => ({sx, sy, sw, sh, dx, dy}))};
     }}),
     convert: Convert,
     log: (message, level = 'info') => sendMessage({method: 'log', level, title: 'Plugin', content: message}),
     delay: ms => sendMessage({method: 'delay', time: ms}),
     error(code, message) { return new Error(`HAZUKI_${code}: ${message}`); },
+    ui: (() => {
+        // QuickJS exposes ArrayBuffer as native bytes. Typed-array views must
+        // retain only their selected range before crossing the host bridge.
+        function serializeImages(options) {
+            if (!Array.isArray(options?.content)) return options;
+            const bytes = value => value instanceof Uint8Array
+                ? value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)
+                : value;
+            // row 的子组件同样可能携带图片，需要递归处理。
+            const serialize = content => content.map(component => {
+                if (!component || typeof component !== 'object') return component;
+                return {...component,
+                    ...(component.image != null ? {image: bytes(component.image)} : {}),
+                    ...(component.hintImage != null ? {hintImage: bytes(component.hintImage)} : {}),
+                    ...(Array.isArray(component.children) ? {children: serialize(component.children)} : {}),
+                };
+            });
+            return {...options, content: serialize(options.content)};
+        }
+        class PluginDialogCancelledError extends Error {
+            constructor(reason = 'user') {
+                super(`plugin_ui_cancelled:${reason}`);
+                this.name = 'PluginDialogCancelledError';
+                this.code = 'plugin_ui_cancelled';
+                this.reason = reason;
+            }
+        }
+        async function simpleDialog(kind, options) {
+            const content = [];
+            if (options.message != null) content.push({id: 'message', type: 'text', text: options.message});
+            if (kind === 'prompt') {
+                const {label, initialValue, placeholder, obscure, keyboardType, required, maxLength} = options;
+                content.push({id: 'value', type: 'input', label, initialValue, placeholder,
+                    obscure, keyboardType, required, maxLength});
+            }
+            const buttons = kind === 'alert' ? [] : [{id: 'cancel',
+                text: options.cancelText ?? {zh_CN: '取消', en_US: 'Cancel'}}];
+            buttons.push({id: 'confirm', text: options.confirmText ?? {zh_CN: '确定', en_US: 'OK'},
+                role: 'primary', validate: true});
+            const dialog = await Hazuki.ui.openDialog({title: options.title, content, buttons});
+            try {
+                const event = await dialog.nextEvent();
+                if (event.type === 'closed') throw new PluginDialogCancelledError(event.reason);
+                if (kind === 'alert') return;
+                if (kind === 'confirm') return event.id === 'confirm';
+                return event.id === 'confirm' ? event.values.value : null;
+            } finally {
+                await dialog.close();
+            }
+        }
+        function browserRequest(options) {
+            const created = Promise.resolve().then(() =>
+                sendMessage({method: 'ui_browser_create', options}));
+            const result = created.then(id => sendMessage({method: 'ui_browser_result', id}));
+            // Plugins may only close the window and never await its outcome.
+            result.catch(() => {});
+            let closing;
+            Object.defineProperty(result, 'close', {value() {
+                return closing ??= created.then(async id => {
+                    try {
+                        await sendMessage({method: 'ui_browser_close', id});
+                    } catch (error) {
+                        if (!String(error).includes('plugin_ui_unavailable') &&
+                            !String(error).includes('plugin_ui_cancelled')) throw error;
+                    }
+                });
+            }});
+            return Object.freeze(result);
+        }
+        return Object.freeze({
+            PluginDialogCancelledError,
+            // 3：支持 rating/row/button/comics/tags/info/richText 与 sheet 展示。
+            dialogVersion: 3,
+            isAvailable: async () => sendMessage({method: 'ui_available'}),
+            openWebView: options => browserRequest({
+                completion: options?.callbacks?.length ? 'callback' : 'manual', ...options,
+            }),
+            requestBrowserAuthorization: browserRequest,
+            alert: options => simpleDialog('alert', options),
+            confirm: options => simpleDialog('confirm', options),
+            prompt: options => simpleDialog('prompt', options),
+            async openDialog(options) {
+                const id = await sendMessage({method: 'ui_open', options: serializeImages(options)});
+                let terminal;
+                return Object.freeze({
+                    async nextEvent() {
+                        if (terminal) return terminal;
+                        const event = await sendMessage({method: 'ui_next_event', id});
+                        if (event.type === 'closed') terminal = event;
+                        return event;
+                    },
+                    async update(patch) {
+                        if (terminal) throw new Error('plugin_ui_closed');
+                        await sendMessage({method: 'ui_update', id, patch: serializeImages(patch)});
+                    },
+                    async close() {
+                        if (terminal) return;
+                        try {
+                            await sendMessage({method: 'ui_close', id});
+                        } catch (error) {
+                            if (!String(error).includes('plugin_ui_unavailable') &&
+                                !String(error).includes('plugin_ui_cancelled')) throw error;
+                        }
+                        terminal = {type: 'closed', reason: 'plugin'};
+                    },
+                });
+            },
+        });
+    })(),
 });
+return {Hazuki, HazukiSource};
 })();
 
 // Only an isolated foreground login runtime installs this host capability.

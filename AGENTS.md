@@ -16,7 +16,7 @@ Hazuki plugin documentation is located at `D:\Project\HazukiSources\docs`.
 - `flutter analyze`: run Flutter lints and static analysis.
 - `flutter test --coverage --reporter expanded`: run the full test suite with coverage.
 - `flutter test test/features/search/search_results_controller_test.dart`: run one focused test.
-- `flutter build apk --debug` / `flutter build windows --debug`: perform CI smoke builds.
+- `flutter build apk --debug` / `flutter build windows --debug`: perform local smoke builds.
 - `dart run build_runner build --delete-conflicting-outputs`: regenerate Drift code after database schema changes.
 
 ## Coding Style & Naming Conventions

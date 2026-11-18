@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -40,7 +40,6 @@ class DownloadsPageAppBar extends StatelessWidget
   Widget build(BuildContext context) {
     return hazukiFrostedAppBar(
       context: context,
-      enableBlur: false,
       title: _DownloadsAnimatedAppBarTitle(
         selectionMode: selectionMode,
         selectedCount: selectedCount,

@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'package:hazuki/services/source/content/source_cloud_reading.dart';
+
+import 'package:hazuki/services/source/source_task_owner.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
-import 'package:hazuki/shared/source_comic_tags.dart';
+import 'package:hazuki/models/source_comic_tags.dart';
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
 import 'history_page_state.dart';
@@ -13,12 +14,18 @@ import 'history_page_state.dart';
 class HistoryPageController extends ChangeNotifier {
   HistoryPageController({
     required ReadHistoryService readHistoryService,
-    required SourceSelectionGateway sourceService,
+    required SourceRuntimeGateway sourceService,
     SourceReaderGateway? readerService,
+    SourceCloudReadingGateway? cloudReading,
+    SourceCloudReadingEvents? cloudReadingEvents,
+    SourceTaskControlGateway? taskControl,
     SourcePresentationReader presentationFor = emptySourcePresentation,
-  }) : _readHistoryService = readHistoryService,
+  }) : _cloudTasks = SourceTaskOwner(taskControl),
+       _readHistoryService = readHistoryService,
        _sourceService = sourceService,
        _readerService = readerService,
+       _cloudReading = cloudReading,
+       _cloudReadingEvents = cloudReadingEvents,
        _presentationFor = presentationFor,
        _activeSourceKey = _normalizeSourceKey(
          (sourceService.activeSourceKey ?? ''),
@@ -28,20 +35,18 @@ class HistoryPageController extends ChangeNotifier {
         .join('|');
     _readHistoryService.addListener(_handleReadHistoryChanged);
     _sourceService.addListener(_handleSourceChanged);
-    final reader = _readerService;
-    if (reader is SourceCloudReadingEvents) {
-      (reader as SourceCloudReadingEvents).addListener(
-        _handleCloudSessionChanged,
-      );
-    }
+    _cloudReadingEvents?.addListener(_handleCloudSessionChanged);
   }
 
   final ReadHistoryService _readHistoryService;
-  final SourceSelectionGateway _sourceService;
+  final SourceRuntimeGateway _sourceService;
   final SourceReaderGateway? _readerService;
+  final SourceCloudReadingGateway? _cloudReading;
+  final SourceCloudReadingEvents? _cloudReadingEvents;
   final SourcePresentationReader _presentationFor;
   final HistoryPageData _state = HistoryPageData();
 
+  final SourceTaskOwner _cloudTasks;
   bool _disposed = false;
   void _handleCloudSessionChanged() {
     if (_disposed) return;
@@ -191,7 +196,10 @@ class HistoryPageController extends ChangeNotifier {
     bool playEntryAnimation = true,
     bool preserveExistingOrder = false,
   }) async {
+    if (_disposed) return;
     final requestVersion = ++_requestVersion;
+    _cloudTasks.restart();
+    final origin = _cloudTasks.origin();
     final sourceKey = _activeSourceKey;
     if (markLoading && !_state.loading) {
       _state.beginLoading();
@@ -206,11 +214,13 @@ class HistoryPageController extends ChangeNotifier {
             .toSet(),
       ),
     );
-    final reader = _readerService;
-    if (reader is SourceCloudReadingGateway) {
+    final cloudReading = _cloudReading;
+    if (cloudReading != null) {
       try {
-        final cloud = await (reader as SourceCloudReadingGateway)
-            .refreshCloudReadingHistory(sourceKey);
+        final cloud = await cloudReading.refreshCloudReadingHistory(
+          sourceKey,
+          taskOrigin: origin,
+        );
         final ids = history.map((c) => c.scopedId.storageKey).toSet();
         history.addAll(cloud.where((c) => ids.add(c.scopedId.storageKey)));
       } catch (_) {
@@ -392,12 +402,8 @@ class HistoryPageController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    final reader = _readerService;
-    if (reader is SourceCloudReadingEvents) {
-      (reader as SourceCloudReadingEvents).removeListener(
-        _handleCloudSessionChanged,
-      );
-    }
+    _cloudTasks.dispose();
+    _cloudReadingEvents?.removeListener(_handleCloudSessionChanged);
     _readHistoryService.removeListener(_handleReadHistoryChanged);
     _sourceService.removeListener(_handleSourceChanged);
     super.dispose();

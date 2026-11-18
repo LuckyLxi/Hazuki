@@ -1,11 +1,13 @@
 export 'models/source_contract_models.dart';
 export 'gateways/source_plugin_gateway.dart';
 export 'plugins/source_plugin_models.dart';
+export 'plugins/source_detail_tabs.dart';
 export 'models/source_identity.dart';
 export 'gateways/source_content_gateways.dart';
 export 'gateways/source_image_gateways.dart';
 export 'gateways/source_runtime_gateways.dart';
-export 'gateways/source_sync_gateway.dart';
 export 'plugins/source_search_capabilities.dart';
 export 'plugins/source_sort_options.dart' show SourceCommentSortOptions;
 export 'account/source_login_interaction.dart';
+export 'models/source_task.dart';
+export 'gateways/source_task_control_gateway.dart';

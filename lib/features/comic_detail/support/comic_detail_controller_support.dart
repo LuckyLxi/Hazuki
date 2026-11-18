@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
 
@@ -10,12 +10,14 @@ typedef ComicDetailCoverPreviewPageBuilder =
       required VoidCallback onLongPress,
     });
 
-typedef ComicDetailChaptersPanelBuilder =
+typedef ComicChaptersPanelBuilder =
     Widget Function({
       required ComicDetailsData details,
       required ValueChanged<Set<String>> onDownloadConfirm,
       required void Function(String epId, String chapterTitle, int index)
       onChapterTap,
+      Map<String, dynamic>? readingProgress,
+      void Function(BuildContext cardContext)? onResume,
     });
 
 typedef ComicDetailReaderPageBuilder =
@@ -37,18 +39,4 @@ typedef ComicDetailCategoryPageBuilder =
       required String title,
       required String viewMoreUrl,
       required ComicDetailNestedPageBuilder comicDetailPageBuilder,
-    });
-
-typedef ReaderWidgetBuilder =
-    Widget Function({
-      required String title,
-      required String chapterTitle,
-      required String comicId,
-      required String epId,
-      required int chapterIndex,
-      required List<String> images,
-      required String sourceKey,
-      String coverUrl,
-      ThemeData? comicTheme,
-      Future<void> Function(BuildContext)? onFavoriteRequested,
     });

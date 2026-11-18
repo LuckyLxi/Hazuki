@@ -47,7 +47,7 @@ class SourcePluginButton {
     }
     final seen = <(String, SourcePluginButtonLocation)>{};
     // Retired like-button declarations are ignored for installed API v1 plugins.
-    // Like visibility and its fixed position come from comic.likeComic instead.
+    // 点赞现由插件在 headerStats 中以 plugin 动作自行声明。
     return value
         .where((item) => item is! Map || item['id'] != 'comicLike')
         .map((item) {

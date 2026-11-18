@@ -1,10 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/source_runtime/source_plugin_update_dialog_support.dart';
 import 'package:hazuki/features/settings/view/plugins/source_plugins_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
 class _Plugins extends ChangeNotifier implements SourcePluginGateway {
@@ -94,7 +95,7 @@ void main() {
         MaterialApp(
           navigatorKey: navigator,
           locale: Locale(locale),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const Scaffold(body: Text('Home')),
         ),

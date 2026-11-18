@@ -1,10 +1,14 @@
+import '../common/source_operation_stop.dart';
 import '../runtime/source_cookie_store.dart';
 import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_runtime_handle.dart';
+import '../interaction/source_ui_scope.dart';
 
 abstract interface class SourceReloginContext {
   String get sourceKey;
   Future<void> ensureInitialized();
   bool get isLogged;
+  bool get skipPeriodicRelogin;
   bool shouldSkipRelogin(Duration duration);
   List<String>? loadAccountDataSync();
   DateTime? get lastReloginAt;
@@ -13,10 +17,16 @@ abstract interface class SourceReloginContext {
   Future<void> saveCookieStore(List<SourceCookie> cookies);
 }
 
-class SourceFacadeReloginContext implements SourceReloginContext {
-  SourceFacadeReloginContext(this.facade);
+class SourceRuntimeReloginContext implements SourceReloginContext {
+  SourceRuntimeReloginContext(this.handle);
 
-  final HazukiSourceFacade facade;
+  final SourceRuntimeHandle handle;
+  HazukiSourceFacade get facade => handle.facade;
+
+  @override
+  bool get skipPeriodicRelogin =>
+      facade.loadSourceData(sourceKey, 'interactive_login') == true ||
+      facade.sourceMeta?.presentation['skipPeriodicRelogin'] == true;
 
   @override
   String get sourceKey => facade.sourceKey;
@@ -35,10 +45,10 @@ class SourceFacadeReloginContext implements SourceReloginContext {
   List<String>? loadAccountDataSync() => facade.loadAccountDataSync();
 
   @override
-  DateTime? get lastReloginAt => facade.lastReloginAt;
+  DateTime? get lastReloginAt => handle.runtime.lastReloginAt;
 
   @override
-  set lastReloginAt(DateTime? value) => facade.lastReloginAt = value;
+  set lastReloginAt(DateTime? value) => handle.runtime.lastReloginAt = value;
 
   @override
   List<SourceCookie> loadCookieStore() => facade.loadCookieStore();
@@ -48,52 +58,44 @@ class SourceFacadeReloginContext implements SourceReloginContext {
       facade.saveCookieStore(cookies);
 }
 
-typedef SourceStoredAccountLogin =
+typedef SourceStoredAccountLogin<C extends SourceReloginContext> =
     Future<void> Function(
-      SourceReloginContext context, {
+      C context, {
       required String account,
       required String password,
     });
 
 /// Coordinates source-session renewal independently from business capabilities.
-class SourceReloginCoordinator {
+class SourceReloginCoordinator<C extends SourceReloginContext> {
   SourceReloginCoordinator({
-    required SourceStoredAccountLogin loginWithStoredAccount,
+    required SourceStoredAccountLogin<C> loginWithStoredAccount,
   }) : _loginWithStoredAccount = loginWithStoredAccount;
 
   static const _reloginInterval = Duration(minutes: 8);
 
-  final SourceStoredAccountLogin _loginWithStoredAccount;
+  final SourceStoredAccountLogin<C> _loginWithStoredAccount;
 
   Future<T> runWithReloginRetry<T>(
     Future<T> Function() action, {
-    required SourceReloginContext context,
+    required C context,
+    void Function()? checkActive,
   }) async {
     try {
       return await action();
     } catch (error) {
+      rethrowSourceOperationStop(error);
+      checkActive?.call();
       if (!isLoginExpiredError(error)) rethrow;
       await clearCookiesForFavoriteDomains(context);
       if (!await tryReloginFromStoredAccount(context, force: true)) rethrow;
+      checkActive?.call();
       return action();
     }
   }
 
-  Future<bool> ensureFavoriteSessionReady(SourceReloginContext context) async {
+  Future<bool> ensureFavoriteSessionReady(C context) async {
     await context.ensureInitialized();
-    if (context is SourceFacadeReloginContext &&
-        context.facade.loadSourceData(
-              context.facade.sourceKey,
-              'interactive_login',
-            ) ==
-            true) {
-      return true;
-    }
-    if (context is SourceFacadeReloginContext &&
-        context.facade.sourceMeta?.presentation['skipPeriodicRelogin'] ==
-            true) {
-      return true;
-    }
+    if (context.skipPeriodicRelogin) return true;
     if (!context.isLogged || context.shouldSkipRelogin(_reloginInterval)) {
       return true;
     }
@@ -101,28 +103,29 @@ class SourceReloginCoordinator {
   }
 
   Future<bool> tryReloginFromStoredAccount(
-    SourceReloginContext context, {
+    C context, {
     bool force = false,
   }) async {
     final accountData = context.loadAccountDataSync();
     if (accountData == null || accountData.length < 2) return false;
     if (!force && context.shouldSkipRelogin(_reloginInterval)) return true;
     try {
-      await _loginWithStoredAccount(
-        context,
-        account: accountData[0],
-        password: accountData[1],
+      await SourceUiScope.withoutInteraction(
+        () => _loginWithStoredAccount(
+          context,
+          account: accountData[0],
+          password: accountData[1],
+        ),
       );
       context.lastReloginAt = DateTime.now();
       return true;
-    } catch (_) {
+    } catch (error) {
+      rethrowSourceOperationStop(error);
       return false;
     }
   }
 
-  Future<void> clearCookiesForFavoriteDomains(
-    SourceReloginContext context,
-  ) async {
+  Future<void> clearCookiesForFavoriteDomains(C context) async {
     final cookies = context.loadCookieStore();
     cookies.clear();
     await context.saveCookieStore(cookies);

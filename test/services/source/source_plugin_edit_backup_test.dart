@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,7 +17,15 @@ search:{load:async()=>({comics:[]})},
 comic:{loadInfo:async()=>({title:'Comic',chapters:{}}),loadEp:async()=>({images:[]})}});
 ''';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory root;
   late SourcePluginManager manager;
@@ -74,6 +83,7 @@ void main() {
     requests.clear();
     manager = createManager();
     assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       pluginManager: manager,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     );
@@ -94,7 +104,7 @@ void main() {
       final engine = assembly.testing.handleFor('a').runtime.engine;
       final edited = '$original\n// B';
       await assembly.gateways.script.saveEditedActiveSource(edited);
-      expect(await assembly.gateways.advanced.hasActiveSourceBackup(), true);
+      expect(await assembly.gateways.script.hasActiveSourceBackup(), true);
       expect(assembly.testing.handleFor('a').runtime.engine, same(engine));
       await assembly.gateways.script.saveEditedActiveSource('$original\n// C');
       expect(await manager.readIfExists('a'), endsWith('// C'));
@@ -124,7 +134,7 @@ void main() {
       expect(await assembly.gateways.script.restoreActiveSourceBackup(), true);
       expect(await manager.readIfExists('a'), original);
       expect(await manager.isCustomEdited('a'), false);
-      expect(await assembly.gateways.advanced.hasActiveSourceBackup(), false);
+      expect(await assembly.gateways.script.hasActiveSourceBackup(), false);
       expect(
         assembly.testing.handleFor('a').facade.runtimeState.isWaitingForRestart,
         true,
@@ -258,7 +268,7 @@ void main() {
       packageUrl = 'https://example.com/new-location.js?token=a%2Fb';
       requests.clear();
       expect(
-        await assembly.gateways.update.downloadActiveSourceAndReload(),
+        await assembly.gateways.script.downloadActiveSourceAndReload(),
         true,
       );
       expect(requests, [sourcePluginsRepositoryUrl, packageUrl]);
@@ -307,7 +317,7 @@ void main() {
       requests.clear();
       expect(await manager.checkUpdate('a'), null);
       expect(
-        await assembly.gateways.update.checkActiveSourceVersionFromCloud(),
+        await assembly.gateways.script.checkActiveSourceVersionFromCloud(),
         null,
       );
       expect(await manager.redownload('a'), false);

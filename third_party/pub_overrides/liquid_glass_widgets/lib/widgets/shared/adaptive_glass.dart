@@ -351,7 +351,10 @@ class AdaptiveGlass extends StatelessWidget {
       // Standard; if the caller already knows they're on Standard, their values
       // must be passed through unchanged so tuning sliders take full effect.
       final bool skipNormalization = quality == GlassQuality.standard;
-      final standardSettings = _withoutNativeMaterial(baseSettings);
+      final standardSettings =
+          baseSettings.lensModel.index >= GlassLensModel.circularArc.index
+              ? baseSettings
+              : _withoutNativeMaterial(baseSettings);
 
       final LiquidGlassSettings normalizedSettings;
       if (skipNormalization) {

@@ -4,29 +4,72 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
+import 'source_shared_request.dart';
+import '../common/source_prefs_keys.dart';
 
 class SourceCacheStore {
+  SourceCacheStore({DateTime Function()? now}) : _now = now ?? DateTime.now;
+
+  final DateTime Function() _now;
   final LinkedHashMap<String, Uint8List> imageBytesCache =
       LinkedHashMap<String, Uint8List>();
-  final Map<String, Future<Uint8List>> imageDownloadInFlight = {};
+  final Map<String, SourceSharedRequest<Uint8List>> imageDownloadInFlight = {};
   final LinkedHashMap<String, ComicDetailsData> comicDetailsMemoryCache =
       LinkedHashMap<String, ComicDetailsData>();
-  final Map<String, Future<ComicDetailsData>> comicDetailsInFlight = {};
-  List<ExploreSection>? exploreSectionsMemoryCache;
-  DateTime? exploreSectionsMemoryCachedAt;
+  final Map<String, SourceSharedRequest<ComicDetailsData>>
+  comicDetailsInFlight = {};
+  List<ExploreSection>? _exploreSectionsMemoryCache;
+  DateTime? _exploreSectionsMemoryCachedAt;
   List<CategoryTagGroup>? categoryTagGroupsMemoryCache;
   DateTime? categoryTagGroupsMemoryCachedAt;
   Directory? imageCacheDir;
   Directory? comicDetailsCacheDir;
   Directory? discoverCacheDir;
 
+  Future<void> initializeExploreCache() async {
+    _exploreSectionsMemoryCache = null;
+    _exploreSectionsMemoryCachedAt = null;
+    clearCategoryTagGroupsMemoryCache();
+    final dir = discoverCacheDir;
+    discoverCacheDir = null;
+    try {
+      if (dir != null && await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+    } catch (_) {}
+  }
+
+  List<ExploreSection>? getExploreSections() {
+    final sections = _exploreSectionsMemoryCache;
+    final cachedAt = _exploreSectionsMemoryCachedAt;
+    if (sections == null || cachedAt == null) {
+      return null;
+    }
+    if (_now().difference(cachedAt) > SourcePrefsKeys.discoverCacheTtl) {
+      _exploreSectionsMemoryCache = null;
+      _exploreSectionsMemoryCachedAt = null;
+      return null;
+    }
+    return sections;
+  }
+
+  void putExploreSections(List<ExploreSection> sections) {
+    _exploreSectionsMemoryCache = List<ExploreSection>.unmodifiable(sections);
+    _exploreSectionsMemoryCachedAt = _now();
+  }
+
+  void clearExploreSections() {
+    _exploreSectionsMemoryCache = null;
+    _exploreSectionsMemoryCachedAt = null;
+  }
+
   void clearMemory() {
     imageBytesCache.clear();
     imageDownloadInFlight.clear();
     comicDetailsMemoryCache.clear();
     comicDetailsInFlight.clear();
-    exploreSectionsMemoryCache = null;
-    exploreSectionsMemoryCachedAt = null;
+    _exploreSectionsMemoryCache = null;
+    _exploreSectionsMemoryCachedAt = null;
     categoryTagGroupsMemoryCache = null;
     categoryTagGroupsMemoryCachedAt = null;
     imageCacheDir = null;

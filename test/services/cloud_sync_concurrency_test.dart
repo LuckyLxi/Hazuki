@@ -1,9 +1,10 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
@@ -120,7 +121,15 @@ class _FakeLockedRemoteClient extends CloudSyncRemoteClient {
   }
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
@@ -415,13 +424,14 @@ Future<_TestDevice> _createDevice(
   final favorites = LocalFavoritesService(database: database);
   final groups = DownloadGroupsService(database: database);
   final source = SourceRuntimeAssembly(
+    sourceUiService: sourceUiService,
     initialCatalog: hazukiAllowedSourceCatalog,
   );
   final readHistory = ReadHistoryService(database: database);
   final readingProgress = ReadingProgressService(database: database);
   final searchHistory = SearchHistoryService(database: database);
   final participants = createCloudSyncParticipantSet(
-    source: source.gateways.sync,
+    source: source.gateways.script,
     readHistory: readHistory,
     readingProgress: readingProgress,
     localFavorites: favorites,

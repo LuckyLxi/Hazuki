@@ -1,18 +1,21 @@
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_destination_route.dart';
 import 'package:hazuki/features/search/view/search_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/source_catalog_fixtures.dart';
+import '../../support/source_presentation_fixtures.dart';
 
 class _Source extends Mock implements SourceSearchGateway {}
 
@@ -35,7 +38,7 @@ void main() {
           ).thenReturn([hazukiAllowedSourceCatalog.first]);
           when(() => source.supportsDirectComicId).thenReturn(false);
           when(
-            () => source.sourceRuntimeState,
+            () => source.runtimeState,
           ).thenReturn(const SourceRuntimeState.idle());
           when(
             () => source.directComicIdRulesForSource(any()),
@@ -43,6 +46,7 @@ void main() {
           when(() => history.add('Action')).thenAnswer((_) async {});
           when(
             () => source.searchComics(
+              taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
               keyword: any(named: 'keyword'),
               page: any(named: 'page'),
               order: any(named: 'order'),
@@ -63,25 +67,28 @@ void main() {
             ),
           );
           await tester.pumpWidget(
-            MaterialApp(
-              theme: ThemeData(platform: platform),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: Builder(
-                builder: (context) => Scaffold(
-                  body: TextButton(
-                    onPressed: () => Navigator.of(context).push<void>(
-                      buildComicDetailDestinationRoute(
-                        context,
-                        (_) => SearchPage(
-                          sourceService: source,
-                          historyService: history,
-                          initialKeyword: 'Action',
-                          comicDetailPageBuilder: (_, _) => const SizedBox(),
+            withTestSourcePresentation(
+              MaterialApp(
+                theme: ThemeData(platform: platform),
+                localizationsDelegates: hazukiLocalizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: Builder(
+                  builder: (context) => Scaffold(
+                    body: TextButton(
+                      onPressed: () => Navigator.of(context).push<void>(
+                        buildComicDetailDestinationRoute(
+                          context,
+                          (_) => SearchPage(
+                            taskControl: FakeSourceTaskControl(),
+                            sourceService: source,
+                            historyService: history,
+                            initialKeyword: 'Action',
+                            comicDetailPageBuilder: (_, _) => const SizedBox(),
+                          ),
                         ),
                       ),
+                      child: const Text('Action tag'),
                     ),
-                    child: const Text('Action tag'),
                   ),
                 ),
               ),
@@ -132,27 +139,28 @@ void main() {
       () => source.allowedSources,
     ).thenReturn([hazukiAllowedSourceCatalog.first]);
     when(() => source.supportsDirectComicId).thenReturn(false);
-    when(
-      () => source.sourceRuntimeState,
-    ).thenReturn(const SourceRuntimeState.idle());
+    when(() => source.runtimeState).thenReturn(const SourceRuntimeState.idle());
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) => TextButton(
-            onPressed: () => Navigator.of(context).push<void>(
-              buildComicDetailDestinationRoute(
-                context,
-                (_) => SearchPage(
-                  sourceService: source,
-                  historyService: history,
-                  initialKeyword: 'Action',
-                  comicDetailPageBuilder: (_, _) => const SizedBox(),
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: hazukiLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => Navigator.of(context).push<void>(
+                buildComicDetailDestinationRoute(
+                  context,
+                  (_) => SearchPage(
+                    taskControl: FakeSourceTaskControl(),
+                    sourceService: source,
+                    historyService: history,
+                    initialKeyword: 'Action',
+                    comicDetailPageBuilder: (_, _) => const SizedBox(),
+                  ),
                 ),
               ),
+              child: const Text('Action tag'),
             ),
-            child: const Text('Action tag'),
           ),
         ),
       ),
@@ -166,6 +174,7 @@ void main() {
     verifyNever(() => history.add(any()));
     verifyNever(
       () => source.searchComics(
+        taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
         keyword: any(named: 'keyword'),
         page: any(named: 'page'),
         order: any(named: 'order'),
@@ -193,7 +202,7 @@ void main() {
         ).thenReturn([hazukiAllowedSourceCatalog.first]);
         when(() => source.supportsDirectComicId).thenReturn(false);
         when(
-          () => source.sourceRuntimeState,
+          () => source.runtimeState,
         ).thenReturn(const SourceRuntimeState.idle());
         when(() => source.directComicIdRulesForSource(any())).thenReturn(null);
         when(
@@ -201,6 +210,7 @@ void main() {
         ).thenAnswer((_) => historyRecorded.future);
         when(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: any(named: 'keyword'),
             page: any(named: 'page'),
             order: any(named: 'order'),
@@ -209,14 +219,17 @@ void main() {
         ).thenAnswer((_) => response.future);
 
         await tester.pumpWidget(
-          MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: SearchPage(
-              sourceService: source,
-              historyService: history,
-              initialKeyword: '  Action  ',
-              comicDetailPageBuilder: (_, _) => const SizedBox(),
+          withTestSourcePresentation(
+            MaterialApp(
+              localizationsDelegates: hazukiLocalizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: SearchPage(
+                taskControl: FakeSourceTaskControl(),
+                sourceService: source,
+                historyService: history,
+                initialKeyword: '  Action  ',
+                comicDetailPageBuilder: (_, _) => const SizedBox(),
+              ),
             ),
           ),
         );
@@ -231,6 +244,7 @@ void main() {
         expect(find.byKey(const ValueKey('search-loading')), findsOneWidget);
         verifyNever(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: any(named: 'keyword'),
             page: any(named: 'page'),
             order: any(named: 'order'),
@@ -243,6 +257,7 @@ void main() {
 
         verify(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: 'Action',
             page: 1,
             order: 'mr',

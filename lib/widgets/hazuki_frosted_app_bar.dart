@@ -1,8 +1,6 @@
-import 'dart:ui';
+import 'package:material_ui/material_ui.dart';
 
-import 'package:flutter/material.dart';
-
-import 'package:hazuki/shared/window/windows_app_bar_drag_area.dart';
+import 'package:hazuki/shared/windows/windows_app_bar_drag_area.dart';
 
 PreferredSizeWidget hazukiFrostedAppBar({
   required BuildContext context,
@@ -17,7 +15,6 @@ PreferredSizeWidget hazukiFrostedAppBar({
   double backgroundAlpha = 0.72,
   double? leadingWidth,
   double? titleSpacing,
-  bool enableBlur = true,
 }) {
   final surface = Theme.of(context).colorScheme.surface;
   return AppBar(
@@ -35,15 +32,8 @@ PreferredSizeWidget hazukiFrostedAppBar({
     surfaceTintColor: Colors.transparent,
     scrolledUnderElevation: 0,
     clipBehavior: Clip.antiAlias,
-    flexibleSpace: HazukiWindowsAppBarDragArea(
-      child: enableBlur
-          ? ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                child: const SizedBox.expand(),
-              ),
-            )
-          : const SizedBox.expand(),
-    ),
+    // 顶栏刻意不做背景模糊：BackdropFilter 在上层遮罩（如密码锁解锁揭开动画）
+    // 改变裁剪时会闪出一帧底层内容，且每帧模糊开销较大。请勿重新加回。
+    flexibleSpace: const HazukiWindowsAppBarDragArea(child: SizedBox.expand()),
   );
 }

@@ -3,11 +3,12 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_models.dart';
 import 'package:hazuki/services/download_groups/download_group.dart';
+import 'package:hazuki/widgets/hazuki_morph_dialog.dart';
 import 'downloads_cover_widgets.dart';
 import 'downloads_completed_status_widgets.dart';
 import 'downloads_shell_widgets.dart';
@@ -141,6 +142,7 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
       DownloadsCategoryMorphLauncher.height + 22;
 
   final GlobalKey _stackKey = GlobalKey();
+  final GlobalKey _categoryLauncherKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
   late final DownloadsCompletedListController _listController;
   _DownloadedComicSwipeReveal? _swipeReveal;
@@ -305,6 +307,7 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
           left: 0,
           right: 0,
           child: DownloadsCategoryMorphLauncher(
+            key: _categoryLauncherKey,
             visible: !_categoryShellOpen,
             landingVersion: _categoryLauncherLandingVersion,
             label: widget.selectedGroupName,
@@ -363,19 +366,29 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
       return;
     }
     _closeSwipeReveal();
+    // 弹窗走根导航铺满窗口，需按根 Overlay 坐标量取胶囊位置。
+    final overlayBox =
+        Navigator.of(
+              context,
+              rootNavigator: true,
+            ).overlay?.context.findRenderObject()
+            as RenderBox?;
+    final launcherContext = _categoryLauncherKey.currentContext;
+    final launcherRect = overlayBox == null || launcherContext == null
+        ? null
+        : DownloadsCategoryMorphLauncher.capsuleRectIn(
+            launcherContext,
+            overlayBox,
+          );
     setState(() {
       _categoryShellOpen = true;
     });
-    await showGeneralDialog<void>(
+    await showHazukiMorphDialog<void>(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      barrierColor: Colors.black.withValues(alpha: 0.34),
-      transitionDuration: const Duration(milliseconds: 420),
-      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+      builder: (dialogContext, animation) {
         return DownloadsCategoryShellDialog(
           animation: animation,
-          onDisposed: _restoreCategoryLauncher,
+          launcherRect: launcherRect,
           groups: widget.groups,
           selectedGroupId: widget.selectedGroupId,
           groupComicCounts: widget.groupComicCounts,
@@ -386,10 +399,8 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
           onDeleteGroup: widget.onDeleteGroup,
         );
       },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        return child;
-      },
     );
+    _restoreCategoryLauncher();
   }
 
   void _restoreCategoryLauncher() {

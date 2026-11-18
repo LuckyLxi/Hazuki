@@ -2,7 +2,7 @@ import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
@@ -11,12 +11,14 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
+import 'package:hazuki/shared/comments/comments_sort_scope.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart'
     show sourceOrderLabel;
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import 'comments_widgets.dart';
 
@@ -26,7 +28,9 @@ part 'comments_composer.dart';
 part 'comments_scroll_support.dart';
 
 class CommentsPage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const CommentsPage({
+    required this.taskControl,
     super.key,
     required this.sourceService,
     required this.filterService,
@@ -64,6 +68,7 @@ class CommentsPage extends StatefulWidget {
 class _CommentsPageState extends State<CommentsPage>
     with AutomaticKeepAliveClientMixin {
   late final CommentsPageController _controller;
+  CommentsSortBinding? _sortBinding;
   late final StreamSubscription<CommentsEffect> _effectSubscription;
   late final ScrollController _scrollController;
   late final bool _ownsScrollController;
@@ -108,6 +113,7 @@ class _CommentsPageState extends State<CommentsPage>
     _ownsScrollController = widget.scrollController == null;
     _scrollController = widget.scrollController ?? ScrollController();
     _controller = CommentsPageController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
       sourceService: widget.sourceService,
       filterService: widget.filterService,
       state: widget.interactionState,
@@ -117,6 +123,7 @@ class _CommentsPageState extends State<CommentsPage>
       sourceKey: widget.sourceKey,
       logSource: widget.isTabView ? 'comic_detail_comments' : 'comments',
       logContext: {'viewMode': widget.isTabView ? 'detail_tab' : 'page'},
+      taskControl: widget.taskControl,
     );
     _commentFocusNode.addListener(_handleCommentFocusChanged);
     _controller.addListener(_onControllerChanged);
@@ -125,7 +132,18 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final binding = CommentsSortScope.maybeOf(context);
+    if (identical(binding, _sortBinding)) return;
+    _sortBinding?.detach(_controller);
+    _sortBinding = binding;
+    binding?.attach(_controller);
+  }
+
+  @override
   void dispose() {
+    _sortBinding?.detach(_controller);
     for (final t in _fullscreenSyncTimers) {
       t.cancel();
     }
@@ -485,7 +503,14 @@ class _CommentsPageState extends State<CommentsPage>
 
   Widget? _buildSortControl() {
     final options = _controller.sortOptions;
-    if (options.orders.isEmpty) return null;
+    final menuBinding = SourcePluginMenuBinding<String>(
+      menuId: 'comments.sort',
+      sourceKey: widget.sourceKey.isEmpty ? null : widget.sourceKey,
+    );
+    if (options.orders.isEmpty &&
+        menuBinding.resolve(context).entries.isEmpty) {
+      return null;
+    }
     final language = Localizations.localeOf(context).languageCode;
     final labels = options.orders.map(
       (key, label) => MapEntry(key, sourceOrderLabel(label, language, key)),
@@ -495,6 +520,7 @@ class _CommentsPageState extends State<CommentsPage>
       child: Align(
         alignment: Alignment.centerRight,
         child: HazukiFrostedMenuButton<String>(
+          pluginMenu: menuBinding,
           tooltip: l10n(context).searchSortTooltip,
           selected: _interaction.order,
           options: [
@@ -540,7 +566,7 @@ class _CommentsPageState extends State<CommentsPage>
     return ColoredBox(
       color: Theme.of(context).colorScheme.surface,
       child: _CommentsBodyList(
-        sortControl: _buildSortControl(),
+        sortControl: _sortBinding == null ? _buildSortControl() : null,
         comments: _comments,
         visibleComments: visibleComments,
         hiddenCount: hiddenCount,

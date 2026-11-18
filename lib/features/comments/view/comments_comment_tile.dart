@@ -210,6 +210,17 @@ class _CommentsCommentTileContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          if (comment.quotedComments.isNotEmpty) ...[
+            _CommentQuotedFloors(
+              key: ValueKey('quoted_$animationKey'),
+              quotes: comment.quotedComments,
+              supportLike: supportLike,
+              supportReply: supportReply,
+              onReply: onReply,
+              onLike: onLike,
+            ),
+            const SizedBox(height: 12),
+          ],
           CommentsSelectableContent(
             content: comment.content,
             style: bodyStyle,
@@ -387,10 +398,14 @@ class _CommentActionRow extends StatelessWidget {
                 Flexible(
                   child: Tooltip(
                     message: liked
-                        ? strings.commentsUnlikeTooltip
+                        ? comment.canUnlike
+                              ? strings.commentsUnlikeTooltip
+                              : strings.commentsLiked
                         : strings.commentsLikeTooltip,
                     child: TextButton.icon(
-                      onPressed: isLiking ? null : () => onLike(comment),
+                      onPressed: isLiking || (liked && !comment.canUnlike)
+                          ? null
+                          : () => onLike(comment),
                       style: buttonStyle.copyWith(
                         foregroundColor: liked
                             ? WidgetStateProperty.resolveWith((states) {
@@ -435,6 +450,63 @@ class _CommentActionRow extends StatelessWidget {
                     ? strings.commentsHideReplies
                     : strings.commentsReplyCount('${comment.replyCount}'),
               ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _CommentQuotedFloors extends StatefulWidget {
+  const _CommentQuotedFloors({
+    super.key,
+    required this.quotes,
+    required this.supportLike,
+    required this.supportReply,
+    required this.onReply,
+    required this.onLike,
+  });
+
+  final List<ComicCommentData> quotes;
+  final bool supportLike;
+  final bool supportReply;
+  final void Function(ComicCommentData comment) onReply;
+  final void Function(ComicCommentData comment) onLike;
+
+  @override
+  State<_CommentQuotedFloors> createState() => _CommentQuotedFloorsState();
+}
+
+class _CommentQuotedFloorsState extends State<_CommentQuotedFloors> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final collapsible = widget.quotes.length > 3;
+    final visible = collapsible && !_expanded
+        ? [widget.quotes.first, widget.quotes.last]
+        : widget.quotes;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CommentRepliesList(
+          parentId: '',
+          replies: visible,
+          loading: false,
+          hasMore: false,
+          supportLike: widget.supportLike,
+          supportReply: widget.supportReply,
+          onReply: widget.onReply,
+          onLike: widget.onLike,
+          onLoadMore: (_) {},
+        ),
+        if (collapsible)
+          TextButton(
+            onPressed: () => setState(() => _expanded = !_expanded),
+            child: Text(
+              _expanded
+                  ? l10n(context).comicDetailCollapse
+                  : l10n(context).comicDetailExpand,
             ),
           ),
       ],

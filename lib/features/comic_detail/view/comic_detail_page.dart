@@ -1,11 +1,11 @@
 import 'package:hazuki/shared/source_presentation.dart';
 import 'comic_detail_destination_route.dart';
 import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/reading/reader_page_builder.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 import '../repository/comic_detail_repository.dart';
@@ -13,6 +13,7 @@ import '../support/comic_detail_actions_controller.dart';
 import '../support/comic_detail_controller_support.dart';
 import '../support/comic_detail_dependencies.dart';
 import '../support/comic_detail_favorite_controller.dart';
+import '../support/comic_detail_plugin_tabs_controller.dart';
 import '../support/comic_detail_scope.dart';
 import '../support/comic_detail_session_controller.dart';
 import '../support/comic_detail_theme_controller.dart';
@@ -21,13 +22,9 @@ import 'comic_detail_app_bar.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 
 import 'comic_detail_background.dart';
-import 'comic_detail_chapters_panel.dart';
+import 'package:hazuki/widgets/comic_chapters_panel.dart';
 import 'comic_detail_cover.dart';
 import 'comic_detail_scaffold.dart';
-
-const MethodChannel _comicDetailMediaChannel = MethodChannel(
-  'hazuki.comics/media',
-);
 
 class ComicDetailPage extends StatefulWidget {
   const ComicDetailPage({
@@ -51,7 +48,7 @@ class ComicDetailPage extends StatefulWidget {
   final ExploreComic comic;
   final ComicDetailDependencies dependencies;
   final String heroTag;
-  final ReaderWidgetBuilder readerWidgetBuilder;
+  final ReaderPageBuilder readerWidgetBuilder;
   final ComicDetailSearchPageBuilder searchPageBuilder;
   final CommentsWidgetBuilder commentsWidgetBuilder;
   final ComicDetailCategoryPageBuilder? categoryPageBuilder;
@@ -82,6 +79,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   late final ComicDetailFavoriteController _favoriteController;
   late final bool _supportsRelatedTab;
   late final bool _supportsCommentsTab;
+  late final ComicDetailPluginTabsController _pluginTabsController;
 
   @override
   void initState() {
@@ -106,9 +104,16 @@ class _ComicDetailPageState extends State<ComicDetailPage>
           listen: false,
         ) !=
         null;
+    _pluginTabsController = ComicDetailPluginTabsController(
+      sourceUiService: widget.dependencies.sourceUiService,
+      loadDetailTab: _repository.loadDetailTab,
+      comicId: widget.comic.id,
+      tabs: sourceDetailTabs(comicSourceKey, context: context, listen: false),
+    );
     _initializeControllers();
     _uiStateController.initialize(initialAppBarTitle: widget.comic.title);
     _sessionController.initialize();
+    _pluginTabsController.initialize();
     _themeController.addListener(_rebuildPage);
     _sessionController.addListener(_rebuildPage);
     _uiStateController.addListener(_rebuildPage);
@@ -136,6 +141,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     _themeController.dispose();
     _actionsController.dispose();
     _favoriteController.dispose();
+    _pluginTabsController.dispose();
     super.dispose();
   }
 
@@ -145,14 +151,21 @@ class _ComicDetailPageState extends State<ComicDetailPage>
 
   void _initializeControllers() {
     _favoriteController = ComicDetailFavoriteController(
-      repository: _repository,
+      sourceUiService: widget.dependencies.sourceUiService,
+      favoriteFolders: _repository.favoriteFolders,
+      runComicHeaderAction: _repository.runComicHeaderAction,
+      taskControl: widget.dependencies.taskControl,
     );
     _themeController = ComicDetailThemeController(
-      repository: _repository,
+      loadDynamicColorEnabled: _repository.loadComicDynamicColorEnabled,
+      loadCoverBytes: (url) =>
+          _repository.downloadImageBytes(url, keepInMemory: true),
       comicCoverUrl: widget.comic.cover,
       detailsFutureGetter: () => _sessionController.future,
     );
     _actionsController = ComicDetailActionsController(
+      downloader: widget.dependencies.downloader,
+      taskControl: widget.dependencies.taskControl,
       destinationRouteBuilder: (builder) =>
           buildComicDetailDestinationRoute(context, builder),
       expandedReaderRouteBuilder: (builder) => buildComicDetailDestinationRoute(
@@ -183,10 +196,14 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             required details,
             required onDownloadConfirm,
             required onChapterTap,
-          }) => ComicDetailChaptersPanel(
+            readingProgress,
+            onResume,
+          }) => ComicChaptersPanel(
             details: details,
             onDownloadConfirm: onDownloadConfirm,
             onChapterTap: onChapterTap,
+            readingProgress: readingProgress,
+            onResume: onResume,
           ),
       readerPageBuilder:
           ({
@@ -229,9 +246,10 @@ class _ComicDetailPageState extends State<ComicDetailPage>
         isDesktopPanel: widget.isDesktopPanel,
         onCloseRequested: widget.onCloseRequested,
       ),
-      mediaChannel: _comicDetailMediaChannel,
     );
     _sessionController = ComicDetailSessionController(
+      sourceUiService: widget.dependencies.sourceUiService,
+      taskControl: widget.dependencies.taskControl,
       repository: _repository,
       comic: widget.comic,
       sourceKey: widget.comic.sourceKey,
@@ -246,6 +264,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       scrollController: _scrollController,
       includeRelatedTab: _supportsRelatedTab,
       includeCommentsTab: _supportsCommentsTab,
+      pluginTabCount: _pluginTabsController.tabs.length,
     );
   }
 
@@ -271,6 +290,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       actions: _actionsController,
       favorite: _favoriteController,
       supportsRelatedTab: _supportsRelatedTab,
+      pluginTabs: _pluginTabsController,
       child: AnimatedTheme(
         data: theme,
         duration: const Duration(milliseconds: 360),

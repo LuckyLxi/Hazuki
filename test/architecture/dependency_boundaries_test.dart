@@ -25,6 +25,20 @@ void main() {
       );
     });
 
+    test('cloud reading consumers depend on contracts', () {
+      final implementation = File(
+        'lib/services/source/content/source_cloud_reading.dart',
+      ).absolute.uri;
+      final violations = [
+        for (final entry in sources.entries)
+          if ((entry.key.path.contains('/features/') ||
+                  entry.key.path.contains('/app/')) &&
+              _dependencyUris(entry.value, entry.key).contains(implementation))
+            entry.key,
+      ];
+      expect(violations, isEmpty);
+    });
+
     test('source public exports do not expose implementations', () {
       final exports = _libraryDependencyGraph(sources, exportsOnly: true);
       final entry = File(
@@ -34,6 +48,7 @@ void main() {
         (uri) =>
             uri.path.contains('/services/source/adapters/') ||
             uri.path.contains('/services/source/runtime/') ||
+            uri.path.endsWith('/content/source_cloud_reading.dart') ||
             uri.path.endsWith('/gateways/source_gateway_set.dart'),
       );
       expect(violations, isEmpty, reason: 'Source implementation exports');
@@ -175,8 +190,7 @@ void main() {
       for (final file in _dartFilesUnder(directory)) {
         for (final line in file.readAsLinesSync()) {
           if (!line.trimLeft().startsWith('import ')) continue;
-          if (line.contains('services/announcement_service.dart') ||
-              line.contains('announcements/announcement_service.dart') ||
+          if (line.contains('announcements/announcement_service.dart') ||
               line.contains('announcements/announcement_remote_source.dart') ||
               line.contains('announcements/announcement_store.dart')) {
             violations.add('${file.path}: $line');
@@ -482,6 +496,26 @@ void main() {
     },
   );
 
+  test('services and models do not depend on shared UI helpers', () {
+    final sharedRoot = Directory('lib/shared').absolute.uri.toString();
+    final violations = <String>[];
+    for (final directory in const ['lib/services', 'lib/models']) {
+      for (final file in _dartFilesUnder(directory)) {
+        final dependsOnShared = _dependencyUris(
+          file.readAsStringSync(),
+          file.absolute.uri,
+        ).any((uri) => uri.toString().startsWith(sharedRoot));
+        if (dependsOnShared) violations.add(file.path);
+      }
+    }
+
+    expect(
+      violations,
+      isEmpty,
+      reason: 'Move shared contracts below lib/shared: $violations',
+    );
+  });
+
   test('application and features do not depend on source implementations', () {
     final violations = <String>[];
     for (final directory in const ['lib/app', 'lib/features']) {
@@ -564,7 +598,7 @@ void main() {
 
   test('migrated source capabilities use explicit runtime dependencies', () {
     const paths = [
-      'lib/services/source/explore_capability.dart',
+      'lib/services/source/content/explore_capability.dart',
       'lib/services/source/category/source_category_capability.dart',
       'lib/services/source/comic/source_comic_details_cache.dart',
       'lib/services/source/comic/source_comic_details_parser.dart',

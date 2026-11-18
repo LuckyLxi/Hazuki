@@ -1,3 +1,7 @@
+import '../common/source_operation_stop.dart';
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:convert';
 
 import '../../../models/hazuki_models.dart';
@@ -8,12 +12,19 @@ import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_host.dart';
 import 'source_comic_details_cache.dart';
 import 'source_comic_details_parser.dart';
+import '../runtime/source_task_registry.dart';
+import '../runtime/source_shared_request.dart';
+import '../runtime/source_host_call_context.dart';
+import '../debug/source_task_log_recorder.dart';
+import '../interaction/source_ui_scope.dart';
+import '../interaction/source_ui_service.dart';
 
 class SourceComicDetailsCapability {
   SourceComicDetailsCapability({
     required SourceRuntimeHost runtimeHost,
     required SourceComicDetailsCache cache,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
     required ComicDetailsTextTranslator translateSourceText,
   }) : _runtimeHost = runtimeHost,
        _cache = cache,
@@ -22,7 +33,8 @@ class SourceComicDetailsCapability {
 
   final SourceRuntimeHost _runtimeHost;
   final SourceComicDetailsCache _cache;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
   final SourceComicDetailsParser _parser;
   final SourceComicDetailsRequestTracker _requestTracker =
       SourceComicDetailsRequestTracker();
@@ -36,7 +48,52 @@ class SourceComicDetailsCapability {
     String comicId, {
     String sourceKey = '',
     bool forceRefresh = false,
+    SourceTaskOrigin? taskOrigin,
+  }) {
+    taskOrigin?.readerSession?.checkActive();
+    taskOrigin?.downloadSession?.checkActive();
+    _runtimeHost.checkReaderSession(
+      _resolveActiveSourceKey(sourceKey),
+      taskOrigin,
+    );
+    if (taskOrigin == null) {
+      return _loadComicDetails(
+        comicId,
+        sourceKey: sourceKey,
+        forceRefresh: forceRefresh,
+      );
+    }
+    final recorder = SourceTaskLogRecorder(_runtimeHost.logStore);
+    return _runtimeHost.tasks.run(
+      pluginId: _resolveActiveSourceKey(sourceKey),
+      method: taskOrigin.readerSession == null
+          ? 'search.directId'
+          : 'reader.details',
+      origin: taskOrigin,
+      observe: (task, event, disposition, error, stack) => recorder.record(
+        task,
+        event,
+        disposition,
+        error,
+        stack,
+        sensitiveValues: [comicId],
+      ),
+      operation: (task) => _loadComicDetails(
+        comicId,
+        sourceKey: sourceKey,
+        forceRefresh: forceRefresh,
+        task: task,
+      ),
+    );
+  }
+
+  Future<ComicDetailsData> _loadComicDetails(
+    String comicId, {
+    required String sourceKey,
+    required bool forceRefresh,
+    SourceTask? task,
   }) async {
+    task?.checkActive();
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
       throw Exception('comic_id_empty');
@@ -58,33 +115,41 @@ class SourceComicDetailsCapability {
     }
 
     final handle = _runtimeHost.handleFor(resolvedSourceKey);
+    task?.bindResource(handle);
     final facade = handle.facade;
 
     final inFlight = facade.cache.comicDetailsInFlight[scopedComicKey];
-    if (!forceRefresh && inFlight != null) {
-      return inFlight;
+    if (!forceRefresh && inFlight != null && inFlight.available) {
+      return inFlight.subscribe(task: task);
     }
 
     final requestToken = _requestTracker.begin(scopedComicKey);
-    final future = _loadComicDetailsWithRuntimeRecovery(
-      normalizedComicId,
-      handle,
-      sourceKey: resolvedSourceKey,
-      shouldCacheResult: () =>
-          _requestTracker.isCurrent(scopedComicKey, requestToken),
+    late final SourceSharedRequest<ComicDetailsData> request;
+    request = SourceSharedRequest<ComicDetailsData>(
+      sourceUiService: _runtimeHost.sourceUiService,
+      pluginId: resolvedSourceKey,
+      method: 'comic.loadInfo',
+      operation: (_) => _loadComicDetailsWithRuntimeRecovery(
+        normalizedComicId,
+        handle,
+        sourceKey: resolvedSourceKey,
+        request: request,
+        shouldCacheResult: () =>
+            request.hasConsumers &&
+            _requestTracker.isCurrent(scopedComicKey, requestToken),
+      ),
+      onUnavailable: () {
+        if (identical(
+          facade.cache.comicDetailsInFlight[scopedComicKey],
+          request,
+        )) {
+          facade.cache.comicDetailsInFlight.remove(scopedComicKey);
+        }
+        _requestTracker.complete(scopedComicKey, requestToken);
+      },
     );
-    facade.cache.comicDetailsInFlight[scopedComicKey] = future;
-    try {
-      return await future;
-    } finally {
-      if (identical(
-        facade.cache.comicDetailsInFlight[scopedComicKey],
-        future,
-      )) {
-        facade.cache.comicDetailsInFlight.remove(scopedComicKey);
-      }
-      _requestTracker.complete(scopedComicKey, requestToken);
-    }
+    facade.cache.comicDetailsInFlight[scopedComicKey] = request;
+    return request.subscribe(task: task);
   }
 
   Future<ComicDetailsData> _loadComicDetailsWithRuntimeRecovery(
@@ -92,10 +157,12 @@ class SourceComicDetailsCapability {
     SourceRuntimeHandle initialHandle, {
     required String sourceKey,
     required bool Function() shouldCacheResult,
+    required SourceSharedRequest<ComicDetailsData> request,
   }) async {
     var handle = initialHandle;
     var recoveringRuntime = false;
     for (var attempt = 0; attempt < 2; attempt++) {
+      request.checkActive();
       final facade = handle.facade;
       try {
         final details = await _loadComicDetailsFromSource(
@@ -103,11 +170,21 @@ class SourceComicDetailsCapability {
           facade,
           sourceKey: sourceKey,
           shouldCacheResult: shouldCacheResult,
+          request: request,
         );
+        request.checkActive();
         if (!handle.recreationRequested) {
           return details;
         }
       } catch (error) {
+        request.checkActive();
+        // 运行时故障不能经插件请求的重建重放到新实例。
+        if (error is SourceTaskCancelled ||
+            error is SourceScriptStopped ||
+            error is SourceRuntimeFailed ||
+            isSourceUiCancellation(error)) {
+          rethrow;
+        }
         if (!handle.recreationRequested || attempt == 1) {
           if (attempt == 1 && recoveringRuntime) {
             throw Exception('source_runtime_recovery_failed:$error');
@@ -139,15 +216,21 @@ class SourceComicDetailsCapability {
     HazukiSourceFacade facade, {
     required String sourceKey,
     required bool Function() shouldCacheResult,
+    required SourceSharedRequest<ComicDetailsData> request,
   }) async {
-    await facade.ensureInitialized();
+    return request.withUiScope(
+      () => facade.handle.runOperation(() async {
+        await facade.ensureInitialized();
+        request.checkActive();
 
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+        final engine = facade.js.engine;
+        if (engine == null) {
+          throw Exception('source_not_initialized');
+        }
+        request.bindEngine(engine);
 
-    final dynamic result = engine.evaluate('''(async () => {
+        final dynamic result = await engine.evaluate(
+          '''(async () => {
         const data = await this.__hazuki_source.comic.loadInfo(${jsonEncode(normalizedComicId)});
         const chapterEntries = [];
         const chapters = data?.chapters;
@@ -177,56 +260,96 @@ class SourceComicDetailsCapability {
           ...data,
           __chapterEntries: chapterEntries,
         };
-      })()''', name: 'source_comic_detail.js');
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! Map) {
-      throw Exception('comic_details_invalid_response');
-    }
+      })()''',
+          name: 'source_comic_detail.js',
+          execution: request.execution,
+        );
+        final dynamic resolved = await facade.js.resolve(result);
+        request.checkActive();
+        if (resolved is! Map) {
+          throw Exception('comic_details_invalid_response');
+        }
 
-    final details = _parser.parse(
-      map: Map<String, dynamic>.from(resolved),
-      fallbackComicId: normalizedComicId,
-      sourceKey: sourceKey,
+        final details = _parser.parse(
+          map: Map<String, dynamic>.from(resolved),
+          fallbackComicId: normalizedComicId,
+          sourceKey: sourceKey,
+        );
+
+        if (shouldCacheResult() &&
+            identical(facade.js.engine, engine) &&
+            !facade.handle.isDisposed &&
+            identical(_runtimeHost.handleFor(sourceKey).facade, facade)) {
+          _cache.put(
+            SourceScopedComicId(
+              sourceKey: details.sourceKey,
+              comicId: normalizedComicId,
+            ).storageKey,
+            details,
+            sourceKey: sourceKey,
+          );
+          if (details.id != normalizedComicId) {
+            _cache.put(
+              details.scopedId.storageKey,
+              details,
+              sourceKey: sourceKey,
+            );
+          }
+        }
+        return details;
+      }),
     );
-
-    if (shouldCacheResult() &&
-        !facade.handle.isDisposed &&
-        identical(_runtimeHost.handleFor(sourceKey).facade, facade)) {
-      _cache.put(
-        SourceScopedComicId(
-          sourceKey: details.sourceKey,
-          comicId: normalizedComicId,
-        ).storageKey,
-        details,
-        sourceKey: sourceKey,
-      );
-      if (details.id != normalizedComicId) {
-        _cache.put(details.scopedId.storageKey, details, sourceKey: sourceKey);
-      }
-    }
-    return details;
   }
 
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) async {
+    taskOrigin?.readerSession?.checkActive();
+    taskOrigin?.downloadSession?.checkActive();
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    _runtimeHost.checkReaderSession(resolvedSourceKey, taskOrigin);
     var handle = _runtimeHost.handleFor(resolvedSourceKey);
+    final callerScope = _runtimeHost.sourceUiService.currentScope;
+    final caller = callerScope?.controllerOwner;
+    final routeOwner =
+        callerScope?.owner ?? _runtimeHost.sourceUiService.captureOwner?.call();
     for (var attempt = 0; attempt < 2; attempt++) {
       final facade = handle.facade;
       try {
-        final images = await _loadChapterImagesFromSource(
-          comicId: comicId,
-          epId: epId,
-          facade: facade,
+        Future<List<String>> run() => runSourceOperation(
+          _runtimeHost,
+          handle,
+          'reader.chapter',
+          (context) => _loadChapterImagesFromSource(
+            comicId: comicId,
+            epId: epId,
+            facade: facade,
+            context: context,
+          ),
+          origin: taskOrigin,
+          retainOnSourceChange: taskOrigin == null,
+          sensitiveValues: [comicId, epId],
+        );
+        // Attempt scopes retire independently of the caller's reading scope.
+        final images = await _runtimeHost.sourceUiService.run(
+          run,
+          inheritCurrent: false,
+          abortOnScopeCancellation: false,
+          owner: caller is SourceUiOwner ? caller : null,
+          routeOwner: routeOwner,
+          captureRouteOwner: false,
         );
         if (!handle.recreationRequested) {
           return images;
         }
-      } catch (_) {
-        if (!handle.recreationRequested || attempt == 1) {
+      } catch (error) {
+        rethrowSourceOperationStop(error);
+        if (error is SourceRuntimeFailed ||
+            !handle.recreationRequested ||
+            attempt == 1) {
           rethrow;
         }
       }
@@ -245,10 +368,16 @@ class SourceComicDetailsCapability {
           'operation': 'load_chapter_images',
         },
       );
+      if (taskOrigin?.cancellation?.reason case final reason?) {
+        throw SourceTaskCancelled(resolvedSourceKey, reason);
+      }
+      _runtimeHost.checkReaderSession(resolvedSourceKey, taskOrigin);
+      final previous = handle;
       handle = _runtimeHost.recreateSourceRuntime(
         resolvedSourceKey,
         expectedHandle: handle,
       );
+      _runtimeHost.transferDownloadSession(taskOrigin, previous, handle);
     }
     throw StateError('unreachable');
   }
@@ -257,71 +386,64 @@ class SourceComicDetailsCapability {
     required String comicId,
     required String epId,
     required HazukiSourceFacade facade,
+    required SourceOperationContext context,
   }) async {
-    await facade.ensureInitialized();
-    final engine = facade.js.engine;
-    if (engine == null) {
-      throw Exception('source_not_initialized');
-    }
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      context.checkActive();
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
 
-    final dynamic result = engine.evaluate(
-      'this.__hazuki_source.comic.loadEp(${jsonEncode(comicId)}, ${jsonEncode(epId)})',
-      name: 'source_chapter_images.js',
-    );
-    final dynamic resolved = await facade.js.resolve(result);
-    if (resolved is! Map) {
-      return const [];
-    }
-
-    final imagesRaw = Map<String, dynamic>.from(resolved)['images'];
-    if (imagesRaw is! List) {
-      return const [];
-    }
-
-    return imagesRaw
-        .map((e) => e.toString())
-        .where((e) => e.isNotEmpty)
-        .toList();
-  }
-
-  bool get supportComicLike {
-    final engine = facade.js.engine;
-    if (engine == null) return false;
-    try {
-      return jsAsBool(
-        engine.evaluate(
-          'typeof this.__hazuki_source.comic?.likeComic === "function"',
-        ),
+      final dynamic result = await context.evaluate(
+        engine,
+        'this.__hazuki_source.comic.loadEp(${jsonEncode(comicId)}, ${jsonEncode(epId)})',
+        name: 'source_chapter_images.js',
       );
-    } catch (_) {
-      return false;
-    }
+      final dynamic resolved = await context.resolve(facade.js.resolve(result));
+      if (resolved is! Map) {
+        return const [];
+      }
+
+      final imagesRaw = Map<String, dynamic>.from(resolved)['images'];
+      if (imagesRaw is! List) {
+        return const [];
+      }
+
+      return imagesRaw
+          .map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    });
   }
 
-  bool supportComicLikeForSource(String sourceKey) {
-    if (!_runtimeHost.runtimeRegistry.isAllowedSourceKey(
-      sourceKey.isEmpty ? _runtimeHost.activeSourceKey : sourceKey,
-    )) {
-      return false;
-    }
-    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final targetFacade = _runtimeHost.handleFor(resolvedSourceKey).facade;
-    final engine = targetFacade.js.engine;
-    if (engine == null) return false;
-    try {
-      return targetFacade.js.asBool(
-        engine.evaluate(
-          'typeof this.__hazuki_source.comic?.likeComic === "function"',
-        ),
-      );
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<void> toggleComicLike({
+  /// 详情页顶部 `plugin` 动作：调用插件的 `comic.onHeaderAction`。
+  /// 插件可在回调中自行弹窗或发请求；返回的新顶部内容同步写回详情缓存。
+  Future<ComicHeaderActionResult> runComicHeaderAction({
     required String comicId,
-    required bool isLike,
+    required String actionId,
+    String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
+  }) => runSourceOperation(
+    _runtimeHost,
+    _runtimeHost.handleFor(_resolveActiveSourceKey(sourceKey)),
+    'comic.headerAction',
+    (operationContext) => _runComicHeaderActionTask(
+      operationContext,
+      comicId: comicId,
+      actionId: actionId,
+      sourceKey: sourceKey,
+    ),
+    origin: taskOrigin,
+    serviceOwned: true,
+    sensitiveValues: [comicId],
+  );
+
+  Future<ComicHeaderActionResult> _runComicHeaderActionTask(
+    SourceOperationContext operationContext, {
+    required String comicId,
+    required String actionId,
     String sourceKey = '',
   }) async {
     final normalizedComicId = comicId.trim();
@@ -329,55 +451,66 @@ class SourceComicDetailsCapability {
       throw Exception('comic_id_empty');
     }
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
-    await facade.ensureInitialized();
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
 
-    Future<void> runToggle() async {
-      final engine = facade.js.engine;
-      if (engine == null) {
-        throw Exception('source_not_initialized');
+      final originalEngine = facade.js.engine;
+      Future<ComicHeaderActionResult> runAction() async {
+        final engine = facade.js.engine;
+        if (engine == null) {
+          throw Exception('source_not_initialized');
+        }
+        if (!jsAsBool(
+          await operationContext.evaluate(
+            engine,
+            'typeof this.__hazuki_source.comic?.onHeaderAction === "function"',
+          ),
+        )) {
+          throw Exception('comic_header_action_not_supported');
+        }
+
+        final dynamic result = await operationContext.evaluate(
+          engine,
+          'this.__hazuki_source.comic.onHeaderAction('
+          '${jsonEncode(normalizedComicId)}, ${jsonEncode(actionId)})',
+          name: 'source_comic_header_action.js',
+        );
+        return _parser.parseHeaderActionResult(
+          await operationContext.resolve(facade.js.resolve(result)),
+          sourceKey: resolvedSourceKey,
+        );
       }
-      if (!jsAsBool(
-        engine.evaluate(
-          'typeof this.__hazuki_source.comic?.likeComic === "function"',
-        ),
-      )) {
-        throw Exception('comic_like_not_supported');
+
+      final result = await _reloginCoordinator.runWithReloginRetry(
+        runAction,
+        context: SourceRuntimeReloginContext(operationContext.resource),
+        checkActive: operationContext.checkActive,
+      );
+
+      if ((result.headerStats != null || result.headerBadges != null) &&
+          operationContext.canCache() &&
+          identical(facade.js.engine, originalEngine) &&
+          identical(_runtimeHost.handleFor(resolvedSourceKey).facade, facade)) {
+        final scopedId = SourceScopedComicId(
+          sourceKey: resolvedSourceKey,
+          comicId: normalizedComicId,
+        );
+        // 别名 ID 先解析到缓存里的规范 ID，保证所有别名条目一起更新。
+        final cached = _cache.get(
+          scopedId.storageKey,
+          sourceKey: resolvedSourceKey,
+        );
+        _updateComicDetailsStateInMemoryCache(
+          cached?.scopedId ?? scopedId,
+          update: (details) => details.copyWith(
+            headerStats: result.headerStats,
+            headerBadges: result.headerBadges,
+          ),
+        );
       }
-
-      final dynamic result = engine.evaluate(
-        'this.__hazuki_source.comic.likeComic(${jsonEncode(normalizedComicId)}, $isLike)',
-        name: 'source_comic_like.js',
-      );
-      await facade.js.resolve(result);
-    }
-
-    await _reloginCoordinator.runWithReloginRetry(
-      runToggle,
-      context: SourceFacadeReloginContext(facade),
-    );
-
-    final scopedKey = SourceScopedComicId(
-      sourceKey: resolvedSourceKey,
-      comicId: normalizedComicId,
-    ).storageKey;
-    final cached = _cache.get(scopedKey, sourceKey: resolvedSourceKey);
-    if (cached != null) {
-      _updateComicDetailsLikeStateInMemoryCache(
-        cached.scopedId,
-        isLike: isLike,
-      );
-    }
-  }
-
-  void _updateComicDetailsLikeStateInMemoryCache(
-    SourceScopedComicId scopedId, {
-    required bool isLike,
-  }) {
-    _updateComicDetailsStateInMemoryCache(
-      scopedId,
-      update: (details) => details.copyWith(isLiked: isLike),
-    );
+      return result;
+    });
   }
 
   void updateFavoriteStateInMemoryCache(

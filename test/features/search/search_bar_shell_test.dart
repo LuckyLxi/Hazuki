@@ -1,16 +1,17 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/features/search/view/search_bar_shell.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 
 void main() {
   for (final brightness in Brightness.values) {
     for (final compact in [false, true]) {
-      testWidgets('glass toggle preserves editing in $brightness, '
+      testWidgets('search stays opaque and editable in $brightness, '
           'compact=$compact', (tester) async {
         await tester.runAsync(
           () => HazukiLiquidGlass.initialize(enabled: false),
@@ -27,7 +28,7 @@ void main() {
           HazukiLiquidGlass.wrap(
             child: MaterialApp(
               theme: ThemeData(brightness: brightness),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: hazukiLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: Scaffold(
                 body: Center(
@@ -73,13 +74,10 @@ void main() {
         );
         expect(tapCount, 1);
 
-        final glass = find.byKey(
-          const ValueKey('search-bar-liquid-glass-surface'),
-        );
         for (final enabled in [true, false, true, false]) {
           await tester.runAsync(() => HazukiLiquidGlass.setEnabled(enabled));
           await tester.pumpAndSettle();
-          expect(glass, enabled ? findsOneWidget : findsNothing);
+          expect(find.byType(GlassContainer), findsNothing);
           expect(tester.getSize(shell), originalSize);
           expect(
             tester.state<EditableTextState>(find.byType(EditableText)),
@@ -92,22 +90,11 @@ void main() {
           final bar = tester.widget<SearchBar>(find.byType(SearchBar));
           expect(
             bar.backgroundColor!.resolve({WidgetState.focused}),
-            enabled
-                ? Colors.transparent
-                : hazukiSearchBoxBackgroundColor(
-                    tester.element(shell),
-                    focusProgress: 1,
-                  ),
+            hazukiSearchBoxBackgroundColor(
+              tester.element(shell),
+              focusProgress: 1,
+            ),
           );
-          if (enabled) {
-            final container = tester.widget<GlassContainer>(glass);
-            expect(container.quality, HazukiLiquidGlass.navigationQuality);
-            expect(
-              container.settings,
-              HazukiLiquidGlass.navigationSettings(tester.element(glass)),
-            );
-            expect(tester.getSize(glass), originalSize);
-          }
         }
 
         await tester.tap(find.byKey(const ValueKey('clear')));

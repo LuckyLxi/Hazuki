@@ -79,3 +79,5 @@ ANNOUNCEMENT_GUIDE.md
 **/ephemeral/
 **/Generated.xcconfig
 **/flutter_export_environment.sh
+# Widget Preview related
+.widget_preview/

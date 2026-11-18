@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../l10n/l10n.dart';
 import '../../../services/source/source_capabilities.dart';
@@ -11,7 +11,7 @@ Future<void> showHomeWindowsSourcePicker(
   BuildContext context, {
   required Rect sidebarBounds,
   required Rect anchorBounds,
-  required SourceSwitchGateway sourceService,
+  required SourceRuntimeGateway sourceService,
   Future<void> Function()? onSourceSwitched,
 }) async {
   await sourceService.loadActiveSourcePreference();
@@ -83,7 +83,7 @@ class _WindowsSourcePickerCard extends StatefulWidget {
     required this.onSourceSwitched,
   });
 
-  final SourceSwitchGateway sourceService;
+  final SourceRuntimeGateway sourceService;
   final Future<void> Function()? onSourceSwitched;
 
   @override

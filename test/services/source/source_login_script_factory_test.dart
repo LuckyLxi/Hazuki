@@ -3,8 +3,7 @@ import 'package:hazuki/services/source/account/source_login_script_factory.dart'
 
 void main() {
   test('encodes credentials for the standard plugin login entry point', () {
-    const factory = SourceLoginScriptFactory();
-    final script = factory.generic(
+    final script = buildSourceLoginScript(
       account: 'user"name',
       password: 'line\nbreak',
     );

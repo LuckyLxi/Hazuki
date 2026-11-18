@@ -1,16 +1,17 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/l10n.dart';
 import '../../services/source/account/source_browser_authorization.dart';
 import '../../services/source/account/source_login_interaction.dart';
-import 'source_account_dialogs.dart';
+import 'source_account_dialog_support.dart';
 import 'source_authorization_browser.dart';
 import 'source_login_interaction_text.dart';
 import 'source_login_dialog_controller.dart';
+import '../source_interaction/source_animated_dialog.dart';
 
 Future<Object?> showSourceBrowserAuthorization(
   BuildContext context,
@@ -32,6 +33,7 @@ Future<Object?> showSourceBrowserAuthorization(
   SourceAuthorizationBrowser? browser;
   Future<void>? preparing;
   var returningResult = false;
+  TransitionRoute<dynamic>? dialogRoute;
   try {
     browser = (browserFactory ?? createSourceAuthorizationBrowser)();
     if (session.options.cookieScopes.isNotEmpty) {
@@ -41,6 +43,7 @@ Future<Object?> showSourceBrowserAuthorization(
         );
       }
       final cookieBrowser = browser as SourceAuthorizationCookieBrowser;
+      session.readUserAgent = cookieBrowser.readUserAgent;
       session.readCookies = () =>
           cookieBrowser.readCookies(session.options.cookieScopes);
     }
@@ -50,16 +53,23 @@ Future<Object?> showSourceBrowserAuthorization(
     unawaited(preparing.catchError((Object _) {}));
     if (!context.mounted) throw const SourceLoginCancelled();
     final preparedBrowser = browser;
-    Widget buildStep(ValueChanged<Object?>? finish) =>
-        _BrowserAuthorizationDialog(
+    Widget buildStep(ValueChanged<Object?>? finish) => Builder(
+      builder: (context) {
+        if (dialogController == null) {
+          final route = ModalRoute.of(context);
+          if (route is TransitionRoute<dynamic>) dialogRoute = route;
+        }
+        return _BrowserAuthorizationDialog(
           session: session,
           browser: preparedBrowser,
           preparing: preparing!,
           sourceName: request['sourceName']?.toString() ?? '',
           onComplete: finish,
         );
+      },
+    );
     if (dialogController == null) {
-      await showHomeAnimatedDialog<Object>(context, child: buildStep(null));
+      await showSourceAnimatedDialog<Object>(context, child: buildStep(null));
     } else {
       await dialogController.present(buildStep, cancellation);
     }
@@ -78,6 +88,8 @@ Future<Object?> showSourceBrowserAuthorization(
       'login_browser_unavailable',
     );
   } finally {
+    // Keep the native view alive until its closing transition has finished.
+    await dialogRoute?.completed;
     // A cancelled preparation may complete late; release its resources too.
     if (preparing != null) {
       try {
@@ -251,7 +263,7 @@ class _BrowserAuthorizationDialogState
                         ),
                       );
                     }
-                    if (!_ready || !widget.session.isActive) {
+                    if (!_ready) {
                       return const Center(child: CircularProgressIndicator());
                     }
                     return Stack(

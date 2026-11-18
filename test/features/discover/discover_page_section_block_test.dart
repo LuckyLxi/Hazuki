@@ -1,13 +1,17 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import '../../support/fake_source_task_control.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/features/discover/view/discover_page_section_block.dart';
 import 'package:hazuki/features/discover/view/discover_section_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../support/source_presentation_fixtures.dart';
 
 class _MockSourceDiscoverGateway extends Mock
     implements SourceDiscoverGateway {}
@@ -122,7 +126,7 @@ void main() {
       expect(observer.latestRoute, isA<CupertinoPageRoute<void>>());
       await tester.pumpAndSettle();
       expect(find.byType(DiscoverSectionPage), findsOneWidget);
-      final grid = tester.widget<GridView>(find.byType(GridView));
+      final grid = tester.widget<SliverGrid>(find.byType(SliverGrid));
       final delegate =
           grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
       expect(delegate.maxCrossAxisExtent, 170);
@@ -135,24 +139,28 @@ Widget _buildSubject({
   required TargetPlatform platform,
   List<NavigatorObserver> navigatorObservers = const <NavigatorObserver>[],
 }) {
-  return MaterialApp(
-    theme: ThemeData(platform: platform),
-    navigatorObservers: navigatorObservers,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: DiscoverSectionBlock(
-          section: _section,
-          sectionIndex: 0,
-          layout: layout,
-          loadingMore: false,
-          hasMore: false,
-          onLoadMore: () async {},
-          comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
-          comicCoverHeroTagBuilder: (comic, {salt = ''}) => '${comic.id}-$salt',
-          sourceService: _MockSourceDiscoverGateway(),
+  return withTestSourcePresentation(
+    MaterialApp(
+      theme: ThemeData(platform: platform),
+      navigatorObservers: navigatorObservers,
+      localizationsDelegates: hazukiLocalizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: DiscoverSectionBlock(
+            section: _section,
+            sectionIndex: 0,
+            layout: layout,
+            loadingMore: false,
+            hasMore: false,
+            onLoadMore: () async {},
+            comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+            comicCoverHeroTagBuilder: (comic, {salt = ''}) =>
+                '${comic.id}-$salt',
+            sourceService: _MockSourceDiscoverGateway(),
+            taskControl: FakeSourceTaskControl(),
+          ),
         ),
       ),
     ),

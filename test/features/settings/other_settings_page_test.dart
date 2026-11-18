@@ -1,21 +1,27 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/support/settings_core_dependencies.dart';
 import 'package:hazuki/features/settings/view/other/other_settings_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _MockSelection extends Mock implements SourceSelectionGateway {}
+class _MockSelection extends Mock implements SourceRuntimeGateway {}
 
 class _MockDependencies extends Mock implements SettingsCoreDependencies {}
+
+class _MockPlugins extends Mock implements SourcePluginGateway {}
 
 void main() {
   late _MockSelection selection;
   late _MockDependencies dependencies;
+  // 词典只加载一次，各用例共用同一个转换服务。
+  final chineseConversion = ChineseConversionService();
 
   setUp(() {
     SharedPreferences.setMockInitialValues({
@@ -25,15 +31,21 @@ void main() {
     when(() => selection.supportsDirectComicId).thenReturn(true);
     when(() => selection.supportsDailyRecommendation).thenReturn(false);
     dependencies = _MockDependencies();
-    when(() => dependencies.sourceSelection).thenReturn(selection);
+    when(() => dependencies.sourceRuntime).thenReturn(selection);
+    final plugins = _MockPlugins();
+    when(() => plugins.installed).thenReturn([]);
+    when(() => dependencies.sourcePlugins).thenReturn(plugins);
   });
 
   Widget app() => MaterialApp(
     theme: ThemeData(platform: TargetPlatform.android),
     locale: const Locale('en'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: hazukiLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: OtherSettingsPage(dependencies: dependencies),
+    home: ChineseConversionScope(
+      service: chineseConversion,
+      child: OtherSettingsPage(dependencies: dependencies),
+    ),
   );
 
   Finder comicIdSwitch(WidgetTester tester) {
@@ -70,30 +82,26 @@ void main() {
         const ValueKey('chinese-conversion-menu-surface'),
       );
       final opacity = find.byKey(
-        const ValueKey('chinese-conversion-menu-opacity'),
+        const ValueKey('chinese-conversion-menu-items-fade'),
       );
-      final scale = find.byKey(const ValueKey('chinese-conversion-menu-scale'));
+      // 当前值胶囊形变成菜单：展开途中胶囊淡出。
+      double pillOpacity() => tester
+          .widget<Opacity>(
+            find.ancestor(of: button, matching: find.byType(Opacity)).first,
+          )
+          .opacity;
       final route = ModalRoute.of(tester.element(surface))!;
       expect(route.animation!.value, greaterThan(0));
       expect(route.animation!.value, lessThan(1));
       expect(tester.widget<Opacity>(opacity).opacity, inExclusiveRange(0, 1));
-      expect(
-        tester.widget<Transform>(scale).transform.storage[0],
-        inExclusiveRange(0.86, 1),
-      );
+      expect(pillOpacity(), lessThan(1));
       await tester.pumpAndSettle();
       expect(route.animation!.value, 1);
+      expect(pillOpacity(), 0);
       final menuRect = tester.getRect(surface);
       expect(menuRect.right, closeTo(buttonRect.right, 0.1));
-      expect(menuRect.top, closeTo(buttonRect.bottom + 8, 0.1));
-      expect(
-        tester.widget<ClipRRect>(surface).borderRadius,
-        BorderRadius.circular(28),
-      );
-      expect(
-        find.descendant(of: surface, matching: find.byType(BackdropFilter)),
-        findsOneWidget,
-      );
+      expect(menuRect.top, closeTo(buttonRect.top, 0.1));
+      expect(menuRect.overlaps(buttonRect), isTrue);
       expect(find.text('Traditional Chinese'), findsOneWidget);
       expect(find.text('Simplified Chinese'), findsOneWidget);
 
@@ -103,13 +111,11 @@ void main() {
       expect(route.animation!.status, AnimationStatus.reverse);
       expect(route.animation!.value, greaterThan(0));
       expect(route.animation!.value, lessThan(1));
-      expect(tester.widget<Opacity>(opacity).opacity, inExclusiveRange(0, 1));
-      expect(
-        tester.widget<Transform>(scale).transform.storage[0],
-        inExclusiveRange(0.86, 1),
-      );
+      // 收起时菜单文字先淡出，外框随后缩回胶囊。
+      expect(tester.widget<Opacity>(opacity).opacity, lessThan(1));
       await tester.pumpAndSettle();
       expect(surface, findsNothing);
+      expect(pillOpacity(), 1);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(hazukiChineseConversionPreferenceKey), isNull);
     },
@@ -120,11 +126,9 @@ void main() {
     (tester) async {
       // Prepare assets outside the widget test's fake clock.
       await tester.runAsync(() async {
-        await hazukiChineseConversion.setMode(
-          ChineseConversionMode.traditional,
-        );
-        await hazukiChineseConversion.setMode(ChineseConversionMode.simplified);
-        await hazukiChineseConversion.setMode(ChineseConversionMode.off);
+        await chineseConversion.setMode(ChineseConversionMode.traditional);
+        await chineseConversion.setMode(ChineseConversionMode.simplified);
+        await chineseConversion.setMode(ChineseConversionMode.off);
       });
       await tester.pumpWidget(app());
       await tester.pumpAndSettle();
@@ -181,6 +185,20 @@ void main() {
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
     expect(tester.widget<SwitchListTile>(comicIdSwitch(tester)).value, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('settings are grouped and empty sections stay hidden', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    expect(find.text('Display'), findsOneWidget);
+    expect(find.text('Search & discover'), findsOneWidget);
+    expect(find.text('Downloads & content'), findsOneWidget);
+    // 当前源不支持签到、也没有插件操作时，对应分区标题不显示
+    expect(find.text('Account'), findsNothing);
+    expect(find.text('Plugins'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

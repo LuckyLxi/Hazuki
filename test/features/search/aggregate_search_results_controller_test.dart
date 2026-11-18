@@ -1,19 +1,29 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../../support/fake_source_task_control.dart';
 import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/source_catalog_fixtures.dart';
 import 'dart:async';
 
 import 'package:hazuki/features/search/support/search_shared.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/search/state/aggregate_search_results_controller.dart';
 import 'package:hazuki/features/search/view/search_aggregate_results.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
-import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.dart';
+
+late SourceUiService sourceUiService;
 
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   testWidgets('keeps successful source results when another source fails', (
     tester,
   ) async {
@@ -21,7 +31,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {
@@ -35,14 +45,14 @@ void main() {
 
     final requestedOrders = <String, String>{};
     final controller = AggregateSearchResultsController.withLoader(
+      sourceUiService: sourceUiService,
+      taskControl: FakeSourceTaskControl(),
       sourceService: (() {
         final source = SourceRuntimeAssembly(
+          sourceUiService: sourceUiService,
           initialCatalog: hazukiAllowedSourceCatalog,
         );
-        return HazukiSourceSearchAdapter(
-          runtime: source.testing.runtime,
-          content: source.testing.content,
-        );
+        return source.gateways.search;
       })(),
       loader:
           ({
@@ -100,7 +110,10 @@ void main() {
 
   testWidgets('source section exposes a view more action', (tester) async {
     final section =
-        AggregateSearchSectionState(source: hazukiAllowedSourceCatalog.first)
+        AggregateSearchSectionState(
+            sourceUiService: sourceUiService,
+            source: hazukiAllowedSourceCatalog.first,
+          )
           ..comics = const [
             ExploreComic(
               id: '1',
@@ -117,7 +130,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: SearchAggregateResultsBody(
@@ -152,7 +165,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {
@@ -165,14 +178,14 @@ void main() {
     );
     final requestedOrders = <String>[];
     final controller = AggregateSearchResultsController.withLoader(
+      sourceUiService: sourceUiService,
+      taskControl: FakeSourceTaskControl(),
       sourceService: (() {
         final source = SourceRuntimeAssembly(
+          sourceUiService: sourceUiService,
           initialCatalog: hazukiAllowedSourceCatalog,
         );
-        return HazukiSourceSearchAdapter(
-          runtime: source.testing.runtime,
-          content: source.testing.content,
-        );
+        return source.gateways.search;
       })(),
       loader:
           ({
@@ -207,7 +220,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) {
@@ -220,13 +233,13 @@ void main() {
     );
     final pendingReload = Completer<SearchComicsResult>();
     final source = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       initialCatalog: hazukiAllowedSourceCatalog,
     );
     final controller = AggregateSearchResultsController.withLoader(
-      sourceService: HazukiSourceSearchAdapter(
-        runtime: source.testing.runtime,
-        content: source.testing.content,
-      ),
+      sourceUiService: sourceUiService,
+      taskControl: FakeSourceTaskControl(),
+      sourceService: source.gateways.search,
       loader:
           ({
             required sourceKey,
@@ -275,13 +288,13 @@ void main() {
     tester,
   ) async {
     final source = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       initialCatalog: hazukiAllowedSourceCatalog,
     );
     final controller = AggregateSearchResultsController.withLoader(
-      sourceService: HazukiSourceSearchAdapter(
-        runtime: source.testing.runtime,
-        content: source.testing.content,
-      ),
+      sourceUiService: sourceUiService,
+      taskControl: FakeSourceTaskControl(),
+      sourceService: source.gateways.search,
       loader:
           ({
             required sourceKey,
@@ -314,7 +327,7 @@ void main() {
     await tester.pumpWidget(
       withTestSourcePresentation(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: SearchAggregateSectionPage(
             controller: controller,

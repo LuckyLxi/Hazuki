@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+Toolchain: Flutter `>=3.47.0`, Dart `^3.11.1`, JDK 21.
+
 ```bash
+# Setup
+flutter pub get
+flutter gen-l10n
+
+# Build the native QuickJS library that tests load (needs cmake; output goes to
+# packages/quickjs_engine/native/build). Required before running test/services/source.
+dart run tool/build_quickjs_test_library.dart
+
 # Run on device/emulator
 flutter run
 
@@ -15,6 +25,8 @@ flutter build apk --split-per-abi --target-platform android-arm64
 flutter analyze
 flutter test
 flutter test test/path/to/test_file.dart            # single test file
+flutter test test/services/source test/services/network_client_test.dart   # source runtime suite
+flutter test test/architecture                      # import/DI boundary rules
 
 # Regenerate localization code after editing lib/l10n/*.arb
 flutter gen-l10n
@@ -22,33 +34,49 @@ flutter gen-l10n
 # Regenerate Drift code after changing the database schema
 dart run build_runner build --delete-conflicting-outputs
 
-# Verify formatting (CI uses this exact form)
+# Verify formatting
 dart format --output=none --set-exit-if-changed lib test
+
+# Local smoke builds
+flutter build apk --debug
+flutter build windows --debug
 ```
 
-`third_party/pub_overrides/quickjs_engine` and each package under `third_party/pub_overrides/` are **separate packages** — run their `flutter pub get` / `dart format` / `flutter analyze` / `flutter test` from that directory, not the repo root. Do not overwrite the local `dependency_overrides` in `pubspec.yaml` (they patch upstream bugs).
+`third_party/pub_overrides/quickjs_engine` and each package under `third_party/pub_overrides/` are **separate packages** — run their `flutter pub get` / `dart format` / `flutter analyze` / `flutter test` from that directory, not the repo root. Build the test library with `dart run tool/build_quickjs_test_library.dart` from the repo root and set `LIBQUICKJSC_TEST_PATH` to its absolute path before running the patched QuickJS tests. The script writes the library to `packages/quickjs_engine/native/build/`. Do not overwrite the local `dependency_overrides` in `pubspec.yaml` (they patch upstream bugs); `third_party/pub_overrides/README.md` records why each exists and the pinned-version limits (`build_runner`, `dynamic_color`, `flutter_secure_storage`) — don't bump those without reading it.
 
 ## Architecture
 
-Hazuki is a Flutter manga reader targeting Android. It fetches and renders manga from third-party JavaScript source scripts (JMComic / CopyManga / Picacg via [venera-configs](https://github.com/venera-app/venera-configs)). No Provider/GetX/Riverpod — state is `ChangeNotifier` controllers consumed via `ListenableBuilder`/`AnimatedBuilder`.
+Hazuki is a Flutter manga reader for Android and Windows (own title bar, sidebar layout, `lib/app/windows/`, `lib/shared/windows/`). It fetches and renders manga from installable JavaScript source plugins (Hazuki Source API v1; default index `LuckyLxi/Sources`). The bundled JMComic / CopyManga / Picacg plugins were adapted from [venera-configs](https://github.com/venera-app/venera-configs) but now use only the Hazuki SDK; the host deliberately does **not** provide venera API compatibility (no `ComicSource`, `Network`, `UI`, `Image`, `fetch`, etc.), and only `Hazuki.registerSource` or `extends HazukiSource` registrations are accepted. No Provider/GetX/Riverpod — state is `ChangeNotifier` controllers consumed via `ListenableBuilder`/`AnimatedBuilder`.
 
 ### JS source runtime
 
-All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `quickjs_engine` (QuickJS, at `third_party/pub_overrides/quickjs_engine`). The JS source script is downloaded at first launch and stored locally. `assets/init.js` is the bridge library injected into the runtime before the source script (provides `sendMessage`, `Convert`, `Network`, etc.).
+All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `quickjs_engine` (QuickJS, at `third_party/pub_overrides/quickjs_engine`). Source scripts are installed locally by `SourcePluginManager`; there is no other script store. `assets/init.js` is the internal bridge library injected before the source script: it wraps `Network`, `Convert`, `HtmlDocument` and locale helpers in an IIFE and hands them over through a temporary `__hazukiRuntime` global, which `assets/hazuki_plugin_sdk.js` captures and deletes. Plugins therefore see only `Hazuki`, `HazukiSource`, and the generic `setTimeout` / `setInterval` / `console`; new plugin-facing capabilities go on `Hazuki.*`, not new globals.
 
 The source service is a decomposed subsystem under `lib/services/source/`, layered as:
 
 - **`SourceRuntimeAssembly`** ([source_runtime_assembly.dart](lib/services/source/runtime/source_runtime_assembly.dart)) — internal composition root. Wires the state stores, per-domain capabilities, and the gateway set together. Application code never depends on it directly.
 - **`SourceRuntimeHost`** ([source_runtime_host.dart](lib/services/source/runtime/source_runtime_host.dart)) — owns source selection and the lifetime of per-source `SourceRuntimeHandle`s. Each handle bundles the `HazukiSourceFacade`, JS kernel, cache/cookie/session stores, and image cache for one source. A generic `SourceRuntimeCoordinator<T>` ([source_runtime_coordinator.dart](lib/services/source/runtime/source_runtime_coordinator.dart)) manages the handle map + active-source selection.
-- **`SourceGatewaySet`** ([source_gateway_set.dart](lib/services/source/gateways/source_gateway_set.dart)) — produces the **focused gateway contracts** that features actually consume (`SourceSearchGateway`, `SourceReaderGateway`, `SourceDiscoverGateway`, `SourceFavoriteGateway`, `SourceSyncGateway`, …). Each gateway is an *Adapter* over the operations/capabilities.
+- **`SourceGatewaySet`** ([source_gateway_set.dart](lib/services/source/gateways/source_gateway_set.dart)) — produces the **focused gateway contracts** that features actually consume (`SourceSearchGateway`, `SourceReaderGateway`, `SourceDiscoverGateway`, `SourceFavoriteGateway`, `SourceRuntimeGateway`, `SourceScriptGateway`, …). Gateways are implemented by adapters in [adapters/](lib/services/source/adapters/) that forward to the concrete `*Operations` classes; one adapter may back several gateways (`HazukiSourceRuntimeAdapter` covers the runtime/account/home/script gateways, `HazukiSourceImageAdapter` covers image/debug/recommendation). `*Operations` are concrete classes with no separate interface — tests fake them by `implements`-ing the class.
 - **`HazukiSourceFacade`** ([source_runtime_facade.dart](lib/services/source/runtime/source_runtime_facade.dart)) — the per-source contract capabilities depend on (JS bridge, session, cache, debug log, http gateway).
 - **Capabilities** live under domain subdirs (`account/`, `comic/`, `comments/`, `favorites/`, `image/`, `debug/`, `content/`, `category/`, `runtime/`); state stores and shared helpers live in `runtime/` and `common/`.
 
+Source scripts are managed as installable plugins by `SourcePluginManager` ([lib/services/source/plugins/](lib/services/source/plugins/)), which fetches an index from a GitHub repo or HTTPS JSON URL and commits installs atomically. Plugin authoring docs live outside this repo at `D:\Project\HazukiSources\docs`.
+
+**Task control / cancellation.** Every source operation runs under an explicit `SourceOperationContext` via `SourceOperationRunner` ([runtime/](lib/services/source/runtime/)), registered in `SourceTaskRegistry` and bound to the QuickJS engine's `task_control`. UI pages own requests through `SourceTaskOwner` ([lib/services/source/source_task_owner.dart](lib/services/source/source_task_owner.dart)); leaving a page cancels its reads, while already-admitted non-interactive writes may finish (`retainAdmittedWork`) without regaining UI scope. Cancellation must be recognized before fallback, auth retry, or generic error wrapping. Stopping tasks on source disable/uninstall/update belongs to the catalog paths — do not add blanket stops to generic `remove` / `recreateSourceRuntime`.
+
 The app-level **`SourceRuntimeCoordinator`** ([lib/app/source_runtime/source_runtime_coordinator.dart](lib/app/source_runtime/source_runtime_coordinator.dart)) is a separate UI orchestrator: bootstrap overlay, connectivity recovery, and source-update checks. Do not confuse it with the generic handle-lifecycle coordinator above.
+
+### Manga translation
+
+`MangaTranslationService` ([lib/services/translation/](lib/services/translation/)) translates reader pages; the reader side is `ReaderTranslationController` + `reader_translation_overlay.dart`. Per page: settings → result cache (`TranslationResultCache`, bypassable) → `TranslationImageProcessor` slices the image → text location → LLM provider (`providers/`: Anthropic and OpenAI-compatible, built by `MangaTranslationProviderFactory`) → `TranslationResponseParser` → `BubbleSnapper` fits boxes to bubbles. Text location is either **AI** (the model returns boxes) or **detector** (`TranslationTextLocator.detector`): a local ONNX model (CTD, Paddle DB, or RT-DETR pipelines in `detection/`, selected by `TranslationDetectorKind`) runs in a worker isolate, and detected boxes are drawn onto the slice before it is sent to the model. Slices with no detected text skip the AI call.
+
+ONNX Runtime is **not bundled**: `onnx_runtime_library.dart` downloads the platform's runtime on demand (via the patched `onnxruntime_v2` override), picking DirectML on Windows and a QNN build for allow-listed Snapdragon SoCs, CPU otherwise. `translation_readiness.dart` defines when the reader may offer translation. Call `releaseDetector()` when leaving the reader or turning translation off.
 
 ### Dependency injection
 
-Pure `get_it`. `lib/app/service_locator.dart` exposes `final GetIt sl` and `registerServices()`, which delegates to `registerSourceServices` + `registerApplicationServices` in [lib/app/di/](lib/app/di/). Resolve **everything** via `sl<T>()` (e.g. `sl<SourceReaderGateway>()`, `sl<MangaDownloadService>()`). There are no `.instance` static singletons. Registrars accept an optional `GetIt` so tests can build an isolated graph.
+Pure `get_it`. `lib/app/service_locator.dart` exposes `final GetIt sl` and `registerServices()`, which delegates to `registerSourceServices` + `registerApplicationServices` in [lib/app/di/](lib/app/di/). `sl<T>()` is used **only in `lib/main.dart` and `lib/app/`** (composition roots such as [home_feature_entrypoints.dart](lib/app/home/home_feature_entrypoints.dart), startup, and the app-level source runtime UI); `lib/features/`, `lib/shared/`, `lib/widgets/`, and `lib/services/` never call it. Services have no `.instance` static singletons; the only process-wide statics are a few non-service brokers/caches (`SourceExternalAuthorizationBroker`, `AnnouncementImageSessionCache`, `WindowsComicDetailController`) — do not add more. The plugin interaction service `SourceUiService` is a single instance registered in `registerSourceServices` and shared by the runtime assembly, handles, and the dialog presenter; features receive it through their dependency bundles or constructor parameters, and widgets read it via `SourcePresentationScope.uiOf(context)`. Registrars accept an optional `GetIt` so tests can build an isolated graph.
+
+These layering rules (no `sl` outside the app layer, services never import features or `lib/app/`, features never import source implementations, gateways never import runtime implementations, no import cycles) are enforced by `test/architecture/`. When a change moves code across layers, run those tests and update the rule lists there deliberately rather than working around them.
 
 ### Startup
 
@@ -56,7 +84,7 @@ Pure `get_it`. `lib/app/service_locator.dart` exposes `final GetIt sl` and `regi
 
 ### State pattern
 
-Feature controllers are `ChangeNotifier`s that hold a private `_state` snapshot and call `notifyListeners()`. They accept **callbacks** injected at construction (e.g. reader update/log callbacks) to stay testable without widget dependencies. Views resolve gateways via `sl<T>()` and pass them into controllers, which take them as constructor parameters.
+Feature controllers are `ChangeNotifier`s that hold a private `_state` snapshot and call `notifyListeners()`. They accept **callbacks** injected at construction (e.g. reader update/log callbacks) to stay testable without widget dependencies. Views do not resolve dependencies themselves: `lib/main.dart` / `lib/app/` resolve gateways/services via `sl<T>()` and hand them to pages through feature dependency bundles (e.g. `HomeServices`, `ComicDetailDependencies`, `MangaTranslationDependencies`) or constructor parameters; views pass them on to controllers as constructor parameters.
 
 ### Feature modules
 
@@ -74,16 +102,20 @@ The bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`) hosts features und
 | `downloads/` | Download queue/history |
 | `history/` | Read history |
 | `comments/` | Chapter comments |
+| `announcements/` | Remote announcements (`announcement.json`) |
+| `password_lock/` | App lock screen |
 
 `support/` holds controllers, async action flows, and utilities factored out of views (the reader feature alone has ~7 support controllers). Cross-feature helpers live in `lib/shared/` (e.g. `navigation_tags.dart`, `reading/`, `favorites/`, `source_account/`, `preferences/`); shared UI widgets live in `lib/widgets/`; shared models in `lib/models/`.
 
 ### Storage
 
-`lib/services/storage/hazuki_database.dart` is the Drift database (tables for read history, reading progress, search history, download groups), with generated code in `hazuki_database.g.dart` (never hand-edit). Tests use `HazukiDatabase.memory()`. App-level preference keys live in `lib/app/app_preferences.dart` and `lib/shared/preferences/hazuki_preference_keys.dart`.
+`lib/services/storage/hazuki_database.dart` is the Drift database (tables for read history, reading progress, search history, local favorites, download groups, plus tombstone tables that record deletions for cloud sync), with generated code in `hazuki_database.g.dart` (never hand-edit). Schema changes need a `schemaVersion` bump and a step in its `MigrationStrategy`. Tests use `HazukiDatabase.memory()`.
+
+`CloudSyncService` ([lib/services/cloud_sync_service.dart](lib/services/cloud_sync_service.dart)) syncs through participants in `lib/services/cloud_sync/` (reading, favorites, comment filter, settings); each participant owns its own snapshot format and merge rules, and receives its dependencies by constructor (no `sl`). Data that can be deleted locally must write a tombstone, otherwise a sync resurrects it. App-level preference keys live in `lib/services/preferences/hazuki_preference_keys.dart`.
 
 ### Navigation & theme
 
-Navigation uses hero animations for comic-cover transitions; helpers live in [lib/shared/navigation_tags.dart](lib/shared/navigation_tags.dart) (`comicCoverHeroTag()`, `buildComicCoverHeroFlightShuttle()`, `comicCoverHeroBorderRadius()`). Android uses a bottom drawer; Windows gets a sidebar layout. Light/dark switching uses a circular reveal animation (`_ThemeRevealOverlay` in `main.dart`).
+Navigation uses hero animations for comic-cover transitions; helpers live in [lib/shared/navigation_tags.dart](lib/shared/navigation_tags.dart) (`comicCoverHeroTag()`, `buildComicCoverHeroFlightShuttle()`, `comicCoverHeroBorderRadius()`). Android uses a bottom drawer; Windows gets a sidebar layout. Light/dark switching uses a circular reveal animation (`ThemeRevealOverlay` in [lib/app/theme/theme_reveal_support.dart](lib/app/theme/theme_reveal_support.dart)).
 
 ### Localization
 
@@ -91,11 +123,12 @@ ARB files in `lib/l10n/`. Use `l10n(context)` from `lib/l10n/l10n.dart` to get `
 
 ### Tests
 
-Tests mirror the `lib/` structure under `test/`. Two patterns: **smoke tests** (instantiate controllers/pages to verify construction) and **controller unit tests** (drive state transitions directly on the `ChangeNotifier`). Use `mocktail` for fakes and `HazukiDatabase.memory()` for isolated storage.
+Tests mirror the `lib/` structure under `test/`. Two patterns: **smoke tests** (instantiate controllers/pages to verify construction) and **controller unit tests** (drive state transitions directly on the `ChangeNotifier`). Use `mocktail` for fakes and `HazukiDatabase.memory()` for isolated storage. Tests that go through `sl<T>()` call `ensureTestServiceLocator()` from `test/support/test_service_locator.dart` in `setUp`; other shared fakes and fixtures live in `test/support/`.
 
 ## Conventions
 
 - **Code comments must be written in Simplified Chinese** — docstrings and inline comments explaining *why/how*, kept concise and professional.
+- **UI changes need approval**: ask before changing UI appearance, visible page content, or animation behavior.
 - **Strict scope**: touch only the lines/functions required for the task; do not refactor unrelated code or delete existing behavior without asking first.
 - **Commits**: Conventional Commits, imperative and scoped (e.g. `feat(settings): …`, `fix(storage): …`). No casual/playful language.
-- **Release notes / `update.json` `log` field / git tag descriptions**: list items start with `- ` (never numeric ordering), separated by `\n`. Release tags must be annotated (`git tag -a`).
+- **Release notes / `update.json` `log` field / git tag descriptions**: list items start with `- ` (never numeric ordering), separated by `\n`. Release tags must be annotated (`git tag -a`) and the message must contain Simplified Chinese — the `.githooks/pre-push` hook rejects lightweight tags and tag messages without Chinese, and the release workflow reads the tag message as the changelog.

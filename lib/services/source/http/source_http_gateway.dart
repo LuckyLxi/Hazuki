@@ -3,6 +3,9 @@ import 'package:dio/dio.dart';
 import '../../network/hazuki_network.dart';
 import '../debug/source_network_log_sink.dart';
 import '../runtime/source_cookie_store.dart';
+import '../models/source_script_execution.dart';
+import '../models/source_task.dart';
+import '../runtime/source_host_call_context.dart';
 
 class SourceHttpGateway {
   SourceHttpGateway({
@@ -10,13 +13,20 @@ class SourceHttpGateway {
     required String sourceKey,
     required SourceCookieStore cookieStore,
     required SourceNetworkLogSink networkLogSink,
+    Map<String, String> Function()? browserUserAgents,
     void Function(int statusCode)? onResponseStatus,
   }) : _cookieStore = cookieStore,
+       _browserUserAgents = browserUserAgents ?? _noUserAgents,
        _networkLogSink = networkLogSink,
        _onResponseStatus = onResponseStatus,
        _client = HazukiNetworkClient(dio: dio, sourceKey: sourceKey);
 
   final SourceCookieStore _cookieStore;
+  static const _hostContextKey = 'hazukiSourceHostCallContext';
+  static const _imageCommitKey = 'hazukiImageCookieCommit';
+  static const _imageExecutionKey = 'hazukiImageExecution';
+  static Map<String, String> _noUserAgents() => const {};
+  final Map<String, String> Function() _browserUserAgents;
   final SourceNetworkLogSink _networkLogSink;
   final void Function(int statusCode)? _onResponseStatus;
   final HazukiNetworkClient _client;
@@ -38,18 +48,81 @@ class SourceHttpGateway {
     HazukiNetworkRetryPolicy retryPolicy =
         HazukiNetworkRetryPolicy.conservative,
     bool withCookies = true,
-  }) {
-    return _client.request<T>(
-      url,
-      method: method,
-      data: data,
-      options: _mergeOptions(
-        options,
-        extra: withCookies ? null : const {'hazukiSkipCookieBridge': true},
-      ),
-      onReceiveProgress: onReceiveProgress,
-      retryPolicy: retryPolicy,
+    void Function()? checkActive,
+    CancelToken? cancelToken,
+  }) async {
+    // Native redirects would carry the pinned UA to a different origin without
+    // passing through Dio interceptors. Rebuild each hop from caller headers.
+    final manageRedirects =
+        withCookies &&
+        _browserUserAgents().isNotEmpty &&
+        (options?.followRedirects ?? dio.options.followRedirects);
+    var currentUrl = normalizeUrl(url);
+    var currentMethod = method.toUpperCase();
+    var currentData = data;
+    var currentOptions = _mergeOptions(
+      options,
+      extra: withCookies ? null : const {'hazukiSkipCookieBridge': true},
     );
+    if (manageRedirects) {
+      currentOptions = currentOptions.copyWith(followRedirects: false);
+    }
+    final maxRedirects = options?.maxRedirects ?? dio.options.maxRedirects;
+    for (var redirects = 0; ; redirects++) {
+      checkActive?.call();
+      final response = await _client.request<T>(
+        currentUrl,
+        method: currentMethod,
+        data: currentData,
+        options: currentOptions,
+        onReceiveProgress: onReceiveProgress,
+        retryPolicy: retryPolicy,
+        cancelToken: cancelToken,
+      );
+      checkActive?.call();
+      final status = response.statusCode;
+      final location = response.headers.value('location');
+      final redirect =
+          const [301, 302, 303, 307, 308].contains(status) &&
+          (currentMethod == 'GET' ||
+              currentMethod == 'HEAD' ||
+              status == 303 ||
+              status == 307 ||
+              status == 308);
+      if (!manageRedirects || !redirect || location == null) return response;
+      if (redirects >= maxRedirects) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          type: DioExceptionType.badResponse,
+          error: StateError('http_too_many_redirects'),
+        );
+      }
+      final previous = Uri.parse(currentUrl);
+      final next = previous.resolve(location);
+      final headers = Map<String, dynamic>.from(currentOptions.headers ?? {});
+      if (next.origin != previous.origin) {
+        headers.removeWhere(
+          (key, _) => const {
+            'authorization',
+            'proxy-authorization',
+            'cookie',
+          }.contains(key.toLowerCase()),
+        );
+      }
+      if (status == 303 && currentMethod != 'HEAD') {
+        currentMethod = 'GET';
+        currentData = null;
+        headers.removeWhere(
+          (key, _) => const {
+            'content-type',
+            'content-length',
+          }.contains(key.toLowerCase()),
+        );
+      }
+      currentOptions = currentOptions.copyWith(headers: headers);
+      currentUrl = next.toString();
+    }
   }
 
   Future<Response<List<int>>> getBytes(
@@ -58,21 +131,35 @@ class SourceHttpGateway {
     String? category,
     HazukiNetworkRetryPolicy retryPolicy =
         HazukiNetworkRetryPolicy.conservative,
+    CancelToken? cancelToken,
+    void Function()? checkActive,
+    Future<void> Function(Future<void> Function())? commitCookies,
+    SourceScriptExecution? execution,
   }) {
     return request<List<int>>(
       url,
       options: Options(
         responseType: ResponseType.bytes,
         headers: headers,
-        extra: category == null ? const {} : {'hazukiLogCategory': category},
+        extra: {
+          'hazukiLogCategory': ?category,
+          _imageCommitKey: ?commitCookies,
+          _imageExecutionKey: ?execution,
+        },
       ),
       retryPolicy: retryPolicy,
+      cancelToken: cancelToken,
+      checkActive: checkActive,
     );
   }
 
   Future<Map<String, dynamic>> sendJsHttpRequest(
-    Map<String, dynamic> request,
-  ) async {
+    Map<String, dynamic> request, {
+    SourceScriptExecution? execution,
+    String? runtimeId,
+    void Function()? checkActive,
+    SourceHostCallContext? hostContext,
+  }) async {
     Response<dynamic>? response;
     String? error;
     final startedAt = DateTime.now();
@@ -83,27 +170,58 @@ class SourceHttpGateway {
     final headers = Map<String, dynamic>.from(request['headers'] as Map? ?? {});
     final bytes = request['bytes'] == true;
     final data = request['data'];
+    final extra = _parsePluginHttpExtra(request['extra']);
+    final cancelToken = hostContext == null ? null : CancelToken();
+    var finished = false;
+    var cancelled = false;
+    if (hostContext != null) {
+      hostContext.whenStopped.then((_) {
+        if (!finished) cancelToken!.cancel('source_work_stopped');
+      });
+    }
+    void checkResource() {
+      hostContext?.checkActive();
+      checkActive?.call();
+    }
 
     try {
+      checkResource();
       response = await this.request<dynamic>(
         requestUrl,
         method: method,
         data: data,
+        checkActive: checkResource,
+        cancelToken: cancelToken,
         options: Options(
           responseType: bytes ? ResponseType.bytes : ResponseType.plain,
           headers: headers,
+          sendTimeout: extra.timeout,
+          receiveTimeout: extra.timeout,
+          followRedirects: extra.followRedirects,
+          maxRedirects: extra.maxRedirects,
           extra: {
             'skipNetworkDebugLog': true,
+            _hostContextKey: ?hostContext,
             if (bytes) 'hazukiLogCategory': 'image_download',
           },
         ),
       );
     } catch (e) {
+      error = e.toString();
+      cancelled =
+          e is SourceScriptStopped ||
+          e is DioException && CancelToken.isCancel(e) ||
+          hostContext?.isStopped == true;
+      hostContext?.checkActive();
+      if (e is SourceScriptStopped ||
+          e is DioException && CancelToken.isCancel(e)) {
+        rethrow;
+      }
       if (e is DioException) {
         response = e.response;
       }
-      error = e.toString();
     } finally {
+      finished = true;
       final statusCode = response?.statusCode;
       if (statusCode != null) {
         _onResponseStatus?.call(statusCode);
@@ -116,19 +234,71 @@ class SourceHttpGateway {
         startedAt: startedAt,
         source: 'js_http',
         category: bytes ? 'image_download' : 'js_http',
-        requestHeaders: Map<String, dynamic>.from(headers),
+        requestHeaders: Map<String, dynamic>.from(
+          response?.requestOptions.headers ?? headers,
+        ),
         requestData: data,
         responseHeaders: _flattenHeaders(response?.headers),
         responseBody: response?.data,
+        cancelled: cancelled,
+        taskContext: execution == null
+            ? null
+            : {
+                ...execution.toMap(),
+                'runtimeId': runtimeId,
+                if (hostContext != null) ...{
+                  'nativeToken': hostContext.nativeToken,
+                  'workId': hostContext.workId,
+                  'resourceId': hostContext.resourceId,
+                  'resourceStopped': hostContext.isStopped,
+                },
+              },
       );
     }
 
     return {
       'status': response?.statusCode,
+      // 跟随重定向后的最终地址；未跟随时即本次请求地址。
+      'url': response?.realUri.toString(),
       'headers': _stringHeaders(response?.headers),
       'body': response?.data,
       'error': error,
     };
+  }
+
+  /// 插件 `Hazuki.http` 的 extra 只接受白名单选项，未知键或越界值直接拒绝。
+  static ({Duration? timeout, bool? followRedirects, int? maxRedirects})
+  _parsePluginHttpExtra(dynamic raw) {
+    if (raw == null) {
+      return (timeout: null, followRedirects: null, maxRedirects: null);
+    }
+    const invalid = FormatException('plugin_invalid_http_extra');
+    if (raw is! Map) throw invalid;
+    int? integerIn(dynamic value, int min, int max) {
+      if (value == null) return null;
+      if (value is! num || value != value.toInt()) throw invalid;
+      final result = value.toInt();
+      if (result < min || result > max) throw invalid;
+      return result;
+    }
+
+    for (final key in raw.keys) {
+      if (!const {
+        'timeoutMs',
+        'followRedirects',
+        'maxRedirects',
+      }.contains(key)) {
+        throw invalid;
+      }
+    }
+    final followRedirects = raw['followRedirects'];
+    if (followRedirects != null && followRedirects is! bool) throw invalid;
+    final timeoutMs = integerIn(raw['timeoutMs'], 1000, 120000);
+    return (
+      timeout: timeoutMs == null ? null : Duration(milliseconds: timeoutMs),
+      followRedirects: followRedirects as bool?,
+      maxRedirects: integerIn(raw['maxRedirects'], 0, 20),
+    );
   }
 
   void configureCookieBridge() {
@@ -145,6 +315,18 @@ class SourceHttpGateway {
           }
           options.extra['hazukiStartedAt'] = DateTime.now();
           if (options.extra['hazukiSkipCookieBridge'] != true) {
+            final uri = Uri.parse(normalizedUrl);
+            final userAgent = uri.scheme == 'https'
+                ? _browserUserAgents()[uri.origin]
+                : null;
+            if (userAgent != null) {
+              options.headers = {
+                for (final entry in options.headers.entries)
+                  if (entry.key.toLowerCase() != 'user-agent')
+                    entry.key: entry.value,
+                'User-Agent': userAgent,
+              };
+            }
             final cookieHeader = _cookieStore.buildHeader(normalizedUrl);
             if (cookieHeader != null && cookieHeader.isNotEmpty) {
               final existing = options.headers['cookie'];
@@ -159,7 +341,47 @@ class SourceHttpGateway {
         },
         onResponse: (response, handler) async {
           final requestUrl = response.requestOptions.uri.toString();
-          await _cookieStore.saveFromHeaders(requestUrl, response.headers.map);
+          final context =
+              response.requestOptions.extra[_hostContextKey]
+                  as SourceHostCallContext?;
+          try {
+            final imageCommit =
+                response.requestOptions.extra[_imageCommitKey]
+                    as Future<void> Function(Future<void> Function())?;
+            if (imageCommit != null) {
+              await imageCommit(
+                () => _cookieStore.saveFromHeaders(
+                  requestUrl,
+                  response.headers.map,
+                ),
+              );
+            } else if (context == null) {
+              await _cookieStore.saveFromHeaders(
+                requestUrl,
+                response.headers.map,
+              );
+            } else {
+              await context.runCommit(
+                () => _cookieStore.saveFromHeaders(
+                  requestUrl,
+                  response.headers.map,
+                ),
+              );
+            }
+          } catch (error, stack) {
+            handler.reject(
+              DioException(
+                requestOptions: response.requestOptions,
+                response: response,
+                type: context?.isStopped == true || error is SourceTaskCancelled
+                    ? DioExceptionType.cancel
+                    : DioExceptionType.unknown,
+                error: error,
+                stackTrace: stack,
+              ),
+            );
+            return;
+          }
 
           final skipLog =
               response.requestOptions.extra['skipNetworkDebugLog'] == true;
@@ -179,6 +401,10 @@ class SourceHttpGateway {
               requestData: response.requestOptions.data,
               responseHeaders: _flattenHeaders(response.headers),
               responseBody: response.data,
+              taskContext:
+                  (response.requestOptions.extra[_imageExecutionKey]
+                          as SourceScriptExecution?)
+                      ?.toMap(),
             );
           }
           handler.next(response);
@@ -199,6 +425,10 @@ class SourceHttpGateway {
               requestData: options.data,
               responseHeaders: _flattenHeaders(error.response?.headers),
               responseBody: error.response?.data,
+              cancelled: CancelToken.isCancel(error),
+              taskContext:
+                  (options.extra[_imageExecutionKey] as SourceScriptExecution?)
+                      ?.toMap(),
             );
           }
           handler.next(error);

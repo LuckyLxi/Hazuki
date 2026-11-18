@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/launch_shortcut_bridge.dart';
 import 'package:hazuki/app/launch_shortcut_coordinator.dart';

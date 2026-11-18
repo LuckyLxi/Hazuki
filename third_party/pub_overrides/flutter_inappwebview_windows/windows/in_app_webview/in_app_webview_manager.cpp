@@ -243,5 +243,33 @@ namespace flutter_inappwebview_plugin
     windowWebViews.clear();
     UnregisterClass(windowClass_.lpszClassName, nullptr);
     plugin = nullptr;
+
+    // Release composition resources while their dispatcher and apartment live.
+    compositor_ = nullptr;
+    graphics_context_ = nullptr;
+    if (dispatcher_queue_controller_) {
+      winrt::com_ptr<ABI::Windows::Foundation::IAsyncAction> shutdown;
+      wil::unique_event_nothrow completed;
+      if (succeededOrLog(completed.create()) &&
+        succeededOrLog(dispatcher_queue_controller_->ShutdownQueueAsync(shutdown.put()))) {
+        auto handler = Microsoft::WRL::Callback<ABI::Windows::Foundation::IAsyncActionCompletedHandler>(
+          [event = completed.get()](ABI::Windows::Foundation::IAsyncAction*,
+            ABI::Windows::Foundation::AsyncStatus) -> HRESULT
+          {
+            SetEvent(event);
+            return S_OK;
+          });
+        if (succeededOrLog(shutdown->put_Completed(handler.Get()))) {
+          HANDLE event = completed.get();
+          DWORD index = 0;
+          // An STA wait must keep pumping messages until shutdown completes.
+          if (succeededOrLog(CoWaitForMultipleHandles(
+            COWAIT_DISPATCH_WINDOW_MESSAGES, INFINITE, 1, &event, &index))) {
+            failedLog(shutdown->GetResults());
+          }
+        }
+      }
+      dispatcher_queue_controller_ = nullptr;
+    }
   }
 }

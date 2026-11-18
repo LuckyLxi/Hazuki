@@ -1,8 +1,8 @@
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../models/hazuki_models.dart';
@@ -10,12 +10,16 @@ import '../../../services/source/source_capabilities.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import '../state/ranking_page_controller.dart';
 
 enum _RankingComicLayout { list, grid3 }
 
 class RankingPage extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const RankingPage({
+    required this.taskControl,
     super.key,
     required this.comicDetailPageBuilder,
     required this.sourceService,
@@ -31,33 +35,28 @@ class RankingPage extends StatefulWidget {
 }
 
 class _RankingPageState extends State<RankingPage> {
-  static const _loadTimeout = Duration(seconds: 25);
-  static const _comicLayoutPreferenceKey = 'ranking_comic_layout';
+  static const _preferences = HazukiGeneralPreferencesStore();
 
-  SourceCategoryGateway get _sourceService => widget.sourceService;
   final ScrollController _scrollController = ScrollController();
-
-  List<CategoryRankingOption> _rankingOptions = const <CategoryRankingOption>[];
-  List<ExploreComic> _rankingComics = const <ExploreComic>[];
-
-  String? _errorMessage;
-  String? _selectedRankingValue;
-
-  bool _initialLoading = true;
-  bool _refreshing = false;
-  bool _rankingLoading = false;
-  bool _rankingLoadingMore = false;
+  late final RankingPageController _ranking;
   bool _showBackToTop = false;
   bool _rankingOptionsIntroPlayed = false;
   _RankingComicLayout _comicLayout = _RankingComicLayout.list;
 
-  int _rankingPage = 1;
-  bool _rankingHasMore = true;
-  int _rankingRequestToken = 0;
-
   @override
   void initState() {
     super.initState();
+    _ranking = RankingPageController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
+      sourceService: widget.sourceService,
+      taskControl: widget.taskControl,
+      optionsTimeoutMessage: () =>
+          AppLocalizations.of(context)!.rankingLoadOptionsTimeout,
+      pageTimeoutMessage: () =>
+          AppLocalizations.of(context)!.rankingLoadTimeout,
+      loadFailedMessage: (error) =>
+          AppLocalizations.of(context)!.rankingLoadFailed(error),
+    )..addListener(_rankingChanged);
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -74,13 +73,14 @@ class _RankingPageState extends State<RankingPage> {
       // A preference read failure must not prevent rankings from loading.
     }
     if (mounted) {
-      await _loadInitial();
+      await _ranking.loadInitial();
     }
   }
 
+  void _rankingChanged() => setState(() {});
+
   Future<void> _restoreComicLayout() async {
-    final preferences = await SharedPreferences.getInstance();
-    final savedLayout = preferences.getString(_comicLayoutPreferenceKey);
+    final savedLayout = await _preferences.loadRankingComicLayoutName();
     final restoredLayout = _RankingComicLayout.values.firstWhere(
       (layout) => layout.name == savedLayout,
       orElse: () => _RankingComicLayout.list,
@@ -93,13 +93,14 @@ class _RankingPageState extends State<RankingPage> {
     });
   }
 
-  Future<void> _persistComicLayout() async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_comicLayoutPreferenceKey, _comicLayout.name);
-  }
+  Future<void> _persistComicLayout() =>
+      _preferences.saveRankingComicLayoutName(_comicLayout.name);
 
   @override
   void dispose() {
+    _ranking
+      ..removeListener(_rankingChanged)
+      ..dispose();
     _scrollController
       ..removeListener(_onScroll)
       ..dispose();
@@ -119,10 +120,10 @@ class _RankingPageState extends State<RankingPage> {
       });
     }
 
-    if (_rankingLoading ||
-        _rankingLoadingMore ||
-        !_rankingHasMore ||
-        _selectedRankingValue == null) {
+    if (_ranking.loading ||
+        _ranking.loadingMore ||
+        !_ranking.hasMore ||
+        _ranking.selectedRanking == null) {
       return;
     }
 
@@ -131,7 +132,7 @@ class _RankingPageState extends State<RankingPage> {
     }
 
     if (position.pixels >= position.maxScrollExtent - 360) {
-      unawaited(_loadRankingComics(append: true));
+      unawaited(_ranking.loadMore());
     }
   }
 
@@ -144,183 +145,6 @@ class _RankingPageState extends State<RankingPage> {
       duration: const Duration(milliseconds: 360),
       curve: Curves.easeOutCubic,
     );
-  }
-
-  Future<List<CategoryRankingOption>> _loadRankingOptions() {
-    final timeoutMessage = AppLocalizations.of(
-      context,
-    )!.rankingLoadOptionsTimeout;
-    return _sourceService.loadCategoryRankingOptions().timeout(
-      _loadTimeout,
-      onTimeout: () => throw Exception(timeoutMessage),
-    );
-  }
-
-  Future<CategoryComicsResult> _loadRankingPage({
-    required String rankingOption,
-    required int page,
-  }) {
-    final timeoutMessage = AppLocalizations.of(context)!.rankingLoadTimeout;
-    return _sourceService
-        .loadCategoryRankingComics(rankingOption: rankingOption, page: page)
-        .timeout(
-          _loadTimeout,
-          onTimeout: () => throw Exception(timeoutMessage),
-        );
-  }
-
-  Future<void> _loadInitial({bool forceRefresh = false}) async {
-    if (!mounted) {
-      return;
-    }
-
-    if (forceRefresh) {
-      setState(() {
-        _refreshing = true;
-      });
-    }
-
-    try {
-      final rankingOptions = await _loadRankingOptions();
-      if (!mounted) {
-        return;
-      }
-
-      final selected = rankingOptions.isEmpty
-          ? null
-          : (_selectedRankingValue != null &&
-                    rankingOptions.any((e) => e.value == _selectedRankingValue)
-                ? _selectedRankingValue
-                : rankingOptions.first.value);
-
-      setState(() {
-        _rankingOptions = rankingOptions;
-        _selectedRankingValue = selected;
-        _rankingComics = const <ExploreComic>[];
-        _rankingPage = 1;
-        _rankingHasMore = selected != null;
-        _errorMessage = null;
-      });
-
-      if (selected != null) {
-        await _loadRankingComics(reset: true);
-      }
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _errorMessage = AppLocalizations.of(context)!.rankingLoadFailed('$e');
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _initialLoading = false;
-          _refreshing = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadRankingComics({
-    bool reset = false,
-    bool append = false,
-  }) async {
-    final option = _selectedRankingValue;
-    if (option == null || option.isEmpty) {
-      return;
-    }
-
-    if (append &&
-        (_rankingLoading || _rankingLoadingMore || !_rankingHasMore)) {
-      return;
-    }
-
-    final targetPage = reset ? 1 : (append ? _rankingPage + 1 : _rankingPage);
-    final requestToken = ++_rankingRequestToken;
-
-    setState(() {
-      if (append) {
-        _rankingLoadingMore = true;
-      } else {
-        _rankingLoading = true;
-        if (reset) {
-          _rankingComics = const <ExploreComic>[];
-          _rankingPage = 1;
-          _rankingHasMore = true;
-        }
-      }
-      _errorMessage = null;
-    });
-
-    try {
-      final result = await _loadRankingPage(
-        rankingOption: option,
-        page: targetPage,
-      );
-      if (!mounted || requestToken != _rankingRequestToken) {
-        return;
-      }
-
-      setState(() {
-        if (append) {
-          final previousCount = _rankingComics.length;
-          final merged = <String, ExploreComic>{
-            for (final comic in _rankingComics)
-              if (comic.id.isNotEmpty) comic.id: comic,
-          };
-          for (final comic in result.comics) {
-            if (comic.id.isNotEmpty) {
-              merged[comic.id] = comic;
-            }
-          }
-          _rankingComics = merged.values.toList();
-
-          final reachedMax =
-              result.maxPage != null && targetPage >= result.maxPage!;
-          final noNewItems = _rankingComics.length == previousCount;
-          _rankingHasMore =
-              !reachedMax && result.comics.isNotEmpty && !noNewItems;
-        } else {
-          _rankingComics = result.comics;
-          final reachedMax =
-              result.maxPage != null && targetPage >= result.maxPage!;
-          _rankingHasMore = !reachedMax && result.comics.isNotEmpty;
-        }
-
-        _rankingPage = targetPage;
-      });
-    } catch (e) {
-      if (!mounted || requestToken != _rankingRequestToken) {
-        return;
-      }
-      setState(() {
-        _errorMessage = AppLocalizations.of(context)!.rankingLoadFailed('$e');
-      });
-    } finally {
-      if (mounted && requestToken == _rankingRequestToken) {
-        setState(() {
-          _rankingLoading = false;
-          _rankingLoadingMore = false;
-        });
-      }
-    }
-  }
-
-  void _onSelectRankingOption(String value) {
-    if (_selectedRankingValue == value) {
-      return;
-    }
-    setState(() {
-      _selectedRankingValue = value;
-      _rankingLoading = true;
-      _rankingLoadingMore = false;
-      _rankingComics = const <ExploreComic>[];
-      _rankingPage = 1;
-      _rankingHasMore = true;
-      _errorMessage = null;
-    });
-    unawaited(_loadRankingComics(reset: true));
   }
 
   Future<void> _showLayoutDialog() async {
@@ -403,7 +227,7 @@ class _RankingPageState extends State<RankingPage> {
   Widget _buildRankingComicItem(ExploreComic comic, int index) {
     final heroTag = widget.comicCoverHeroTagBuilder(
       comic,
-      salt: 'ranking-page-${_selectedRankingValue ?? 'none'}-$index',
+      salt: 'ranking-page-${_ranking.selectedRanking ?? 'none'}-$index',
     );
 
     final item = Padding(
@@ -527,7 +351,7 @@ class _RankingPageState extends State<RankingPage> {
           key: const ValueKey('ranking-comic-grid3'),
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _rankingComics.length,
+          itemCount: _ranking.comics.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
             mainAxisSpacing: spacing,
@@ -535,10 +359,10 @@ class _RankingPageState extends State<RankingPage> {
             childAspectRatio: 0.57,
           ),
           itemBuilder: (context, index) {
-            final comic = _rankingComics[index];
+            final comic = _ranking.comics[index];
             final heroTag = widget.comicCoverHeroTagBuilder(
               comic,
-              salt: 'ranking-page-${_selectedRankingValue ?? 'none'}-$index',
+              salt: 'ranking-page-${_ranking.selectedRanking ?? 'none'}-$index',
             );
             return TweenAnimationBuilder<double>(
               key: ValueKey(
@@ -654,7 +478,6 @@ class _RankingPageState extends State<RankingPage> {
       child: Scaffold(
         appBar: hazukiFrostedAppBar(
           context: context,
-          enableBlur: false,
           title: Text(strings.rankingTitle),
           actions: [
             IconButton(
@@ -672,12 +495,12 @@ class _RankingPageState extends State<RankingPage> {
         body: Stack(
           children: [
             HazukiPullToRefresh(
-              onRefresh: () => _loadInitial(forceRefresh: true),
-              child: _initialLoading
+              onRefresh: () => _ranking.loadInitial(forceRefresh: true),
+              child: _ranking.initialLoading
                   ? _buildCenteredRankingLoading(text: strings.commonLoading)
-                  : (_errorMessage != null &&
-                        _rankingOptions.isEmpty &&
-                        _rankingComics.isEmpty)
+                  : (_ranking.errorMessage != null &&
+                        _ranking.options.isEmpty &&
+                        _ranking.comics.isEmpty)
                   ? ListView(
                       physics: const AlwaysScrollableScrollPhysics(
                         parent: ClampingScrollPhysics(),
@@ -685,12 +508,17 @@ class _RankingPageState extends State<RankingPage> {
                       padding: const EdgeInsets.all(16),
                       children: [
                         const SizedBox(height: 90),
-                        Text(_errorMessage!, textAlign: TextAlign.center),
+                        Text(
+                          _ranking.errorMessage!,
+                          textAlign: TextAlign.center,
+                        ),
                         const SizedBox(height: 12),
                         Center(
                           child: FilledButton(
                             onPressed: () {
-                              unawaited(_loadInitial(forceRefresh: true));
+                              unawaited(
+                                _ranking.loadInitial(forceRefresh: true),
+                              );
                             },
                             child: Text(strings.commonRetry),
                           ),
@@ -704,44 +532,46 @@ class _RankingPageState extends State<RankingPage> {
                       ),
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                       children: [
-                        if (_errorMessage != null)
+                        if (_ranking.errorMessage != null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Text(
-                              _errorMessage!,
+                              _ranking.errorMessage!,
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.error,
                               ),
                             ),
                           ),
-                        if (_rankingOptions.isEmpty)
+                        if (_ranking.options.isEmpty)
                           Text(strings.rankingEmptyOptions)
                         else
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: _rankingOptions.asMap().entries.map((
+                            children: _ranking.options.asMap().entries.map((
                               entry,
                             ) {
                               final index = entry.key;
                               final option = entry.value;
                               final chip = ChoiceChip(
                                 label: Text(option.label),
-                                selected: _selectedRankingValue == option.value,
-                                onSelected: (_) =>
-                                    _onSelectRankingOption(option.value),
+                                selected:
+                                    _ranking.selectedRanking == option.value,
+                                onSelected: (_) => unawaited(
+                                  _ranking.selectRanking(option.value),
+                                ),
                               );
                               if (_rankingOptionsIntroPlayed) {
                                 return chip;
                               }
-                              // 涓烘瘡涓垎绫绘寜閽坊鍔犱粠宸﹀悜鍙虫粦鍏ュ苟娓愭樉鐨勪氦閿欏姩锟?
+                              // 为每个分类按钮添加从左向右滑入并渐显的交错动画
                               return TweenAnimationBuilder<double>(
                                 tween: Tween<double>(begin: 0.0, end: 1.0),
                                 duration: Duration(
                                   milliseconds: 300 + (index * 50),
                                 ),
                                 curve: Curves.easeOutCubic,
-                                onEnd: index == _rankingOptions.length - 1
+                                onEnd: index == _ranking.options.length - 1
                                     ? () {
                                         if (!mounted ||
                                             _rankingOptionsIntroPlayed) {
@@ -770,9 +600,9 @@ class _RankingPageState extends State<RankingPage> {
                             }).toList(),
                           ),
                         const SizedBox(height: 10),
-                        if (_rankingLoading && _rankingComics.isEmpty)
+                        if (_ranking.loading && _ranking.comics.isEmpty)
                           _buildRankingLoadingSection(strings.commonLoading)
-                        else if (_rankingComics.isEmpty)
+                        else if (_ranking.comics.isEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 20),
                             child: Center(
@@ -780,22 +610,22 @@ class _RankingPageState extends State<RankingPage> {
                             ),
                           )
                         else if (_comicLayout == _RankingComicLayout.list) ...[
-                          for (int i = 0; i < _rankingComics.length; i++)
-                            _buildRankingComicItem(_rankingComics[i], i),
+                          for (int i = 0; i < _ranking.comics.length; i++)
+                            _buildRankingComicItem(_ranking.comics[i], i),
                         ] else
                           _buildRankingComicGrid(),
-                        if (_rankingLoadingMore)
+                        if (_ranking.loadingMore)
                           const HazukiLoadMoreFooter(verticalPadding: 8),
-                        if (!_rankingLoading &&
-                            !_rankingLoadingMore &&
-                            !_rankingHasMore)
+                        if (!_ranking.loading &&
+                            !_ranking.loadingMore &&
+                            !_ranking.hasMore)
                           Padding(
                             padding: const EdgeInsets.only(top: 12, bottom: 6),
                             child: Center(
                               child: Text(strings.rankingReachedEnd),
                             ),
                           ),
-                        if (_refreshing)
+                        if (_ranking.refreshing)
                           const Padding(
                             padding: EdgeInsets.only(top: 8),
                             child: SizedBox.shrink(),

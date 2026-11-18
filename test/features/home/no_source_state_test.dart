@@ -1,4 +1,7 @@
-import 'package:flutter/material.dart';
+import '../../support/source_presentation_fixtures.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../../support/fake_source_task_control.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/discover/view/discover_page.dart';
 import 'package:hazuki/features/favorite/view/favorite_page.dart';
@@ -7,6 +10,7 @@ import 'package:hazuki/features/home/support/home_sidebar_models.dart';
 import 'package:hazuki/features/home/view/home_drawer_profile_header.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
@@ -32,13 +36,27 @@ class _Preferences extends Mock implements LocalFavoritesPreferencesStore {}
 class _Images extends Mock implements SourceImageGateway {}
 
 Widget _app(Widget child) => MaterialApp(
+  builder: (context, child) => withTestSourcePresentation(
+    child!,
+    sourceUiService: sourceUiService,
+    activeSourceKey: '',
+    catalog: const [],
+  ),
   locale: const Locale('zh'),
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: hazukiLocalizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: Scaffold(body: child),
 );
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _Source source;
 
   setUp(() {
@@ -61,6 +79,7 @@ void main() {
           allowInitialLoad: false,
           comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
           pluginPageBuilder: (_) => const Scaffold(body: Text('plugin-page')),
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -106,6 +125,7 @@ void main() {
           authVersion: 0,
           onComicTap: (_, _) async {},
           onRequestLogin: () async => fail('Login must not be offered'),
+          taskControl: FakeSourceTaskControl(),
         ),
       ),
     );
@@ -122,7 +142,11 @@ void main() {
       tester,
     ) async {
       when(() => source.activeSourceKey).thenReturn(sourceKey);
-      final controller = HomeProfileController(sourceService: source);
+      final controller = HomeProfileController(
+        sourceUiService: sourceUiService,
+        sourceService: source,
+        taskControl: FakeSourceTaskControl(),
+      );
       addTearDown(controller.dispose);
       late BuildContext profileContext;
       await tester.pumpWidget(
@@ -165,7 +189,9 @@ void main() {
             .loading,
         hasSource,
       );
-      verifyNever(source.loadCurrentAvatarUrl);
+      verifyNever(
+        () => source.loadCurrentAvatarUrl(taskOrigin: any(named: 'taskOrigin')),
+      );
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }

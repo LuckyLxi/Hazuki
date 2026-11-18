@@ -1,12 +1,13 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hazuki/features/home/view/home_source_switch_pill_button.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 
 void main() {
@@ -31,7 +32,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(brightness: brightness),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: RepaintBoundary(

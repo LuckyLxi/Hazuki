@@ -1,0 +1,43 @@
+const hazukiAutoCheckInEnabledPreferenceKey = 'other_auto_check_in_enabled';
+const hazukiChineseConversionPreferenceKey = 'other_chinese_conversion';
+const hazukiAutoSourceUpdateCheckEnabledPreferenceKey =
+    'other_auto_source_update_check_enabled';
+const hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey =
+    'other_auto_software_update_check_enabled';
+const hazukiSoftwareUpdateSourcePreferenceKey =
+    'advanced_software_update_source';
+const hazukiDiscoverDailyRecommendationEnabledPreferenceKey =
+    'other_discover_daily_recommendation_enabled';
+const hazukiDiscoverDailyRecommendationCachePreferenceKey =
+    'discover_daily_recommendation_cache';
+const hazukiUseSystemTitleBarPreferenceKey = 'other_use_system_title_bar';
+const hazukiLocalePreferenceKey = 'app_locale';
+const hazukiWindowsAdaptationNoticeAcceptedPreferenceKey =
+    'windows_adaptation_notice_accepted';
+const hazukiComicIdSearchEnhancePreferenceKey =
+    'advanced_comic_id_search_enhance';
+const hazukiAggregateSearchEnabledPreferenceKey = 'search_aggregate_enabled';
+const hazukiSearchComicLayoutPreferenceKey = 'search_comic_layout';
+const hazukiRankingComicLayoutPreferenceKey = 'ranking_comic_layout';
+const hazukiComicDetailDynamicColorPreferenceKey =
+    'appearance_comic_detail_dynamic_color';
+const hazukiCommentFilterKeywordsKey = 'comment_filter_keywords';
+const hazukiCommentFilterKeywordsUpdatedAtKey =
+    'comment_filter_keywords_updated_at_ms';
+const hazukiCommentFilterModeKey = 'comment_filter_mode';
+const hazukiFirstUseDatePreferenceKey = 'app_first_use_date';
+const hazukiAnnouncementCachePreferenceKey = 'announcement_cache';
+const hazukiAnnouncementReadIdsPreferenceKey = 'announcement_read_ids';
+const hazukiAnnouncementPresentedIdsPreferenceKey =
+    'announcement_presented_important_ids';
+const hazukiAnnouncementHiddenCardIdsPreferenceKey =
+    'announcement_hidden_normal_ids';
+const hazukiReadHistoryMaxCount = 300;
+const hazukiSearchHistoryMaxCount = 50;
+
+// 阅读器设置中由设备决定、云同步始终跳过的键。
+const hazukiReaderReadingModePreferenceKey = 'reader_reading_mode';
+const hazukiReaderDoublePageModePreferenceKey = 'reader_double_page_mode';
+const hazukiReaderFilterEnabledPreferenceKey = 'reader_filter_enabled';
+const hazukiReaderFilterColorPreferenceKey = 'reader_filter_color';
+const hazukiReaderFilterStrengthPreferenceKey = 'reader_filter_strength';

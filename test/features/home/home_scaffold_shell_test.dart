@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
@@ -70,7 +70,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: HomeScaffoldShell(
           scaffoldKey: GlobalKey<ScaffoldState>(),
@@ -164,27 +164,14 @@ void main() {
     for (final (index, enabled) in [true, false, true, false].indexed) {
       await tester.runAsync(() => HazukiLiquidGlass.setEnabled(enabled));
       await tester.pumpAndSettle();
-      expect(glass, enabled ? findsOneWidget : findsNothing);
+      expect(glass, findsNothing);
       expect(tester.getSize(searchBox), originalSize);
       expect(tester.state(find.byType(HomeScaffoldShell)), same(homeState));
-      final material = tester.widget<Material>(
-        find.descendant(of: searchBox, matching: find.byType(Material)).first,
-      );
+      final material = tester.widget<Material>(searchBox);
       expect(
         material.color,
-        enabled
-            ? Colors.transparent
-            : hazukiSearchBoxBackgroundColor(tester.element(searchBox)),
+        hazukiSearchBoxBackgroundColor(tester.element(searchBox)),
       );
-      if (enabled) {
-        final container = tester.widget<GlassContainer>(glass);
-        expect(container.quality, HazukiLiquidGlass.navigationQuality);
-        expect(
-          container.settings,
-          HazukiLiquidGlass.navigationSettings(tester.element(glass)),
-        );
-        expect(tester.getSize(glass), originalSize);
-      }
       await tester.tap(
         find.descendant(of: searchBox, matching: find.byType(InkWell)),
       );

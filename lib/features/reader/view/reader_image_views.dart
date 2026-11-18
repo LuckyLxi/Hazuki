@@ -1,15 +1,15 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/reading/reader_mode.dart';
-import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import '../support/reader_translation_controller.dart';
+import 'reader_translation_overlay.dart';
 
 class ReaderImageViews {
   const ReaderImageViews({
@@ -19,7 +19,6 @@ class ReaderImageViews {
     required this.epId,
     required this.comicTheme,
     required this.runtimeState,
-    required this.imagePipelineState,
     required this.zoomController,
     required this.imagePipelineController,
     required this.navigationController,
@@ -30,6 +29,7 @@ class ReaderImageViews {
     required this.blockPageScrolling,
     required this.wrapImageWidget,
     required this.noImageModeEnabled,
+    this.translationController,
   });
 
   final BuildContext context;
@@ -38,7 +38,6 @@ class ReaderImageViews {
   final String epId;
   final ThemeData? comicTheme;
   final ReaderRuntimeState runtimeState;
-  final ReaderImagePipelineState imagePipelineState;
   final TransformationController zoomController;
   final ReaderImagePipelineController imagePipelineController;
   final ReaderNavigationController navigationController;
@@ -49,6 +48,19 @@ class ReaderImageViews {
   final bool blockPageScrolling;
   final Widget Function(Widget imageWidget, String url) wrapImageWidget;
   final bool noImageModeEnabled;
+  final ReaderTranslationController? translationController;
+
+  Widget _withTranslation(Widget child, String url, {required bool contain}) {
+    final controller = translationController;
+    if (controller == null) return child;
+    return ReaderTranslatedImage(
+      controller: controller,
+      url: url,
+      aspectRatio: () => imagePipelineController.imageAspectRatioCache[url],
+      contain: contain,
+      child: child,
+    );
+  }
 
   ThemeData resolveReaderTheme([BuildContext? buildContext]) {
     final targetContext = buildContext ?? context;
@@ -126,34 +138,38 @@ class ReaderImageViews {
 
     Widget buildImage(ImageProvider provider) {
       return wrapImageWidget(
-        ColoredBox(
-          color: readerSurfaceColor,
-          child: Center(
-            child: Image(
-              key: ValueKey('reader-page-$url'),
-              image: provider,
-              fit: BoxFit.contain,
-              width: double.infinity,
-              height: double.infinity,
-              filterQuality: FilterQuality.medium,
-              gaplessPlayback: false,
-              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                if (wasSynchronouslyLoaded || frame != null) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (context.mounted) onFrameDisplayed?.call(imageIndex);
-                  });
-                  return child;
-                }
-                return ColoredBox(color: readerSurfaceColor);
-              },
-              errorBuilder: (_, _, _) {
-                return _buildReaderImageErrorView(
-                  url,
-                  backgroundColor: readerPlaceholderColor,
-                );
-              },
+        _withTranslation(
+          ColoredBox(
+            color: readerSurfaceColor,
+            child: Center(
+              child: Image(
+                key: ValueKey('reader-page-$url'),
+                image: provider,
+                fit: BoxFit.contain,
+                width: double.infinity,
+                height: double.infinity,
+                filterQuality: FilterQuality.medium,
+                gaplessPlayback: false,
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (wasSynchronouslyLoaded || frame != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (context.mounted) onFrameDisplayed?.call(imageIndex);
+                    });
+                    return child;
+                  }
+                  return ColoredBox(color: readerSurfaceColor);
+                },
+                errorBuilder: (_, _, _) {
+                  return _buildReaderImageErrorView(
+                    url,
+                    backgroundColor: readerPlaceholderColor,
+                  );
+                },
+              ),
             ),
           ),
+          url,
+          contain: true,
         ),
         url,
       );
@@ -273,7 +289,7 @@ class ReaderImageViews {
     final readerPlaceholderColor = _resolveReaderPlaceholderColor(context);
 
     double? currentResolvedAspectRatio() {
-      return imagePipelineState.imageAspectRatioCache[url];
+      return imagePipelineController.imageAspectRatioCache[url];
     }
 
     double currentPlaceholderAspectRatio() {
@@ -338,7 +354,10 @@ class ReaderImageViews {
                 child: image,
               ),
             );
-      return wrapImageWidget(stableImage, url);
+      return wrapImageWidget(
+        _withTranslation(stableImage, url, contain: false),
+        url,
+      );
     }
 
     if (cachedProvider != null) {

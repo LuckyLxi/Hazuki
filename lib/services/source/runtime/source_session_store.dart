@@ -252,6 +252,7 @@ class SourceSessionStore {
 
   Future<void> saveCookieStore(List<SourceCookie> cookies) async {
     if (cookies.isEmpty) {
+      await saveBrowserUserAgents(const {});
       await _secureStorage.delete(
         SourceSecureSessionStorageKeys.cookies(sourceKey),
       );
@@ -266,6 +267,32 @@ class SourceSessionStore {
     );
     _secureDataFor(sourceKey).cookiesRaw = raw;
     if (stagedStore == null) await prefs?.remove(_cookieStoreKey);
+  }
+
+  Map<String, String> loadBrowserUserAgents() =>
+      Map<String, String>.from(_secureDataFor(sourceKey).browserUserAgents);
+
+  String? browserUserAgentFor(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return null;
+    return _secureDataFor(sourceKey).browserUserAgents[uri.origin];
+  }
+
+  Future<void> saveBrowserUserAgents(Map<String, String> values) async {
+    final key = SourceSecureSessionStorageKeys.browserUserAgents(sourceKey);
+    if (values.isEmpty) {
+      await _secureStorage.delete(key);
+    } else {
+      await _secureStorage.write(key, jsonEncode(values));
+    }
+    _secureDataFor(sourceKey).browserUserAgents = Map.from(values);
+  }
+
+  Future<void> deleteBrowserUserAgent(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasAuthority) return;
+    final values = loadBrowserUserAgents();
+    if (values.remove(uri.origin) != null) await saveBrowserUserAgents(values);
   }
 
   String get _cookieStoreKey => 'cookie_store_v2_${sourceKey.trim()}';
@@ -382,6 +409,28 @@ class SourceSessionStore {
     data.cookiesRaw = await _safeRead(
       SourceSecureSessionStorageKeys.cookies(normalizedSourceKey),
     );
+    final userAgents = await _safeRead(
+      SourceSecureSessionStorageKeys.browserUserAgents(normalizedSourceKey),
+    );
+    data.browserUserAgents = {};
+    try {
+      final decoded = userAgents == null ? null : jsonDecode(userAgents);
+      if (decoded is Map) {
+        for (final entry in decoded.entries) {
+          final origin = Uri.tryParse(entry.key.toString());
+          if (origin?.scheme == 'https' &&
+              origin!.host.isNotEmpty &&
+              origin.origin == entry.key &&
+              entry.value is String &&
+              (entry.value as String).trim().isNotEmpty &&
+              !(entry.value as String).contains(RegExp(r'[\r\n]'))) {
+            data.browserUserAgents[entry.key as String] = entry.value as String;
+          }
+        }
+      }
+    } catch (_) {
+      // A malformed optional UA profile must not invalidate an existing login.
+    }
   }
 
   Future<String?> _safeRead(String key) async {
@@ -442,4 +491,5 @@ class _SecureSourceSessionData {
   List<String>? account;
   String? token;
   String? cookiesRaw;
+  Map<String, String> browserUserAgents = {};
 }

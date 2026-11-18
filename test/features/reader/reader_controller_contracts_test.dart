@@ -1,6 +1,7 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/reader/state/reader_image_content_state.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
@@ -53,7 +54,6 @@ class _SettingsState extends Fake implements ReaderSettingsState {
     double? filterStrength,
     bool? pageIndicator,
     bool? pinchToZoom,
-    bool? longPressToSave,
   }) {
     events.add('state');
     if (readerMode != null) this.readerMode = readerMode;
@@ -120,7 +120,15 @@ class _ImageState extends Fake implements ReaderImageContentState {
 
 class _Source extends Mock implements SourceReaderGateway {}
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('settings state and callbacks', () {
@@ -315,6 +323,7 @@ void main() {
         ),
       ).thenAnswer((_) => incoming.future);
       controller = ReaderImagePipelineController(
+        sourceUiService: sourceUiService,
         runtimeState: state,
         pipelineState: pipeline,
         diagnosticsState: ReaderDiagnosticsState(),
@@ -337,8 +346,9 @@ void main() {
         loadImagesErrorBuilder: (error) => 'failed:$error',
         sourceService: source,
       );
-      addTearDown(controller.dispose);
       addTearDown(transform.dispose);
+      addTearDown(pipeline.dispose);
+      addTearDown(controller.dispose);
     });
 
     for (final images in <List<String>>[
@@ -355,7 +365,7 @@ void main() {
           };
           final pending = controller.loadChapterImages();
           incoming.complete(images);
-          await pending;
+          expect(await pending, isTrue);
           expect(
             state.images,
             images.where((image) => image.trim().isNotEmpty).toList(),
@@ -368,7 +378,7 @@ void main() {
     test('chapter failure is applied through the error transition', () async {
       final pending = controller.loadChapterImages();
       incoming.completeError(StateError('source failure'));
-      await pending;
+      expect(await pending, isFalse);
       expect(state.error, contains('source failure'));
       expect(state.images, ['old']);
       expect(events, ['update', 'error']);
@@ -385,7 +395,7 @@ void main() {
           } else {
             incoming.complete(['late']);
           }
-          await pending;
+          expect(await pending, isFalse);
           expect(state.images, ['old']);
           expect(state.error, isNull);
           expect(events, isEmpty);

@@ -377,7 +377,7 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int64_t d)
     (void)&ctx;
     JSValue v;
     v.tag = JS_TAG_SHORT_BIG_INT;
-    v.u.short_big_int = d;
+    v.u.short_big_int = (int32_t)d;
     return v;
 }
 
@@ -1211,6 +1211,27 @@ JS_EXTERN int JS_EnqueueJob(JSContext *ctx, JSJobFunc *job_func,
                             int argc, JSValueConst *argv);
 
 JS_EXTERN bool JS_IsJobPending(JSRuntime *rt);
+/* Hazuki: async task ownership; accessed only by the runtime's owner thread. */
+typedef void JSHostTaskReference(JSRuntime *rt, uint64_t token, int delta, void *opaque);
+typedef uint64_t JSHostWorkControl(JSRuntime *rt, int op, uint64_t a, uint64_t b, void *opaque);
+JS_EXTERN void JS_SetHostWorkControl(JSRuntime *rt, JSHostWorkControl *callback, void *opaque);
+JS_EXTERN uint64_t JS_GetHostWorkContext(JSRuntime *rt);
+JS_EXTERN void JS_SetHostWorkContext(JSRuntime *rt, uint64_t work);
+JS_EXTERN void JS_SetHostStopReason(JSRuntime *rt, int reason);
+JS_EXTERN int JS_GetHostStopError(JSValueConst error, uint64_t *task);
+JS_EXTERN void JS_MarkHostStopError(JSValueConst error, uint64_t task, int reason);
+JS_EXTERN int JS_CheckHostTask(JSContext *ctx);
+JS_EXTERN void JS_SetHostObserver(JSRuntime *rt, bool enabled);
+JS_EXTERN uint64_t JS_GetLastJobTask(JSRuntime *rt);
+JS_EXTERN int JS_GetLastJobStopReason(JSRuntime *rt);
+JS_EXTERN int JS_SweepStoppedPromises(JSContext *ctx);
+JS_EXTERN JSValue JS_SettleHostFuture(JSContext *ctx, JSValueConst resolver, JSValueConst value);
+JS_EXTERN int JS_ObserveHostPromise(JSContext *ctx, JSValueConst promise, JSValueConst resolve, JSValueConst reject);
+JS_EXTERN void JS_SetHostTaskReference(JSRuntime *rt, JSHostTaskReference *callback, void *opaque);
+JS_EXTERN uint64_t JS_GetHostTaskContext(JSRuntime *rt);
+JS_EXTERN void JS_SetHostTaskContext(JSRuntime *rt, uint64_t token);
+JS_EXTERN void JS_RetainHostTaskContext(JSRuntime *rt, uint64_t token);
+JS_EXTERN void JS_ReleaseHostTaskContext(JSRuntime *rt, uint64_t token);
 JS_EXTERN JSContext *JS_GetPendingJobContext(JSRuntime *rt);
 JS_EXTERN int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx);
 

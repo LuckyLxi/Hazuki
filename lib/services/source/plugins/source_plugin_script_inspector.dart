@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import '../runtime/source_script_engine.dart';
+import '../runtime/source_runtime_load_control.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../runtime/source_js_bridge_cookie_capability.dart';
@@ -9,8 +10,10 @@ import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_secure_session_storage.dart';
 import 'source_plugin_models.dart';
 import 'source_plugin_buttons.dart';
+import 'source_detail_tabs.dart';
 import 'source_search_capabilities.dart';
 import '../account/source_login_interaction.dart';
+import '../interaction/source_ui_service.dart';
 
 /// Reads a plugin's own registration without running init or accessing user data.
 class SourcePluginScriptInspector {
@@ -22,7 +25,9 @@ class SourcePluginScriptInspector {
   Future<SourcePluginManifest> inspect(String script) async {
     final init = await _loadAssetText('assets/init.js');
     final sdk = await _loadAssetText('assets/hazuki_plugin_sdk.js');
+    final sourceUiService = SourceUiService();
     final handle = SourceRuntimeHandle(
+      sourceUiService: sourceUiService,
       sourceKey: '_plugin_inspection',
       secureStorage: MemorySourceSecureSessionStorage(),
       ensureInitialized: (_) async {},
@@ -30,6 +35,9 @@ class SourcePluginScriptInspector {
     );
     final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
     final engine = SourceScriptEngine(
+      sourceUiService: sourceUiService,
+      pluginId: '_plugin_inspection',
+      inspection: true,
       timeout: 5000,
       memoryLimit: 64 * 1024 * 1024,
       hostPromiseRejectionHandler: (_) {},
@@ -46,44 +54,52 @@ class SourcePluginScriptInspector {
           return null;
         }
         if (method == 'isLogged') return false;
-        if (const {
-          'html',
-          'convert',
-          'random',
-          'uuid',
-          'getLocale',
-          'getPlatform',
-          'log',
-        }.contains(method)) {
+        if (method == 'ui_available') return false;
+        if (const {'html', 'convert', 'getLocale', 'log'}.contains(method)) {
           return bridge.handleJsMessageForHandle(handle, message);
         }
         throw const SourcePluginException('plugin_host_call_during_inspection');
       });
-      engine.setGlobal('appVersion', '1.0.0');
-      engine.evaluate(init, name: 'init.js');
-      engine.evaluate(sdk, name: 'hazuki_plugin_sdk.js');
-      evaluateSourcePlugin(engine, script);
-      return registeredSourcePluginManifest(engine);
+      await engine.execute(init, name: 'init.js');
+      await engine.execute(sdk, name: 'hazuki_plugin_sdk.js');
+      await evaluateSourcePlugin(engine, script);
+      return await registeredSourcePluginManifest(engine);
     } finally {
       handle.requestDispose();
+      await engine.close();
     }
   }
 }
 
-void evaluateSourcePlugin(SourceScriptEngine engine, String script) {
-  engine.evaluate(script, name: 'main.js');
-  if (engine.evaluate('!!globalThis.__hazuki_source') == true) return;
+Future<void> evaluateSourcePlugin(
+  SourceScriptEngine engine,
+  String script, {
+  SourceRuntimeLoadControl? control,
+}) async {
+  Future<dynamic> evaluate(String code) =>
+      control == null ? engine.evaluate(code) : control.evaluate(engine, code);
+  if (control == null) {
+    await engine.execute(script, name: 'main.js');
+  } else {
+    await control.execute(engine, script, name: 'main.js');
+  }
+  if (await evaluate('!!globalThis.__hazuki_source') == true) return;
   final sourceClass = RegExp(
-    r'class\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+extends\s+(?:HazukiSource|ComicSource)\b',
+    r'class\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+extends\s+HazukiSource\b',
   ).firstMatch(script)?.group(1);
   if (sourceClass == null) {
     throw const SourcePluginException('plugin_registration_missing');
   }
-  engine.evaluate('Hazuki.registerSource(new $sourceClass())');
+  await evaluate('Hazuki.registerSource(new $sourceClass())');
 }
 
-SourcePluginManifest registeredSourcePluginManifest(SourceScriptEngine engine) {
-  if (engine.evaluate(
+Future<SourcePluginManifest> registeredSourcePluginManifest(
+  SourceScriptEngine engine, {
+  SourceRuntimeLoadControl? control,
+}) async {
+  Future<dynamic> evaluate(String code) =>
+      control == null ? engine.evaluate(code) : control.evaluate(engine, code);
+  if (await evaluate(
         'typeof globalThis.__hazuki_source.comic?.loadReadingHistory === "function" && typeof globalThis.__hazuki_source.comic?.loadReadingProgress !== "function"',
       ) ==
       true) {
@@ -92,12 +108,12 @@ SourcePluginManifest registeredSourcePluginManifest(SourceScriptEngine engine) {
     );
   }
   SourceLoginMethod.parse(
-    engine.evaluate('globalThis.__hazuki_source.account?.loginMethods'),
+    await evaluate('globalThis.__hazuki_source.account?.loginMethods'),
   );
   final manifest = SourcePluginManifest.fromJson({
     ...Map<String, dynamic>.from(
       jsonDecode(
-            engine.evaluate(
+            await evaluate(
                   'JSON.stringify((({key,name,version,apiVersion,presentation,settings,translation,comic})=>({id:key,name,version,apiVersion,presentation:{...presentation,...(typeof comic?.loadReadingProgress === "function" ? {__hostCloudReading:true} : {})},settings,translation}))(globalThis.__hazuki_source))',
                 )
                 as String,
@@ -110,7 +126,7 @@ SourcePluginManifest registeredSourcePluginManifest(SourceScriptEngine engine) {
     manifest.presentation['dailyRecommendation'],
   );
   if (recommendation?.mode == DailyRecommendationMode.plugin &&
-      engine.evaluate(
+      await evaluate(
             'typeof globalThis.__hazuki_source.dailyRecommendation?.load === "function"',
           ) !=
           true) {
@@ -126,12 +142,19 @@ SourcePluginManifest registeredSourcePluginManifest(SourceScriptEngine engine) {
       _ => null,
     };
     if (callback != null &&
-        engine.evaluate(
+        await evaluate(
               'typeof globalThis.__hazuki_source.$callback === "function"',
             ) !=
             true) {
       throw SourcePluginException('plugin_button_callback_missing', button.id);
     }
+  }
+  if (SourceDetailTab.forPresentation(manifest.presentation).isNotEmpty &&
+      await evaluate(
+            'typeof globalThis.__hazuki_source.comic?.loadDetailTab === "function"',
+          ) !=
+          true) {
+    throw const SourcePluginException('plugin_detail_tab_callback_missing');
   }
   return manifest;
 }

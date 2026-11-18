@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app_startup_coordinator.dart';
 import 'package:hazuki/app/software_update/software_update_dialog_support.dart';

@@ -1,6 +1,7 @@
+import '../models/source_task.dart';
 import 'package:flutter/foundation.dart';
 import '../../../models/source_meta.dart';
-import '../../../shared/preferences/software_update_source.dart';
+import '../../preferences/software_update_source.dart';
 import '../plugins/source_plugin_models.dart';
 
 abstract interface class SourcePluginGateway implements Listenable {
@@ -29,10 +30,22 @@ abstract interface class SourcePluginGateway implements Listenable {
     SourcePluginIndexEntry entry,
   );
   Future<void> setEnabled(String id, bool enabled);
+
+  /// 调整已安装插件顺序，切换漫画源列表随之变化。
+  Future<void> reorder(List<String> ids);
   Future<void> uninstall(String id);
   Future<SourcePluginIndexEntry?> checkUpdate(String id);
   Future<SourceMeta?> loadMetadata(String id);
   Object? loadSetting(String id, String key);
-  Future<void> saveSetting(String id, String key, dynamic value);
-  Future<dynamic> runAction(String id, String action);
+  Future<void> saveSetting(
+    String id,
+    String key,
+    dynamic value, {
+    SourceTaskOrigin? taskOrigin,
+  });
+  Future<dynamic> runAction(
+    String id,
+    String action, {
+    SourceTaskOrigin? taskOrigin,
+  });
 }

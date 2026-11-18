@@ -1,316 +1,61 @@
+import '../models/source_task.dart';
 import '../account/source_login_interaction.dart';
-import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
-import '../account/source_account_operations.dart';
-import '../debug/source_debug_operations.dart';
-import '../favorites/source_favorites_operations.dart';
+import '../account/account_session_capability.dart';
+import '../account/source_daily_check_in_capability.dart';
+import '../debug/debug_favorites_capability.dart';
 import '../gateways/source_runtime_gateways.dart';
 import '../image/source_image_operations.dart';
 import '../models/source_contract_models.dart';
-import '../runtime/source_localization_operations.dart';
-import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_initialization_operations.dart';
+import '../runtime/source_runtime_recovery_operations.dart';
 import '../runtime/source_runtime_view.dart';
+import '../runtime/source_script_editing_operations.dart';
 import '../runtime/source_settings_operations.dart';
+import '../runtime/source_update_operations.dart';
 import 'hazuki_source_adapter_base.dart';
 
-class HazukiSourceBootstrapAdapter implements SourceBootstrapGateway {
-  const HazukiSourceBootstrapAdapter(this._runtimeOperations, [this._runtime]);
-
-  final SourceRuntimeOperations _runtimeOperations;
-  final SourceRuntimeView? _runtime;
-  @override
-  Future<void> prepareSources() async {
-    await _runtime?.loadActiveSourcePreference();
-  }
-
-  @override
-  bool get hasActiveSource => _runtime?.activeSourceKey?.isNotEmpty ?? false;
-
-  @override
-  Future<bool> hasLocalJmSourceFile() =>
-      _runtimeOperations.hasLocalJmSourceFile();
-  @override
-  Future<void> init({void Function(int received, int total)? onProgress}) =>
-      _runtimeOperations.init(onSourceDownloadProgress: onProgress);
-  @override
-  Future<void> ensureInitialized({String? sourceKey}) =>
-      _runtimeOperations.ensureInitialized(sourceKey: sourceKey);
-}
-
-class HazukiSourceUpdateAdapter implements SourceUpdateGateway {
-  const HazukiSourceUpdateAdapter(this._runtimeOperations);
-
-  final SourceRuntimeOperations _runtimeOperations;
-
-  @override
-  Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud() =>
-      _runtimeOperations.checkActiveSourceVersionFromCloud();
-  @override
-  Future<bool> downloadActiveSourceAndReload({
-    void Function(int received, int total)? onProgress,
-  }) =>
-      _runtimeOperations.downloadActiveSourceAndReload(onProgress: onProgress);
-  @override
-  Future<bool> refreshSourceOnNetworkRecovery() =>
-      _runtimeOperations.refreshSourceOnNetworkRecovery();
-}
-
-class HazukiSourceScriptAdapter implements SourceScriptGateway {
-  const HazukiSourceScriptAdapter(this._runtimeOperations);
-
-  final SourceRuntimeOperations _runtimeOperations;
-
-  @override
-  Future<String> loadEditableActiveSource() =>
-      _runtimeOperations.loadEditableActiveSource();
-  @override
-  Future<void> saveEditedActiveSource(String content) =>
-      _runtimeOperations.saveEditedActiveSource(content);
-  @override
-  Future<bool> hasCustomEditedActiveSource() =>
-      _runtimeOperations.hasCustomEditedActiveSource();
-  @override
-  Future<bool> restoreActiveSourceBackup() =>
-      _runtimeOperations.restoreActiveSourceBackup();
-  @override
-  Future<String?> readLocalActiveSourceIfExists() =>
-      _runtimeOperations.readLocalActiveSourceIfExists();
-  @override
-  Future<void> writeLocalActiveSource(String content) =>
-      _runtimeOperations.writeLocalActiveSource(content);
-  @override
-  Future<void> reloadFromLocalSourceFiles() =>
-      _runtimeOperations.reloadFromLocalSourceFiles();
-}
-
-class HazukiSourceLocalizationAdapter implements SourceLocalizationGateway {
-  const HazukiSourceLocalizationAdapter(this._localizationOperations);
-
-  final SourceLocalizationOperations _localizationOperations;
-
-  @override
-  void clearLocalizedSourceTextCaches() =>
-      _localizationOperations.clearLocalizedSourceTextCaches();
-}
-
-class HazukiSourceHomeAdapter extends HazukiSourceListenableAdapter
-    with _InteractiveAccountAdapter
-    implements SourceHomeGateway {
-  HazukiSourceHomeAdapter({
-    required SourceRuntimeView runtime,
-    required SourceRuntimeOperations runtimeOperations,
-    required SourceAccountOperations account,
-    required SourceFavoritesOperations favorites,
-  }) : _runtimeOperations = runtimeOperations,
-       _account = account,
-       _favorites = favorites,
-       super(runtime);
-
-  final SourceRuntimeOperations _runtimeOperations;
-  final SourceAccountOperations _account;
-  @override
-  SourceAccountOperations get interactiveAccountOperations => _account;
-  final SourceFavoritesOperations _favorites;
-
-  @override
-  String? get sourceRevision => runtime.sourceRevision;
-  @override
-  String? get cachedAvatarUrl => _account.cachedAvatarUrl;
-  @override
-  String? get activeSourceKey => runtime.activeSourceKey;
-  @override
-  bool get supportsLegacyRanking => runtime.supportsLegacyRanking;
-  @override
-  bool get isLogged => _account.isLogged;
-  @override
-  bool get isInitialized => runtime.isInitialized;
-  @override
-  bool get isActiveDailyCheckInSource => runtime.isActiveDailyCheckInSource;
-  @override
-  String? get currentAccount => _account.currentAccount;
-  @override
-  SourceMeta? get sourceMeta => runtime.sourceMeta;
-  @override
-  SourceRuntimeState get runtimeState => runtime.runtimeState;
-  @override
-  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
-  @override
-  Future<void> loadActiveSourcePreference() =>
-      runtime.loadActiveSourcePreference();
-  @override
-  Future<void> ensureInitialized({String? sourceKey}) =>
-      _runtimeOperations.ensureInitialized(sourceKey: sourceKey);
-  @override
-  Future<void> prewarmInBackground() => runtime.prewarmInBackground();
-  @override
-  Future<void> warmUpFavoritesDebugInfo() =>
-      _favorites.warmUpFavoritesDebugInfo();
-  @override
-  Future<void> login({required String account, required String password}) =>
-      _account.login(account: account, password: password);
-  @override
-  Future<void> logout() => _account.logout();
-  @override
-  Future<String?> loadCurrentAvatarUrl() => _account.loadCurrentAvatarUrl();
-  @override
-  Future<bool> isDailyCheckInCompletedToday() =>
-      _account.isDailyCheckInCompletedToday();
-  @override
-  Future<DailyCheckInResult> performDailyCheckIn() =>
-      _account.performDailyCheckIn();
-}
-
-class HazukiSourceAdvancedAdapter extends HazukiSourceListenableAdapter
-    implements SourceAdvancedGateway {
-  HazukiSourceAdvancedAdapter({
-    required SourceRuntimeView runtime,
-    required SourceRuntimeOperations runtimeOperations,
-  }) : _runtimeOperations = runtimeOperations,
-       super(runtime);
-
-  final SourceRuntimeOperations _runtimeOperations;
-  @override
-  Future<bool> hasCustomEditedActiveSource() =>
-      _runtimeOperations.hasCustomEditedActiveSource();
-  @override
-  Future<bool> hasActiveSourceBackup() =>
-      _runtimeOperations.hasActiveSourceBackup();
-  @override
-  Future<bool> loadSoftwareLogCaptureEnabled() =>
-      _runtimeOperations.loadSoftwareLogCaptureEnabled();
-  @override
-  Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
-      _runtimeOperations.setSoftwareLogCaptureEnabled(enabled);
-}
-
-class HazukiSourceAccountAdapter extends HazukiSourceListenableAdapter
-    with _InteractiveAccountAdapter
-    implements SourceAccountGateway {
-  HazukiSourceAccountAdapter({
-    required SourceRuntimeView runtime,
-    required SourceRuntimeOperations runtimeOperations,
-    required SourceAccountOperations account,
-  }) : _runtimeOperations = runtimeOperations,
-       _account = account,
-       super(runtime);
-
-  final SourceRuntimeOperations _runtimeOperations;
-  final SourceAccountOperations _account;
-  @override
-  SourceAccountOperations get interactiveAccountOperations => _account;
-
-  @override
-  String? get activeSourceKey => runtime.activeSourceKey;
-  @override
-  bool get isLogged => _account.isLogged;
-  @override
-  bool get isInitialized => runtime.isInitialized;
-  @override
-  bool get isActiveDailyCheckInSource => runtime.isActiveDailyCheckInSource;
-  @override
-  String? get currentAccount => _account.currentAccount;
-  @override
-  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
-  @override
-  Future<void> ensureInitialized({String? sourceKey}) =>
-      _runtimeOperations.ensureInitialized(sourceKey: sourceKey);
-  @override
-  Future<void> loadActiveSourcePreference() =>
-      runtime.loadActiveSourcePreference();
-  @override
-  Future<void> login({required String account, required String password}) =>
-      _account.login(account: account, password: password);
-  @override
-  Future<void> logout() => _account.logout();
-  @override
-  Future<String?> loadCurrentAvatarUrl() => _account.loadCurrentAvatarUrl();
-  @override
-  Future<bool> isDailyCheckInCompletedToday() =>
-      _account.isDailyCheckInCompletedToday();
-  @override
-  Future<DailyCheckInResult> performDailyCheckIn() =>
-      _account.performDailyCheckIn();
-}
-
-class HazukiSourceDebugAdapter implements SourceDebugGateway {
-  const HazukiSourceDebugAdapter({
-    required SourceRuntimeOperations runtimeOperations,
-    required SourceDebugOperations debug,
-  }) : _runtimeOperations = runtimeOperations,
-       _debug = debug;
-
-  final SourceRuntimeOperations _runtimeOperations;
-  final SourceDebugOperations _debug;
-
-  @override
-  bool get softwareLogCaptureEnabled => _debug.softwareLogCaptureEnabled;
-  @override
-  Listenable get logChanges => _debug.logStore;
-  @override
-  Future<bool> loadSoftwareLogCaptureEnabled() =>
-      _runtimeOperations.loadSoftwareLogCaptureEnabled();
-  @override
-  Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
-      _runtimeOperations.setSoftwareLogCaptureEnabled(enabled);
-  @override
-  void addApplicationLog({
-    required String level,
-    required String title,
-    Object? content,
-    String source = 'app',
-  }) => _debug.addApplicationLog(
-    level: level,
-    title: title,
-    content: content,
-    source: source,
-  );
-  @override
-  void addReaderLog({
-    required String level,
-    required String title,
-    Object? content,
-    String source = 'reader',
-  }) => _debug.addReaderLog(
-    level: level,
-    title: title,
-    content: content,
-    source: source,
-  );
-  @override
-  Future<Map<String, dynamic>> collectTypedDebugInfo(String type) =>
-      _debug.collectTypedDebugInfo(type);
-  @override
-  Future<Map<String, dynamic>> collectAllDebugInfo() =>
-      _debug.collectAllDebugInfo();
-  @override
-  Future<void> clearCapturedLogs() => _debug.clearCapturedLogs();
-}
-
+/// 运行时、账号与脚本三组 Gateway 共用一个实现。
 class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
-    with _InteractiveAccountAdapter
     implements
         SourceRuntimeGateway,
-        SourceSelectionGateway,
-        SourceSwitchGateway {
+        SourceAccountGateway,
+        SourceInteractiveAccountGateway,
+        SourceHomeGateway,
+        SourceScriptGateway {
   HazukiSourceRuntimeAdapter({
     required SourceRuntimeView runtime,
-    required SourceRuntimeOperations runtimeOperations,
-    required SourceAccountOperations account,
-    required SourceFavoritesOperations favorites,
-  }) : _runtimeOperations = runtimeOperations,
+    required SourceRuntimeInitializationOperations initialization,
+    required SourceScriptEditingOperations scriptEditing,
+    required SourceUpdateOperations updates,
+    required SourceRuntimeRecoveryOperations recovery,
+    required SourceAccountSessionCapability account,
+    required SourceDailyCheckInCapability dailyCheckIn,
+    required SourceFavoritesDebugCapability favoritesDebug,
+  }) : _initialization = initialization,
+       _scriptEditing = scriptEditing,
+       _updates = updates,
+       _recovery = recovery,
        _account = account,
-       _favorites = favorites,
+       _dailyCheckIn = dailyCheckIn,
+       _favoritesDebug = favoritesDebug,
        super(runtime);
 
-  final SourceRuntimeOperations _runtimeOperations;
-  final SourceAccountOperations _account;
-  @override
-  SourceAccountOperations get interactiveAccountOperations => _account;
-  final SourceFavoritesOperations _favorites;
+  final SourceRuntimeInitializationOperations _initialization;
+  final SourceScriptEditingOperations _scriptEditing;
+  final SourceUpdateOperations _updates;
+  final SourceRuntimeRecoveryOperations _recovery;
+  final SourceAccountSessionCapability _account;
+  final SourceDailyCheckInCapability _dailyCheckIn;
+  final SourceFavoritesDebugCapability _favoritesDebug;
 
   @override
   String? get activeSourceKey => runtime.activeSourceKey;
+  @override
+  bool get hasActiveSource => runtime.activeSourceKey?.isNotEmpty ?? false;
+  @override
+  String? get sourceRevision => runtime.sourceRevision;
   @override
   bool get supportsDirectComicId => runtime.supportsDirectComicId;
   @override
@@ -326,82 +71,125 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   @override
   String? get currentAccount => _account.currentAccount;
   @override
+  String? get cachedAvatarUrl => _account.cachedAvatarUrl;
+  @override
   SourceMeta? get sourceMeta => runtime.sourceMeta;
   @override
   SourceRuntimeState get runtimeState => runtime.runtimeState;
   @override
-  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
-  @override
   List<SourceCatalogEntry> get allowedSources =>
       runtime.runtimeRegistry.allowedSources;
-  @override
-  bool isLoggedForSource(String sourceKey) =>
-      _account.isLoggedForSource(sourceKey);
-  @override
-  String? currentAccountForSource(String sourceKey) =>
-      _account.currentAccountForSource(sourceKey);
   @override
   Future<void> loadActiveSourcePreference() =>
       runtime.loadActiveSourcePreference();
   @override
+  Future<void> init({void Function(int received, int total)? onProgress}) =>
+      _initialization.init(onSourceDownloadProgress: onProgress);
+  @override
   Future<void> ensureInitialized({String? sourceKey}) =>
-      _runtimeOperations.ensureInitialized(sourceKey: sourceKey);
+      _initialization.ensureInitialized(sourceKey: sourceKey);
   @override
   Future<void> activateSource(String sourceKey) =>
       runtime.activateSource(sourceKey);
   @override
-  Future<void> prewarmInBackground() => runtime.prewarmInBackground();
+  Future<void> prewarmInBackground() => _initialization.prewarmInBackground();
   @override
   Future<void> warmUpFavoritesDebugInfo() =>
-      _favorites.warmUpFavoritesDebugInfo();
+      _favoritesDebug.warmUpFavoritesDebugInfo();
   @override
-  Future<void> login({required String account, required String password}) =>
-      _account.login(account: account, password: password);
+  Future<void> login({
+    required String account,
+    required String password,
+    SourceTaskOrigin? taskOrigin,
+  }) => _account.login(
+    account: account,
+    password: password,
+    taskOrigin: taskOrigin,
+  );
   @override
-  Future<void> logout() => _account.logout();
+  Future<void> logout({SourceTaskOrigin? taskOrigin}) =>
+      _account.logout(taskOrigin: taskOrigin);
   @override
-  Future<String?> loadCurrentAvatarUrl() => _account.loadCurrentAvatarUrl();
+  Future<String?> loadCurrentAvatarUrl({SourceTaskOrigin? taskOrigin}) =>
+      _account.loadCurrentAvatarUrl(taskOrigin: taskOrigin);
   @override
-  Future<bool> isDailyCheckInCompletedToday() =>
-      _account.isDailyCheckInCompletedToday();
+  Future<bool> isDailyCheckInCompletedToday({SourceTaskOrigin? taskOrigin}) =>
+      _dailyCheckIn.isCompletedToday(taskOrigin: taskOrigin);
   @override
-  Future<DailyCheckInResult> performDailyCheckIn() =>
-      _account.performDailyCheckIn();
+  Future<DailyCheckInResult> performDailyCheckIn({
+    SourceTaskOrigin? taskOrigin,
+  }) => _dailyCheckIn.perform(taskOrigin: taskOrigin);
+  @override
+  Future<bool> hasLocalActiveSourceFile() =>
+      _scriptEditing.hasLocalActiveSourceFile();
   @override
   Future<bool> hasLocalSourceFile(String sourceKey) =>
-      _runtimeOperations.hasLocalSourceFile(sourceKey);
+      _scriptEditing.hasLocalSourceFile(sourceKey);
   @override
   Future<void> downloadSourceFile(
     String sourceKey, {
     void Function(int received, int total)? onProgress,
-  }) =>
-      _runtimeOperations.downloadSourceFile(sourceKey, onProgress: onProgress);
-  @override
-  Future<void> deleteLocalSourceFile(String sourceKey) =>
-      _runtimeOperations.deleteLocalSourceFile(sourceKey);
+  }) => _recovery.downloadSourceFile(sourceKey, onProgress: onProgress);
   @override
   Future<String> loadEditableActiveSource() =>
-      _runtimeOperations.loadEditableActiveSource();
+      _scriptEditing.loadEditableActiveSource();
   @override
   Future<void> saveEditedActiveSource(String content) =>
-      _runtimeOperations.saveEditedActiveSource(content);
+      _scriptEditing.saveEditedActiveSource(content);
   @override
   Future<bool> hasCustomEditedActiveSource() =>
-      _runtimeOperations.hasCustomEditedActiveSource();
+      _scriptEditing.hasCustomEditedActiveSource();
+  @override
+  Future<bool> hasActiveSourceBackup() =>
+      _scriptEditing.hasActiveSourceBackup();
+  @override
+  Future<bool> restoreActiveSourceBackup() =>
+      _scriptEditing.restoreActiveSourceBackup();
+  @override
+  Future<String?> readLocalActiveSourceIfExists() =>
+      _scriptEditing.readLocalActiveSourceIfExists();
+  @override
+  Future<void> writeLocalActiveSource(String content) =>
+      _scriptEditing.writeLocalActiveSource(content);
   @override
   Future<void> reloadFromLocalSourceFiles() =>
-      _runtimeOperations.reloadFromLocalSourceFiles();
+      _recovery.reloadFromLocalSourceFiles();
+  @override
+  Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud() =>
+      _updates.checkActiveSourceVersion();
   @override
   Future<bool> downloadActiveSourceAndReload({
     void Function(int received, int total)? onProgress,
+  }) => _updates.downloadActiveSource(onProgress: onProgress);
+  @override
+  Future<bool> refreshSourceOnNetworkRecovery() =>
+      _recovery.refreshSourceOnNetworkRecovery();
+
+  @override
+  void cancelPendingLogin() => _account.interactive?.cancelPendingLogin();
+  @override
+  Future<List<SourceLoginMethod>> loadLoginMethods({
+    SourceTaskOrigin? taskOrigin,
   }) =>
-      _runtimeOperations.downloadActiveSourceAndReload(onProgress: onProgress);
+      _account.interactive?.loadLoginMethods(taskOrigin: taskOrigin) ??
+      Future.value(const []);
+
   @override
-  Future<bool> loadSoftwareLogCaptureEnabled() =>
-      _runtimeOperations.loadSoftwareLogCaptureEnabled();
-  @override
-  Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
-      _runtimeOperations.setSoftwareLogCaptureEnabled(enabled);
+  Future<void> loginInteractive({
+    required String account,
+    required String password,
+    required String method,
+    required SourceLoginPresenter present,
+    required SourceLoginCancellation cancellation,
+    SourceTaskOrigin? taskOrigin,
+  }) => _account.interactive!.loginInteractive(
+    account: account,
+    password: password,
+    method: method,
+    present: present,
+    cancellation: cancellation,
+    taskOrigin: taskOrigin,
+  );
 }
 
 class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
@@ -435,8 +223,14 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   Future<void> updateSourceSetting(
     String sourceKey,
     String key,
-    dynamic value,
-  ) => _settings.updateSourceSetting(sourceKey, key, value);
+    dynamic value, {
+    SourceTaskOrigin? taskOrigin,
+  }) => _settings.updateSourceSetting(
+    sourceKey,
+    key,
+    value,
+    taskOrigin: taskOrigin,
+  );
   @override
   Object? loadActiveSourceSetting(String key) =>
       _settings.loadActiveSourceSetting(key);
@@ -444,8 +238,9 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   Future<void> updateActiveSourceSetting(String key, dynamic value) =>
       _settings.updateActiveSourceSetting(key, value);
   @override
-  Future<Map<String, dynamic>> getLineSettingsSnapshot() =>
-      _settings.getLineSettingsSnapshot();
+  Future<Map<String, dynamic>> getLineSettingsSnapshot({
+    SourceTaskOrigin? taskOrigin,
+  }) => _settings.getLineSettingsSnapshot(taskOrigin: taskOrigin);
   @override
   Future<void> updateLineSetting(String key, dynamic value) =>
       _settings.updateLineSetting(key, value);
@@ -453,9 +248,11 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   Future<void> refreshLines({
     bool refreshApiDomains = true,
     bool refreshImageHost = true,
+    SourceTaskOrigin? taskOrigin,
   }) => _settings.refreshLines(
     refreshApiDomains: refreshApiDomains,
     refreshImageHost: refreshImageHost,
+    taskOrigin: taskOrigin,
   );
   @override
   Future<Map<String, dynamic>> getImageCacheStatus() =>
@@ -468,35 +265,4 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
       _image.setImageCacheAutoCleanMode(mode);
   @override
   Future<void> clearImageCache() => _image.clearImageCache();
-}
-
-mixin _InteractiveAccountAdapter implements SourceInteractiveAccountGateway {
-  SourceAccountOperations get interactiveAccountOperations;
-  @override
-  void cancelPendingLogin() =>
-      (interactiveAccountOperations as SourceInteractiveAccountGateway)
-          .cancelPendingLogin();
-  @override
-  Future<List<SourceLoginMethod>> loadLoginMethods() {
-    final account = interactiveAccountOperations;
-    return account is SourceInteractiveAccountGateway
-        ? (account as SourceInteractiveAccountGateway).loadLoginMethods()
-        : Future.value(const []);
-  }
-
-  @override
-  Future<void> loginInteractive({
-    required String account,
-    required String password,
-    required String method,
-    required SourceLoginPresenter present,
-    required SourceLoginCancellation cancellation,
-  }) => (interactiveAccountOperations as SourceInteractiveAccountGateway)
-      .loginInteractive(
-        account: account,
-        password: password,
-        method: method,
-        present: present,
-        cancellation: cancellation,
-      );
 }

@@ -1,3 +1,4 @@
+import '../models/source_task.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,14 @@ class SourceLoginCancelled implements Exception {
 class SourceLoginCancellation extends ChangeNotifier {
   final _done = Completer<void>();
   bool get isCancelled => _done.isCompleted;
+  bool _cleanup = false;
+  bool get isCleanupCancellation => _cleanup;
+  void cancelForCleanup() {
+    if (isCancelled) return;
+    _cleanup = true;
+    cancel();
+  }
+
   Future<void> get whenCancelled => _done.future;
   void cancel() {
     if (isCancelled) return;
@@ -71,12 +80,15 @@ typedef SourceLoginPresenter =
 
 abstract interface class SourceInteractiveAccountGateway {
   void cancelPendingLogin();
-  Future<List<SourceLoginMethod>> loadLoginMethods();
+  Future<List<SourceLoginMethod>> loadLoginMethods({
+    SourceTaskOrigin? taskOrigin,
+  });
   Future<void> loginInteractive({
     required String account,
     required String password,
     required String method,
     required SourceLoginPresenter present,
     required SourceLoginCancellation cancellation,
+    SourceTaskOrigin? taskOrigin,
   });
 }

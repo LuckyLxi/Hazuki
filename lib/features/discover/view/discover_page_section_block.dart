@@ -1,6 +1,6 @@
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/shared/source_presentation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
@@ -15,7 +15,9 @@ import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 import 'discover_section_page.dart';
 
 class DiscoverSectionBlock extends StatefulWidget {
+  final SourceTaskControlGateway taskControl;
   const DiscoverSectionBlock({
+    required this.taskControl,
     super.key,
     required this.section,
     required this.sectionIndex,
@@ -98,6 +100,7 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
                       comicDetailPageBuilder: widget.comicDetailPageBuilder,
                       comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
                       sourceService: widget.sourceService,
+                      taskControl: widget.taskControl,
                     );
                     Navigator.of(context).push(
                       useWindowsLayout
@@ -239,7 +242,6 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
                             animateOnLoad: true,
                             filterQuality: FilterQuality.low,
                             deferLoadingWhileScrolling: true,
-                            useShimmerLoading: false,
                             loading: SizedBox(
                               width: coverWidth,
                               height: coverHeight,

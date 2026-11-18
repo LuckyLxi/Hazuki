@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'app_preferences.dart';
+import '../services/preferences/hazuki_preference_keys.dart';
 import 'software_update/software_update_dialog_support.dart';
 import 'source_runtime/source_runtime_coordinator.dart';
 import 'source_runtime/source_runtime_widgets.dart';

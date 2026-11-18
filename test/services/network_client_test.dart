@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'dart:async';
 import 'dart:typed_data';
@@ -9,7 +10,51 @@ import 'package:hazuki/services/network/hazuki_network.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
+  test(
+    'cancelling during retry delay cancels the wait without sending another request',
+    () async {
+      final first = Completer<void>();
+      final adapter = _FakeAdapter((options, count) {
+        if (!first.isCompleted) first.complete();
+        return ResponseBody.fromString('retry', 503);
+      });
+      final dio = Dio(BaseOptions(validateStatus: (_) => true))
+        ..httpClientAdapter = adapter;
+      final client = HazukiNetworkClient(
+        dio: dio,
+        sourceKey: 'fixture',
+        retryDelay: const Duration(seconds: 30),
+      );
+      final token = CancelToken();
+      final request = client.request<String>(
+        'https://fixture.test/retry',
+        cancelToken: token,
+      );
+      final assertion = expectLater(
+        request,
+        throwsA(
+          isA<DioException>().having(CancelToken.isCancel, 'cancel', true),
+        ),
+      );
+      await first.future;
+      await Future<void>.delayed(Duration.zero);
+      final elapsed = Stopwatch()..start();
+      token.cancel('fixture');
+      await assertion;
+      expect(elapsed.elapsed, lessThan(const Duration(seconds: 2)));
+      expect(adapter.callCount, 1);
+      dio.close(force: true);
+    },
+  );
   group('Hazuki network URL normalization', () {
     test('preserves explicit ports regardless of source identity', () {
       expect(
@@ -159,14 +204,16 @@ void main() {
     test('keeps JS response shape and source-scoped cookies', () async {
       final secureStorage = MemorySourceSecureSessionStorage();
       final service = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
       final handle = SourceRuntimeHandle(
+        sourceUiService: sourceUiService,
         sourceKey: 'jm',
         secureStorage: secureStorage,
         ensureInitialized:
-            service.testing.runtimeOperations.ensureSourceInitialized,
+            service.testing.initialization.ensureSourceInitialized,
         notifyRuntimeStateChanged: (_) {},
       );
       await handle.facade.ensurePrefs();

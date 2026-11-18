@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart';
 
 import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/features/home/support/home_profile_flow.dart';
@@ -15,19 +15,30 @@ import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
 
 class HomeCoordinator extends ChangeNotifier {
   HomeCoordinator({
+    required SourceTaskControlGateway taskControl,
     required int initialTabIndex,
     required SourceHomeGateway sourceService,
-    required SourceSwitchGateway sourceSwitchService,
+    required SourceRuntimeGateway sourceSwitchService,
     required SourceImageGateway imageService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
     required AnnouncementController announcementService,
-  }) : _sourceService = sourceService,
+    required SourceUiService sourceUi,
+  }) : _taskControl = taskControl,
+       _sourceUi = sourceUi,
+       _sourceService = sourceService,
        _sourceSwitchService = sourceSwitchService,
        _imageService = imageService,
        _dailyRecommendationService = dailyRecommendationService,
        _announcementService = announcementService,
-       _profileController = HomeProfileController(sourceService: sourceService),
-       _shellController = HomeShellController(initialTabIndex: initialTabIndex),
+       _profileController = HomeProfileController(
+         sourceUiService: sourceUi,
+         sourceService: sourceService,
+         taskControl: taskControl,
+       ),
+       _shellController = HomeShellController(
+         initialTabIndex: initialTabIndex,
+         sourceUi: sourceUi,
+       ),
        scaffoldKey = GlobalKey<ScaffoldState>(),
        favoriteActionsBinding = FavoritePageActionsBinding() {
     _lastSourceKey = _sourceService.activeSourceKey;
@@ -41,12 +52,10 @@ class HomeCoordinator extends ChangeNotifier {
     _sourceService.addListener(_handleSourceChanged);
   }
 
-  static const MethodChannel _mediaChannel = MethodChannel(
-    'hazuki.comics/media',
-  );
-
+  final SourceTaskControlGateway _taskControl;
+  final SourceUiService _sourceUi;
   final SourceHomeGateway _sourceService;
-  final SourceSwitchGateway _sourceSwitchService;
+  final SourceRuntimeGateway _sourceSwitchService;
   final SourceImageGateway _imageService;
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
@@ -71,7 +80,7 @@ class HomeCoordinator extends ChangeNotifier {
   int get authVersion => _profileController.authVersion;
   bool get isLogged => _profileController.isLogged;
   SourceHomeGateway get sourceService => _sourceService;
-  SourceSwitchGateway get sourceSwitchService => _sourceSwitchService;
+  SourceRuntimeGateway get sourceSwitchService => _sourceSwitchService;
 
   int get currentIndex => _shellController.currentIndex;
   double get discoverSearchMorphProgress =>
@@ -122,10 +131,17 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   Future<void> loadOtherSettings(BuildContext context) async {
-    await _profileController.loadOtherSettings(context);
+    // 推荐准备与个人设置读取互不依赖，并行执行以便轮播区域尽早出现
+    await Future.wait<void>([
+      _profileController.loadOtherSettings(context),
+      _prepareDailyRecommendation(),
+    ]);
+    _relayChange();
+  }
+
+  Future<void> _prepareDailyRecommendation() async {
     final enabled = await _dailyRecommendationService.loadEnabled();
     await _dailyRecommendationService.ensurePrepared(enabled: enabled);
-    _relayChange();
   }
 
   Future<void> performCheckIn(
@@ -182,12 +198,13 @@ class HomeCoordinator extends ChangeNotifier {
     required bool Function() isMounted,
   }) {
     return HomeProfileFlow(
+      taskControl: _taskControl,
       context: context,
       isMounted: isMounted,
       profileController: _profileController,
       sourceService: _sourceService,
       imageService: _imageService,
-      mediaChannel: _mediaChannel,
+      sourceUi: _sourceUi,
       syncUserProfile: () => syncUserProfile(context),
     );
   }
@@ -244,6 +261,9 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   Future<void> _prewarmSourceRuntime(BuildContext context) async {
+    // start() 由首页 initState 调用，处于构建阶段；预热会在首个 await 前同步
+    // 发出运行时状态通知。帧内构建同步执行，微任务在其结束后才运行。
+    await Future<void>.microtask(() {});
     try {
       await _sourceService.prewarmInBackground();
     } catch (_) {

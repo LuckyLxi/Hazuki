@@ -76,9 +76,8 @@ class AppLogTextFormatter {
   }
 
   String _formatData(Object value) {
-    if (value is Map || value is Iterable) {
-      return const JsonEncoder.withIndent('  ').convert(value);
-    }
+    // 紧凑 JSON 比缩进格式小三到四成，对 AI 分析同样可读。
+    if (value is Map || value is Iterable) return jsonEncode(value);
     return value.toString();
   }
 }

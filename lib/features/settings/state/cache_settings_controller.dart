@@ -12,12 +12,18 @@ class CacheSettingsController extends ChangeNotifier {
   final SourceSettingsGateway _sourceService;
 
   bool _loading = true;
+  bool _initialized = false;
+  bool _clearing = false;
   int _maxBytes;
   int _usedBytes = 0;
   String _autoCleanMode = _defaultAutoCleanMode;
   bool _disposed = false;
 
   bool get loading => _loading;
+
+  /// 首次加载完成后为 true，之后的刷新不再回到加载占位态。
+  bool get initialized => _initialized;
+  bool get clearing => _clearing;
   int get maxBytes => _maxBytes;
   int get usedBytes => _usedBytes;
   String get autoCleanMode => _autoCleanMode;
@@ -42,6 +48,7 @@ class CacheSettingsController extends ChangeNotifier {
     } finally {
       if (!_disposed) {
         _loading = false;
+        _initialized = true;
         _notify();
       }
     }
@@ -60,13 +67,16 @@ class CacheSettingsController extends ChangeNotifier {
   }
 
   Future<void> clearCache() async {
-    if (_disposed) return;
-    _loading = true;
+    if (_disposed || _clearing) return;
+    // 清理期间保留现有数值，完成后由刷新驱动用量回落动画。
+    _clearing = true;
     _notify();
     try {
       await _sourceService.clearImageCache();
     } finally {
       await loadStatus();
+      _clearing = false;
+      _notify();
     }
   }
 

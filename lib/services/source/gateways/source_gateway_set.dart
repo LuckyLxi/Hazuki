@@ -1,22 +1,33 @@
-import '../account/source_account_operations.dart';
+import '../comic/comic_details_capability.dart';
+import '../comic/comic_detail_tab_capability.dart';
+import '../category/source_category_capability.dart';
+import '../content/explore_capability.dart';
+import '../account/account_session_capability.dart';
+import '../account/source_daily_check_in_capability.dart';
+import '../debug/debug_favorites_capability.dart';
 import '../adapters/hazuki_source_content_adapters.dart';
 import '../adapters/hazuki_source_image_adapters.dart';
 import '../adapters/hazuki_source_runtime_adapters.dart';
-import '../adapters/hazuki_source_sync_adapter.dart';
-import '../comments/source_comments_operations.dart';
+import '../comments/comments_capability.dart';
+import '../content/source_cloud_reading.dart';
 import '../content/source_content_operations.dart';
+import '../content/source_reading_progress_uploads.dart';
 import '../debug/source_debug_operations.dart';
-import '../favorites/source_favorites_operations.dart';
+import '../favorites/source_favorites_capability.dart';
 import '../image/source_image_operations.dart';
 import '../image/source_image_preparation_capability.dart';
 import '../runtime/source_localization_operations.dart';
-import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_diagnostics_operations.dart';
+import '../runtime/source_runtime_initialization_operations.dart';
+import '../runtime/source_runtime_recovery_operations.dart';
+import '../runtime/source_script_editing_operations.dart';
+import '../runtime/source_update_operations.dart';
 import '../runtime/source_runtime_view.dart';
 import '../runtime/source_settings_operations.dart';
 import 'source_content_gateways.dart';
 import 'source_image_gateways.dart';
 import 'source_runtime_gateways.dart';
-import 'source_sync_gateway.dart';
+import 'source_task_control_gateway.dart';
 
 /// Complete set of focused gateways created by the source composition root.
 ///
@@ -24,124 +35,143 @@ import 'source_sync_gateway.dart';
 /// constructors or runtime implementation details.
 class SourceGatewaySet {
   SourceGatewaySet({
+    required this.taskControl,
     required SourceRuntimeView runtime,
-    required SourceRuntimeOperations runtimeOperations,
+    required SourceRuntimeInitializationOperations initialization,
+    required SourceRuntimeDiagnosticsOperations diagnostics,
+    required SourceScriptEditingOperations scriptEditing,
+    required SourceUpdateOperations updates,
+    required SourceRuntimeRecoveryOperations recovery,
     required SourceLocalizationOperations localization,
     required SourceSettingsOperations settings,
-    required SourceAccountOperations account,
-    required SourceCommentsOperations comments,
+    required SourceAccountSessionCapability account,
+    required SourceDailyCheckInCapability dailyCheckIn,
+    required SourceCommentsCapability comments,
     required SourceContentOperations content,
-    required SourceFavoritesOperations favorites,
+    required SourceCloudReadingCapability cloudReading,
+    required SourceReadingProgressUploads readingProgressUploads,
+    required SourceComicDetailsCapability comicDetails,
+    required SourceComicDetailTabCapability detailTabs,
+    required SourceCategoryCapability category,
+    required SourceExploreCapability explore,
+    required SourceFavoritesCapability favorites,
+    required SourceFavoritesDebugCapability favoritesDebug,
+    required Stream<void> cloudFavoritesChangedStream,
     required SourceImageOperations image,
     required SourceImagePreparationCapability imagePreparation,
     required SourceDebugOperations debug,
   }) {
-    search = HazukiSourceSearchAdapter(runtime: runtime, content: content);
+    search = HazukiSourceSearchAdapter(
+      runtime: runtime,
+      recovery: recovery,
+      content: content,
+      comicDetails: comicDetails,
+    );
     discover = HazukiSourceDiscoverAdapter(
       runtime: runtime,
-      content: content,
+      recovery: recovery,
+      explore: explore,
+      category: category,
       account: account,
     );
     favorite = HazukiSourceFavoriteAdapter(
       runtime: runtime,
+      recovery: recovery,
       account: account,
       favorites: favorites,
-      runtimeOperations: runtimeOperations,
+      cloudFavoritesChangedStream: cloudFavoritesChangedStream,
+      initialization: initialization,
     );
-    reader = HazukiSourceReaderAdapter(
-      content: content,
+    final readerAdapter = HazukiSourceReaderAdapter(
+      readingProgressUploads: readingProgressUploads,
+      comicDetails: comicDetails,
       imagePreparation: imagePreparation,
       image: image,
       debug: debug,
     );
+    reader = readerAdapter;
+    readerSessions = readerAdapter;
+    downloadSessions = readerAdapter;
+    this.readingProgressUploads = readerAdapter;
+    this.cloudReading = cloudReading;
+    cloudReadingEvents = cloudReading;
     settingsGateway = HazukiSourceSettingsAdapter(
       runtime: runtime,
       settings: settings,
       image: image,
     );
-    accountGateway = HazukiSourceAccountAdapter(
-      runtime: runtime,
-      runtimeOperations: runtimeOperations,
-      account: account,
-    );
-    debugGateway = HazukiSourceDebugAdapter(
-      runtimeOperations: runtimeOperations,
-      debug: debug,
-    );
-    imageGateway = HazukiSourceImageAdapter(runtime: runtime, image: image);
-    recommendation = HazukiSourceRecommendationAdapter(
+    final imageAdapter = HazukiSourceImageAdapter(
       runtime: runtime,
       image: image,
-      runtimeOperations: runtimeOperations,
+      diagnostics: diagnostics,
       debug: debug,
     );
+    imageGateway = imageAdapter;
+    debugGateway = imageAdapter;
+    recommendation = imageAdapter;
     dailyRecommendation = HazukiSourceDailyRecommendationAdapter(
       runtime: runtime,
+      recovery: recovery,
       image: image,
       content: content,
-    );
-    sync = HazukiSourceSyncAdapter(
-      runtime: runtime,
-      runtimeOperations: runtimeOperations,
+      comicDetails: comicDetails,
     );
     final runtimeAdapter = HazukiSourceRuntimeAdapter(
       runtime: runtime,
-      runtimeOperations: runtimeOperations,
+      initialization: initialization,
+      scriptEditing: scriptEditing,
+      updates: updates,
+      recovery: recovery,
       account: account,
-      favorites: favorites,
+      dailyCheckIn: dailyCheckIn,
+      favoritesDebug: favoritesDebug,
     );
+    accountGateway = runtimeAdapter;
     runtimeGateway = runtimeAdapter;
-    selection = runtimeAdapter;
-    switchGateway = runtimeAdapter;
-    home = HazukiSourceHomeAdapter(
-      runtime: runtime,
-      runtimeOperations: runtimeOperations,
-      account: account,
-      favorites: favorites,
+    home = runtimeAdapter;
+    script = runtimeAdapter;
+    this.category = HazukiSourceCategoryAdapter(
+      category: category,
+      debug: debug,
     );
-    advanced = HazukiSourceAdvancedAdapter(
-      runtime: runtime,
-      runtimeOperations: runtimeOperations,
-    );
-    category = HazukiSourceCategoryAdapter(content: content, debug: debug);
     commentsGateway = HazukiSourceCommentsAdapter(
       comments: comments,
+      account: account,
       debug: debug,
     );
     comicDetail = HazukiSourceComicDetailAdapter(
       runtime: runtime,
       account: account,
       favorites: favorites,
-      content: content,
+      comicDetails: comicDetails,
+      category: category,
+      detailTabs: detailTabs,
       image: image,
     );
-    bootstrap = HazukiSourceBootstrapAdapter(runtimeOperations, runtime);
-    update = HazukiSourceUpdateAdapter(runtimeOperations);
-    script = HazukiSourceScriptAdapter(runtimeOperations);
-    localizationGateway = HazukiSourceLocalizationAdapter(localization);
+    localizationGateway = localization;
   }
 
   late final SourceSearchGateway search;
+  final SourceTaskControlGateway taskControl;
   late final SourceDiscoverGateway discover;
   late final SourceFavoriteGateway favorite;
   late final SourceReaderGateway reader;
+  late final SourceReaderSessionGateway readerSessions;
+  late final SourceDownloadSessionGateway downloadSessions;
+  late final SourceReadingProgressGateway readingProgressUploads;
+  late final SourceCloudReadingGateway cloudReading;
+  late final SourceCloudReadingEvents cloudReadingEvents;
   late final SourceSettingsGateway settingsGateway;
   late final SourceAccountGateway accountGateway;
   late final SourceDebugGateway debugGateway;
   late final SourceImageGateway imageGateway;
   late final SourceRecommendationGateway recommendation;
   late final SourceDailyRecommendationGateway dailyRecommendation;
-  late final SourceSyncGateway sync;
   late final SourceRuntimeGateway runtimeGateway;
-  late final SourceSelectionGateway selection;
-  late final SourceSwitchGateway switchGateway;
   late final SourceHomeGateway home;
-  late final SourceAdvancedGateway advanced;
   late final SourceCategoryGateway category;
   late final SourceCommentsGateway commentsGateway;
   late final SourceComicDetailGateway comicDetail;
-  late final SourceBootstrapGateway bootstrap;
-  late final SourceUpdateGateway update;
   late final SourceScriptGateway script;
   late final SourceLocalizationGateway localizationGateway;
 }

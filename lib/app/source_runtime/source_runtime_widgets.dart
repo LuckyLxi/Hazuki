@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/app/service_locator.dart';
 
 import '../../l10n/l10n.dart';
@@ -265,7 +265,7 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
       _indeterminate = true;
     });
 
-    final ok = await sl<SourceUpdateGateway>().downloadActiveSourceAndReload(
+    final ok = await sl<SourceScriptGateway>().downloadActiveSourceAndReload(
       onProgress: (received, total) {
         _updateDialogState(() {
           if (total > 0) {

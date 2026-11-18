@@ -2,10 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/view/plugins/source_plugins_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_plugin_adapter.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_models.dart';
@@ -90,14 +91,14 @@ void main() {
             manager,
             metadataLoader: (_) async => null,
             settingLoader: (_, _) => null,
-            settingWriter: (_, _, _) async {},
-            actionRunner: (_, _) async => null,
+            settingWriter: (_, _, _, {taskOrigin}) async {},
+            actionRunner: (_, _, {taskOrigin}) async => null,
           );
           await tester.runAsync(() async {
             await tester.pumpWidget(
               MaterialApp(
                 locale: const Locale('en'),
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                localizationsDelegates: hazukiLocalizationsDelegates,
                 supportedLocales: AppLocalizations.supportedLocales,
                 home: SourcePluginsPage(manager: gateway),
               ),
@@ -111,7 +112,7 @@ void main() {
 
           if (useUpdate) {
             await tester.scrollUntilVisible(
-              find.text(s.pluginsUpdate),
+              find.text(s.pluginsUpdateTo(nextVersion)),
               250,
               scrollable: find
                   .descendant(
@@ -121,7 +122,9 @@ void main() {
                   .first,
             );
             await tester.pumpAndSettle();
-            await tester.runAsync(() => tester.tap(find.text(s.pluginsUpdate)));
+            await tester.runAsync(
+              () => tester.tap(find.text(s.pluginsUpdateTo(nextVersion))),
+            );
           } else {
             await tester.tap(find.widgetWithText(Tab, s.pluginsAvailable));
             await tester.pumpAndSettle();
@@ -209,14 +212,14 @@ void main() {
       manager,
       metadataLoader: (_) async => null,
       settingLoader: (_, _) => null,
-      settingWriter: (_, _, _) async {},
-      actionRunner: (_, _) async => null,
+      settingWriter: (_, _, _, {taskOrigin}) async {},
+      actionRunner: (_, _, {taskOrigin}) async => null,
     );
     await tester.runAsync(() async {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: SourcePluginsPage(manager: gateway),
         ),
@@ -226,7 +229,7 @@ void main() {
     await tester.pumpAndSettle();
     final context = tester.element(find.byType(SourcePluginsPage));
     final s = AppLocalizations.of(context)!;
-    expect(find.text(s.pluginsImportLocal), findsOneWidget);
+    expect(find.byTooltip(s.pluginsImportLocal), findsOneWidget);
     expect(find.text(s.pluginsAddRepository), findsNothing);
     expect(find.text(s.pluginsRemoveRepository), findsNothing);
     await tester.scrollUntilVisible(
@@ -282,7 +285,11 @@ void main() {
     expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
 
     Future<void> openUninstallDialog() async {
-      await tester.ensureVisible(find.text(s.pluginsUninstall));
+      final more = find.byKey(const ValueKey('plugin-actions-widget_example'));
+      await tester.ensureVisible(more);
+      await tester.pumpAndSettle();
+      // 操作面板的结果在点击“更多”的 zone 中继续执行，因此同样放进真实异步。
+      await tester.runAsync(() => tester.tap(more));
       await tester.pumpAndSettle();
       // Keep the confirmation continuation in the real async zone for the
       // manager's file IO after accepting the dialog.

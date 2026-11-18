@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 import '../../services/source/runtime/source_runtime_assembly.dart';
 import '../../services/source/plugins/source_plugin_manager.dart';
 import '../../services/source/source_capabilities.dart';
+import '../../services/source/interaction/source_ui_service.dart';
 
 /// Registers the source runtime and its focused gateway contracts.
 ///
@@ -10,9 +11,17 @@ import '../../services/source/source_capabilities.dart';
 /// application's global service locator and makes the registration graph
 /// reusable in isolated tests.
 void registerSourceServices(GetIt services) {
+  if (!services.isRegistered<SourceUiService>()) {
+    services.registerLazySingleton<SourceUiService>(
+      services.isRegistered<SourceRuntimeAssembly>()
+          ? () => services<SourceRuntimeAssembly>().sourceUiService
+          : SourceUiService.new,
+      dispose: (service) => service.detach(),
+    );
+  }
   if (!services.isRegistered<SourceRuntimeAssembly>()) {
     services.registerLazySingleton<SourceRuntimeAssembly>(
-      SourceRuntimeAssembly.new,
+      () => SourceRuntimeAssembly(sourceUiService: services<SourceUiService>()),
     );
   }
   if (!services.isRegistered<SourceRuntimeRegistry>()) {
@@ -32,9 +41,33 @@ void registerSourceServices(GetIt services) {
   }
 
   _registerGateway<SourceSearchGateway>(services, (a) => a.gateways.search);
+  _registerGateway<SourceTaskControlGateway>(
+    services,
+    (a) => a.gateways.taskControl,
+  );
   _registerGateway<SourceDiscoverGateway>(services, (a) => a.gateways.discover);
   _registerGateway<SourceFavoriteGateway>(services, (a) => a.gateways.favorite);
   _registerGateway<SourceReaderGateway>(services, (a) => a.gateways.reader);
+  _registerGateway<SourceReaderSessionGateway>(
+    services,
+    (a) => a.gateways.readerSessions,
+  );
+  _registerGateway<SourceDownloadSessionGateway>(
+    services,
+    (a) => a.gateways.downloadSessions,
+  );
+  _registerGateway<SourceReadingProgressGateway>(
+    services,
+    (a) => a.gateways.readingProgressUploads,
+  );
+  _registerGateway<SourceCloudReadingGateway>(
+    services,
+    (a) => a.gateways.cloudReading,
+  );
+  _registerGateway<SourceCloudReadingEvents>(
+    services,
+    (a) => a.gateways.cloudReadingEvents,
+  );
   _registerGateway<SourceSettingsGateway>(
     services,
     (a) => a.gateways.settingsGateway,
@@ -59,21 +92,11 @@ void registerSourceServices(GetIt services) {
     services,
     (a) => a.gateways.dailyRecommendation,
   );
-  _registerGateway<SourceSyncGateway>(services, (a) => a.gateways.sync);
   _registerGateway<SourceRuntimeGateway>(
     services,
     (a) => a.gateways.runtimeGateway,
   );
-  _registerGateway<SourceSelectionGateway>(
-    services,
-    (a) => a.gateways.selection,
-  );
   _registerGateway<SourceHomeGateway>(services, (a) => a.gateways.home);
-  _registerGateway<SourceSwitchGateway>(
-    services,
-    (a) => a.gateways.switchGateway,
-  );
-  _registerGateway<SourceAdvancedGateway>(services, (a) => a.gateways.advanced);
   _registerGateway<SourceCategoryGateway>(services, (a) => a.gateways.category);
   _registerGateway<SourceCommentsGateway>(
     services,
@@ -83,11 +106,6 @@ void registerSourceServices(GetIt services) {
     services,
     (a) => a.gateways.comicDetail,
   );
-  _registerGateway<SourceBootstrapGateway>(
-    services,
-    (a) => a.gateways.bootstrap,
-  );
-  _registerGateway<SourceUpdateGateway>(services, (a) => a.gateways.update);
   _registerGateway<SourceScriptGateway>(services, (a) => a.gateways.script);
   _registerGateway<SourceLocalizationGateway>(
     services,

@@ -1,5 +1,5 @@
 import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/features/reader/view/reader_control_surface.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';

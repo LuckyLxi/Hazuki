@@ -1,21 +1,22 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 
-class _MockSourceSwitchGateway extends Mock implements SourceSwitchGateway {}
+class _MockSourceRuntimeGateway extends Mock implements SourceRuntimeGateway {}
 
-Future<_MockSourceSwitchGateway> _openPicker(
+Future<_MockSourceRuntimeGateway> _openPicker(
   WidgetTester tester, {
   required int sourceCount,
   String activeSourceKey = 'source_1',
   double textScale = 1,
 }) async {
-  final gateway = _MockSourceSwitchGateway();
+  final gateway = _MockSourceRuntimeGateway();
   when(() => gateway.activeSourceKey).thenReturn(activeSourceKey);
   when(() => gateway.allowedSources).thenReturn([
     for (var index = 1; index <= sourceCount; index++)
@@ -29,7 +30,7 @@ Future<_MockSourceSwitchGateway> _openPicker(
 
   await tester.pumpWidget(
     MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: hazukiLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(

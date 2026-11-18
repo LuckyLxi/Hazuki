@@ -3,17 +3,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../shared/preferences/hazuki_preference_keys.dart';
-import '../../../shared/preferences/software_update_source.dart';
+import '../../preferences/hazuki_preference_keys.dart';
+import '../../preferences/software_update_source.dart';
 import '../models/source_contract_models.dart';
-import '../runtime/source_script_storage.dart';
 import 'source_plugin_models.dart';
+import 'source_plugin_remote_client.dart';
 import 'source_presentation_metadata.dart';
 import 'source_plugin_script_inspector.dart';
 import 'source_plugin_repository.dart';
@@ -23,7 +22,7 @@ typedef PluginPackageValidator =
 
 /// Owns installed packages. Atomic registry replacement commits complete
 /// generations; interrupted installs never overwrite committed user data.
-class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
+class SourcePluginManager extends ChangeNotifier {
   SourcePluginManager({
     Future<Directory> Function()? directory,
     Future<List<int>> Function(Uri url)? download,
@@ -32,17 +31,22 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     this.validatePackage,
     this.onCatalogChanged,
   }) : _directory = directory ?? _defaultDirectory,
-       _download = download ?? _downloadBytes,
        _loadUpdateSource =
            loadUpdateSource ?? loadSoftwareUpdateSourcePreference,
-       _legacyDirectories = legacyDirectories;
+       _legacyDirectories = legacyDirectories {
+    _remote = SourcePluginRemoteClient(
+      download: download,
+      loadUpdateSource: _loadUpdateSource,
+    );
+  }
 
   final Future<Directory> Function() _directory;
-  final Future<List<int>> Function(Uri url) _download;
+  late final SourcePluginRemoteClient _remote;
   final Future<SoftwareUpdateSource> Function() _loadUpdateSource;
   final List<Directory>? _legacyDirectories;
   PluginPackageValidator? validatePackage;
   Future<void> Function(List<SourceCatalogEntry>)? onCatalogChanged;
+  Future<void> Function(String)? onUninstalled;
   final Map<String, InstalledSourcePlugin> _installed = {};
   final Map<String, String> _installedVersions = {};
   // Pending edits change stored files without publishing a new runtime revision.
@@ -130,9 +134,6 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     _notify();
   }
 
-  Future<List<int>> _downloadPluginIndexBytes(Uri url) async =>
-      _download(resolveSourcePluginIndexUrl(url, await _loadUpdateSource()));
-
   List<SourceCatalogEntry> get catalog => _installed.values
       .where(
         (plugin) =>
@@ -155,31 +156,6 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   static Future<Directory> _defaultDirectory() async => Directory(
     p.join((await getApplicationSupportDirectory()).path, 'source_plugins'),
   );
-
-  static Future<List<int>> _downloadBytes(Uri url) async {
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 20),
-        receiveTimeout: const Duration(seconds: 60),
-      ),
-    );
-    try {
-      final response = await dio.get<ResponseBody>(
-        url.toString(),
-        options: Options(responseType: ResponseType.stream),
-      );
-      final result = <int>[];
-      await for (final bytes in response.data!.stream) {
-        result.addAll(bytes);
-        if (result.length > 8 * 1024 * 1024) {
-          throw const SourcePluginException('plugin_download_too_large');
-        }
-      }
-      return result;
-    } finally {
-      dio.close(force: true);
-    }
-  }
 
   Future<void> initialize() => _initializing ??= _initialize();
 
@@ -353,52 +329,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     String address, {
     String? branch,
     String path = 'plugins.json',
-  }) async {
-    final uri = Uri.tryParse(address.trim());
-    if (uri == null ||
-        uri.scheme != 'https' ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty) {
-      throw const SourcePluginException('plugin_invalid_repository');
-    }
-    if (uri.host != 'github.com') return uri;
-    final parts = uri.pathSegments;
-    if (parts.length < 2 || !isPluginPath(path)) {
-      throw const SourcePluginException('plugin_invalid_repository');
-    }
-    final owner = parts[0];
-    final repo = parts[1].replaceFirst(RegExp(r'\.git$'), '');
-    var selectedBranch = branch;
-    var selectedPath = path;
-    if (parts.length > 3 && (parts[2] == 'tree' || parts[2] == 'blob')) {
-      selectedBranch ??= parts[3];
-      final branchParts = selectedBranch.split('/');
-      final branchLength =
-          parts.skip(3).take(branchParts.length).join('/') == selectedBranch
-          ? branchParts.length
-          : 1;
-      if (parts.length > 3 + branchLength) {
-        selectedPath = parts.skip(3 + branchLength).join('/');
-        if (parts[2] == 'tree') selectedPath = '$selectedPath/$path';
-      }
-    }
-    if (selectedBranch == null || selectedBranch.isEmpty) {
-      final info = jsonDecode(
-        utf8.decode(
-          await _download(Uri.https('api.github.com', '/repos/$owner/$repo')),
-        ),
-      );
-      selectedBranch = (info as Map)['default_branch'] as String?;
-      if (selectedBranch == null || selectedBranch.isEmpty) {
-        throw const SourcePluginException('plugin_repository_not_found');
-      }
-    }
-    return Uri(
-      scheme: 'https',
-      host: 'raw.githubusercontent.com',
-      pathSegments: [owner, repo, selectedBranch, ...selectedPath.split('/')],
-    );
-  }
+  }) => _remote.resolveRepository(address, branch: branch, path: path);
 
   Future<String> addRepository(
     String address, {
@@ -423,7 +354,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   });
 
   Future<List<SourcePluginIndexEntry>> _readIndex(Uri uri) async {
-    final data = await _downloadPluginIndexBytes(uri);
+    final data = await _remote.downloadIndex(uri);
     if (data.length > 2 * 1024 * 1024) {
       throw const SourcePluginException('plugin_index_too_large');
     }
@@ -477,8 +408,9 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
 
   Future<void> installFromRepository(
     String repository,
-    SourcePluginIndexEntry entry,
-  ) async {
+    SourcePluginIndexEntry entry, {
+    SourcePluginDownloadProgress? onProgress,
+  }) async {
     await initialize();
     if (_disposed) throw StateError('plugin_manager_disposed');
     if (!_repositories.contains(repository)) {
@@ -491,7 +423,11 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     }
     // Downloads are independent; catalog changes and registry writes must
     // still commit one at a time.
-    final bytes = await _download(entry.downloadUrl);
+    final bytes = await _remote.downloadPackage(
+      repository,
+      entry.downloadUrl,
+      onProgress: onProgress,
+    );
     await _serialize(() async {
       if (!_repositories.contains(repository)) {
         throw const SourcePluginException('plugin_repository_not_added');
@@ -614,6 +550,36 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     _notify();
   });
 
+  /// 按 [ids] 重排已安装插件。顺序写入注册表，并通过目录变更同步到切换漫画源列表；
+  /// [ids] 必须恰好覆盖当前全部已安装插件。
+  Future<void> reorder(List<String> ids) => _serialize(() async {
+    final previous = Map<String, InstalledSourcePlugin>.of(_installed);
+    if (ids.length != previous.length ||
+        ids.toSet().length != ids.length ||
+        !ids.every(previous.containsKey)) {
+      throw const SourcePluginException('plugin_invalid_order');
+    }
+    if (listEquals(ids, previous.keys.toList())) return;
+    void apply(Iterable<String> order) => _installed
+      ..clear()
+      ..addEntries(order.map((id) => MapEntry(id, previous[id]!)));
+    apply(ids);
+    var committed = false;
+    try {
+      await _commit();
+      committed = true;
+      await onCatalogChanged?.call(catalog);
+    } catch (_) {
+      apply(previous.keys);
+      if (committed) {
+        await _commit();
+        await onCatalogChanged?.call(catalog);
+      }
+      rethrow;
+    }
+    _notify();
+  });
+
   Future<void> uninstall(String id) => _serialize(() async {
     final old = _requirePlugin(id);
     _installed.remove(id);
@@ -623,6 +589,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
       await _commit();
       committed = true;
       await onCatalogChanged?.call(catalog);
+      await onUninstalled?.call(id);
     } catch (_) {
       _installed[id] = old;
       if (oldError != null) _fileErrors[id] = oldError;
@@ -632,7 +599,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
       }
       rethrow;
     }
-    // Retain packages as rollback/edited-script backups and retain all source data.
+    // Retain packages and user data; discard only the browser authorization UA.
     _deferredCatalogEntries.remove(id);
     _runtimeErrors.remove(id);
     _notify();
@@ -662,7 +629,10 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
       (throw SourcePluginException('plugin_not_installed', id));
 
   /// Re-fetch the index even when the installed version is already current.
-  Future<bool> redownload(String id) async {
+  Future<bool> redownload(
+    String id, {
+    SourcePluginDownloadProgress? onProgress,
+  }) async {
     await initialize();
     final repository = _requirePlugin(id).repository;
     if (repository == null) return false;
@@ -673,7 +643,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     if (entry == null) {
       throw SourcePluginException('plugin_not_found_in_index', id);
     }
-    await installFromRepository(repository, entry);
+    await installFromRepository(repository, entry, onProgress: onProgress);
     return true;
   }
 
@@ -794,46 +764,33 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     }
   }
 
-  @override
-  Future<File> sourceFileFor(
-    String sourceKey, {
-    bool ensureDirectory = false,
-  }) async {
+  Future<File> sourceFileFor(String sourceKey) async {
     await initialize();
     final plugin = _requirePlugin(sourceKey);
     return File(p.join(_root!.path, plugin.directory, plugin.manifest.entry));
   }
 
-  @override
-  Future<File> ensureLocalSourceFile(String sourceKey) =>
-      sourceFileFor(sourceKey);
-  @override
   Future<String?> readIfExists(String sourceKey) async =>
       await exists(sourceKey)
       ? (await sourceFileFor(sourceKey)).readAsString()
       : null;
-  @override
   Future<bool> exists(String sourceKey) async {
     await initialize();
     return _installed.containsKey(sourceKey) &&
         await (await sourceFileFor(sourceKey)).exists();
   }
 
-  @override
   Future<void> write(String sourceKey, String content) async {
     final file = await sourceFileFor(sourceKey);
     await file.writeAsString(content, flush: true);
   }
 
-  @override
   Future<void> delete(String sourceKey) => uninstall(sourceKey);
-  @override
   Future<bool> isCustomEdited(String sourceKey) async {
     await initialize();
     return _requirePlugin(sourceKey).customEdited;
   }
 
-  @override
   Future<void> setCustomEdited(String sourceKey, bool value) =>
       _serialize(() async {
         final old = _requirePlugin(sourceKey);

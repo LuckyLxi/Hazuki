@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../l10n/l10n.dart';
 import '../../services/source/account/source_external_authorization.dart';
 import '../../services/source/account/source_login_interaction.dart';
-import 'source_account_dialogs.dart';
+import 'source_account_dialog_support.dart';
 import 'source_login_interaction_text.dart';
 import 'source_login_dialog_controller.dart';
 

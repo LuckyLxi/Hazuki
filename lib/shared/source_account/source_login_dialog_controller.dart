@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/services/source/account/source_login_interaction.dart';
 
 /// Presents login steps inside the existing dialog route.
@@ -77,7 +77,8 @@ class SourceLoginStepContent extends StatelessWidget {
         backgroundColor: backgroundColor,
         title: title,
         content: content,
-        actions: actions,
+        // 无按钮时不保留空操作栏的留白。
+        actions: actions.isEmpty ? null : actions,
       );
     }
     return SizedBox(

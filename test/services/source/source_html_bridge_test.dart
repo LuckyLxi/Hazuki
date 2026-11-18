@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -6,14 +7,11 @@ import 'package:dio/dio.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
-import 'package:hazuki/services/source/runtime/source_catalog_resolver.dart';
 import 'package:hazuki/services/source/runtime/source_js_bridge_cookie_capability.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_loader.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_state_controller.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
-import 'package:hazuki/services/source/runtime/source_text_downloader.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _html = '''
@@ -22,6 +20,7 @@ const _html = '''
 
 Future<SourceRuntimeHandle> _createRuntime(String id) async {
   final handle = SourceRuntimeHandle(
+    sourceUiService: sourceUiService,
     sourceKey: id,
     secureStorage: MemorySourceSecureSessionStorage(),
     ensureInitialized: (_) async {},
@@ -30,6 +29,7 @@ Future<SourceRuntimeHandle> _createRuntime(String id) async {
   addTearDown(handle.requestDispose);
   final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
   final engine = SourceScriptEngine(
+    sourceUiService: sourceUiService,
     timeout: 5000,
     hostPromiseRejectionHandler: (_) {},
   );
@@ -37,13 +37,23 @@ Future<SourceRuntimeHandle> _createRuntime(String id) async {
   engine.setMessageHandler(
     (dynamic request) => bridge.handleJsMessageForHandle(handle, request),
   );
-  engine.setGlobal('fixtureHtml', _html);
-  engine.evaluate(await File('assets/init.js').readAsString());
-  engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
+  await engine.setGlobal('fixtureHtml', _html);
+  await engine.evaluate(await File('assets/init.js').readAsString());
+  await engine.evaluate(
+    await File('assets/hazuki_plugin_sdk.js').readAsString(),
+  );
   return handle;
 }
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -93,9 +103,9 @@ void main() {
     () async {
       final handle = await _createRuntime('html_source');
       final engine = handle.runtime.engine!;
-      final result = engine.evaluate('''
+      final result = await engine.evaluate('''
 (() => {
-  const doc = new HtmlDocument(fixtureHtml);
+  const doc = Hazuki.html.parse(fixtureHtml);
   try {
     const catalog = doc.getElementById('catalog');
     const first = doc.getElementById('comic:1');
@@ -145,20 +155,26 @@ void main() {
   test('parses incomplete HTML and keeps documents independent', () async {
     final handle = await _createRuntime('html_source');
     final engine = handle.runtime.engine!;
-    engine.evaluate('''
+    await engine.evaluate('''
 const firstDoc = Hazuki.html.parse('<p>First &amp; One');
 const secondDoc = Hazuki.html.parse('<p>Second');
 const savedElement = firstDoc.querySelector('p');
 ''');
-    expect(engine.evaluate('savedElement.text'), 'First & One');
-    engine.evaluate('firstDoc.dispose(); firstDoc.dispose();');
+    expect(await engine.evaluate('savedElement.text'), 'First & One');
+    await engine.evaluate('firstDoc.dispose(); firstDoc.dispose();');
     expect(
-      () => engine.evaluate("firstDoc.querySelector('p')"),
+      () async => await engine.evaluate("firstDoc.querySelector('p')"),
       throwsA(anything),
     );
-    expect(() => engine.evaluate('savedElement.text'), throwsA(anything));
-    expect(engine.evaluate("secondDoc.querySelector('p').text"), 'Second');
-    engine.evaluate('secondDoc.dispose();');
+    expect(
+      () async => await engine.evaluate('savedElement.text'),
+      throwsA(anything),
+    );
+    expect(
+      await engine.evaluate("secondDoc.querySelector('p').text"),
+      'Second',
+    );
+    await engine.evaluate('secondDoc.dispose();');
   });
 
   test(
@@ -166,17 +182,17 @@ const savedElement = firstDoc.querySelector('p');
     () async {
       final first = await _createRuntime('first');
       final second = await _createRuntime('second');
-      first.runtime.engine!.evaluate(
+      await first.runtime.engine!.evaluate(
         "const doc = Hazuki.html.parse('<p>First');",
       );
-      second.runtime.engine!.evaluate(
+      await second.runtime.engine!.evaluate(
         "const doc = Hazuki.html.parse('<p>Second');",
       );
-      expect(first.runtime.engine!.evaluate('doc.key'), 0);
-      expect(second.runtime.engine!.evaluate('doc.key'), 0);
-      first.runtime.engine!.evaluate('doc.dispose();');
+      expect(await first.runtime.engine!.evaluate('doc.key'), 0);
+      expect(await second.runtime.engine!.evaluate('doc.key'), 0);
+      await first.runtime.engine!.evaluate('doc.dispose();');
       expect(
-        second.runtime.engine!.evaluate("doc.querySelector('p').text"),
+        await second.runtime.engine!.evaluate("doc.querySelector('p').text"),
         'Second',
       );
       final documents = second.htmlBridge;
@@ -201,6 +217,7 @@ const savedElement = firstDoc.querySelector('p');
         legacyDirectories: [],
       );
       final assembly = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         pluginManager: manager,
         secureSessionStorage: MemorySourceSecureSessionStorage(),
       );
@@ -229,8 +246,6 @@ Hazuki.registerSource({
       final oldDocuments = handle.htmlBridge;
       final loader = SourceRuntimeLoader(
         scriptStore: manager,
-        catalogResolver: _UnusedCatalogResolver(),
-        downloader: const SourceTextDownloader(),
         jsBridge: SourceJsBridgeCookieCapability(activeHandle: () => handle),
         runtimeStateController: SourceRuntimeStateController(),
         bundledInitAssetPath: 'assets/init.js',
@@ -241,11 +256,11 @@ Hazuki.registerSource({
       await expectLater(loader.loadMetadata(handle, file), throwsA(anything));
       expect(handle.runtime.engine, same(oldEngine));
       expect(handle.htmlBridge, same(oldDocuments));
-      expect(oldEngine.evaluate("doc.querySelector('h1').text"), 'First');
+      expect(await oldEngine.evaluate("doc.querySelector('h1').text"), 'First');
       await manager.write('html_source', script('Second'));
       await loader.loadMetadata(handle, file);
       expect(
-        handle.runtime.engine!.evaluate("doc.querySelector('h1').text"),
+        await handle.runtime.engine!.evaluate("doc.querySelector('h1').text"),
         'Second',
       );
       expect(
@@ -282,5 +297,3 @@ class _HtmlFixtures implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
 }
-
-class _UnusedCatalogResolver extends Mock implements SourceCatalogResolver {}

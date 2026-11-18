@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -21,6 +21,7 @@ class SearchEntryPage extends StatefulWidget {
   const SearchEntryPage({
     super.key,
     required this.sourceService,
+    required this.taskControl,
     required this.historyService,
     this.autoFocusOnOpen = false,
     required this.comicDetailPageBuilder,
@@ -29,6 +30,7 @@ class SearchEntryPage extends StatefulWidget {
   });
 
   final SourceSearchGateway sourceService;
+  final SourceTaskControlGateway taskControl;
   final SearchHistoryService historyService;
   final bool autoFocusOnOpen;
   final ComicDetailPageBuilder comicDetailPageBuilder;
@@ -271,7 +273,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     _idExtractController.hide();
     await _focusCoordinator.dismissKeyboard(context, parkOnPage: true);
     _focusCoordinator.syncText(rawKeyword);
-    final keyword = await normalizeSubmittedKeyword(
+    final keyword = normalizeSubmittedKeyword(
       rawKeyword,
       controller: _focusCoordinator.primaryController,
     );
@@ -283,6 +285,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SearchResultsPage(
+          taskControl: widget.taskControl,
           sourceService: widget.sourceService,
           historyService: widget.historyService,
           initialKeyword: keyword,
@@ -493,7 +496,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                       forceFocusedAppearance: _forceInitialFocusedAppearance,
                     ),
                   ),
-                  enableBlur: false,
                   actions: [
                     IconButton(
                       key: const ValueKey('search-settings-button'),

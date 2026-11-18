@@ -19,6 +19,7 @@ class ReaderImagePrefetchWindow {
 class ReaderImagePrefetchScheduler {
   ReaderImagePrefetchScheduler({
     required ReaderImagePipelineState state,
+    this.onWindowChanged,
     required ReaderImagePrefetchWindow Function(int index) windowFor,
     required Future<ImageProvider> Function(String url, {bool priority})
     getImageProvider,
@@ -32,10 +33,16 @@ class ReaderImagePrefetchScheduler {
        _downloadImageBytes = downloadImageBytes,
        _evictImageBytesFromMemory = evictImageBytesFromMemory;
 
+  int? _runningGeneration;
+  // 最近一次完整完成的向前预取窗口（代次 + 窗口范围）。
+  String? _completedAheadKey;
+
   static const int _prefetchAroundCount = 10;
   static const int _prefetchAheadMemoryCount = 6;
   static const int _providerKeepBehindCount = 12;
   static const int _providerKeepAheadCount = 24;
+  final void Function(Set<String> providers, Set<String> bytes)?
+  onWindowChanged;
   final ReaderImagePipelineState _pipelineState;
   final ReaderImagePrefetchWindow Function(int index) _windowFor;
   final Future<ImageProvider> Function(String url, {bool priority})
@@ -50,6 +57,27 @@ class ReaderImagePrefetchScheduler {
   void prefetchAround(int currentSpreadIndex) {
     final window = _windowFor(currentSpreadIndex);
     final anchorImageIndex = window.anchorImageIndex;
+    onWindowChanged?.call(
+      {
+        for (var i = 0; i < window.images.length; i++)
+          if ((i >= anchorImageIndex - _providerKeepBehindCount &&
+                  i <= anchorImageIndex + _providerKeepAheadCount) ||
+              window.visibleImageIndices.contains(i))
+            window.images[i],
+      },
+      {
+        for (
+          var i = anchorImageIndex + window.spreadSize;
+          i < window.images.length &&
+              i <
+                  anchorImageIndex +
+                      window.spreadSize +
+                      _prefetchAheadMemoryCount;
+          i++
+        )
+          if (i >= 0) window.images[i],
+      },
+    );
     var start = anchorImageIndex - _prefetchAroundCount;
     if (start < 0) {
       start = 0;
@@ -90,11 +118,19 @@ class ReaderImagePrefetchScheduler {
   }
 
   void requestPrefetchAhead(int currentIndex) {
-    if (_windowFor(currentIndex).images.isEmpty) {
+    final window = _windowFor(currentIndex);
+    if (window.images.isEmpty) {
+      return;
+    }
+    // 滚动通知按帧触发；位置与窗口都未变化且上次已完成时不重复预取，
+    // 否则每帧都会对同一批页面重新发起图片请求。
+    if (_pipelineState.queuedPrefetchAheadIndex == null &&
+        _runningGeneration != _pipelineState.generation &&
+        _completedAheadKey == _aheadKey(window)) {
       return;
     }
     _pipelineState.queuedPrefetchAheadIndex = currentIndex;
-    if (_pipelineState.prefetchAheadRunning) {
+    if (_runningGeneration == _pipelineState.generation) {
       return;
     }
     unawaited(_drainPrefetchAheadQueue());
@@ -150,9 +186,11 @@ class ReaderImagePrefetchScheduler {
   }
 
   Future<void> _drainPrefetchAheadQueue() async {
-    if (_pipelineState.prefetchAheadRunning) {
+    if (_runningGeneration == _pipelineState.generation) {
       return;
     }
+    final generation = _pipelineState.generation;
+    _runningGeneration = generation;
     _pipelineState.prefetchAheadRunning = true;
     try {
       while (true) {
@@ -161,39 +199,55 @@ class ReaderImagePrefetchScheduler {
         if (currentIndex == null || _windowFor(currentIndex).images.isEmpty) {
           break;
         }
-        await _prefetchAheadFrom(currentIndex);
-        if (_pipelineState.disposed) break;
+        final completed = await _prefetchAheadFrom(currentIndex);
+        if (_pipelineState.disposed ||
+            generation != _pipelineState.generation) {
+          break;
+        }
+        if (completed) {
+          _completedAheadKey = _aheadKey(_windowFor(currentIndex));
+        }
       }
     } finally {
-      _pipelineState.prefetchAheadRunning = false;
-      if (!_pipelineState.disposed &&
-          _pipelineState.queuedPrefetchAheadIndex != null) {
-        unawaited(_drainPrefetchAheadQueue());
+      if (_runningGeneration == generation) {
+        _runningGeneration = null;
+        _pipelineState.prefetchAheadRunning = false;
+        if (!_pipelineState.disposed &&
+            _pipelineState.queuedPrefetchAheadIndex != null) {
+          unawaited(_drainPrefetchAheadQueue());
+        }
       }
     }
   }
 
-  Future<void> _prefetchAheadFrom(int currentSpreadIndex) async {
+  String _aheadKey(ReaderImagePrefetchWindow window) =>
+      '${_pipelineState.generation}:${window.anchorImageIndex}:'
+      '${window.spreadSize}:${window.images.length}';
+
+  /// 返回该窗口是否完整处理（未被更新的位置打断）。
+  Future<bool> _prefetchAheadFrom(int currentSpreadIndex) async {
     final window = _windowFor(currentSpreadIndex);
     if (_pipelineState.disposed || window.images.isEmpty) {
-      return;
+      return false;
     }
     var start = window.anchorImageIndex + window.spreadSize;
     if (start < 0) {
       start = 0;
     }
     if (start >= window.images.length) {
-      return;
+      return true;
     }
     final endExclusive =
         (start + _prefetchAheadMemoryCount) < window.images.length
         ? (start + _prefetchAheadMemoryCount)
         : window.images.length;
     final futures = <Future<void>>[];
+    var interrupted = false;
 
     for (var i = start; i < endExclusive; i++) {
       if (_pipelineState.queuedPrefetchAheadIndex != null &&
           _pipelineState.queuedPrefetchAheadIndex != currentSpreadIndex) {
+        interrupted = true;
         break;
       }
 
@@ -214,5 +268,6 @@ class ReaderImagePrefetchScheduler {
     if (futures.isNotEmpty) {
       await Future.wait(futures);
     }
+    return !interrupted;
   }
 }

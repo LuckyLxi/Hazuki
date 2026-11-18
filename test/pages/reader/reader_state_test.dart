@@ -1,16 +1,16 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/features/reader/state/reader_scroll_state.dart';
 import 'package:hazuki/features/reader/support/reader_input_controller.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/shared/ui_flags.dart';
-import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
 import 'dart:async';
 import 'package:hazuki/app/service_locator.dart';
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
@@ -19,9 +19,11 @@ import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/shared/reading/reader_filter_color.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
+import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
+import 'package:hazuki/features/reader/support/reader_progress_reporter.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
 import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
@@ -31,6 +33,7 @@ import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
 import 'package:hazuki/widgets/reader_settings_content.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
@@ -38,7 +41,21 @@ import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import '../../support/test_service_locator.dart';
 
+class _ImagePipeline extends Mock implements ReaderImagePipelineController {}
+
+class _Actions extends Mock implements ReaderActionsController {}
+
+class _ProgressReporter extends Mock implements ReaderProgressReporter {}
+
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     await ensureTestServiceLocator();
@@ -143,7 +160,6 @@ void main() {
           filterStrength: 0.6,
           pageIndicator: true,
           pinchToZoom: true,
-          longPressToSave: true,
         ),
       );
 
@@ -160,7 +176,6 @@ void main() {
       expect(state.filterStrength, 0.6);
       expect(state.pageIndicator, isTrue);
       expect(state.pinchToZoom, isTrue);
-      expect(state.longPressToSave, isTrue);
       expect(state.readerSpreadSize, 2);
       expect(state.readerSpreadCount, 2);
       expect(state.itemKeys, hasLength(2));
@@ -402,12 +417,11 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       await tester.pumpWidget(const SizedBox.shrink());
       final runtimeState = ReaderRuntimeState();
-      final scrollController = ScrollController();
-      final pageController = PageController();
-      final focusNode = FocusNode();
-      final transformationController = TransformationController();
-      var appliedInitialImages = false;
-      var loadChapterImagesCount = 0;
+      addTearDown(runtimeState.dispose);
+      final imagePipeline = _ImagePipeline();
+      when(
+        () => imagePipeline.loadChapterImages(trigger: any(named: 'trigger')),
+      ).thenAnswer((_) async => true);
       final displayBridge = ReaderDisplayBridge(
         onVolumeButtonPressed: (_) async {},
       );
@@ -417,28 +431,16 @@ void main() {
         readSettings: () => runtimeState.settings,
       );
       final sessionController = ReaderSessionController(
-        viewBindings: ReaderViewBindings(
-          scrollController: scrollController,
-          pageController: pageController,
-          focusNode: focusNode,
-          zoomController: transformationController,
-          onNoImageModeChanged: () {},
-          onScrollPositionChanged: () {},
-          onZoomChanged: () {},
-          noImageMode: hazukiNoImageModeNotifier,
-        ),
+        syncPositionToImageIndex: (index, {required trigger}) {},
+        requestViewportReport: () {},
+        noImageModeEnabled: () => hazukiNoImageModeNotifier.value,
         runtimeState: runtimeState,
         displayBridge: displayBridge,
         displaySession: displaySession,
         settingsStore: const ReaderSettingsStore(),
-        applyInitialImages: (images, {required trigger}) {
-          appliedInitialImages = true;
-          expect(images, isEmpty);
-          expect(trigger, 'offline_constructor_images');
-        },
-        loadChapterImages: ({trigger = 'manual'}) async {
-          loadChapterImagesCount++;
-        },
+        imagePipeline: imagePipeline,
+        actions: _Actions(),
+        progressReporter: _ProgressReporter(),
         isMounted: () => false,
         updateState: (update) => update(),
         logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
@@ -454,10 +456,21 @@ void main() {
 
       sessionController.initialize();
 
-      expect(appliedInitialImages, isTrue);
-      expect(loadChapterImagesCount, 0);
+      verify(
+        () => imagePipeline.applyInitialImages(
+          [],
+          trigger: 'offline_constructor_images',
+        ),
+      ).called(1);
+      verifyNever(
+        () => imagePipeline.loadChapterImages(trigger: any(named: 'trigger')),
+      );
 
       sessionController.dispose();
+      void listener() {}
+
+      runtimeState.pageIndexNotifier.addListener(listener);
+      runtimeState.pageIndexNotifier.removeListener(listener);
     });
 
     testWidgets('turning off immersive mode shows system overlays', (
@@ -512,10 +525,7 @@ void main() {
       });
 
       final runtimeState = ReaderRuntimeState();
-      final scrollController = ScrollController();
-      final pageController = PageController();
-      final focusNode = FocusNode();
-      final transformationController = TransformationController();
+      addTearDown(runtimeState.dispose);
       final displayBridge = ReaderDisplayBridge(
         onVolumeButtonPressed: (_) async {},
       );
@@ -525,22 +535,16 @@ void main() {
         readSettings: () => runtimeState.settings,
       );
       final sessionController = ReaderSessionController(
-        viewBindings: ReaderViewBindings(
-          scrollController: scrollController,
-          pageController: pageController,
-          focusNode: focusNode,
-          zoomController: transformationController,
-          onNoImageModeChanged: () {},
-          onScrollPositionChanged: () {},
-          onZoomChanged: () {},
-          noImageMode: hazukiNoImageModeNotifier,
-        ),
+        syncPositionToImageIndex: (index, {required trigger}) {},
+        requestViewportReport: () {},
+        noImageModeEnabled: () => hazukiNoImageModeNotifier.value,
         runtimeState: runtimeState,
         displayBridge: displayBridge,
         displaySession: displaySession,
         settingsStore: const ReaderSettingsStore(),
-        applyInitialImages: (_, {required trigger}) {},
-        loadChapterImages: ({trigger = 'manual'}) async {},
+        imagePipeline: _ImagePipeline(),
+        actions: _Actions(),
+        progressReporter: _ProgressReporter(),
         isMounted: () => true,
         updateState: (update) => update(),
         logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
@@ -551,6 +555,7 @@ void main() {
         chapterIndex: 0,
         widgetImages: const [],
         readingProgressService: sl<ReadingProgressService>(),
+        offlineMode: true,
       );
 
       sessionController.initialize();
@@ -613,7 +618,6 @@ void main() {
       await controller.updateFilterStrength(1.4);
       await controller.togglePageIndicator(true);
       await controller.togglePinchToZoom(true);
-      await controller.toggleLongPressToSave(true);
 
       final prefs = await SharedPreferences.getInstance();
       expect(
@@ -638,7 +642,6 @@ void main() {
       expect(prefs.getDouble(ReaderSettingsStore.filterStrengthKey), 1.0);
       expect(prefs.getBool(ReaderSettingsStore.pageIndicatorKey), isTrue);
       expect(prefs.getBool(ReaderSettingsStore.pinchToZoomKey), isTrue);
-      expect(prefs.getBool(ReaderSettingsStore.longPressToSaveKey), isTrue);
     });
   });
 
@@ -650,7 +653,7 @@ void main() {
       ReaderMode? selectedMode;
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: hazukiLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: ReaderSettingsContent(
@@ -660,7 +663,6 @@ void main() {
               tapToTurnPage: false,
               volumeButtonTurnPage: false,
               pinchToZoom: false,
-              longPressToSave: false,
               immersiveMode: true,
               keepScreenOn: true,
               pageIndicator: false,
@@ -675,7 +677,6 @@ void main() {
               onTapToTurnPageChanged: (_) {},
               onVolumeButtonTurnPageChanged: (_) {},
               onPinchToZoomChanged: (_) {},
-              onLongPressToSaveChanged: (_) {},
               onImmersiveModeChanged: (_) {},
               onKeepScreenOnChanged: (_) {},
               onPageIndicatorChanged: (_) {},
@@ -689,6 +690,10 @@ void main() {
           ),
         ),
       );
+
+      expect(find.text('Long press to save images'), findsNothing);
+      expect(find.text('Image zoom'), findsOneWidget);
+      expect(find.text('Allow zooming in on images'), findsOneWidget);
 
       final modeSlider = find.byKey(
         const ValueKey<String>('reader-mode-slider'),
@@ -821,12 +826,16 @@ void main() {
         final precacheCompleter = Completer<void>();
         var updateCount = 0;
         late ReaderImagePipelineController controller;
+        addTearDown(runtimeState.dispose);
+        addTearDown(zoomController.dispose);
+        addTearDown(pipelineState.dispose);
 
         await tester.pumpWidget(
           MaterialApp(
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
+                  sourceUiService: sourceUiService,
                   sourceService: sl<SourceReaderGateway>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
@@ -864,6 +873,7 @@ void main() {
           ),
         );
 
+        addTearDown(controller.dispose);
         final providerFuture = controller.getImageProvider('image-url');
         await tester.pump();
 
@@ -895,12 +905,16 @@ void main() {
         final evictedMemoryUrls = <String>[];
         final evictedDiskUrls = <String>[];
         late ReaderImagePipelineController controller;
+        addTearDown(runtimeState.dispose);
+        addTearDown(zoomController.dispose);
+        addTearDown(pipelineState.dispose);
 
         await tester.pumpWidget(
           MaterialApp(
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
+                  sourceUiService: sourceUiService,
                   sourceService: sl<SourceReaderGateway>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
@@ -942,6 +956,7 @@ void main() {
           ),
         );
 
+        addTearDown(controller.dispose);
         await controller.retryImage('retry-url');
         await tester.pump();
 
@@ -966,12 +981,14 @@ void main() {
       late ReaderImagePipelineController controller;
       addTearDown(zoomController.dispose);
       addTearDown(runtimeState.dispose);
+      addTearDown(pipelineState.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
           home: Builder(
             builder: (context) {
               controller = ReaderImagePipelineController(
+                sourceUiService: sourceUiService,
                 sourceService: sl<SourceReaderGateway>(),
                 runtimeState: runtimeState,
                 pipelineState: pipelineState,
@@ -1001,6 +1018,7 @@ void main() {
         ),
       );
 
+      addTearDown(controller.dispose);
       controller.prefetchAround(3);
       await tester.pump();
 
@@ -1019,12 +1037,14 @@ void main() {
       late ReaderImagePipelineController controller;
       addTearDown(zoomController.dispose);
       addTearDown(runtimeState.dispose);
+      addTearDown(pipelineState.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
           home: Builder(
             builder: (context) {
               controller = ReaderImagePipelineController(
+                sourceUiService: sourceUiService,
                 sourceService: sl<SourceReaderGateway>(),
                 runtimeState: runtimeState,
                 pipelineState: pipelineState,
@@ -1049,6 +1069,7 @@ void main() {
         ),
       );
 
+      addTearDown(controller.dispose);
       expect(controller.resolvePlaceholderAspectRatio(1), 0.6);
 
       pipelineState.imageAspectRatioCache['img2'] = 1.1;
@@ -1454,7 +1475,7 @@ void main() {
   });
 
   group('ReaderDiagnosticsController', () {
-    test('creates a snapshot from reader runtime and pipeline state', () {
+    test('builds a log payload from reader runtime and pipeline state', () {
       final runtimeState = ReaderRuntimeState()
         ..applyImages(['a', 'b', 'c'])
         ..setCurrentPageIndex(1)
@@ -1493,21 +1514,22 @@ void main() {
         chapterIndex: 0,
       );
 
-      final snapshot = controller.createSnapshot();
+      final payload = controller.buildLogPayload({'trigger': 'test'});
 
-      expect(snapshot.readerSessionId, 'session-1');
-      expect(snapshot.comicId, 'comic-1');
-      expect(snapshot.currentPageIndex, 1);
-      expect(snapshot.currentPage, 2);
-      expect(snapshot.totalPages, 3);
-      expect(snapshot.controlsVisible, isTrue);
-      expect(snapshot.noImageModeEnabled, isTrue);
-      expect(snapshot.isZoomed, isTrue);
-      expect(snapshot.activeUnscrambleTasks, 2);
-      expect(snapshot.prefetchAheadRunning, isTrue);
-      expect(snapshot.lastObservedListPixels, 12.35);
-      expect(snapshot.listSnapshot, isNull);
-      expect(snapshot.pageControllerPage, isNull);
+      expect(payload['sessionId'], 'session-1');
+      expect(payload['comicId'], 'comic-1');
+      expect(payload['currentPageIndex'], 1);
+      expect(payload['currentPage'], 2);
+      expect(payload['totalPages'], 3);
+      expect(payload['controlsVisible'], isTrue);
+      expect(payload['noImageModeEnabled'], isTrue);
+      expect(payload['isZoomed'], isTrue);
+      expect(payload['activeUnscrambleTasks'], 2);
+      expect(payload['prefetchAheadRunning'], isTrue);
+      expect(payload['lastObservedListPixels'], 12.35);
+      expect(payload.containsKey('listPixels'), isFalse);
+      expect(payload.containsKey('pageControllerPage'), isFalse);
+      expect(payload['trigger'], 'test');
     });
 
     test('normalizes and deduplicates visible page logs', () {

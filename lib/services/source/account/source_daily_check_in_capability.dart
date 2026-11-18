@@ -1,3 +1,6 @@
+import '../runtime/source_operation_context.dart';
+import '../runtime/source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:convert';
 
 import '../models/source_contract_models.dart';
@@ -9,12 +12,14 @@ import 'source_relogin_coordinator.dart';
 class SourceDailyCheckInCapability {
   SourceDailyCheckInCapability({
     required SourceRuntimeHost runtimeHost,
-    required SourceReloginCoordinator reloginCoordinator,
+    required SourceReloginCoordinator<SourceRuntimeReloginContext>
+    reloginCoordinator,
   }) : _runtimeHost = runtimeHost,
        _reloginCoordinator = reloginCoordinator;
 
   final SourceRuntimeHost _runtimeHost;
-  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
 
   HazukiSourceFacade get _facade => _runtimeHost.activeHandle.facade;
 
@@ -39,49 +44,94 @@ class SourceDailyCheckInCapability {
   }
 
   bool get _supports => _runtimeHost.supportsDailyCheckIn;
-  Future<bool> isCompletedToday() async {
+  Future<bool> isCompletedToday({SourceTaskOrigin? taskOrigin}) async {
     if (!_supports) return false;
-    final facade = _facade;
-    await facade.ensureInitialized();
-    if (!facade.isLogged) return false;
-    final result = await facade.js.resolve(
-      facade.js.engine!.evaluate(
-        'this.__hazuki_source.account?.checkInStatus?.()',
-      ),
+    return await runSourceOperation(
+      _runtimeHost,
+      _runtimeHost.activeHandle,
+      'account.checkInStatus',
+      (operationContext) => _isCompletedTodayTask(operationContext),
+      origin: taskOrigin,
+      serviceOwned: false,
     );
-    if (result is bool) return result;
-    return facade.loadSourceData(facade.sourceKey, 'lastCheckInDate') ==
-        dailyCheckInDateTag(DateTime.now());
   }
 
-  Future<DailyCheckInResult> perform() async {
+  Future<bool> _isCompletedTodayTask(
+    SourceOperationContext operationContext,
+  ) async {
+    if (!_supports) return false;
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      if (!facade.isLogged) return false;
+      final result = await operationContext.resolve(
+        facade.js.resolve(
+          operationContext.evaluate(
+            facade.js.engine!,
+            'this.__hazuki_source.account?.checkInStatus?.()',
+          ),
+        ),
+      );
+      if (result is bool) return result;
+      return facade.loadSourceData(facade.sourceKey, 'lastCheckInDate') ==
+          dailyCheckInDateTag(DateTime.now());
+    });
+  }
+
+  Future<DailyCheckInResult> perform({SourceTaskOrigin? taskOrigin}) async {
+    if (!_supports) return const DailyCheckInResult.skipped();
+    return await runSourceOperation(
+      _runtimeHost,
+      _runtimeHost.activeHandle,
+      'account.checkIn',
+      (operationContext) => _performTask(operationContext),
+      origin: taskOrigin,
+      serviceOwned: true,
+    );
+  }
+
+  Future<DailyCheckInResult> _performTask(
+    SourceOperationContext operationContext,
+  ) async {
     if (!_supports || !_facade.isLogged) {
       return const DailyCheckInResult.skipped();
     }
-    final facade = _facade;
-    await facade.ensureInitialized();
-    final result = await _reloginCoordinator.runWithReloginRetry(
-      () => facade.js.resolve(
-        facade.js.engine!.evaluate('this.__hazuki_source.account.checkIn()'),
-      ),
-      context: SourceFacadeReloginContext(facade),
-    );
-    if (result is! Map) throw StateError('plugin_invalid_check_in_result');
-    final message = result['message']?.toString();
-    if (result['status'] == 'skipped') {
-      return const DailyCheckInResult.skipped();
-    }
-    if (result['status'] != 'success' &&
-        result['status'] != 'alreadyCheckedIn') {
-      throw StateError('plugin_invalid_check_in_result');
-    }
-    await facade.saveSourceData(
-      facade.sourceKey,
-      'lastCheckInDate',
-      dailyCheckInDateTag(DateTime.now()),
-    );
-    return result['status'] == 'alreadyCheckedIn'
-        ? DailyCheckInResult.alreadyCheckedIn(message)
-        : DailyCheckInResult.success(message);
+    final facade = operationContext.resource.facade;
+    return facade.handle.runOperation(() async {
+      await facade.ensureInitialized();
+      final result = await _reloginCoordinator.runWithReloginRetry(
+        () async => operationContext.resolve(
+          facade.js.resolve(
+            operationContext.evaluate(
+              facade.js.engine!,
+              'this.__hazuki_source.account.checkIn()',
+            ),
+          ),
+        ),
+        context: SourceRuntimeReloginContext(operationContext.resource),
+        checkActive: operationContext.checkActive,
+      );
+      if (result is! Map) throw StateError('plugin_invalid_check_in_result');
+      final message = result['message']?.toString();
+      if (result['status'] == 'skipped') {
+        return const DailyCheckInResult.skipped();
+      }
+      if (result['status'] != 'success' &&
+          result['status'] != 'alreadyCheckedIn') {
+        throw StateError('plugin_invalid_check_in_result');
+      }
+      if (operationContext.canCache()) {
+        await operationContext.commit(
+          () => facade.saveSourceData(
+            facade.sourceKey,
+            'lastCheckInDate',
+            dailyCheckInDateTag(DateTime.now()),
+          ),
+        );
+      }
+      return result['status'] == 'alreadyCheckedIn'
+          ? DailyCheckInResult.alreadyCheckedIn(message)
+          : DailyCheckInResult.success(message);
+    });
   }
 }

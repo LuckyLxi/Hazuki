@@ -1,6 +1,6 @@
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/shared/source_comic_tags.dart';
+import 'package:hazuki/models/source_comic_tags.dart';
 import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
 /// Resolves missing source-specific tags without owning page or storage state.

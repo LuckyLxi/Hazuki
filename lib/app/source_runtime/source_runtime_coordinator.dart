@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/app/service_locator.dart';
 
 import '../../services/source/source_capabilities.dart';
@@ -50,13 +50,13 @@ class SourceBootstrapState {
 
 class SourceRuntimeCoordinator {
   SourceRuntimeCoordinator({
-    SourceBootstrapGateway? bootstrapGateway,
-    SourceUpdateGateway? updateGateway,
-  }) : _bootstrapGateway = bootstrapGateway ?? sl<SourceBootstrapGateway>(),
-       _updateGateway = updateGateway ?? sl<SourceUpdateGateway>();
+    SourceRuntimeGateway? bootstrapGateway,
+    SourceScriptGateway? updateGateway,
+  }) : _bootstrapGateway = bootstrapGateway ?? sl<SourceRuntimeGateway>(),
+       _updateGateway = updateGateway ?? sl<SourceScriptGateway>();
 
-  final SourceBootstrapGateway _bootstrapGateway;
-  final SourceUpdateGateway _updateGateway;
+  final SourceRuntimeGateway _bootstrapGateway;
+  final SourceScriptGateway _updateGateway;
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _hasConnectivity = true;
@@ -67,7 +67,7 @@ class SourceRuntimeCoordinator {
     required VoidCallback onSourceReady,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    await _bootstrapGateway.prepareSources();
+    await _bootstrapGateway.loadActiveSourcePreference();
     if (!_bootstrapGateway.hasActiveSource) {
       if (isMounted()) {
         onBootstrapStateChanged(const SourceBootstrapState.idle());
@@ -75,7 +75,7 @@ class SourceRuntimeCoordinator {
       }
       return;
     }
-    final hasLocalSource = await _bootstrapGateway.hasLocalJmSourceFile();
+    final hasLocalSource = await _bootstrapGateway.hasLocalActiveSourceFile();
     if (!isMounted()) {
       return;
     }

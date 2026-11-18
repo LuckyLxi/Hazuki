@@ -1,3 +1,5 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +10,7 @@ import 'package:hazuki/features/search/support/search_contracts.dart';
 import 'package:hazuki/features/search/support/search_submission_coordinator.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/interaction/source_ui_scope.dart';
 
 class _Source extends Mock implements SourceSearchGateway {}
 
@@ -27,7 +30,15 @@ const _details = ComicDetailsData(
   sourceKey: 'jm',
 );
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late Completer<ComicDetailsData> details;
   late SearchSubmissionCoordinator coordinator;
   late SearchResultsController results;
@@ -55,6 +66,8 @@ void main() {
     events = [];
     lookups = [];
     results = SearchResultsController(
+      sourceUiService: sourceUiService,
+      taskControl: FakeSourceTaskControl(),
       initialOrder: 'mr',
       sourceService: source,
       comicDetailsLoader: (id, {required sourceKey}) {
@@ -77,7 +90,11 @@ void main() {
             );
           },
     );
-    aggregate = AggregateSearchResultsController(sourceService: source);
+    aggregate = AggregateSearchResultsController(
+      sourceUiService: sourceUiService,
+      taskControl: FakeSourceTaskControl(),
+      sourceService: source,
+    );
     addTearDown(results.dispose);
     addTearDown(aggregate.dispose);
     coordinator = SearchSubmissionCoordinator(
@@ -126,6 +143,17 @@ void main() {
   );
 
   test(
+    'closing an ID interaction ends loading without keyword fallback',
+    () async {
+      final pending = submit('12345');
+      details.completeError(const SourceUiCancelled('user'));
+      await pending;
+      expect(events, isEmpty);
+      expect(results.searchLoading, isFalse);
+    },
+  );
+
+  test(
     'new submission prevents old direct lookup from navigating or adding history',
     () async {
       final pending = submit('12345');
@@ -147,6 +175,31 @@ void main() {
     expect(results.searchKeyword, isEmpty);
     expect(results.searchLoading, isFalse);
   });
+
+  testWidgets(
+    'direct ID work timeout falls back once and ignores late details',
+    (tester) async {
+      final pending = submit('12345');
+      await tester.pump(searchLoadTimeout);
+      await pending;
+      expect(events, ['history:12345', 'search:12345']);
+      details.complete(_details);
+      await tester.pump();
+      expect(events, ['history:12345', 'search:12345']);
+      expect(results.searchComics.single.id, '12345');
+    },
+  );
+
+  test(
+    'explicit direct ID cancellation does not trigger fallback or navigation',
+    () async {
+      final pending = submit('12345');
+      results.stopPending(SourceTaskStopReason.user);
+      await pending;
+      details.complete(_details);
+      expect(events, isEmpty);
+    },
+  );
 
   test(
     'single-source ID lookup accepts an arbitrary source identity',
@@ -176,6 +229,7 @@ void main() {
     () async {
       aggregate.sections.add(
         AggregateSearchSectionState(
+          sourceUiService: sourceUiService,
           source: const SourceCatalogEntry(
             key: 'books',
             name: 'Books',
@@ -208,6 +262,7 @@ void main() {
       for (final key in ['jm', 'books']) {
         aggregate.sections.add(
           AggregateSearchSectionState(
+            sourceUiService: sourceUiService,
             source: SourceCatalogEntry(
               key: key,
               name: key,
@@ -223,6 +278,7 @@ void main() {
         );
         when(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: '12345',
             page: 1,
             order: '',
@@ -243,6 +299,7 @@ void main() {
       for (final key in ['jm', 'books']) {
         verify(
           () => source.searchComics(
+            taskOrigin: any<SourceTaskOrigin?>(named: 'taskOrigin'),
             keyword: '12345',
             page: 1,
             order: '',

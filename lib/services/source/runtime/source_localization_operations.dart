@@ -1,15 +1,17 @@
+import '../gateways/source_runtime_gateways.dart';
 import '../plugins/source_plugin_localization.dart';
 import 'source_runtime_host.dart';
 
 /// Source-provided text localization and active-source cache invalidation.
-class SourceLocalizationOperations {
+class SourceLocalizationOperations implements SourceLocalizationGateway {
   const SourceLocalizationOperations(this._runtimeHost);
 
   final SourceRuntimeHost _runtimeHost;
 
+  @override
   void clearLocalizedSourceTextCaches() {
     for (final handle in _runtimeHost.existingHandles) {
-      handle.exploreCache.clearMemory();
+      handle.cache.clearExploreSections();
       handle.facade.cache.clearCategoryTagGroupsMemoryCache();
     }
   }
@@ -36,7 +38,9 @@ class SourceLocalizationOperations {
       return localizeSourcePluginText(
         text,
         sourcePluginLocaleTag(handle.session.prefs),
-        translation: engine.evaluate('this.__hazuki_source.translation ?? {}'),
+        translation: engine.cachedValue(
+          'this.__hazuki_source.translation ?? {}',
+        ),
       );
     } catch (_) {
       return text;

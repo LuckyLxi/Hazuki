@@ -1,3 +1,5 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -21,7 +23,15 @@ ExploreComic _comic(String id) =>
 
 Future<void> _settle() => Future<void>.delayed(Duration.zero);
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   late _Source source;
   late _Local local;
   late _Preferences preferences;
@@ -29,6 +39,7 @@ void main() {
   late FavoritePageController controller;
   late VoidCallback sourceChanged;
   late String activeSource;
+  Object? favoriteMenu;
 
   setUp(() {
     source = _Source();
@@ -36,6 +47,7 @@ void main() {
     preferences = _Preferences();
     cloudChanges = StreamController<void>.broadcast();
     activeSource = 'jm';
+    favoriteMenu = null;
     when(() => source.activeSourceKey).thenAnswer((_) => activeSource);
     when(
       () => source.cloudFavoritesChangedStream,
@@ -49,7 +61,9 @@ void main() {
     when(() => source.supportFavoriteSortOrder).thenReturn(true);
     when(() => source.supportFavoriteFolderLoad).thenReturn(true);
     when(() => source.ensureInitialized()).thenAnswer((_) async {});
-    when(() => source.loadFavoriteFolders()).thenAnswer(
+    when(
+      () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer(
       (_) async => FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
         folders: const [
@@ -65,6 +79,7 @@ void main() {
       () => source.loadFavoriteComics(
         page: any(named: 'page'),
         folderId: any(named: 'folderId'),
+        taskOrigin: any(named: 'taskOrigin'),
       ),
     ).thenAnswer(
       (_) async => FavoriteComicsResult.success([_comic('current')]),
@@ -117,14 +132,17 @@ void main() {
       ),
     ).thenAnswer((_) async => FavoriteComicsResult.success([_comic('local')]));
     controller = FavoritePageController(
+      sourceUiService: sourceUiService,
       presentationFor: (key) => {
         'refreshCloudFavorites': true,
         'favoriteDefaultOrder': 'mr',
+        'favoriteMenu': favoriteMenu,
         'localFavoriteOrders': {'mr': 'savedNewest', 'mp': 'updatedNewest'},
       },
       sourceService: source,
       localFavoritesRepository: local,
       localFavoritesPreferences: preferences,
+      taskControl: FakeSourceTaskControl(),
     );
   });
 
@@ -132,6 +150,37 @@ void main() {
     controller.dispose();
     await cloudChanges.close();
   });
+
+  test(
+    'app bar state follows menu declaration changes and source identity',
+    () {
+      when(() => source.supportFavoriteFolderAdd).thenReturn(false);
+      favoriteMenu = [
+        {
+          'id': 'saved',
+          'title': 'Saved',
+          'children': [
+            {'order': 'mr'},
+            {'order': 'mp'},
+          ],
+        },
+      ];
+      final first = controller.appBarActionsState;
+      expect(first.sourceKey, 'jm');
+      expect(first.menu.single.children.map((e) => e.order), ['mr', 'mp']);
+      expect(controller.appBarActionsState, first);
+      expect(controller.appBarActionsState.hashCode, first.hashCode);
+      favoriteMenu = [
+        {'action': 'export', 'title': 'Export'},
+      ];
+      expect(controller.appBarActionsState, isNot(first));
+      expect(controller.appBarActionsState.menu.single.action, 'export');
+      activeSource = 'picacg';
+      expect(controller.appBarActionsState.sourceKey, 'picacg');
+      favoriteMenu = [];
+      expect(controller.appBarActionsState.menu, isEmpty);
+    },
+  );
 
   test(
     'cloud favorites require a source before login or initialization',
@@ -175,7 +224,9 @@ void main() {
   test(
     'initial load replaces the saved all ID with the plugin shelf ID',
     () async {
-      when(source.loadFavoriteFolders).thenAnswer(
+      when(
+        () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+      ).thenAnswer(
         (_) async => const FavoriteFoldersResult.success(
           folders: [FavoriteFolder(id: 'shelf', name: '書架')],
           favoritedFolderIds: {},
@@ -202,9 +253,19 @@ void main() {
         ),
       ).called(1);
       verify(
-        () => source.loadFavoriteComics(page: 1, folderId: 'shelf'),
+        () => source.loadFavoriteComics(
+          page: 1,
+          folderId: 'shelf',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).called(1);
-      verifyNever(() => source.loadFavoriteComics(page: 1, folderId: '0'));
+      verifyNever(
+        () => source.loadFavoriteComics(
+          page: 1,
+          folderId: '0',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
+      );
     },
   );
 
@@ -223,7 +284,10 @@ void main() {
             sourceKey: 'jm',
           ),
         ).thenAnswer((_) async => 'deleted');
-        when(source.loadFavoriteFolders).thenAnswer(
+        when(
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+        ).thenAnswer(
           (_) async => FavoriteFoldersResult.success(
             folders: [deletedFolder, ...remainingFolders],
             favoritedFolderIds: const {},
@@ -240,13 +304,17 @@ void main() {
           () => source.loadFavoriteComics(
             page: any(named: 'page'),
             folderId: any(named: 'folderId'),
+            taskOrigin: any(named: 'taskOrigin'),
           ),
         ).thenAnswer((call) async {
           final id = call.namedArguments[#folderId] as String;
           return FavoriteComicsResult.success([_comic(id)]);
         });
         when(
-          () => source.deleteFavoriteFolder('deleted'),
+          () => source.deleteFavoriteFolder(
+            'deleted',
+            taskOrigin: any(named: 'taskOrigin'),
+          ),
         ).thenAnswer((_) async {});
         await controller.loadInitial(timeoutMessage: 'timeout');
         expect(controller.selectedFolderId, 'deleted');
@@ -254,7 +322,8 @@ void main() {
 
         final pendingFolders = Completer<FavoriteFoldersResult>();
         when(
-          source.loadFavoriteFolders,
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
         ).thenAnswer((_) => pendingFolders.future);
 
         expect(
@@ -265,7 +334,11 @@ void main() {
         expect(controller.selectedFolderId, targetId);
         expect(controller.comics.single.id, targetId);
         verify(
-          () => source.loadFavoriteComics(page: 1, folderId: targetId),
+          () => source.loadFavoriteComics(
+            page: 1,
+            folderId: targetId,
+            taskOrigin: any(named: 'taskOrigin'),
+          ),
         ).called(1);
         verify(
           () => preferences.saveSelectedFavoriteFolderId(
@@ -317,12 +390,15 @@ void main() {
             ),
           ).thenAnswer((_) async {});
           when(
-            source.loadFavoriteFolders,
+            () => source.loadFavoriteFolders(
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
           ).thenAnswer((_) async => originalFolders);
           when(
             () => source.loadFavoriteComics(
               page: any(named: 'page'),
               folderId: any(named: 'folderId'),
+              taskOrigin: any(named: 'taskOrigin'),
             ),
           ).thenAnswer((call) async {
             final id = call.namedArguments[#folderId] as String;
@@ -332,7 +408,10 @@ void main() {
 
           final pendingDelete = Completer<void>();
           when(
-            () => source.deleteFavoriteFolder('deleted'),
+            () => source.deleteFavoriteFolder(
+              'deleted',
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
           ).thenAnswer((_) => pendingDelete.future);
           final deletion = controller.deleteCurrentFolder(
             timeoutMessage: 'timeout',
@@ -342,11 +421,17 @@ void main() {
           final pendingComics = Completer<FavoriteComicsResult>();
           if (refreshStage == 'folders') {
             when(
-              source.loadFavoriteFolders,
+              () => source.loadFavoriteFolders(
+                taskOrigin: any(named: 'taskOrigin'),
+              ),
             ).thenAnswer((_) => pendingFolders.future);
           } else if (refreshStage == 'comics') {
             when(
-              () => source.loadFavoriteComics(page: 1, folderId: 'deleted'),
+              () => source.loadFavoriteComics(
+                page: 1,
+                folderId: 'deleted',
+                taskOrigin: any(named: 'taskOrigin'),
+              ),
             ).thenAnswer((_) => pendingComics.future);
           }
           final refresh = controller.refresh(timeoutMessage: 'timeout');
@@ -357,7 +442,11 @@ void main() {
             expect(controller.refreshing, isTrue);
           }
 
-          when(source.loadFavoriteFolders).thenAnswer(
+          when(
+            () => source.loadFavoriteFolders(
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
+          ).thenAnswer(
             (_) async => FavoriteFoldersResult.success(
               folders: [remainingFolder],
               favoritedFolderIds: const {},
@@ -387,7 +476,11 @@ void main() {
           await refresh;
           expectRemainingFolder();
           verify(
-            () => source.loadFavoriteComics(page: 1, folderId: remainingId),
+            () => source.loadFavoriteComics(
+              page: 1,
+              folderId: remainingId,
+              taskOrigin: any(named: 'taskOrigin'),
+            ),
           ).called(1);
           verify(
             () => preferences.saveSelectedFavoriteFolderId(
@@ -409,22 +502,19 @@ void main() {
       () => local.loadFavoriteFolders(sourceKey: 'jm'),
     ).thenAnswer((_) => pending.future);
     when(
-      () => preferences.saveSortOrder('updatedNewest'),
+      () => preferences.saveSortOrder('readNewest'),
     ).thenAnswer((_) async {});
     when(
       () => local.loadFavoriteComics(
         page: 1,
         folderId: 'local',
-        sortOrder: 'updatedNewest',
+        sortOrder: 'readNewest',
         sourceKey: 'jm',
       ),
     ).thenAnswer((_) async => FavoriteComicsResult.success([_comic('sorted')]));
 
     final reload = controller.reloadFolders();
-    await controller.changeSortOrder(
-      'updatedNewest',
-      timeoutMessage: 'timeout',
-    );
+    await controller.changeSortOrder('readNewest', timeoutMessage: 'timeout');
     pending.complete(
       FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
@@ -463,7 +553,7 @@ void main() {
         () => local.loadFavoriteComics(
           page: 1,
           folderId: 'local',
-          sortOrder: 'updatedNewest',
+          sortOrder: 'readNewest',
           sourceKey: any(named: 'sourceKey'),
         ),
       ).thenAnswer(
@@ -471,20 +561,20 @@ void main() {
       );
       await controller.loadInitial(timeoutMessage: 'timeout');
       await controller.toggleMode(timeoutMessage: 'timeout');
-      expect(savedOrder, 'updatedNewest');
-      expect(controller.appBarActionsState.currentSortOrder, 'updatedNewest');
+      expect(savedOrder, 'readNewest');
+      expect(controller.appBarActionsState.currentSortOrder, 'readNewest');
       activeSource = 'picacg';
       sourceChanged();
       await _settle();
       expect(controller.mode, FavoritePageMode.local);
-      expect(controller.appBarActionsState.currentSortOrder, 'updatedNewest');
+      expect(controller.appBarActionsState.currentSortOrder, 'readNewest');
       expect(controller.appBarActionsState.sortOrders, [
         'savedNewest',
         'savedOldest',
-        'updatedNewest',
+        'readNewest',
       ]);
       expect(controller.comics.single.id, 'updated');
-      verify(() => preferences.saveSortOrder('updatedNewest')).called(1);
+      verify(() => preferences.saveSortOrder('readNewest')).called(1);
     },
   );
 
@@ -543,12 +633,90 @@ void main() {
     },
   );
 
+  for (final initialOrder in ['mr', 'mr_reverse']) {
+    test(
+      'changing $initialOrder direction clears data and restarts paging',
+      () async {
+        final nextOrder = initialOrder == 'mr' ? 'mr_reverse' : 'mr';
+        var order = initialOrder;
+        final requests = <(String, int)>[];
+        final oldPage = Completer<FavoriteComicsResult>();
+        final newPage = Completer<FavoriteComicsResult>();
+        when(() => source.favoriteSortOrders).thenReturn(['mr', 'mr_reverse']);
+        when(() => source.favoriteSortOrder).thenAnswer((_) => order);
+        when(() => source.setFavoriteSortOrder(nextOrder)).thenAnswer((
+          _,
+        ) async {
+          order = nextOrder;
+        });
+        when(
+          () => source.loadFavoriteComics(
+            page: any(named: 'page'),
+            folderId: any(named: 'folderId'),
+            taskOrigin: any(named: 'taskOrigin'),
+          ),
+        ).thenAnswer((call) async {
+          final page = call.namedArguments[#page] as int;
+          requests.add((order, page));
+          if (order == initialOrder && page == 3) return oldPage.future;
+          if (order == nextOrder && page == 1) return newPage.future;
+          return FavoriteComicsResult.success([
+            _comic('$order-$page'),
+          ], maxPage: 4);
+        });
+        await controller.loadInitial(timeoutMessage: 'timeout');
+        await controller.loadMore(timeoutMessage: 'timeout');
+        expect(controller.comics.map((c) => c.id), [
+          '$initialOrder-1',
+          '$initialOrder-2',
+        ]);
+        final pendingOld = controller.loadMore(timeoutMessage: 'timeout');
+        final change = controller.changeSortOrder(
+          nextOrder,
+          timeoutMessage: 'timeout',
+        );
+        await _settle();
+        expect(controller.comics, isEmpty);
+        expect(controller.initialLoading, isTrue);
+        expect(controller.loadingMore, isFalse);
+        expect(requests.last, (nextOrder, 1));
+
+        oldPage.complete(
+          FavoriteComicsResult.success([_comic('stale')], maxPage: 4),
+        );
+        await pendingOld;
+        expect(controller.comics, isEmpty);
+        newPage.complete(
+          FavoriteComicsResult.success([_comic('$nextOrder-1')], maxPage: 4),
+        );
+        expect(await change, isNull);
+        expect(controller.comics.single.id, '$nextOrder-1');
+        await controller.loadMore(timeoutMessage: 'timeout');
+        expect(requests, [
+          (initialOrder, 1),
+          (initialOrder, 2),
+          (initialOrder, 3),
+          (nextOrder, 1),
+          (nextOrder, 2),
+        ]);
+        expect(controller.comics.map((c) => c.id), [
+          '$nextOrder-1',
+          '$nextOrder-2',
+        ]);
+      },
+    );
+  }
+
   test('older folder refresh cannot overwrite the latest folders', () async {
     await controller.loadInitial(timeoutMessage: 'timeout');
     final pending = Completer<FavoriteFoldersResult>();
-    when(() => source.loadFavoriteFolders()).thenAnswer((_) => pending.future);
+    when(
+      () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer((_) => pending.future);
     final oldReload = controller.reloadFolders();
-    when(() => source.loadFavoriteFolders()).thenAnswer(
+    when(
+      () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+    ).thenAnswer(
       (_) async => FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
         folders: const [
@@ -583,7 +751,7 @@ void main() {
       await controller.loadInitial(timeoutMessage: 'timeout');
       final pending = Completer<FavoriteFoldersResult>();
       when(
-        () => source.loadFavoriteFolders(),
+        () => source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
       ).thenAnswer((_) => pending.future);
       final reload = controller.reloadFolders();
       if (transition == 'logout') {
@@ -592,7 +760,10 @@ void main() {
         await controller.toggleMode(timeoutMessage: 'timeout');
       } else {
         activeSource = 'picacg';
-        when(() => source.loadFavoriteFolders()).thenAnswer(
+        when(
+          () =>
+              source.loadFavoriteFolders(taskOrigin: any(named: 'taskOrigin')),
+        ).thenAnswer(
           (_) async => FavoriteFoldersResult.success(
             favoritedFolderIds: const {},
             folders: const [
@@ -631,7 +802,11 @@ void main() {
     () async {
       final pending = Completer<FavoriteComicsResult>();
       when(
-        () => source.loadFavoriteComics(page: 1, folderId: '0'),
+        () => source.loadFavoriteComics(
+          page: 1,
+          folderId: '0',
+          taskOrigin: any(named: 'taskOrigin'),
+        ),
       ).thenAnswer((_) => pending.future);
       final initial = controller.loadInitial(timeoutMessage: 'timeout');
       await _settle();
@@ -647,7 +822,11 @@ void main() {
   test('logout invalidates a pending first-page result', () async {
     final pending = Completer<FavoriteComicsResult>();
     when(
-      () => source.loadFavoriteComics(page: 1, folderId: '0'),
+      () => source.loadFavoriteComics(
+        page: 1,
+        folderId: '0',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     ).thenAnswer((_) => pending.future);
     final initial = controller.loadInitial(timeoutMessage: 'timeout');
     await _settle();
@@ -676,7 +855,11 @@ void main() {
     expect(controller.selectedFolderId, '0');
     expect(controller.comics.single.id, 'current');
     verifyNever(
-      () => source.loadFavoriteComics(page: 1, folderId: 'old-source-folder'),
+      () => source.loadFavoriteComics(
+        page: 1,
+        folderId: 'old-source-folder',
+        taskOrigin: any(named: 'taskOrigin'),
+      ),
     );
   });
 

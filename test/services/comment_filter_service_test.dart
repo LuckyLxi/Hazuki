@@ -1,6 +1,8 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import '../support/fake_source_task_control.dart';
 import '../support/source_catalog_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -10,7 +12,15 @@ import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('CommentFilterService.isFiltered', () {
@@ -250,17 +260,21 @@ void main() {
         mode: CommentFilterMode.collapse,
       );
       final controller = CommentsPageController(
+        sourceUiService: sourceUiService,
         comicId: 'comic',
         sourceService: (() {
           final source = SourceRuntimeAssembly(
+            sourceUiService: sourceUiService,
             initialCatalog: hazukiAllowedSourceCatalog,
           );
           return HazukiSourceCommentsAdapter(
             comments: source.testing.comments,
+            account: source.testing.account,
             debug: source.testing.debug,
           );
         })(),
         filterService: service,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(controller.dispose);
       const comments = [
@@ -291,17 +305,21 @@ void main() {
         mode: CommentFilterMode.hide,
       );
       final controller = CommentsPageController(
+        sourceUiService: sourceUiService,
         comicId: 'comic',
         sourceService: (() {
           final source = SourceRuntimeAssembly(
+            sourceUiService: sourceUiService,
             initialCatalog: hazukiAllowedSourceCatalog,
           );
           return HazukiSourceCommentsAdapter(
             comments: source.testing.comments,
+            account: source.testing.account,
             debug: source.testing.debug,
           );
         })(),
         filterService: service,
+        taskControl: FakeSourceTaskControl(),
       );
       addTearDown(controller.dispose);
       const comments = [

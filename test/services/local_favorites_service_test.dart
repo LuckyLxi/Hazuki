@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../support/test_service_locator.dart';
 
@@ -250,66 +251,52 @@ void main() {
       expect(await service.loadSortOrder(), 'da');
     });
 
-    test(
-      'sorts local favorites by the generic updatedNewest strategy',
-      () async {
-        await service.addFavoriteFolder('Copy', sourceKey: 'copy_manga');
-        final folder = (await service.loadFavoriteFolders(
-          sourceKey: 'copy_manga',
-        )).folders.single;
+    test('sorts local favorites by the generic readNewest strategy', () async {
+      await service.addFavoriteFolder('Copy', sourceKey: 'copy_manga');
+      final folder = (await service.loadFavoriteFolders(
+        sourceKey: 'copy_manga',
+      )).folders.single;
 
+      for (final id in ['read-old', 'read-new', 'unread']) {
         await service.toggleFavorite(
-          details: const ComicDetailsData(
-            id: 'newer',
+          details: ComicDetailsData(
+            id: id,
             sourceKey: 'copy_manga',
-            title: 'Newer',
+            title: id,
             subTitle: '',
             cover: '',
             description: '',
-            updateTime: '2026-05-16',
+            updateTime: '',
             likesCount: '',
-            chapters: {},
-            tags: {},
-            recommend: [],
+            chapters: const {},
+            tags: const {},
+            recommend: const [],
             isFavorite: false,
             subId: '',
           ),
           isAdding: true,
           folderId: folder.id,
         );
-        await service.toggleFavorite(
-          details: const ComicDetailsData(
-            id: 'older',
-            sourceKey: 'copy_manga',
-            title: 'Older',
-            subTitle: '',
-            cover: '',
-            description: '',
-            updateTime: '2026-05-15',
-            likesCount: '',
-            chapters: {},
-            tags: {},
-            recommend: [],
-            isFavorite: false,
-            subId: '',
-          ),
-          isAdding: true,
-          folderId: folder.id,
-        );
+      }
+      await sl<ReadingProgressService>().mergeJsonList([
+        {'comicId': 'read-old', 'sourceKey': 'copy_manga', 'timestamp': 1000},
+        {'comicId': 'read-new', 'sourceKey': 'copy_manga', 'timestamp': 2000},
+      ]);
 
-        final comics = await service.loadFavoriteComics(
-          page: 1,
-          folderId: folder.id,
-          sortOrder: 'updatedNewest',
-          sourceKey: 'copy_manga',
-        );
+      final comics = await service.loadFavoriteComics(
+        page: 1,
+        folderId: folder.id,
+        sortOrder: 'readNewest',
+        sourceKey: 'copy_manga',
+      );
 
-        expect(comics.comics.map((comic) => comic.id), <String>[
-          'newer',
-          'older',
-        ]);
-      },
-    );
+      // 未读条目排在已读之后，即使它收藏得最晚。
+      expect(comics.comics.map((comic) => comic.id), <String>[
+        'read-new',
+        'read-old',
+        'unread',
+      ]);
+    });
   });
 
   group('LocalFavoritesService source-scoped entries', () {

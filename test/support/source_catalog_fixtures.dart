@@ -5,9 +5,6 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
     key: "jm",
     name: "JMComic",
     fileName: "jm.js",
-    directUrls: [
-      "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js",
-    ],
     presentation: {
       "showComments": true,
       "directComicIdRules": {
@@ -48,9 +45,6 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
     key: "copy_manga",
     name: "CopyManga",
     fileName: "copy_manga.js",
-    directUrls: [
-      "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/copy_manga.js",
-    ],
     presentation: {
       "showComments": true,
       "legacyRanking": true,
@@ -97,9 +91,6 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
     key: "picacg",
     name: "Picacg",
     fileName: "picacg.js",
-    directUrls: [
-      "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/picacg.js",
-    ],
     presentation: {
       "showComments": true,
       "dailyCheckIn": true,

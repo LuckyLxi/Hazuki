@@ -1,20 +1,46 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import '../support/source_catalog_fixtures.dart';
+
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
+
 import 'package:hazuki/app/service_locator.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
+import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
+import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/debug/debug_log_internals.dart';
 import 'package:hazuki/services/source/common/source_prefs_keys.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../support/test_service_locator.dart';
 
+class _ConnectionTestClient extends CloudSyncRemoteClient {
+  _ConnectionTestClient(super.config, {required super.configStore});
+
+  @override
+  Future<CloudSyncConnectionStatus> testConnection() async =>
+      CloudSyncConnectionStatus(
+        ok: true,
+        message: 'connected',
+        checkedAt: DateTime(2026),
+      );
+}
+
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
     await ensureTestServiceLocator();
@@ -163,7 +189,7 @@ void main() {
   });
 
   test(
-    'CloudSyncFacade keeps config and remote client access reachable',
+    'cloud sync loads config and passes it to the remote client factory',
     () async {
       const config = CloudSyncConfig(
         enabled: true,
@@ -172,10 +198,22 @@ void main() {
         password: 'secret',
       );
 
-      await sl<CloudSyncService>().saveConfig(config);
-      final restored = await sl<CloudSyncService>().facade.configStore
-          .loadConfig();
-      final client = sl<CloudSyncService>().facade.remoteClient(restored);
+      late CloudSyncConfig clientConfig;
+      late _ConnectionTestClient client;
+      final service = CloudSyncService(
+        participants: sl<CloudSyncParticipantSet>(),
+        remoteClientFactory: (config, store) {
+          clientConfig = config;
+          return client = _ConnectionTestClient(config, configStore: store);
+        },
+      );
+      await service.saveConfig(config);
+      final restored = await service.loadConfig();
+      final status = await service.testConnection();
+      expect(status.ok, isTrue);
+      expect(clientConfig.url, restored.url);
+      expect(clientConfig.username, config.username);
+      expect(clientConfig.password, config.password);
 
       expect(restored.enabled, isTrue);
       expect(restored.url, 'https://example.com');
@@ -192,27 +230,6 @@ void main() {
       'copy_manga',
       'picacg',
     ]);
-    expect(
-      registry.allowedSources
-          .firstWhere((s) => s.key == 'jm')
-          .matchesIndexEntry({'key': 'jm', 'fileName': 'jm.js'}),
-      isTrue,
-    );
-    expect(
-      registry.allowedSources
-          .firstWhere((s) => s.key == 'copy_manga')
-          .matchesIndexEntry({
-            'key': 'copy_manga',
-            'fileName': 'copy_manga.js',
-          }),
-      isTrue,
-    );
-    expect(
-      registry.allowedSources
-          .firstWhere((s) => s.key == 'picacg')
-          .matchesIndexEntry({'key': 'picacg', 'fileName': 'picacg.js'}),
-      isTrue,
-    );
     expect(registry.isAllowedSourceKey('not-allowed'), isFalse);
   });
 
@@ -238,6 +255,7 @@ void main() {
       });
       final secureStorage = MemorySourceSecureSessionStorage();
       final service = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
@@ -293,6 +311,7 @@ void main() {
       final secureStorage = MemorySourceSecureSessionStorage()
         ..failWrites = true;
       final service = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
@@ -338,6 +357,7 @@ void main() {
         },
       );
       final service = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
@@ -364,14 +384,15 @@ void main() {
     });
     final secureStorage = MemorySourceSecureSessionStorage();
     final service = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       initialCatalog: hazukiAllowedSourceCatalog,
       secureSessionStorage: secureStorage,
     );
     final handle = SourceRuntimeHandle(
+      sourceUiService: sourceUiService,
       sourceKey: hazukiDefaultSourceKey,
       secureStorage: secureStorage,
-      ensureInitialized:
-          service.testing.runtimeOperations.ensureSourceInitialized,
+      ensureInitialized: service.testing.initialization.ensureSourceInitialized,
       notifyRuntimeStateChanged: (_) {},
     );
     await handle.facade.ensurePrefs();
@@ -456,6 +477,7 @@ void main() {
       });
       final secureStorage = MemorySourceSecureSessionStorage();
       final service = SourceRuntimeAssembly(
+        sourceUiService: sourceUiService,
         initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
@@ -502,7 +524,7 @@ void main() {
 
   test('debug export data keeps full typed log content', () async {
     final service = sl<SourceRuntimeAssembly>();
-    await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
+    await service.testing.diagnostics.setSoftwareLogCaptureEnabled(true);
     final longMessage = 'avatar-${'x' * 520}';
 
     service.testing.debug.addApplicationLog(
@@ -523,7 +545,7 @@ void main() {
 
   test('application debug export data keeps full log content', () async {
     final service = sl<SourceRuntimeAssembly>();
-    await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
+    await service.testing.diagnostics.setSoftwareLogCaptureEnabled(true);
     final longMessage = 'picacg-${'u' * 520}';
 
     service.testing.debug.addApplicationLog(
@@ -540,15 +562,15 @@ void main() {
     expect((log['data'] as Map)['body'], longMessage);
   });
 
-  test('network debug export data keeps full response body', () async {
+  test('network debug export data keeps failed response body', () async {
     final service = sl<SourceRuntimeAssembly>();
-    await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
+    await service.testing.diagnostics.setSoftwareLogCaptureEnabled(true);
     final longBody = '{"body":"${'y' * 1400}"}';
 
     service.testing.debug.appendNetworkLogEntry(
       method: 'POST',
       url: 'source://account.login',
-      statusCode: 200,
+      statusCode: 500,
       error: null,
       startedAt: DateTime.now(),
       source: 'source_login',

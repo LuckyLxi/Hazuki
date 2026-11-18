@@ -1,14 +1,16 @@
+import 'package:hazuki/services/source/models/source_task.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/home/support/home_sidebar_models.dart';
 import 'package:hazuki/features/home/view/home_drawer_content.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/gateways/source_image_gateways.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -34,7 +36,7 @@ Widget _wrap(_Images images, HomeSidebarProfileState profile) =>
       gateway: images,
       child: MaterialApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: hazukiLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: SizedBox(
@@ -49,8 +51,14 @@ Widget _wrap(_Images images, HomeSidebarProfileState profile) =>
       ),
     );
 
-SnapshotController _snapshot(WidgetTester tester) =>
-    tester.widget<SnapshotWidget>(find.byType(SnapshotWidget)).controller;
+SnapshotController _snapshot(WidgetTester tester) => tester
+    .widget<SnapshotWidget>(
+      find.descendant(
+        of: find.byType(HomeDrawerContent),
+        matching: find.byType(SnapshotWidget),
+      ),
+    )
+    .controller;
 
 void _expectRevealing(WidgetTester tester) {
   expect(_snapshot(tester).allowSnapshotting, isFalse);
@@ -215,6 +223,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'cached background shows at once while a drawer route slides in',
+    (tester) async {
+      final images = _Images(cached: true);
+      await tester.pumpWidget(_wrap(images, _profile(loading: true)));
+      await tester.runAsync(
+        () => precacheImage(
+          MemoryImage(images.bytes),
+          tester.element(find.byType(HomeDrawerContent)),
+        ),
+      );
+      final drawerContent = Drawer(
+        width: 304,
+        child: HomeDrawerContent(
+          profile: _profile(),
+          actions: const HomeSidebarActions(),
+          activeSourceKey: 'source',
+        ),
+      );
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .push(
+            PageRouteBuilder<void>(
+              opaque: false,
+              transitionDuration: const Duration(milliseconds: 210),
+              pageBuilder: (_, _, _) => drawerContent,
+            ),
+          );
+      // 首帧为 Hero 测量的离屏构建，此后转场仍在进行。
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      final background = find.byKey(
+        const ValueKey('drawer-bg-$_avatarUrl'),
+        skipOffstage: false,
+      );
+      expect(background, findsOneWidget);
+      expect(
+        find.descendant(of: background, matching: find.byType(AnimatedOpacity)),
+        findsNothing,
+      );
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
+
   testWidgets('long usernames remain constrained during the transition', (
     tester,
   ) async {
@@ -253,6 +306,7 @@ class _Images implements SourceImageGateway {
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
+    SourceTaskOrigin? taskOrigin,
   }) {
     downloads++;
     return download.future;

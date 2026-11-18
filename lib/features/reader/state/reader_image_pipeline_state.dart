@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ReaderImagePipelineState {
   final Map<String, ImageProvider> providerCache = <String, ImageProvider>{};
@@ -19,6 +19,7 @@ class ReaderImagePipelineState {
   bool prefetchAheadRunning = false;
   int? queuedPrefetchAheadIndex;
   bool disposed = false;
+  int generation = 0;
 
   void resetForImages(List<String> images) {
     clearProviderCaches();
@@ -42,7 +43,14 @@ class ReaderImagePipelineState {
       );
   }
 
+  void invalidatePending() {
+    generation++;
+    activeUnscrambleTasks = 0;
+    completeDecodeWaiters();
+  }
+
   void clearProviderCaches() {
+    invalidatePending();
     providerCache.clear();
     providerFutureCache.clear();
     priorityProviderRequests.clear();
@@ -73,5 +81,6 @@ class ReaderImagePipelineState {
 class ReaderImagePipelinePermitWaiter {
   ReaderImagePipelinePermitWaiter();
 
+  bool granted = false;
   final Completer<void> completer = Completer<void>();
 }

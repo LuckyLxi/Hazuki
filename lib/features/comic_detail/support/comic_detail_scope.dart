@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import 'comic_detail_actions_controller.dart';
 import 'comic_detail_favorite_controller.dart';
+import 'comic_detail_plugin_tabs_controller.dart';
 import 'comic_detail_session_controller.dart';
 import 'comic_detail_theme_controller.dart';
 import 'comic_detail_ui_state_controller.dart';
@@ -15,6 +16,7 @@ class ComicDetailScope extends InheritedWidget {
     required this.actions,
     required this.favorite,
     required this.supportsRelatedTab,
+    required this.pluginTabs,
     required super.child,
   });
 
@@ -24,6 +26,7 @@ class ComicDetailScope extends InheritedWidget {
   final ComicDetailActionsController actions;
   final ComicDetailFavoriteController favorite;
   final bool supportsRelatedTab;
+  final ComicDetailPluginTabsController pluginTabs;
 
   static ComicDetailScope of(BuildContext context) {
     final scope = context

@@ -10,43 +10,13 @@ import '../storage/hazuki_database.dart'
         LocalFavoriteFolderTombstone;
 import 'local_favorites_models.dart';
 
-abstract interface class LocalFavoritesPersistence {
-  Future<LocalFavoritesSnapshot> load();
-  Future<void> replace(LocalFavoritesSnapshot snapshot);
-
-  Future<void> appendFolderTombstone(String folderId);
-  Future<void> appendEntryTombstone(String comicId, {String sourceKey = ''});
-  Future<void> appendComicFolderTombstone(
-    String comicId,
-    String folderId, {
-    String sourceKey = '',
-    int afterMs = 0,
-  });
-  Future<int> nextComicFolderSavedAtMs(String storageKey, String folderId);
-
-  Future<List<LocalFavoriteFolderTombstone>> loadFolderTombstones();
-  Future<List<LocalFavoriteEntryTombstone>> loadEntryTombstones();
-  Future<List<LocalFavoriteComicFolderTombstone>> loadComicFolderTombstones();
-  Future<void> upsertFolderTombstones(
-    Iterable<LocalFavoriteFolderTombstone> tombstones,
-  );
-  Future<void> upsertEntryTombstones(
-    Iterable<LocalFavoriteEntryTombstone> tombstones,
-  );
-  Future<void> upsertComicFolderTombstones(
-    Iterable<LocalFavoriteComicFolderTombstone> tombstones,
-  );
-  Future<void> pruneTombstones();
-}
-
-class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
-  DriftLocalFavoritesPersistence(this._database);
+class LocalFavoritesPersistence {
+  LocalFavoritesPersistence(this._database);
 
   static const int _tombstoneTtlMs = 90 * 24 * 60 * 60 * 1000;
 
   final HazukiDatabase _database;
 
-  @override
   Future<LocalFavoritesSnapshot> load() async {
     final folders = await _database
         .select(_database.localFavoriteFolders)
@@ -93,7 +63,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     );
   }
 
-  @override
   Future<void> replace(LocalFavoritesSnapshot snapshot) async {
     await _database.transaction(() async {
       await _database.delete(_database.localFavoriteComicFolders).go();
@@ -161,7 +130,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     });
   }
 
-  @override
   Future<void> appendFolderTombstone(String folderId) async {
     await upsertFolderTombstones([
       LocalFavoriteFolderTombstone(
@@ -172,7 +140,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     await pruneTombstones();
   }
 
-  @override
   Future<void> appendEntryTombstone(
     String comicId, {
     String sourceKey = '',
@@ -187,7 +154,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     await pruneTombstones();
   }
 
-  @override
   Future<void> appendComicFolderTombstone(
     String comicId,
     String folderId, {
@@ -205,7 +171,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     await pruneTombstones();
   }
 
-  @override
   Future<int> nextComicFolderSavedAtMs(
     String storageKey,
     String folderId,
@@ -229,12 +194,33 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     );
   }
 
+  /// 按 storageKey 汇总阅读记录与阅读进度中最近一次阅读时间。
+  Future<Map<String, int>> loadLastReadAtMs() async {
+    final result = <String, int>{};
+    void merge(String storageKey, int timestampMs) {
+      final current = result[storageKey];
+      if (current == null || timestampMs > current) {
+        result[storageKey] = timestampMs;
+      }
+    }
+
+    // 阅读记录有条数上限，阅读进度补齐被裁掉的旧条目。
+    for (final row
+        in await _database.select(_database.readHistoryEntries).get()) {
+      merge(row.storageKey, row.timestampMs);
+    }
+    for (final row
+        in await _database.select(_database.readingProgressEntries).get()) {
+      merge(row.storageKey, row.timestampMs);
+    }
+    return result;
+  }
+
   int _timestampAfter(int value) {
     final now = DateTime.now().millisecondsSinceEpoch;
     return now > value ? now : value + 1;
   }
 
-  @override
   Future<List<LocalFavoriteFolderTombstone>> loadFolderTombstones() async {
     final rows = await _database
         .select(_database.localFavoriteFolderTombstones)
@@ -245,7 +231,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     ];
   }
 
-  @override
   Future<List<LocalFavoriteEntryTombstone>> loadEntryTombstones() async {
     final rows = await _database
         .select(_database.localFavoriteEntryTombstones)
@@ -260,7 +245,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     ];
   }
 
-  @override
   Future<List<LocalFavoriteComicFolderTombstone>>
   loadComicFolderTombstones() async {
     final rows = await _database
@@ -282,7 +266,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     ];
   }
 
-  @override
   Future<void> upsertFolderTombstones(
     Iterable<LocalFavoriteFolderTombstone> tombstones,
   ) async {
@@ -298,7 +281,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     }
   }
 
-  @override
   Future<void> upsertEntryTombstones(
     Iterable<LocalFavoriteEntryTombstone> tombstones,
   ) async {
@@ -320,7 +302,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     }
   }
 
-  @override
   Future<void> upsertComicFolderTombstones(
     Iterable<LocalFavoriteComicFolderTombstone> tombstones,
   ) async {
@@ -341,7 +322,6 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     }
   }
 
-  @override
   Future<void> pruneTombstones() async {
     final cutoff = DateTime.now().millisecondsSinceEpoch - _tombstoneTtlMs;
     await (_database.delete(

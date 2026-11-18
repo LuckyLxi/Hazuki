@@ -2,10 +2,8 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 import 'search_contracts.dart';
-import 'package:flutter/material.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
-import 'package:hazuki/services/search_history_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:hazuki/shared/preferences/hazuki_general_preferences_store.dart';
 
 export 'search_contracts.dart';
 
@@ -41,52 +39,44 @@ Map<String, String> searchOrderLabels(
       : const {};
 }
 
-Future<bool> isComicIdSearchEnhanceEnabled() async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) == true;
-}
+Future<bool> isComicIdSearchEnhanceEnabled({
+  HazukiGeneralPreferencesStore store = const HazukiGeneralPreferencesStore(),
+}) => store.loadComicIdSearchEnhanceEnabled();
 
-Future<bool> isAggregateSearchEnabled() async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.getBool(hazukiAggregateSearchEnabledPreferenceKey) == true;
-}
+Future<bool> isAggregateSearchEnabled({
+  HazukiGeneralPreferencesStore store = const HazukiGeneralPreferencesStore(),
+}) => store.loadAggregateSearchEnabled();
 
-Future<void> setAggregateSearchEnabled(bool enabled) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool(hazukiAggregateSearchEnabledPreferenceKey, enabled);
-}
+Future<void> setAggregateSearchEnabled(
+  bool enabled, {
+  HazukiGeneralPreferencesStore store = const HazukiGeneralPreferencesStore(),
+}) => store.saveAggregateSearchEnabled(enabled);
 
-Future<SearchComicLayout> loadSearchComicLayout() async {
-  final prefs = await SharedPreferences.getInstance();
-  final savedLayout = prefs.getString(hazukiSearchComicLayoutPreferenceKey);
+Future<SearchComicLayout> loadSearchComicLayout({
+  HazukiGeneralPreferencesStore store = const HazukiGeneralPreferencesStore(),
+}) async {
+  final savedLayout = await store.loadSearchComicLayoutName();
   return SearchComicLayout.values.firstWhere(
     (layout) => layout.name == savedLayout,
     orElse: () => SearchComicLayout.list,
   );
 }
 
-Future<void> setSearchComicLayout(SearchComicLayout layout) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(hazukiSearchComicLayoutPreferenceKey, layout.name);
-}
+Future<void> setSearchComicLayout(
+  SearchComicLayout layout, {
+  HazukiGeneralPreferencesStore store = const HazukiGeneralPreferencesStore(),
+}) => store.saveSearchComicLayoutName(layout.name);
 
-Future<String> normalizeSubmittedKeyword(
+String normalizeSubmittedKeyword(
   String rawKeyword, {
   TextEditingController? controller,
-}) async {
+}) {
   final keyword = rawKeyword.trim();
   controller?.value = TextEditingValue(
     text: keyword,
     selection: TextSelection.collapsed(offset: keyword.length),
   );
   return keyword;
-}
-
-Future<void> addSearchHistory(
-  SearchHistoryService historyService,
-  String keyword,
-) async {
-  await historyService.add(keyword);
 }
 
 SearchMessages searchMessages(BuildContext context) {

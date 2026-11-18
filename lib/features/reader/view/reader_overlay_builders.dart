@@ -2,16 +2,16 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/reading/reader_filter_color.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
-import 'package:hazuki/features/reader/view/reader_overlay_controls.dart';
-import 'package:hazuki/features/reader/view/reader_settings_drawer_content.dart';
+import 'package:hazuki/features/reader/view/reader_bottom_controls.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/widgets/reader_settings_content.dart';
 
 const Duration readerSliderHapticMinInterval = Duration(milliseconds: 90);
 
@@ -70,7 +70,6 @@ Widget buildReaderSettingsDrawer({
   required ValueChanged<bool>? onTapToTurnPageChanged,
   required ValueChanged<bool> onVolumeButtonTurnPageChanged,
   required ValueChanged<bool> onPinchToZoomChanged,
-  required ValueChanged<bool> onLongPressToSaveChanged,
   required ValueChanged<bool> onImmersiveModeChanged,
   required ValueChanged<bool> onKeepScreenOnChanged,
   required ValueChanged<bool> onPageIndicatorChanged,
@@ -84,6 +83,8 @@ Widget buildReaderSettingsDrawer({
   required ReaderSourceImageQualitySnapshot sourceImageQuality,
   required ValueChanged<String?> onSourceImageQualityChanged,
   required VoidCallback? onShowWindowsShortcuts,
+  bool restorePagePosition = false,
+  ValueChanged<bool>? onRestorePagePositionChanged,
 }) {
   final drawerWidth = math.min(MediaQuery.sizeOf(context).width * 0.88, 360.0);
 
@@ -106,13 +107,13 @@ Widget buildReaderSettingsDrawer({
                 color: colorScheme.surface.withValues(
                   alpha: isDark ? 0.68 : 0.76,
                 ),
-                child: ReaderSettingsDrawerContent(
+                child: ReaderSettingsContent(
+                  surface: ReaderSettingsSurface.drawer,
                   readerMode: runtimeState.readerMode,
                   doublePageMode: runtimeState.doublePageMode,
                   tapToTurnPage: runtimeState.tapToTurnPage,
                   volumeButtonTurnPage: runtimeState.volumeButtonTurnPage,
                   pinchToZoom: runtimeState.pinchToZoom,
-                  longPressToSave: runtimeState.longPressToSave,
                   immersiveMode: runtimeState.immersiveMode,
                   keepScreenOn: runtimeState.keepScreenOn,
                   pageIndicator: runtimeState.pageIndicator,
@@ -126,7 +127,6 @@ Widget buildReaderSettingsDrawer({
                   onTapToTurnPageChanged: onTapToTurnPageChanged,
                   onVolumeButtonTurnPageChanged: onVolumeButtonTurnPageChanged,
                   onPinchToZoomChanged: onPinchToZoomChanged,
-                  onLongPressToSaveChanged: onLongPressToSaveChanged,
                   onImmersiveModeChanged: onImmersiveModeChanged,
                   onKeepScreenOnChanged: onKeepScreenOnChanged,
                   onPageIndicatorChanged: onPageIndicatorChanged,
@@ -141,6 +141,8 @@ Widget buildReaderSettingsDrawer({
                   onSourceImageQualityChanged: onSourceImageQualityChanged,
                   onShowWindowsShortcuts: onShowWindowsShortcuts,
                   onClose: () => Navigator.of(drawerContext).pop(),
+                  restorePagePosition: restorePagePosition,
+                  onRestorePagePositionChanged: onRestorePagePositionChanged,
                 ),
               ),
             ),
@@ -148,36 +150,6 @@ Widget buildReaderSettingsDrawer({
         );
       },
     ),
-  );
-}
-
-Widget buildReaderTopControls({
-  required BuildContext context,
-  required ReaderRuntimeState runtimeState,
-  required ThemeData readerTheme,
-  required String title,
-  required VoidCallback onBackPressed,
-  required VoidCallback onOpenSettingsDrawer,
-}) {
-  return ReaderTopControls(
-    readerTheme: readerTheme,
-    title: title,
-    settingsTooltip: l10n(context).readingSettingsTitle,
-    onBackPressed: onBackPressed,
-    onOpenSettingsDrawer: onOpenSettingsDrawer,
-  );
-}
-
-Widget buildReaderPageIndicator({
-  required ReaderRuntimeState runtimeState,
-  required ThemeData readerTheme,
-  required int chapterIndex,
-}) {
-  return ReaderPageIndicatorOverlay(
-    readerTheme: readerTheme,
-    pageIndexNotifier: runtimeState.pageIndexNotifier,
-    chapterIndex: chapterIndex,
-    imageCount: runtimeState.readerSpreadCount,
   );
 }
 
@@ -193,6 +165,9 @@ Widget buildReaderBottomControls({
   VoidCallback? onPreviousChapter,
   VoidCallback? onFavorite,
   VoidCallback? onComments,
+  VoidCallback? onTranslation,
+  VoidCallback? onTranslationLongPress,
+  bool translationSelected = false,
   VoidCallback? onNextChapter,
   required VoidCallback onResetZoom,
 }) {
@@ -244,6 +219,10 @@ Widget buildReaderBottomControls({
     onPreviousChapter: onPreviousChapter,
     onFavorite: onFavorite,
     onComments: onComments,
+    onTranslation: onTranslation,
+    onTranslationLongPress: onTranslationLongPress,
+    translationSelected: translationSelected,
+    translationTooltip: l10n(context).translationTitle,
     onNextChapter: onNextChapter,
     onResetZoom: onResetZoom,
     isZoomed: runtimeState.pinchToZoom && runtimeState.isZoomed,

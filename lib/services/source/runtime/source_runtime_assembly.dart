@@ -1,3 +1,5 @@
+import 'source_operation_runner.dart';
+import '../models/source_task.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -5,28 +7,27 @@ import '../../../models/hazuki_models.dart';
 import '../account/account_session_capability.dart';
 import '../account/source_interactive_login_operations.dart';
 import '../account/source_login_interaction.dart';
-import '../account/source_account_operations.dart';
 import '../account/source_daily_check_in_capability.dart';
 import '../account/source_relogin_coordinator.dart';
 import '../category/source_category_capability.dart';
 import '../comic/comic_details_capability.dart';
+import '../comic/comic_detail_tab_capability.dart';
 import '../comic/source_comic_details_cache.dart';
 import '../comments/comments_capability.dart';
-import '../comments/source_comments_operations.dart';
 import '../common/source_json_coerce.dart';
+import '../content/source_cloud_reading.dart';
 import '../content/source_content_operations.dart';
+import '../content/source_reading_progress_uploads.dart';
 import '../debug/debug_favorites_capability.dart';
 import '../debug/debug_report_capability.dart';
 import '../debug/source_debug_operations.dart';
-import '../explore_capability.dart';
+import '../content/explore_capability.dart';
 import '../favorites/source_favorites_capability.dart';
-import '../favorites/source_favorites_operations.dart';
 import '../gateways/source_gateway_set.dart';
 import '../image/image_cache_capability.dart';
 import '../image/source_image_operations.dart';
 import '../image/source_image_preparation_capability.dart';
 import '../models/source_contract_models.dart';
-import '../models/source_identity.dart';
 import '../plugins/source_plugin_manager.dart';
 import '../plugins/source_plugin_models.dart';
 import '../adapters/hazuki_source_plugin_adapter.dart';
@@ -36,15 +37,18 @@ import 'source_localization_operations.dart';
 import 'source_runtime_capability.dart';
 import 'source_runtime_facade.dart';
 import 'source_runtime_handle.dart';
+import 'source_runtime_health.dart';
 import 'source_runtime_host.dart';
-import 'source_runtime_operations.dart';
+import 'source_runtime_diagnostics_operations.dart';
+import 'source_runtime_initialization_operations.dart';
+import 'source_script_editing_operations.dart';
 import 'source_runtime_view.dart';
 import 'source_runtime_registry.dart';
 import 'source_runtime_state_controller.dart';
-import 'source_script_storage.dart';
 import 'source_secure_session_storage.dart';
 import '../../logging/app_log_store.dart';
 import 'source_settings_operations.dart';
+import '../interaction/source_ui_service.dart';
 
 export '../debug/source_debug_log_store.dart';
 export '../models/source_contract_models.dart';
@@ -58,21 +62,25 @@ export 'source_runtime_registry.dart';
 export 'source_session_store.dart';
 
 const _bundledInitAssetPath = 'assets/init.js';
-const _sourceIndexUrls = <String>[];
 
 /// Internal composition root for source runtime dependencies.
 ///
 /// Feature and application code consume the focused source gateways instead of
 /// depending on this assembly directly.
 class SourceRuntimeAssembly {
+  final SourceUiService sourceUiService;
+
   SourceRuntimeAssembly({
+    required this.sourceUiService,
     SourceSecureSessionStorage? secureSessionStorage,
+    // 仅供测试预置目录：跳过插件初始化，脚本存储仍是插件管理器。
     List<SourceCatalogEntry> initialCatalog = const [],
     SourcePluginManager? pluginManager,
   }) : _secureSessionStorage =
            secureSessionStorage ?? FlutterSourceSecureSessionStorage() {
     _logStore = AppLogStore(secureStorage: _secureSessionStorage);
     _runtimeHost = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: initialCatalog,
       defaultSourceKey: initialCatalog.firstOrNull?.key ?? '',
       secureSessionStorage: _secureSessionStorage,
@@ -91,17 +99,19 @@ class SourceRuntimeAssembly {
         plugins.historicalPresentationFor;
     // Installation uses local script inspection; init runs when the source is used.
     plugins.onCatalogChanged = _runtimeHost.replaceCatalog;
+    plugins.onUninstalled = (id) => _secureSessionStorage.delete(
+      SourceSecureSessionStorageKeys.browserUserAgents(id),
+    );
     if (initialCatalog.isEmpty) {
       _runtimeHost.runtimeRegistry.prepareCatalog = plugins.initialize;
     }
     _accountCapability = SourceAccountSessionCapability(
       runtimeHost: _runtimeHost,
     );
-    _reloginCoordinator = SourceReloginCoordinator(
+    _reloginCoordinator = SourceReloginCoordinator<SourceRuntimeReloginContext>(
       loginWithStoredAccount: (context, {required account, required password}) {
-        final facade = (context as SourceFacadeReloginContext).facade;
-        return _accountCapability.loginWithFacade(
-          facade,
+        return _accountCapability.loginWithHandle(
+          context.handle,
           account: account,
           password: password,
         );
@@ -109,20 +119,25 @@ class SourceRuntimeAssembly {
     );
     _runtimeCapability = SourceRuntimeCapability(
       runtimeHost: _runtimeHost,
-      scriptStorage: initialCatalog.isEmpty ? plugins : _scriptStorage,
+      scriptStorage: plugins,
       jsBridgeCookieCapability: _jsBridgeCookieCapability,
       runtimeStateController: _runtimeStateController,
       reloginCoordinator: _reloginCoordinator,
       bundledInitAssetPath: _bundledInitAssetPath,
-      sourceIndexUrls: _sourceIndexUrls,
     );
+    _runtimeHost.onRuntimeFailed = SourceRuntimeHealthMonitor(
+      runtimeHost: _runtimeHost,
+      runtimeStateController: _runtimeStateController,
+      ensureSourceInitialized: (sourceKey) =>
+          _runtimeCapability.initialization.ensureSourceInitialized(sourceKey),
+    ).handleFailure;
     _accountCapability.interactive = SourceInteractiveLoginOperations(
       host: _runtimeHost,
       loadRuntime: _runtimeCapability.loadLoginRuntime,
-      readLoginMethods: (key) => _runtimeCapability.localRuntime.run(
+      readLoginMethods: (key, context) => _runtimeCapability.localRuntime.run(
         key,
         (handle) async => SourceLoginMethod.parse(
-          handle.runtime.engine!.evaluate(
+          await handle.runtime.engine!.evaluate(
             'this.__hazuki_source.account?.loginMethods',
           ),
         ),
@@ -181,7 +196,7 @@ class SourceRuntimeAssembly {
     );
     _favoritesDebugCapability = SourceFavoritesDebugCapability(
       activeFacade: () => _facade,
-      currentAccount: () => _accountOperations.currentAccount,
+      currentAccount: () => _accountCapability.currentAccount,
       ensureFavoriteSessionReady: () => _ensureFavoriteSessionReady(),
       loadFavoriteComics: ({required page, required folderId}) =>
           _favoritesCapability.loadFavoriteComics(
@@ -191,7 +206,7 @@ class SourceRuntimeAssembly {
     );
     _debugReportCapability = SourceDebugReportCapability(
       activeFacade: () => _facade,
-      currentAccount: () => _accountOperations.currentAccount,
+      currentAccount: () => _accountCapability.currentAccount,
       logStore: _logStore,
     );
   }
@@ -211,40 +226,23 @@ class SourceRuntimeAssembly {
   late final AppLogStore _logStore;
   late final SourceRuntimeHost _runtimeHost;
   late final SourceAccountSessionCapability _accountCapability;
-  late final SourceReloginCoordinator _reloginCoordinator;
+  late final SourceReloginCoordinator<SourceRuntimeReloginContext>
+  _reloginCoordinator;
   late final SourceRuntimeCapability _runtimeCapability;
-  late final SourceRuntimeOperations _runtimeOperations =
-      SourceRuntimeOperationService(
-        _runtimeCapability.initialization,
-        _runtimeCapability.diagnostics,
-        _runtimeCapability.scriptEditing,
-        _runtimeCapability.sourceUpdates,
-        _runtimeCapability.sourceRecovery,
-      );
-  late final SourceRuntimeView _runtimeView = SourceRuntimeViewService(
+  late final SourceRuntimeView _runtimeView = SourceRuntimeView(
     runtimeHost: _runtimeHost,
-    runtimeOperations: _runtimeOperations,
   );
   late final SourceLocalizationOperations _localizationOperations =
       SourceLocalizationOperations(_runtimeHost);
-  late final SourceImageOperations _imageOperations =
-      SourceImageOperationService(_imageCacheForSourceRequest);
+  late final SourceImageOperations _imageOperations = SourceImageOperations(
+    _imageCacheForSourceRequest,
+  );
   late final SourceSettingsOperations _settingsOperations =
       SourceSettingsOperations(
         _runtimeHost,
         localRuntime: _runtimeCapability.localRuntime,
       );
-  late final SourceAccountOperations _accountOperations =
-      SourceAccountOperationService(
-        accountSession: _accountCapability,
-        dailyCheckIn: _dailyCheckInCapability,
-      );
   late final SourceCommentsCapability _commentsCapability;
-  late final SourceCommentsOperations _commentsOperations =
-      SourceCommentsOperations(
-        comments: _commentsCapability,
-        account: _accountOperations,
-      );
   late final SourceDebugOperations _debugOperations = SourceDebugOperations(
     activeDebugLog: () => _activeHandle.debugLog,
     activeFacade: () => _facade,
@@ -260,39 +258,49 @@ class SourceRuntimeAssembly {
   late final SourceCategoryCapability _categoryCapability;
   late final SourceImagePreparationCapability _imagePreparationCapability;
   late final SourceFavoritesCapability _favoritesCapability;
+  late final _detailTabsCapability = SourceComicDetailTabCapability(
+    runtimeHost: _runtimeHost,
+    reloginCoordinator: _reloginCoordinator,
+  );
   late final SourceContentOperations _contentOperations =
-      SourceContentOperationService(
-        loadCloudReadRuntime: _runtimeCapability.loadLoginRuntime,
+      SourceContentOperations(
         runtimeHost: _runtimeHost,
-        runtimeOperations: _runtimeOperations,
-        explore: _exploreCapability,
-        category: _categoryCapability,
-        comicDetails: _comicDetailsCapability,
+        initialization: _runtimeCapability.initialization,
       );
-  late final SourceFavoritesOperations _favoritesOperations =
-      SourceFavoritesOperationService(
-        favorites: _favoritesCapability,
-        debug: _favoritesDebugCapability,
-        changedStream: _cloudFavoritesChangedController.stream,
+  late final SourceCloudReadingCapability _cloudReading =
+      SourceCloudReadingCapability(
+        _runtimeHost,
+        _runtimeCapability.initialization,
+        loadReadRuntime: _runtimeCapability.loadLoginRuntime,
       );
+  late final SourceReadingProgressUploads _readingProgressUploads =
+      SourceReadingProgressUploads(_runtimeHost);
   late final SourceGatewaySet gateways = SourceGatewaySet(
+    taskControl: _runtimeHost.tasks,
     runtime: _runtimeView,
-    runtimeOperations: _runtimeOperations,
+    initialization: _runtimeCapability.initialization,
+    diagnostics: _runtimeCapability.diagnostics,
+    scriptEditing: _runtimeCapability.scriptEditing,
+    updates: _runtimeCapability.sourceUpdates,
+    recovery: _runtimeCapability.sourceRecovery,
     localization: _localizationOperations,
     settings: _settingsOperations,
-    account: _accountOperations,
-    comments: _commentsOperations,
+    account: _accountCapability,
+    dailyCheckIn: _dailyCheckInCapability,
+    comments: _commentsCapability,
     content: _contentOperations,
-    favorites: _favoritesOperations,
+    cloudReading: _cloudReading,
+    readingProgressUploads: _readingProgressUploads,
+    explore: _exploreCapability,
+    category: _categoryCapability,
+    comicDetails: _comicDetailsCapability,
+    detailTabs: _detailTabsCapability,
+    favorites: _favoritesCapability,
+    favoritesDebug: _favoritesDebugCapability,
+    cloudFavoritesChangedStream: _cloudFavoritesChangedController.stream,
     image: _imageOperations,
     imagePreparation: _imagePreparationCapability,
     debug: _debugOperations,
-  );
-  late final SourceScriptStorage _scriptStorage = SourceScriptStorage(
-    defaultSourceKey: hazukiDefaultSourceKey,
-    normalizeSourceKey: _normalizeAllowedSourceKey,
-    ensurePreferences: (sourceKey) =>
-        _handleFor(sourceKey).facade.ensurePrefs(),
   );
   late final SourceJsBridgeCookieCapability _jsBridgeCookieCapability =
       SourceJsBridgeCookieCapability(activeHandle: () => _activeHandle);
@@ -301,31 +309,47 @@ class SourceRuntimeAssembly {
 
   SourceRuntimeRegistry get runtimeRegistry => _runtimeHost.runtimeRegistry;
   Future<void> ensureSourceInitialized(String id) =>
-      _runtimeOperations.ensureSourceInitialized(id);
+      _runtimeCapability.initialization.ensureSourceInitialized(id);
   SourceMeta? sourceMetadata(String id) =>
       _runtimeHost.handleFor(id).runtime.sourceMeta;
-  Future<dynamic> runPluginAction(String id, String action) async {
-    await ensureSourceInitialized(id);
+  Future<dynamic> runPluginAction(
+    String id,
+    String action, {
+    SourceTaskOrigin? taskOrigin,
+  }) async {
     final handle = _runtimeHost.handleFor(id);
-    return handle.runOperation(
-      () async => handle.facade.js.resolve(
-        handle.runtime.engine!.evaluate(
-          'this.__hazuki_source.actions?.[${jsonEncode(action)}]?.()',
-        ),
-      ),
+    return runSourceOperation(
+      _runtimeHost,
+      handle,
+      'plugin.action',
+      (context) async {
+        await ensureSourceInitialized(id);
+        context.checkActive();
+        return context.resolve(
+          handle.facade.js.resolve(
+            context.evaluate(
+              handle.runtime.engine!,
+              'this.__hazuki_source.actions?.[${jsonEncode(action)}]?.()',
+            ),
+          ),
+        );
+      },
+      origin: taskOrigin,
+      serviceOwned: true,
     );
   }
 
   @visibleForTesting
   late final SourceRuntimeTestAccess testing = SourceRuntimeTestAccess(
     runtime: _runtimeView,
-    runtimeOperations: _runtimeOperations,
-    content: _contentOperations,
-    comments: _commentsOperations,
-    favorites: _favoritesOperations,
+    initialization: _runtimeCapability.initialization,
+    diagnostics: _runtimeCapability.diagnostics,
+    scriptEditing: _runtimeCapability.scriptEditing,
+    comments: _commentsCapability,
+    favorites: _favoritesCapability,
     image: _imageOperations,
     settings: _settingsOperations,
-    account: _accountOperations,
+    account: _accountCapability,
     debug: _debugOperations,
     activeFacade: () => _facade,
     handleFor: _handleFor,
@@ -343,6 +367,7 @@ class SourceRuntimeAssembly {
   }
 
   late final SourceRuntimeHandle _applicationHandle = SourceRuntimeHandle(
+    sourceUiService: sourceUiService,
     sourceKey: '__app__',
     secureStorage: _secureSessionStorage,
     ensureInitialized: (_) async {},
@@ -384,6 +409,7 @@ class SourceRuntimeAssembly {
     final handle = _retainedImageHandles.putIfAbsent(
       requested,
       () => SourceRuntimeHandle(
+        sourceUiService: sourceUiService,
         sourceKey: requested,
         secureStorage: _secureSessionStorage,
         ensureInitialized: (_) async =>
@@ -395,14 +421,10 @@ class SourceRuntimeAssembly {
     return handle.imageCache;
   }
 
-  String _normalizeAllowedSourceKey(String sourceKey) {
-    return _runtimeHost.normalize(sourceKey);
-  }
-
   String _resolveActiveSourceKey([String? requestedSourceKey]) {
     final requested = requestedSourceKey?.trim() ?? '';
     return requested.isNotEmpty
-        ? _normalizeAllowedSourceKey(requested)
+        ? _runtimeHost.normalize(requested)
         : (_runtimeView.activeSourceKey ?? '');
   }
 
@@ -411,11 +433,10 @@ class SourceRuntimeAssembly {
     String sourceKey = '',
   }) => _comicDetailsCache.get(comicId, sourceKey: sourceKey);
 
-  Future<bool> _ensureFavoriteSessionReady({
-    HazukiSourceFacade? targetFacade,
-  }) => _reloginCoordinator.ensureFavoriteSessionReady(
-    SourceFacadeReloginContext(targetFacade ?? _facade),
-  );
+  Future<bool> _ensureFavoriteSessionReady() =>
+      _reloginCoordinator.ensureFavoriteSessionReady(
+        SourceRuntimeReloginContext(_runtimeHost.activeHandle),
+      );
 
   List<ExploreComic> _parseExploreComics(List list, {String sourceKey = ''}) {
     final resolvedSourceKey = sourceKey.trim().isEmpty
@@ -442,9 +463,14 @@ class SourceRuntimeAssembly {
     return comics;
   }
 
+  Future<void> get whenSettled => Future.wait([
+    _cloudReading.whenSettled,
+    _readingProgressUploads.whenSettled,
+  ]);
+
   void dispose() {
-    final content = _contentOperations;
-    if (content is SourceContentOperationService) content.dispose();
+    _cloudReading.dispose();
+    _readingProgressUploads.dispose();
     _applicationHandle.requestDispose();
     for (final handle in _retainedImageHandles.values) {
       handle.requestDispose();
@@ -460,8 +486,9 @@ class SourceRuntimeAssembly {
 class SourceRuntimeTestAccess {
   SourceRuntimeTestAccess({
     required this.runtime,
-    required this.runtimeOperations,
-    required this.content,
+    required this.initialization,
+    required this.diagnostics,
+    required this.scriptEditing,
     required this.comments,
     required this.favorites,
     required this.image,
@@ -487,13 +514,14 @@ class SourceRuntimeTestAccess {
        _saveCookiesFromHeaders = saveCookiesFromHeaders;
 
   final SourceRuntimeView runtime;
-  final SourceRuntimeOperations runtimeOperations;
-  final SourceContentOperations content;
-  final SourceCommentsOperations comments;
-  final SourceFavoritesOperations favorites;
+  final SourceRuntimeInitializationOperations initialization;
+  final SourceRuntimeDiagnosticsOperations diagnostics;
+  final SourceScriptEditingOperations scriptEditing;
+  final SourceCommentsCapability comments;
+  final SourceFavoritesCapability favorites;
   final SourceImageOperations image;
   final SourceSettingsOperations settings;
-  final SourceAccountOperations account;
+  final SourceAccountSessionCapability account;
   final SourceDebugOperations debug;
   final HazukiSourceFacade Function() _activeFacade;
   final SourceRuntimeHandle Function(String) _handleFor;

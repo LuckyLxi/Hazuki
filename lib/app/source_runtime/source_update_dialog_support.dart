@@ -3,7 +3,7 @@
 import 'dart:convert';
 import 'package:hazuki/app/service_locator.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../l10n/l10n.dart';
@@ -20,7 +20,7 @@ class SourceUpdateDialogSupport {
     required String skipPrefsKey,
     bool respectSkipPreference = true,
   }) async {
-    final check = await sl<SourceUpdateGateway>()
+    final check = await sl<SourceScriptGateway>()
         .checkActiveSourceVersionFromCloud();
     if (!isMounted() || check == null || !check.hasUpdate) {
       return null;

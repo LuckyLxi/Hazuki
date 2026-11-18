@@ -6,6 +6,9 @@ import 'package:hazuki/services/cloud_sync_service.dart';
 typedef ApplyCloudSyncRestoreCallback =
     Future<void> Function(CloudSyncRestoreResult result);
 
+/// 正在执行的备份动作，供页面在对应条目上展示进度。
+enum CloudSyncAction { upload, restore }
+
 class CloudSyncRestoreOutcome {
   const CloudSyncRestoreOutcome({required this.skippedPlatformSettings});
   final bool skippedPlatformSettings;
@@ -25,6 +28,7 @@ class CloudSyncController extends ChangeNotifier {
   bool _saving = false;
   bool _syncing = false;
   bool _checkingConnectivity = false;
+  CloudSyncAction? _activeAction;
   CloudSyncConnectionStatus? _status;
   bool _disposed = false;
 
@@ -33,6 +37,7 @@ class CloudSyncController extends ChangeNotifier {
   bool get saving => _saving;
   bool get syncing => _syncing;
   bool get checkingConnectivity => _checkingConnectivity;
+  CloudSyncAction? get activeAction => _activeAction;
   CloudSyncConnectionStatus? get status => _status;
 
   bool get isConfigComplete => _buildConfig().isComplete;
@@ -81,6 +86,21 @@ class CloudSyncController extends ChangeNotifier {
     }
   }
 
+  /// 用当前输入的配置重新检测连接状态。
+  Future<void> testConnection() => _checkConnectivityOnce(_buildConfig());
+
+  /// 由服务器编辑表单提交：写回输入框后保存并检测连接。
+  Future<void> saveServerConfig({
+    required String url,
+    required String username,
+    required String password,
+  }) {
+    urlController.text = url;
+    usernameController.text = username;
+    passwordController.text = password;
+    return saveConfig();
+  }
+
   void setEnabled(bool value) {
     _enabled = value;
     if (!value) {
@@ -115,6 +135,7 @@ class CloudSyncController extends ChangeNotifier {
   Future<void> uploadBackup() async {
     if (_disposed || _syncing) return;
     _syncing = true;
+    _activeAction = CloudSyncAction.upload;
     _notify();
     try {
       final config = _buildConfig();
@@ -125,6 +146,7 @@ class CloudSyncController extends ChangeNotifier {
     } finally {
       if (!_disposed) {
         _syncing = false;
+        _activeAction = null;
         _notify();
       }
     }
@@ -137,6 +159,7 @@ class CloudSyncController extends ChangeNotifier {
       throw StateError('cloud sync busy');
     }
     _syncing = true;
+    _activeAction = CloudSyncAction.restore;
     _notify();
     try {
       final config = _buildConfig();
@@ -153,6 +176,7 @@ class CloudSyncController extends ChangeNotifier {
     } finally {
       if (!_disposed) {
         _syncing = false;
+        _activeAction = null;
         _notify();
       }
     }

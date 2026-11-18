@@ -1,16 +1,17 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/announcements/announcement.dart';
 import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/shared/downloads/downloaded_comic_reader_page_builder.dart';
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
-import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
+import 'package:hazuki/shared/reading/reader_page_builder.dart';
 
 abstract class HomeDownloadStatusListenable implements Listenable {
   bool get hasTasks;
@@ -18,7 +19,9 @@ abstract class HomeDownloadStatusListenable implements Listenable {
 }
 
 class HomeServices {
+  final SourceTaskControlGateway taskControl;
   const HomeServices({
+    required this.taskControl,
     required this.sourceService,
     required this.sourceSwitchService,
     required this.imageService,
@@ -26,10 +29,16 @@ class HomeServices {
     required this.announcementService,
     required this.downloadStatus,
     required this.showAnnouncement,
+    required this.sourceUi,
+    this.sourcePlugins,
   });
 
+  /// 插件交互队列由应用层注入，功能层不直接取进程级静态实例。
+  final SourceUiService sourceUi;
+
   final SourceHomeGateway sourceService;
-  final SourceSwitchGateway sourceSwitchService;
+  final SourcePluginGateway? sourcePlugins;
+  final SourceRuntimeGateway sourceSwitchService;
   final SourceImageGateway imageService;
   final DiscoverDailyRecommendationService dailyRecommendationService;
   final AnnouncementController announcementService;
@@ -59,25 +68,6 @@ typedef HomeSearchPageBuilder =
 
 typedef HomeSearchRouteBuilder =
     Route<T> Function<T>({required WidgetBuilder builder});
-
-typedef HomeDownloadedComicReaderPageBuilder =
-    Widget Function(DownloadedMangaComic comic, DownloadedMangaChapter chapter);
-
-typedef HomeReaderPageBuilder =
-    Widget Function({
-      required String title,
-      required String chapterTitle,
-      required String comicId,
-      required String epId,
-      required int chapterIndex,
-      required List<String> images,
-      required String sourceKey,
-      String coverUrl,
-      ThemeData? comicTheme,
-      Future<void> Function(BuildContext context)? onFavoriteRequested,
-      bool offlineMode,
-      List<ReaderOfflineChapterData> offlineChapters,
-    });
 
 typedef HomeDiscoverTabBuilder =
     Widget Function({
@@ -123,7 +113,7 @@ typedef HomeRankingPageBuilder =
 
 typedef HomeDownloadsPageBuilder =
     Widget Function({
-      required HomeDownloadedComicReaderPageBuilder readerPageBuilder,
+      required DownloadedComicReaderPageBuilder readerPageBuilder,
     });
 
 typedef HomeSettingsPageBuilder =
@@ -154,7 +144,7 @@ class HomeFeatureEntrypoints {
   });
 
   final HomeComicDetailPageBuilder buildComicDetailPage;
-  final HomeReaderPageBuilder buildReaderPage;
+  final ReaderPageBuilder buildReaderPage;
   final HomeSearchPageBuilder buildSearchPage;
   final HomeSearchRouteBuilder buildSearchRoute;
   final Future<void> Function()? prepareSearchPage;

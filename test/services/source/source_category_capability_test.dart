@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,7 +9,15 @@ import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   test('parses category and explore View More targets', () {
     expect(
@@ -70,11 +79,12 @@ void main() {
       final host = _createHost();
       addTearDown(host.dispose);
       final engine = SourceScriptEngine(
+        sourceUiService: sourceUiService,
         timeout: 5000,
         hostPromiseRejectionHandler: (_) {},
       );
       host.activeHandle.runtime.engine = engine;
-      engine.evaluate('''
+      await engine.evaluate('''
 globalThis.__hazuki_source = {categoryComics: {
   optionList: [{options: ['-All', 'japan-Japan']}, {options: ['score-Score']}],
   load: (category, param, options, page) => {
@@ -99,7 +109,7 @@ globalThis.__hazuki_source = {categoryComics: {
       );
       expect(
         jsonDecode(
-          engine.evaluate('JSON.stringify(lastRequest)') as String,
+          await engine.evaluate('JSON.stringify(lastRequest)') as String,
         )['options'],
         [],
       );
@@ -109,7 +119,9 @@ globalThis.__hazuki_source = {categoryComics: {
         orders: ['', ' score '],
       );
       final request =
-          jsonDecode(engine.evaluate('JSON.stringify(lastRequest)') as String)
+          jsonDecode(
+                await engine.evaluate('JSON.stringify(lastRequest)') as String,
+              )
               as Map;
       expect(request['options'], ['', 'score']);
       expect(request['page'], 2);
@@ -119,6 +131,7 @@ globalThis.__hazuki_source = {categoryComics: {
 
 SourceRuntimeHost _createHost() {
   return SourceRuntimeHost(
+    sourceUiService: sourceUiService,
     catalog: const [
       SourceCatalogEntry(key: 'jm', name: 'JM', fileName: 'jm.js'),
     ],

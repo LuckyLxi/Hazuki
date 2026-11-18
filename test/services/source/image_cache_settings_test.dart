@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -10,7 +11,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'source_plugins_test.dart' show package;
 
+late SourceUiService sourceUiService;
+
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
   late SourceRuntimeAssembly assembly;
@@ -23,6 +32,7 @@ void main() {
           (_) async => directory.path,
         );
     assembly = SourceRuntimeAssembly(
+      sourceUiService: sourceUiService,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
       pluginManager: SourcePluginManager(
         directory: () async => Directory('${directory.path}/plugins'),

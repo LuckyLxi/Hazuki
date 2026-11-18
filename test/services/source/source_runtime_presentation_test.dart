@@ -1,3 +1,6 @@
+import 'package:hazuki/services/source/interaction/source_ui_service.dart';
+import 'package:hazuki/services/source/comic/comic_details_capability.dart';
+import '../../support/fake_source_task_control.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,21 +12,32 @@ import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.d
 import 'package:hazuki/services/source/content/source_content_operations.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
-import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_recovery_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_view.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _Content extends Mock implements SourceContentOperations {}
 
-class _Operations extends Mock implements SourceRuntimeOperations {}
+class _Recovery extends Mock implements SourceRuntimeRecoveryOperations {}
+
+class _ComicDetails extends Fake implements SourceComicDetailsCapability {}
+
+late SourceUiService sourceUiService;
 
 void main() {
+  setUp(() {
+    sourceUiService = SourceUiService();
+  });
+  tearDown(() {
+    sourceUiService.detach();
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   late SourceRuntimeHost host;
   late HazukiSourceSearchAdapter source;
   setUp(() {
     host = SourceRuntimeHost(
+      sourceUiService: sourceUiService,
       catalog: const [
         SourceCatalogEntry(
           key: 'custom',
@@ -43,11 +57,10 @@ void main() {
       isLoggedForSource: (_) => false,
     );
     source = HazukiSourceSearchAdapter(
-      runtime: SourceRuntimeViewService(
-        runtimeHost: host,
-        runtimeOperations: _Operations(),
-      ),
+      runtime: SourceRuntimeView(runtimeHost: host),
+      recovery: _Recovery(),
       content: _Content(),
+      comicDetails: _ComicDetails(),
     );
   });
   tearDown(() => host.dispose());
@@ -74,6 +87,8 @@ void main() {
     'page choices and labels share runtime declarations without losing installed fields',
     () async {
       final controller = SearchResultsController(
+        sourceUiService: sourceUiService,
+        taskControl: FakeSourceTaskControl(),
         initialOrder: '',
         sourceService: source,
       );
@@ -104,6 +119,8 @@ void main() {
         final newResult = Completer<SearchComicsResult>();
         final requests = <(String, int)>[];
         final controller = SearchResultsController(
+          sourceUiService: sourceUiService,
+          taskControl: FakeSourceTaskControl(),
           initialOrder: '',
           sourceService: source,
           searchPageLoader:
@@ -164,6 +181,8 @@ void main() {
   test('runtime sort changes preserve an active direct ID lookup', () async {
     final requests = <String>[];
     final controller = SearchResultsController(
+      sourceUiService: sourceUiService,
+      taskControl: FakeSourceTaskControl(),
       initialOrder: '',
       sourceService: source,
       searchPageLoader:
@@ -211,6 +230,8 @@ void main() {
         final requests = <(String, String)>[];
         final targetSourceKey = sourceKey;
         final controller = AggregateSearchResultsController.withLoader(
+          sourceUiService: sourceUiService,
+          taskControl: FakeSourceTaskControl(),
           sourceService: source,
           loader:
               ({

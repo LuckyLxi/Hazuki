@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -10,6 +10,7 @@ import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 
 import '../state/aggregate_search_results_controller.dart';
 import '../state/search_focus_coordinator.dart';
@@ -26,6 +27,7 @@ class SearchResultsPage extends StatefulWidget {
   const SearchResultsPage({
     super.key,
     required this.sourceService,
+    required this.taskControl,
     required this.historyService,
     required this.initialKeyword,
     this.initialOrder = '',
@@ -39,6 +41,7 @@ class SearchResultsPage extends StatefulWidget {
   });
 
   final SourceSearchGateway sourceService;
+  final SourceTaskControlGateway taskControl;
   final SearchHistoryService historyService;
   final String initialKeyword;
   final String initialOrder;
@@ -62,8 +65,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         results: _resultsController,
         sourceService: _sourceService,
         aggregateResults: _aggregateResultsController,
-        recordHistory: (keyword) =>
-            addSearchHistory(widget.historyService, keyword),
+        recordHistory: (keyword) => widget.historyService.add(keyword),
         isActive: () => mounted,
         openComic: (comic) async {
           await _focusCoordinator.dismissKeyboard(context);
@@ -191,12 +193,16 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _aggregateSearchEnabled = widget.aggregateSearchEnabled ?? false;
     _comicLayout = widget.comicLayout ?? SearchComicLayout.list;
     _resultsController = SearchResultsController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
+      taskControl: widget.taskControl,
       initialOrder: widget.initialOrder,
       sourceService: widget.sourceService,
       searchPageLoader: widget.searchPageLoader,
       comicDetailsLoader: widget.comicDetailsLoader,
     );
     _aggregateResultsController = AggregateSearchResultsController(
+      sourceUiService: SourcePresentationScope.uiOf(context),
+      taskControl: widget.taskControl,
       sourceService: _sourceService,
     );
     _scrollController.addListener(_onScroll);
@@ -448,7 +454,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     final activeController = _focusCoordinator.activeController;
     final rawKeyword = submittedText ?? activeController.text;
     _focusCoordinator.syncText(rawKeyword);
-    final keyword = await normalizeSubmittedKeyword(
+    final keyword = normalizeSubmittedKeyword(
       rawKeyword,
       controller: activeController,
     );
@@ -535,7 +541,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       return;
     }
     if (_resultsController.canRetry) {
-      _resultsController.logRuntimeRetryRequested('search_results_page');
+      _resultsController.requestRuntimeRetry('search_results_page');
     }
     await _resultsController.search(
       searchMessages(context),
@@ -602,6 +608,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   PreferredSizeWidget _buildSearchResultsAppBar() {
     return SearchResultsAppBar(
+      sourceKey: _sourceService.activeSourceKey,
       title: _buildSearchResultsAppBarTitle(),
       orderLabels: searchOrderLabels(
         context,
@@ -618,10 +625,15 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       },
       showOrderControl:
           !_aggregateSearchEnabled &&
-          searchOrderLabels(
-            context,
-            sourceKey: (_sourceService.activeSourceKey ?? ''),
-          ).isNotEmpty,
+              searchOrderLabels(
+                context,
+                sourceKey: (_sourceService.activeSourceKey ?? ''),
+              ).isNotEmpty ||
+          (!_aggregateSearchEnabled &&
+              SourcePluginMenuBinding<String>(
+                menuId: 'search.sort',
+                sourceKey: _sourceService.activeSourceKey,
+              ).resolve(context).entries.isNotEmpty),
     );
   }
 

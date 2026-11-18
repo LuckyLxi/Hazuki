@@ -1,4 +1,4 @@
-export 'repository/favorite_folders_repository.dart';
+export 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 export 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 export 'package:hazuki/shared/favorites/favorite_page_actions.dart';
 export 'support/favorite_dialogs.dart';

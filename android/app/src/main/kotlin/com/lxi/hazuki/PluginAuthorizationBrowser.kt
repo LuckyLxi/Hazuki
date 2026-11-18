@@ -60,6 +60,11 @@ class PluginAuthorizationBrowser(private val activity: Activity, private val eng
                             val browser = sessions[args["id"] as String] ?: error("session")
                             result.success(browser.cookies(args["scopes"] as List<*>))
                         }
+                        "userAgent" -> {
+                            val args = call.arguments as Map<*, *>
+                            val browser = sessions[args["id"] as String] ?: error("session")
+                            result.success(browser.userAgent())
+                        }
                         else -> result.notImplemented()
                     }
                 } catch (_: Exception) {
@@ -162,6 +167,8 @@ class PluginAuthorizationBrowser(private val activity: Activity, private val eng
                 }.map { mapOf("url" to url, "cookie" to it) }
             }
         }
+
+        fun userAgent(): String = windows.first().settings.userAgentString
 
         init {
             val root = createWindow(context)

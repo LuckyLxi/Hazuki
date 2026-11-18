@@ -1,9 +1,14 @@
 import 'dart:async';
 
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+
+Color _compactMetaChipColor(ColorScheme colors) =>
+    colors.brightness == Brightness.light
+    ? Color.alphaBlend(colors.primary.withValues(alpha: 0.14), colors.surface)
+    : colors.primaryContainer.withValues(alpha: 0.22);
 
 class ComicDetailMetaSection extends StatelessWidget {
   const ComicDetailMetaSection({
@@ -88,7 +93,7 @@ class ComicDetailIdRow extends StatelessWidget {
           child: Chip(
             visualDensity: VisualDensity.compact,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            backgroundColor: colors.primary.withValues(alpha: 0.08),
+            backgroundColor: _compactMetaChipColor(colors),
             side: BorderSide.none,
             labelPadding: const EdgeInsets.symmetric(horizontal: 4),
             padding: EdgeInsets.zero,
@@ -156,6 +161,9 @@ class ComicDetailMetaRow extends StatelessWidget {
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final chipColor = useMobileStyle
+        ? _compactMetaChipColor(cs)
+        : cs.secondaryContainer;
     final valueStyle = theme.textTheme.bodySmall?.copyWith(
       color: useMobileStyle ? cs.onSurfaceVariant : cs.onSecondaryContainer,
       fontWeight: FontWeight.w500,
@@ -169,12 +177,8 @@ class ComicDetailMetaRow extends StatelessWidget {
               child: ActionChip(
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                backgroundColor: useMobileStyle
-                    ? cs.primary.withValues(alpha: 0.08)
-                    : cs.secondaryContainer,
-                disabledColor: useMobileStyle
-                    ? cs.primary.withValues(alpha: 0.08)
-                    : cs.secondaryContainer,
+                backgroundColor: chipColor,
+                disabledColor: chipColor,
                 side: useMobileStyle
                     ? BorderSide.none
                     : BorderSide(
@@ -208,15 +212,14 @@ class ComicDetailMetaRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (useMobileStyle)
-            SizedBox(
-              width: 56,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 5, right: 8),
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+            // 标签名按自身宽度单行显示，后面跟固定间距，长标签名只推开本行的 chips。
+            Padding(
+              padding: const EdgeInsets.only(top: 5, right: 8),
+              child: Text(
+                label,
+                softWrap: false,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             )

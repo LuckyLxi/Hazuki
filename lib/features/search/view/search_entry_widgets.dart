@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'search_history_section.dart';
 import 'search_id_extract_pill.dart';

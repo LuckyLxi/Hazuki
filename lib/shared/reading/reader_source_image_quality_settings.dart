@@ -4,6 +4,7 @@ import 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
 class ReaderSourceImageQualitySnapshot {
   const ReaderSourceImageQualitySnapshot({
     this.settingKey,
+    this.sourceKey = '',
     this.options = const {},
     this.value = '',
     this.title = 'Image quality',
@@ -12,6 +13,7 @@ class ReaderSourceImageQualitySnapshot {
 
   static const defaults = ReaderSourceImageQualitySnapshot();
   final String? settingKey;
+  final String sourceKey;
   final Map<String, String> options;
   final String value;
   final String title;
@@ -26,6 +28,7 @@ class ReaderSourceImageQualitySnapshot {
   ReaderSourceImageQualitySnapshot copyWith({String? value}) =>
       ReaderSourceImageQualitySnapshot(
         settingKey: settingKey,
+        sourceKey: sourceKey,
         options: options,
         title: title,
         locations: locations,
@@ -55,6 +58,7 @@ class ReaderSourceImageQualitySettings {
               '';
     return ReaderSourceImageQualitySnapshot(
       settingKey: key,
+      sourceKey: sourceKey,
       options: options,
       value: options.containsKey(requested)
           ? requested

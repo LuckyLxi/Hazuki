@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:flutter/scheduler.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -14,198 +14,22 @@ import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
+import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
 import 'package:hazuki/shared/discover_back_to_top_notification.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 import 'home_app_bar_actions.dart';
 import 'home_bottom_navigation.dart';
 import 'home_content_stack.dart';
 import 'home_drawer_snapshot.dart';
+import 'home_windows_destination_host.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 
-@visibleForTesting
-Future<void> handleHomePopRequest({
-  required Future<bool> Function() onWillPop,
-  required Future<void> Function() onExitRequested,
-}) async {
-  if (await onWillPop()) {
-    await onExitRequested();
-  }
-}
-
-@visibleForTesting
-Offset resolveHomeNavigationDrawerOffset({
-  required Size viewportSize,
-  required double progress,
-}) {
-  final scale = 1 - 0.035 * progress;
-  return Offset(
-    18 * progress + (1 - scale) * viewportSize.width / 2,
-    -(1 - scale) * viewportSize.height / 2,
-  );
-}
-
-class HomeNavigationDrawerLayout extends StatelessWidget {
-  const HomeNavigationDrawerLayout({
-    super.key,
-    required this.viewportWidth,
-    required this.progress,
-    required this.child,
-  });
-
-  final double viewportWidth;
-  final double progress;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = 1 - 0.035 * progress;
-    final scaledWidth = viewportWidth * scale;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 18 * progress + viewportWidth * (1 - scale),
-      ),
-      // Scale the entire layout width with the foreground. Reducing it by
-      // the translation instead makes the glass bar recalculate its action
-      // reservation and shift independently on narrow screens. Use layout
-      // coordinates so the glass shader samples without a paint transform.
-      child: OverflowBox(
-        alignment: Alignment.bottomLeft,
-        fit: OverflowBoxFit.deferToChild,
-        minWidth: scaledWidth,
-        maxWidth: scaledWidth,
-        child: child,
-      ),
-    );
-  }
-}
-
-@visibleForTesting
-void resetHomeDrawerScale(AnimationController controller) {
-  controller.value = 0;
-}
-
-/// Keeps the glass scaffold stable while only the foreground transform and
-/// navigation layout follow the drawer. Rebuilding the scaffold every tick
-/// also rebuilds its glass scopes and background infrastructure.
-class HomeDrawerTransition extends StatelessWidget {
-  const HomeDrawerTransition({
-    super.key,
-    required this.animation,
-    required this.child,
-    required this.navigationBuilder,
-    this.showNavigation = true,
-  });
-
-  final Animation<double> animation;
-  final Widget child;
-  final Widget Function(BuildContext, double, Size) navigationBuilder;
-  final bool showNavigation;
-
-  @override
-  Widget build(BuildContext context) {
-    final foreground = AnimatedBuilder(
-      animation: animation,
-      child: child,
-      builder: (context, child) => Transform.translate(
-        offset: Offset(18 * animation.value, 0),
-        child: Transform.scale(
-          scale: 1 - 0.035 * animation.value,
-          alignment: Alignment.centerRight,
-          child: child,
-        ),
-      ),
-    );
-    if (!showNavigation) return foreground;
-
-    return ListenableBuilder(
-      listenable: HazukiLiquidGlass.changes,
-      child: foreground,
-      builder: (context, foreground) => LayoutBuilder(
-        builder: (context, constraints) {
-          final glass = HazukiLiquidGlass.isAvailable;
-          final navigation = AnimatedBuilder(
-            animation: animation,
-            builder: (context, _) {
-              final progress = animation.value;
-              final offset = resolveHomeNavigationDrawerOffset(
-                viewportSize: constraints.biggest,
-                progress: progress,
-              );
-              final content = navigationBuilder(
-                context,
-                progress,
-                constraints.biggest,
-              );
-              if (glass) {
-                return Padding(
-                  padding: EdgeInsets.only(bottom: -offset.dy),
-                  child: content,
-                );
-              }
-              return Positioned(
-                left: 0,
-                right: 0,
-                bottom: -offset.dy,
-                child: content,
-              );
-            },
-          );
-          if (glass) {
-            return GlassScaffold(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              enableBackgroundSampling: false,
-              resizeToAvoidBottomInset: false,
-              topEdgeFade: false,
-              bottomEdgeFade: false,
-              contentAwareBrightness: false,
-              bottomBarHeight:
-                  HomeBottomNavigation.floatingBarHeight +
-                  HomeBottomNavigation.floatingVerticalPadding * 2,
-              body: foreground!,
-              bottomBar: navigation,
-            );
-          }
-          return Stack(
-            fit: StackFit.expand,
-            clipBehavior: Clip.none,
-            children: [foreground!, navigation],
-          );
-        },
-      ),
-    );
-  }
-}
-
-@visibleForTesting
-VoidCallback holdHomeDrawerScaleUntilRouteReturns({
-  required Animation<double> routeAnimation,
-  required VoidCallback onRouteReturning,
-}) {
-  var listening = true;
-  late final AnimationStatusListener listener;
-
-  void stopListening() {
-    if (!listening) {
-      return;
-    }
-    listening = false;
-    routeAnimation.removeStatusListener(listener);
-  }
-
-  listener = (status) {
-    if (status != AnimationStatus.reverse &&
-        status != AnimationStatus.dismissed) {
-      return;
-    }
-    stopListening();
-    onRouteReturning();
-  };
-  routeAnimation.addStatusListener(listener);
-  return stopListening;
-}
+part 'home_scaffold_app_bar.dart';
+part 'home_scaffold_drawer.dart';
 
 class HomeScaffoldShell extends StatefulWidget {
   const HomeScaffoldShell({
@@ -220,6 +44,7 @@ class HomeScaffoldShell extends StatefulWidget {
     required this.discoverChild,
     required this.favoriteChild,
     required this.favoriteAppBarActions,
+    this.sourcePlugins,
     required this.showFavoriteBackToTop,
     required this.isLogged,
     required this.profileLoading,
@@ -252,6 +77,8 @@ class HomeScaffoldShell extends StatefulWidget {
     this.selectedDrawerDestination,
     this.unreadAnnouncementCount = 0,
     required this.onDestinationSelected,
+    this.windowsDestinationBuilder,
+    this.onWindowsDestinationClosed,
   });
 
   final GlobalKey<ScaffoldState> scaffoldKey;
@@ -264,6 +91,7 @@ class HomeScaffoldShell extends StatefulWidget {
   final Widget discoverChild;
   final Widget favoriteChild;
   final FavoriteAppBarActionsState favoriteAppBarActions;
+  final SourcePluginGateway? sourcePlugins;
   final bool showFavoriteBackToTop;
   final bool isLogged;
   final bool profileLoading;
@@ -281,9 +109,9 @@ class HomeScaffoldShell extends StatefulWidget {
   final VoidCallback onFavoriteModeTogglePressed;
   final VoidCallback onFavoriteBackToTopPressed;
   final VoidCallback? onProfileTap;
-  final VoidCallback? onCheckInPressed;
+  final FutureOr<void> Function()? onCheckInPressed;
   final VoidCallback? onSwitchSourcePressed;
-  final SourceSwitchGateway? sourceSwitchService;
+  final SourceRuntimeGateway? sourceSwitchService;
   final Future<void> Function()? onSourceSwitched;
   final VoidCallback onOpenHistory;
   final VoidCallback onOpenCategories;
@@ -297,15 +125,59 @@ class HomeScaffoldShell extends StatefulWidget {
   final int unreadAnnouncementCount;
   final ValueChanged<int> onDestinationSelected;
 
+  /// Windows 下侧栏页面在右侧内容区内构建；为空时沿用推入新路由的方式。
+  final HomeWindowsDestinationBuilder? windowsDestinationBuilder;
+
+  /// Windows 内容区里的侧栏页面自行关闭时回调。
+  final VoidCallback? onWindowsDestinationClosed;
+
   @override
   State<HomeScaffoldShell> createState() => _HomeScaffoldShellState();
 }
 
 class _HomeScaffoldShellState extends State<HomeScaffoldShell>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _sourceSwitchDialogOpen = ValueNotifier(false);
   final _sourceSwitchButtonKey = GlobalKey();
   final _homeContentAnimating = ValueNotifier(false);
+  // 内容区与应用栏共享同一道切口过渡。
+  late final _tabTransition = HomeTabCutTransition(
+    vsync: this,
+    initialIndex: widget.currentIndex,
+    onTransitionChanged: _setHomeContentAnimating,
+  );
+
+  // 由显示设置控制，关闭时使用淡入滑动过渡。
+  bool _cutTransitionEnabled = false;
+
+  void _setHomeContentAnimating(bool animating) =>
+      _homeContentAnimating.value = animating;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled =
+        HazukiThemeControllerScope.maybeOf(
+          context,
+        )?.settings.homeTabCutTransition ??
+        false;
+    if (enabled == _cutTransitionEnabled) return;
+    _cutTransitionEnabled = enabled;
+    // 换用另一种过渡后，原过渡的结束回调不再触发，这里直接复位。
+    _tabTransition.jumpTo(widget.currentIndex);
+    _homeContentAnimating.value = false;
+  }
+
+  @override
+  void didUpdateWidget(HomeScaffoldShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_cutTransitionEnabled) {
+      _tabTransition.jumpTo(widget.currentIndex);
+      return;
+    }
+    // 在子树重建前切换，使应用栏与内容区在同一帧收到进度变化。
+    _tabTransition.select(widget.currentIndex);
+  }
 
   Future<void> _showSourceSwitchWithMorph(
     FavoriteFoldersMorphOrigin origin,
@@ -364,7 +236,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
   VoidCallback get onFavoriteModeTogglePressed =>
       widget.onFavoriteModeTogglePressed;
   VoidCallback? get onProfileTap => widget.onProfileTap;
-  VoidCallback? get onCheckInPressed => widget.onCheckInPressed;
+  FutureOr<void> Function()? get onCheckInPressed => widget.onCheckInPressed;
   VoidCallback? get onSwitchSourcePressed => widget.onSwitchSourcePressed;
   VoidCallback get onOpenHistory => widget.onOpenHistory;
   VoidCallback get onOpenCategories => widget.onOpenCategories;
@@ -381,6 +253,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
   @override
   void dispose() {
     _sourceSwitchDialogOpen.dispose();
+    _tabTransition.dispose();
     _homeContentAnimating.dispose();
     _profileDrawerController.dispose();
     super.dispose();
@@ -410,8 +283,9 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
         '$activeSourceKey|${avatarUrl ?? ''}|$profileLoading|${widget.isLogged}|$username';
     final homeContent = HomeContentStack(
       currentIndex: currentIndex,
-      onTransitionChanged: (animating) =>
-          _homeContentAnimating.value = animating,
+      transition: _tabTransition,
+      cutTransition: _cutTransitionEnabled,
+      onTransitionChanged: _setHomeContentAnimating,
       discoverChild: NotificationListener<DiscoverBackToTopNotification>(
         onNotification: (notification) {
           setState(() {
@@ -465,37 +339,64 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
       selectedDestination: selectedDrawerDestination,
       unreadAnnouncementCount: widget.unreadAnnouncementCount,
     );
-    final body = Platform.isWindows
-        ? Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: resolveHomeWindowsSidebarWidth(context),
-                child: HomeWindowsSidebar(
-                  key: ValueKey('home-windows-sidebar-$drawerVisualKey'),
-                  profile: sidebarProfile,
-                  sourceSwitchService: widget.sourceSwitchService,
-                  onSourceSwitched: widget.onSourceSwitched,
-                  actions: sidebarActions,
-                  currentIndex: currentIndex,
-                  selectedDestination: selectedDrawerDestination,
-                  unreadAnnouncementCount: widget.unreadAnnouncementCount,
+    final body = HazukiDesktopPageContainer(child: homeContent);
+
+    // Windows：侧栏常驻左侧，顶栏与首页内容、侧栏页面都放在右侧圆角内容区。
+    Widget wrapWindowsLayout(Widget homeScaffold) {
+      if (!Platform.isWindows) return homeScaffold;
+      final destinationBuilder = widget.windowsDestinationBuilder;
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: resolveHomeWindowsSidebarWidth(context),
+            child: HomeWindowsSidebar(
+              key: ValueKey('home-windows-sidebar-$drawerVisualKey'),
+              profile: sidebarProfile,
+              sourceSwitchService: widget.sourceSwitchService,
+              onSourceSwitched: widget.onSourceSwitched,
+              actions: sidebarActions,
+              currentIndex: currentIndex,
+              selectedDestination: selectedDrawerDestination,
+              unreadAnnouncementCount: widget.unreadAnnouncementCount,
+            ),
+          ),
+          Expanded(
+            // 漫画详情面板打开时内容区左侧改为直角，关闭后恢复圆角。
+            child: ListenableBuilder(
+              listenable: WindowsComicDetailController.instance,
+              builder: (context, child) => TweenAnimationBuilder<double>(
+                tween: Tween<double>(
+                  // 按详情是否打开判断，打开阅读器等临时隐藏期间也保持直角。
+                  end: WindowsComicDetailController.instance.isOpen ? 0 : 22,
+                ),
+                duration: windowsComicDetailPanelAnimationDuration,
+                curve: Curves.easeOutCubic,
+                child: child,
+                builder: (context, radius, child) => ClipRRect(
+                  borderRadius: BorderRadius.horizontal(
+                    left: Radius.circular(radius),
+                  ),
+                  child: child,
                 ),
               ),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.horizontal(
-                    left: Radius.circular(22),
-                  ),
-                  child: ColoredBox(
-                    color: Theme.of(context).colorScheme.surface,
-                    child: HazukiDesktopPageContainer(child: homeContent),
-                  ),
-                ),
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.surface,
+                child: destinationBuilder == null
+                    ? homeScaffold
+                    : HomeWindowsDestinationHost(
+                        destination: selectedDrawerDestination,
+                        destinationBuilder: destinationBuilder,
+                        onCloseRequested:
+                            widget.onWindowsDestinationClosed ?? () {},
+                        homeChild: homeScaffold,
+                      ),
               ),
-            ],
-          )
-        : HazukiDesktopPageContainer(child: homeContent);
+            ),
+          ),
+        ],
+      );
+    }
 
     return PopScope(
       canPop: false,
@@ -520,97 +421,172 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
         child: HomeDrawerTransition(
           animation: _profileDrawerController,
           showNavigation: !Platform.isWindows,
-          child: WindowsComicDetailHost(
-            child: ListenableBuilder(
-              listenable: downloadStatus,
-              builder: (context, _) {
-                final hasDownloadTasks = downloadStatus.hasTasks;
-                return TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, leadingWidth, _) {
-                    final appBar = hazukiFrostedAppBar(
-                      context: context,
-                      leading: Platform.isWindows
-                          ? null
-                          : _HomeAppBarProfileButton(
-                              downloadStatus: downloadStatus,
-                              activeSourceKey: activeSourceKey,
-                              avatarUrl: avatarUrl,
-                              profileLoading: profileLoading,
-                              username: username,
-                              drawerContent: mobileDrawerContent,
-                              onOpenDownloads: onOpenDownloadTasks,
-                              onDrawerVisibilityChanged: _setProfileDrawerOpen,
-                              onDrawerCovered: _resetProfileDrawer,
+          child: wrapWindowsLayout(
+            WindowsComicDetailHost(
+              child: ListenableBuilder(
+                listenable: downloadStatus,
+                builder: (context, _) {
+                  final hasDownloadTasks = downloadStatus.hasTasks;
+                  return TweenAnimationBuilder<double>(
+                    tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, leadingWidth, _) {
+                      // 属于某一页的应用栏组件仅在切口过渡开启时跟随裁剪。
+                      Widget cutClip(int index, Widget child) =>
+                          _cutTransitionEnabled
+                          ? HomeTabCutClip(
+                              transition: _tabTransition,
+                              index: index,
+                              child: child,
+                            )
+                          : child;
+                      // overlay 为切页期间叠在上方的进入页应用栏：背景透明，
+                      // 头像位只占位，确保组件位置与切换完成后的真实布局一致。
+                      PreferredSizeWidget buildAppBar(
+                        int index, {
+                        bool overlay = false,
+                      }) => hazukiFrostedAppBar(
+                        context: context,
+                        leading: Platform.isWindows
+                            ? null
+                            : overlay
+                            ? const SizedBox.shrink()
+                            : _HomeAppBarProfileButton(
+                                downloadStatus: downloadStatus,
+                                activeSourceKey: activeSourceKey,
+                                avatarUrl: avatarUrl,
+                                profileLoading: profileLoading,
+                                username: username,
+                                drawerContent: mobileDrawerContent,
+                                onOpenDownloads: onOpenDownloadTasks,
+                                onDrawerVisibilityChanged:
+                                    _setProfileDrawerOpen,
+                                onDrawerCovered: _resetProfileDrawer,
+                              ),
+                        leadingWidth: Platform.isWindows ? null : leadingWidth,
+                        automaticallyImplyLeading: false,
+                        backgroundAlpha: overlay ? 0 : 0.72,
+                        title: index == 1
+                            ? null
+                            : cutClip(
+                                0,
+                                _HomeAppBarSearchBox(
+                                  onOpenSearch: onOpenSearch,
+                                  maxWidth: Platform.isWindows ? 520 : null,
+                                ),
+                              ),
+                        // Windows 搜索框靠左，与内容区左边距对齐。
+                        titleSpacing: Platform.isWindows ? 24 : 4,
+                        centerTitle: false,
+                        actions: [
+                          if (Platform.isWindows)
+                            _HomeWindowsDownloadPill(
+                              visible: hasDownloadTasks,
+                              taskCount: downloadStatus.taskCount,
+                              onPressed: onOpenDownloadTasks,
                             ),
-                      leadingWidth: Platform.isWindows ? null : leadingWidth,
-                      automaticallyImplyLeading: false,
-                      title: currentIndex == 1
-                          ? null
-                          : _HomeAppBarSearchBox(
+                          cutClip(
+                            1,
+                            HomeAppBarActions(
+                              currentIndex: index,
+                              discoverSearchMorphProgress:
+                                  discoverSearchMorphProgress,
+                              forceDiscoverSearchInAppBar:
+                                  usePinnedDiscoverSearch,
+                              favoriteAppBarActions: favoriteAppBarActions,
+                              sourcePlugins: widget.sourcePlugins,
                               onOpenSearch: onOpenSearch,
-                              maxWidth: Platform.isWindows ? 320 : null,
-                            ),
-                      titleSpacing: Platform.isWindows ? null : 4,
-                      centerTitle: Platform.isWindows,
-                      enableBlur: currentIndex != 0 && currentIndex != 1,
-                      actions: [
-                        HomeAppBarActions(
-                          currentIndex: currentIndex,
-                          discoverSearchMorphProgress:
-                              discoverSearchMorphProgress,
-                          forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
-                          favoriteAppBarActions: favoriteAppBarActions,
-                          onOpenSearch: onOpenSearch,
-                          onFavoriteSortSelected: onFavoriteSortSelected,
-                          onFavoriteCreateFolderPressed:
-                              onFavoriteCreateFolderPressed,
-                          onFavoriteModeTogglePressed:
-                              onFavoriteModeTogglePressed,
-                        ),
-                      ],
-                    );
-                    return Scaffold(
-                      key: scaffoldKey,
-                      extendBody: true,
-                      appBar: PreferredSize(
-                        preferredSize: appBar.preferredSize,
-                        child: RepaintBoundary(
-                          key: const ValueKey('home-app-bar-repaint-boundary'),
-                          child: HomeDrawerSnapshot(
-                            animation: _profileDrawerController,
-                            enabled: !Platform.isWindows,
-                            // The app bar normally composites over Scaffold's
-                            // background. Include it in the isolated raster
-                            // so its translucent glass keeps the same tint.
-                            child: ColoredBox(
-                              color: Theme.of(context).scaffoldBackgroundColor,
-                              child: appBar,
+                              onFavoriteSortSelected: onFavoriteSortSelected,
+                              onFavoriteCreateFolderPressed:
+                                  onFavoriteCreateFolderPressed,
+                              onFavoriteModeTogglePressed:
+                                  onFavoriteModeTogglePressed,
                             ),
                           ),
+                        ],
+                      );
+                      final appBar = buildAppBar(currentIndex);
+                      return HazukiLiquidGlass.backdropScope(
+                        child: Scaffold(
+                          key: scaffoldKey,
+                          extendBody: true,
+                          appBar: PreferredSize(
+                            preferredSize: appBar.preferredSize,
+                            child: RepaintBoundary(
+                              key: const ValueKey(
+                                'home-app-bar-repaint-boundary',
+                              ),
+                              child: HomeDrawerSnapshot(
+                                animation: _profileDrawerController,
+                                enabled: !Platform.isWindows,
+                                contentAnimating: _homeContentAnimating,
+                                // The app bar normally composites over Scaffold's
+                                // background. Include it in the isolated raster
+                                // so its translucent glass keeps the same tint.
+                                child: ColoredBox(
+                                  color: Theme.of(
+                                    context,
+                                  ).scaffoldBackgroundColor,
+                                  // 切页期间真实应用栏保持退出页布局，进入页组件
+                                  // 由上层透明应用栏承载，两者按同一切口互补裁剪。
+                                  child: !_cutTransitionEnabled
+                                      ? Stack(children: [appBar])
+                                      : AnimatedBuilder(
+                                          animation: _tabTransition.animation,
+                                          builder: (context, _) {
+                                            if (!_tabTransition.isAnimating) {
+                                              return Stack(children: [appBar]);
+                                            }
+                                            return Stack(
+                                              children: [
+                                                buildAppBar(
+                                                  _tabTransition.outgoing,
+                                                ),
+                                                Positioned.fill(
+                                                  child: IgnorePointer(
+                                                    child: HeroMode(
+                                                      enabled: false,
+                                                      child: buildAppBar(
+                                                        _tabTransition.incoming,
+                                                        overlay: true,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          drawerEnableOpenDragGesture: false,
+                          drawer: null,
+                          // Cache the body and header separately. A full-page
+                          // snapshot would rasterize the cached header again and
+                          // allocate a second texture containing the same pixels.
+                          body: HazukiLiquidGlass.backdropSource(
+                            child: HomeDrawerSnapshot(
+                              animation: _profileDrawerController,
+                              enabled: !Platform.isWindows,
+                              contentAnimating: _homeContentAnimating,
+                              child: ColoredBox(
+                                color: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                child: body,
+                              ),
+                            ),
+                          ),
+                          bottomNavigationBar: null,
                         ),
-                      ),
-                      drawerEnableOpenDragGesture: false,
-                      drawer: null,
-                      // Cache the body and header separately. A full-page
-                      // snapshot would rasterize the cached header again and
-                      // allocate a second texture containing the same pixels.
-                      body: HomeDrawerSnapshot(
-                        animation: _profileDrawerController,
-                        enabled: !Platform.isWindows,
-                        contentAnimating: _homeContentAnimating,
-                        child: ColoredBox(
-                          color: Theme.of(context).scaffoldBackgroundColor,
-                          child: body,
-                        ),
-                      ),
-                      bottomNavigationBar: null,
-                    );
-                  },
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
           navigationBuilder: (context, drawerProgress, viewportSize) {
@@ -649,455 +625,6 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
           },
         ),
       ),
-    );
-  }
-}
-
-class _HomeAppBarProfileButton extends StatefulWidget {
-  const _HomeAppBarProfileButton({
-    required this.downloadStatus,
-    required this.activeSourceKey,
-    required this.avatarUrl,
-    required this.profileLoading,
-    required this.username,
-    required this.drawerContent,
-    required this.onOpenDownloads,
-    required this.onDrawerVisibilityChanged,
-    required this.onDrawerCovered,
-  });
-
-  final HomeDownloadStatusListenable downloadStatus;
-  final String activeSourceKey;
-  final String? avatarUrl;
-  final bool profileLoading;
-  final String username;
-  final Widget drawerContent;
-  final VoidCallback onOpenDownloads;
-  final ValueChanged<bool> onDrawerVisibilityChanged;
-  final VoidCallback onDrawerCovered;
-
-  @override
-  State<_HomeAppBarProfileButton> createState() =>
-      _HomeAppBarProfileButtonState();
-}
-
-class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
-  late final ValueNotifier<Widget> _drawerContentNotifier =
-      ValueNotifier<Widget>(widget.drawerContent);
-  int _lastVisibleTaskCount = 0;
-  Widget? _pendingDrawerContent;
-  bool _drawerContentUpdateScheduled = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _syncLastVisibleTaskCount();
-  }
-
-  @override
-  void didUpdateWidget(covariant _HomeAppBarProfileButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _syncLastVisibleTaskCount();
-    _syncDrawerContent();
-  }
-
-  @override
-  void dispose() {
-    _drawerContentNotifier.dispose();
-    super.dispose();
-  }
-
-  void _syncLastVisibleTaskCount() {
-    final taskCount = widget.downloadStatus.taskCount;
-    if (taskCount > 0) {
-      _lastVisibleTaskCount = taskCount;
-    }
-  }
-
-  void _syncDrawerContent() {
-    if (SchedulerBinding.instance.schedulerPhase ==
-        SchedulerPhase.persistentCallbacks) {
-      _pendingDrawerContent = widget.drawerContent;
-      if (_drawerContentUpdateScheduled) {
-        return;
-      }
-      _drawerContentUpdateScheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _drawerContentUpdateScheduled = false;
-        final drawerContent = _pendingDrawerContent;
-        _pendingDrawerContent = null;
-        if (!mounted || drawerContent == null) {
-          return;
-        }
-        _drawerContentNotifier.value = drawerContent;
-      });
-      return;
-    }
-    _drawerContentNotifier.value = widget.drawerContent;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Tooltip(
-      message: widget.profileLoading
-          ? l10n(context).commonLoading
-          : widget.username,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: IconButton(
-          onPressed: _openProfileDrawer,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          icon: TweenAnimationBuilder<double>(
-            tween: Tween<double>(end: widget.downloadStatus.hasTasks ? 1 : 0),
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            builder: (context, progress, _) {
-              final liveTaskCount = widget.downloadStatus.taskCount;
-              final taskCount = liveTaskCount > 0
-                  ? liveTaskCount
-                  : _lastVisibleTaskCount;
-              final pillWidth = 38 + 58 * progress;
-              return SizedBox(
-                width: pillWidth,
-                height: 38,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer.withValues(
-                      alpha: 0.92 * progress,
-                    ),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: colorScheme.primary.withValues(
-                        alpha: 0.26 * progress,
-                      ),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.shadow.withValues(
-                          alpha: 0.08 * progress,
-                        ),
-                        blurRadius: 10 * progress,
-                        offset: Offset(0, 3 * progress),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      HomeProfileAvatar(
-                        key: ValueKey(
-                          'home-appbar-avatar-${widget.activeSourceKey}|'
-                          '${widget.avatarUrl ?? ''}|'
-                          '${widget.profileLoading}|'
-                          '${widget.username}',
-                        ),
-                        avatarUrl: widget.avatarUrl,
-                        loading: widget.profileLoading,
-                        size: 38,
-                        borderWidth: 2,
-                        borderColor: colorScheme.primary.withValues(
-                          alpha: 0.72,
-                        ),
-                        backgroundColor: colorScheme.surfaceContainerHigh,
-                        heroEnabled: true,
-                      ),
-                      ClipRect(
-                        child: SizedBox(
-                          width: 58 * progress,
-                          child: Opacity(
-                            opacity: progress.clamp(0.0, 1.0),
-                            child: GestureDetector(
-                              key: const ValueKey<String>(
-                                'home-appbar-download-status',
-                              ),
-                              behavior: HitTestBehavior.opaque,
-                              onTap: widget.onOpenDownloads,
-                              child: _HomeDownloadStatusContent(
-                                taskCount: taskCount,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _openProfileDrawer() {
-    final context = this.context;
-    widget.onDrawerVisibilityChanged(true);
-    Navigator.of(context).push(
-      _HomeProfileDrawerRoute(
-        drawerWidth: resolveHomeDrawerWidth(context),
-        drawerColor:
-            DrawerTheme.of(context).backgroundColor ??
-            Theme.of(context).drawerTheme.backgroundColor ??
-            Theme.of(context).colorScheme.surface,
-        drawerContentListenable: _drawerContentNotifier,
-        onClosing: () => widget.onDrawerVisibilityChanged(false),
-        onDestinationReturning: widget.onDrawerCovered,
-      ),
-    );
-  }
-}
-
-class _HomeDownloadStatusContent extends StatelessWidget {
-  const _HomeDownloadStatusContent({required this.taskCount});
-
-  final int taskCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(left: 7, right: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.download_rounded,
-            size: 18,
-            color: colorScheme.onPrimaryContainer,
-          ),
-          const SizedBox(width: 3),
-          Text(
-            'x$taskCount',
-            maxLines: 1,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeAppBarSearchBox extends StatelessWidget {
-  const _HomeAppBarSearchBox({required this.onOpenSearch, this.maxWidth});
-
-  final VoidCallback onOpenSearch;
-  final double? maxWidth;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: HazukiLiquidGlass.changes,
-      builder: (context, _) => _buildSearchBox(context),
-    );
-  }
-
-  Widget _buildSearchBox(BuildContext context) {
-    final theme = Theme.of(context);
-    final glass = HazukiLiquidGlass.isAvailable;
-    final content = Material(
-      color: glass
-          ? Colors.transparent
-          : hazukiSearchBoxBackgroundColor(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(50),
-        side: hazukiSearchBoxOutlineSide(context),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(50),
-        onTap: onOpenSearch,
-        child: SizedBox(
-          height: 40,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.search,
-                  size: 20,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    l10n(context).homeSearchHint,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    final searchBox = Stack(
-      key: const ValueKey('home-app-bar-search-box'),
-      fit: StackFit.passthrough,
-      children: [
-        Positioned.fill(
-          child: IgnorePointer(
-            child: glass
-                ? GlassContainer(
-                    key: const ValueKey('home-search-liquid-glass-surface'),
-                    useOwnLayer: true,
-                    quality: HazukiLiquidGlass.navigationQuality,
-                    shape: const LiquidRoundedRectangle(borderRadius: 50),
-                    settings: HazukiLiquidGlass.navigationSettings(context),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ),
-        content,
-      ],
-    );
-    if (maxWidth == null) {
-      return Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: searchBox,
-      );
-    }
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth!),
-      child: Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: searchBox,
-      ),
-    );
-  }
-}
-
-class _HomeProfileDrawerRoute extends PageRoute<void> {
-  _HomeProfileDrawerRoute({
-    required this.drawerWidth,
-    required this.drawerColor,
-    required this.drawerContentListenable,
-    required this.onClosing,
-    required this.onDestinationReturning,
-  });
-
-  final double drawerWidth;
-  final Color drawerColor;
-  final ValueListenable<Widget> drawerContentListenable;
-  final VoidCallback onClosing;
-  final VoidCallback onDestinationReturning;
-  bool _closingNotified = false;
-  bool _scaleResetHandedOff = false;
-
-  @override
-  bool get opaque => false;
-
-  @override
-  bool get barrierDismissible => true;
-
-  @override
-  Color get barrierColor => Colors.black.withValues(alpha: 0.28);
-
-  @override
-  String? get barrierLabel => 'Dismiss';
-
-  @override
-  bool get maintainState => true;
-
-  @override
-  Duration get transitionDuration => const Duration(milliseconds: 210);
-
-  @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 160);
-
-  void _notifyClosing() {
-    if (_closingNotified) {
-      return;
-    }
-    _closingNotified = true;
-    onClosing();
-  }
-
-  @override
-  bool didPop(void result) {
-    _notifyClosing();
-    return super.didPop(result);
-  }
-
-  @override
-  void didChangeNext(Route<dynamic>? nextRoute) {
-    super.didChangeNext(nextRoute);
-    if (_scaleResetHandedOff || nextRoute is! PageRoute<dynamic>) {
-      return;
-    }
-    final destinationAnimation = nextRoute.animation;
-    if (destinationAnimation == null) {
-      return;
-    }
-    _scaleResetHandedOff = true;
-    _closingNotified = true;
-    holdHomeDrawerScaleUntilRouteReturns(
-      routeAnimation: destinationAnimation,
-      onRouteReturning: onDestinationReturning,
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      navigator?.removeRoute(this);
-    });
-  }
-
-  @override
-  Widget buildPage(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-  ) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: RepaintBoundary(
-        child: Drawer(
-          width: drawerWidth,
-          backgroundColor: drawerColor,
-          child: ValueListenableBuilder<Widget>(
-            valueListenable: drawerContentListenable,
-            builder: (context, drawerContent, _) => drawerContent,
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _notifyClosing();
-    super.dispose();
-  }
-
-  @override
-  Widget buildTransitions(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) {
-    final curved = CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-    return Stack(
-      children: [
-        FadeTransition(opacity: animation, child: const SizedBox.expand()),
-        SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(-1, 0),
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
-        ),
-      ],
     );
   }
 }

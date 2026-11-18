@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'package:hazuki/services/preferences/hazuki_preference_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _MissingDictionaryBundle extends CachingAssetBundle {

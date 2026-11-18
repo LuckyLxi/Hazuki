@@ -5,6 +5,7 @@ import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
 
 class _Display extends ReaderDisplayController {
   _Display() : super(const MethodChannel('test/settings-display'));
@@ -46,7 +47,9 @@ void main() {
   late _Display display;
   late ReaderDisplaySession session;
   late ReaderSettingsController settings;
+  var viewportChanges = 0;
   setUp(() {
+    viewportChanges = 0;
     SharedPreferences.setMockInitialValues({});
     runtime = ReaderRuntimeState();
     display = _Display();
@@ -65,6 +68,7 @@ void main() {
       updateState: (update) => update(),
       logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
       logPayload: ([extra]) => extra ?? {},
+      onViewportChanged: () => viewportChanges++,
     );
   });
   tearDown(() {
@@ -98,6 +102,22 @@ void main() {
     ]);
     expect(runtime.volumeButtonTurnPage, isFalse);
     expect(display.applied, isEmpty);
+  });
+
+  test('only layout settings request a new viewport measurement', () async {
+    await settings.updateReaderMode(ReaderMode.rightToLeft);
+    expect(viewportChanges, 1);
+    await settings.toggleDoublePageMode(true);
+    expect(viewportChanges, 2);
+    await settings.togglePinchToZoom(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(viewportChanges, 3);
+    await settings.toggleImmersiveMode(false);
+    expect(viewportChanges, 4);
+    await settings.updateBrightness(0.7);
+    await settings.toggleFilter(true);
+    await settings.toggleVolumeButtonTurnPage(true);
+    expect(viewportChanges, 4);
   });
 
   test(

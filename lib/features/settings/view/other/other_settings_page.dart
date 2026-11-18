@@ -1,10 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/chinese_conversion_service.dart';
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'comment_filter_dialog.dart';
 import 'other_settings_sections.dart';
@@ -31,8 +32,7 @@ class OtherSettingsPage extends StatefulWidget {
 
 class _OtherSettingsPageState extends State<OtherSettingsPage> {
   bool _updatingChineseConversion = false;
-  SourceSelectionGateway get _sourceService =>
-      widget.dependencies.sourceSelection;
+  SourceRuntimeGateway get _sourceService => widget.dependencies.sourceRuntime;
   late OtherSettingsSnapshot _snapshot = OtherSettingsSnapshot.initial(
     useSystemTitleBar: widget.initialUseSystemTitleBar,
   );
@@ -57,10 +57,11 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
   }
 
   Future<void> _loadSettings() async {
+    final conversion = ChineseConversionScope.read(context);
     final snapshot = await OtherSettingsActions.loadSettings(
       initialUseSystemTitleBar: widget.initialUseSystemTitleBar,
     );
-    await hazukiChineseConversion.load();
+    await conversion.load();
     if (!mounted) {
       return;
     }
@@ -80,7 +81,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     if (_updatingChineseConversion) return;
     setState(() => _updatingChineseConversion = true);
     try {
-      await hazukiChineseConversion.setMode(mode);
+      await ChineseConversionScope.read(context).setMode(mode);
     } catch (_) {
       if (mounted) {
         await showHazukiPrompt(
@@ -168,7 +169,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
         child: _snapshot.loading
             ? const Center(child: CircularProgressIndicator())
             : ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.only(top: 4, bottom: 24),
                 children: [
                   OtherSettingsGeneralSection(
                     onChineseConversionChanged: (mode) =>
@@ -205,11 +206,11 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                         unawaited(_editMangaDownloadPath()),
                     onCommentFilter: () => unawaited(_openCommentFilter()),
                   ),
-                  if (widget.dependencies.sourcePlugins case final plugins?)
-                    SourcePluginActionList(
-                      gateway: plugins,
-                      location: SourcePluginActionLocation.other,
-                    ),
+                  SourcePluginActionList(
+                    gateway: widget.dependencies.sourcePlugins,
+                    location: SourcePluginActionLocation.other,
+                    title: strings.otherSectionPlugins,
+                  ),
                 ],
               ),
       ),

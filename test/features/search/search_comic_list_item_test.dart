@@ -1,5 +1,5 @@
 import '../../support/source_presentation_fixtures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/search/view/search_results_widgets.dart';
 import 'package:hazuki/models/hazuki_models.dart';
