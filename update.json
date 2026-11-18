@@ -1,12 +1,12 @@
 {
-  "version": "1.2.0",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.2.0",
+  "version": "1.2.1",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.2.1",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.2.0/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.2.1/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.2.0/hazuki-windows-x64-v1.2.0.zip",
-    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.2.0/hazuki-windows-x64-v1.2.0-setup.exe"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.2.1/hazuki-windows-x64-v1.2.1.zip",
+    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.2.1/hazuki-windows-x64-v1.2.1-setup.exe"
   },
-  "changelog": "Hazuki v1.2.0\n\n- 漫画源改为插件\n- 新增插件源码编辑的本地备份与恢复\n- 详情页阅读按钮随进度更新\n- 阅读器新增图片分享、复制功能，优化章节面板及章节切换体验\n- 新增漫画标题、简介和评论的简繁转换设置\n- 收藏页新增排版选项，支持插件提供的收藏排序，本地收藏按漫画源分别展示\n- 支持插件提供每日推荐、横幅标题、详情信息及搜索、排序选项\n- 评论支持插件提供的排序方式，修复刷新后回复展开状态未重置的问题\n- 优化液态玻璃效果、首页控件、侧栏、弹窗及页面切换动画\n- 优化头像缓存与同步，修复头像及漫画封面切换时的显示问题\n- 优化云备份恢复、下载任务恢复及登录数据保存\n- 修复首次搜索时短暂显示空状态等问题，改善 Windows 端兼容性\n- 更新脚本运行引擎与相关依赖"
+  "changelog": "Hazuki v1.2.1\n\n- 加入漫画翻译\n- 重新设计设置首页、外观、云同步、缓存、高级及其他设置页面\n- Windows 端首页改为常驻侧栏布局，优化详情页头部布局及面板切换\n- 首页新增漫画分格切换动画，可在设置中关闭\n- 重做应用锁、搜索、加载及下拉刷新动画\n- 详情页及阅读器章节面板新增阅读进度、批量选择和排版选项\n- 阅读器新增\"恢复上次阅读页\"开关（默认关闭），长按默认保存图片\n- 评论支持引用楼层和单向点赞，修复换行显示问题\n- 云端收藏夹支持重命名，本地收藏按最近阅读排序\n- 离开页面时及时停止相关加载，漫画源运行异常时自动恢复\n- 发现页某一分区加载失败时保留其他分区，优化分区筛选栏和标签分类加载速度\n- 优化下载任务卡片、取消下载及弹窗展开动画"
 }
